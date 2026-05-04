@@ -11,8 +11,8 @@ av-suite/
 
 ## Tools
 
-- **Posture Tool** — Image-based postural analysis
-- **Exercise Library** — Digital exercise prescription
+- **Posture Tool** – Image-based postural analysis  
+- **Exercise Library** – Digital exercise prescription  
 
 ## Setup
 

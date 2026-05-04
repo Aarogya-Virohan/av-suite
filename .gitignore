@@ -1,13 +1,44 @@
+# OS
+.DS_Store
 
 # Python
 __pycache__/
 *.py[cod]
-*.env
+*.pyo
+*.pyd
 .env
 .env.*
-!.env.example
-venv/
 .venv/
-*.egg-info/
+venv/
+env/
+*.sqlite3
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build / dist
 dist/
 build/
+out/
+
+# Logs
+logs
+*.log
+
+# Coverage
+coverage/
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.swp
