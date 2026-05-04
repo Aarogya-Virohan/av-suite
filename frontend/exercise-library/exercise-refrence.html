@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- SEO Optimized Title -->
+    <title>Physio Exercise Chart Generator | Professional Workstation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        :root { --emerald: #059669; --slate: #0f172a; --bg: #f8fafc; --border: #e2e8f0; --blue: #3b82f6; --red: #ef4444; }
+        * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        
+        body { background: var(--bg); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow-x: hidden; }
+        @media (min-width: 1024px) { body { flex-direction: row; overflow: hidden; } }
+
+        /* --- SIDEBAR STYLING --- */
+        .sidebar { width: 100%; background: white; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        @media (min-width: 1024px) { .sidebar { width: 380px; height: 100vh; border-right: 1px solid var(--border); } }
+
+        .sidebar-brand { padding: 20px; background: var(--slate); color: white; text-align: center; }
+        .sidebar-brand h2 { margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .sidebar-scroll { flex: 1; overflow-y: auto; padding: 15px; max-height: 45vh; }
+        @media (min-width: 1024px) { .sidebar-scroll { max-height: none; } }
+
+        /* --- SYNC BUTTON ANIMATION --- */
+        .btn-sync { 
+            width: 100%; padding: 12px; background: var(--emerald); color: white; 
+            border: none; border-radius: 8px; font-weight: 700; cursor: pointer; 
+            margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;
+            transition: 0.3s;
+        }
+        .btn-sync:disabled { opacity: 0.7; cursor: not-allowed; }
+        .spinner { 
+            width: 16px; height: 16px; border: 2px solid #ffffff66; border-top: 2px solid white; 
+            border-radius: 50%; display: none; animation: spin 0.8s linear infinite; 
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .syncing .spinner { display: block; }
+
+        .btn-add-top { width: 100%; padding: 10px; background: #fff; border: 1.5px solid var(--border); border-radius: 8px; font-weight: 700; cursor: pointer; margin-bottom: 15px; }
+
+        /* --- COLLAPSIBLE SECTIONS --- */
+        .lib-section { margin-bottom: 15px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: white; }
+        .lib-header { 
+            background: #f1f5f9; padding: 12px; font-weight: 800; font-size: 10px; 
+            text-transform: uppercase; color: var(--slate); cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .lib-section.collapsed .lib-content { display: none; }
+        .search-bar { width: 100%; padding: 10px; border: 1px solid #eee; border-radius: 6px; outline: none; font-size: 13px; margin-bottom: 10px; }
+
+        .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; padding: 10px; }
+        .img-item { border: 1px solid var(--border); border-radius: 8px; cursor: pointer; text-align: center; padding: 5px; background: #fff; }
+        .img-item img { width: 100%; height: 60px; object-fit: contain; }
+
+        .text-list { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+        .text-item { padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 12px; }
+        .text-item:hover { background: #f0fdf4; border-color: var(--emerald); }
+
+        /* --- WORKSPACE & SHEET --- */
+        .workspace { flex: 1; padding: 15px; display: flex; flex-direction: column; align-items: center; overflow-y: auto; }
+        @media (min-width: 1024px) { .workspace { padding: 40px; } }
+
+        .printable-sheet { width: 100%; max-width: 210mm; background: white; min-height: 297mm; box-shadow: 0 0 50px rgba(0,0,0,0.05); padding: 15px; box-sizing: border-box; position: relative; }
+        @media (min-width: 1024px) { .printable-sheet { padding: 15mm; } }
+
+        .sheet-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 20px; }
+        .logo-container { width: 110px; height: 75px; border: 2px dashed #cbd5e1; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 8px; overflow: hidden; }
+        .logo-container img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .clinic-info { text-align: right; flex: 1; min-width: 200px; }
+        .clinic-info h1 { margin: 0; font-size: 24px; font-weight: 800; color: var(--slate); }
+
+        .chart-main-title { width: 100%; text-align: center; font-size: 20px; font-weight: 800; color: var(--slate); text-transform: uppercase; margin-bottom: 20px; outline: none; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px; }
+
+        .patient-box { background: #f8fafc; border-radius: 15px; padding: 15px; margin-bottom: 10px; border: 1px solid #f1f5f9; }
+        .demo-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        @media (min-width: 600px) { .demo-grid { grid-template-columns: 1.5fr 1fr 1fr; gap: 15px; } }
+
+        .field { border-bottom: 1.5px solid #e2e8f0; position: relative; padding-right: 25px; }
+        .field label { font-size: 9px; font-weight: 800; color: var(--emerald); text-transform: uppercase; }
+        .field input { border: none; background: transparent; width: 100%; padding: 6px 0; font-size: 14px; font-weight: 600; outline: none; color: #475569; }
+        .remove-field-btn { position: absolute; right: 0; bottom: 8px; color: var(--red); cursor: pointer; border: none; background: none; font-size: 14px; }
+
+        .btn-add-detail { background: #e2e8f0; border: none; padding: 8px; border-radius: 10px; font-size: 10px; font-weight: 700; cursor: pointer; color: var(--slate); margin-bottom: 25px; width: 100%; }
+
+        /* --- EXERCISE BLOCKS --- */
+        #mainChart { display: flex; flex-direction: column; gap: 10px; }
+        .exercise-row { 
+            display: flex; 
+            flex-direction: column; 
+            border: 2.5px solid #f1f5f9; 
+            border-radius: 20px; 
+            position: relative; 
+            cursor: pointer; 
+            background: #fff; 
+            overflow: hidden; 
+        }
+        @media (min-width: 768px) { .exercise-row { flex-direction: row; min-height: 260px; } }
+
+        .exercise-row.active-row { border-color: var(--blue); }
+        .exercise-row.active-row::before { content: 'SELECTED'; position: absolute; top: 10px; left: 10px; background: var(--blue); color: white; font-size: 8px; font-weight: 800; padding: 2px 8px; border-radius: 4px; z-index: 10; }
+
+        .row-img { width: 100%; background: #fafafa; display: flex; align-items: center; justify-content: center; padding: 15px; }
+        @media (min-width: 768px) { .row-img { width: 45%; border-right: 1.5px solid #f1f5f9; } }
+        .row-img img { max-width: 100%; max-height: 220px; object-fit: contain; }
+
+        .row-text { width: 100%; padding: 20px; display: flex; flex-direction: column; justify-content: center; }
+        @media (min-width: 768px) { .row-text { width: 55%; } }
+        
+        .ex-title { margin: 0; font-size: 20px; color: var(--emerald); font-weight: 700; outline: none; }
+        .ex-desc { font-size: 13px; color: #475569; line-height: 1.5; white-space: pre-wrap; outline: none; margin: 10px 0; }
+        
+        .dosage-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
+        @media (min-width: 600px) { .dosage-row { grid-template-columns: repeat(4, 1fr); } }
+        
+        .dosage-box { background: #f8fafc; padding: 8px; border-radius: 8px; text-align: center; border: 1px solid #f1f5f9; }
+        .dosage-box label { font-size: 7px; color: #94a3b8; text-transform: uppercase; display: block; margin-bottom: 2px;}
+        .dosage-box input { width: 100%; border: none; background: transparent; text-align: center; font-weight: 700; font-size: 13px; outline: none; }
+
+        /* --- ADD BLOCK BETWEEN BUTTON --- */
+        .add-between-container { display: flex; justify-content: center; padding: 5px 0; }
+        .btn-add-between { 
+            background: #e2e8f0; color: #64748b; border: none; padding: 4px 15px; 
+            border-radius: 20px; font-size: 9px; font-weight: 800; cursor: pointer; 
+            transition: 0.2s; opacity: 0.4;
+        }
+        .add-between-container:hover .btn-add-between { opacity: 1; background: var(--slate); color: white; }
+
+        .remove-row { position: absolute; right: 10px; top: 10px; background: var(--red); color: white; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; display: none; z-index: 100; }
+        .exercise-row:hover .remove-row { display: block; }
+
+        .btn-print { position: fixed; bottom: 20px; right: 20px; background: var(--slate); color: white; padding: 15px 35px; border-radius: 50px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 2000; }
+
+        @media print {
+            @page { margin: 10mm; size: A4 portrait; }
+            .sidebar, .btn-print, .remove-row, .remove-field-btn, .btn-add-detail, .add-between-container, .no-print, .exercise-row::before { display: none !important; }
+            body { background: white; display: block; }
+            .workspace { padding: 0; display: block; overflow: visible; }
+            .printable-sheet { box-shadow: none; border: none; width: 100%; padding: 0; margin: 0; }
+            .exercise-row { display: flex !important; flex-direction: row !important; height: 115mm !important; border: 1px solid #eee !important; page-break-inside: avoid; margin-bottom: 8mm; }
+            .row-img { width: 45% !important; border-right: 1px solid #eee !important; }
+            .row-text { width: 55% !important; justify-content: center !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar no-print">
+        <div class="sidebar-brand"><h2>Physio Exercise Chart Generator</h2></div>
+        <div class="sidebar-scroll">
+            <!-- Sync Button with Animation -->
+            <button class="btn-sync" id="syncBtn" onclick="syncAll()">
+                <div class="spinner"></div>
+                <span id="btnText">?? Sync Library</span>
+            </button>
+
+            <button class="btn-add-top" onclick="addNewBlock()">+ Add New Block (Bottom)</button>
+
+            <div class="lib-section" id="imgSec">
+                <div class="lib-header" onclick="toggleLib('imgSec')">IMAGE LIBRARY <span>?</span></div>
+                <div class="lib-content">
+                    <button class="btn-add-top" style="font-size:11px; padding:5px; margin-bottom:10px;" onclick="document.getElementById('localImg').click()">+ Upload Local Image</button>
+                    <input type="file" id="localImg" hidden accept="image/*" onchange="uploadLocalImage(event)">
+                    <input type="text" class="search-bar" id="imgSearch" placeholder="Search visuals..." onkeyup="searchLib('imgSearch', 'img-item')">
+                    <div class="img-grid" id="imageLib"></div>
+                </div>
+            </div>
+
+            <div class="lib-section" id="insSec">
+                <div class="lib-header" onclick="toggleLib('insSec')">INSTRUCTIONS LIBRARY <span>?</span></div>
+                <div class="lib-content">
+                    <input type="text" class="search-bar" id="insSearch" placeholder="Search text..." onkeyup="searchLib('insSearch', 'text-item')">
+                    <div class="text-list" id="insLib"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div class="printable-sheet" id="mainDocument">
+            <div class="sheet-header">
+                <div class="logo-container" onclick="document.getElementById('logoInput').click()">
+                    <input type="file" id="logoInput" hidden accept="image/*" onchange="loadLogo(event)">
+                    <img id="logoDisp" src="">
+                    <span id="logoText">LOGO</span>
+                </div>
+                <div class="clinic-info">
+                    <h1 contenteditable="true">PHYSIO CLINIC</h1>
+                    <div contenteditable="true" style="font-size:12px; color:#64748b;">Specialist Rehabilitation Centre | +91 00000 00000</div>
+                </div>
+            </div>
+
+            <div class="chart-main-title" contenteditable="true">EXERCISE CHART</div>
+
+            <div class="patient-box">
+                <div class="demo-grid" id="demoContainer">
+                    <div class="field"><label>Patient Name</label><input type="text" placeholder="John Abraham"></div>
+                    <div class="field"><label>Date</label><input type="date" id="dateInput"></div>
+                    <div class="field"><label>Age</label><input type="text" placeholder="32 Years"></div>
+                    <div class="field" style="grid-column: 1 / -1; border:none; margin-top:10px;"><label>Diagnosis</label><input type="text" placeholder="e.g. Lumbar Herniation"></div>
+                </div>
+            </div>
+            <button class="btn-add-detail no-print" onclick="addOtherField()">+ Add Patient Heading (Weight, Side, etc.)</button>
+
+            <div id="mainChart"></div>
+        </div>
+    </div>
+
+    <button class="btn-print no-print" onclick="window.print()">Download Patient PDF</button>
+
+    <script>
+        const IMG_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQjt8-lmP5pv_uBaGy4WukbX06X-CSfe9uRV0u8gXKgTFBs6sGS4g3lH0GR1FlFywU2ANfB1Y4cnoS2/pub?gid=0&single=true&output=csv";
+        const INS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQjt8-lmP5pv_uBaGy4WukbX06X-CSfe9uRV0u8gXKgTFBs6sGS4g3lH0GR1FlFywU2ANfB1Y4cnoS2/pub?gid=606613161&single=true&output=csv";
+
+        let selectedRow = null;
+        let masterImages = [];
+        let masterTexts = [];
+
+        window.onload = () => { document.getElementById('dateInput').valueAsDate = new Date(); syncAll(); };
+
+        function toggleLib(id) { document.getElementById(id).classList.toggle('collapsed'); }
+
+        function uploadLocalImage(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const newItem = { Name: file.name.split('.')[0], ImageURL: ev.target.result };
+                masterImages.unshift(newItem);
+                renderImages(masterImages);
+            };
+            if(file) reader.readAsDataURL(file);
+        }
+
+        function driveFix(url) {
+            if (url && url.includes('drive.google.com')) {
+                const id = url.split('/d/')[1]?.split('/')[0];
+                if (id) return `https://drive.google.com/uc?export=view&id=${id}`;
+            }
+            return url;
+        }
+
+        // SYNC WITH ANIMATION
+        function syncAll() {
+            const btn = document.getElementById('syncBtn');
+            const txt = document.getElementById('btnText');
+            btn.classList.add('syncing');
+            btn.disabled = true;
+            txt.innerText = "Syncing...";
+
+            let completed = 0;
+            const checkDone = () => {
+                completed++;
+                if(completed === 2) {
+                    btn.classList.remove('syncing');
+                    btn.disabled = false;
+                    txt.innerText = "?? Sync Library";
+                }
+            };
+
+            Papa.parse(IMG_URL, { download: true, header: true, complete: (res) => { masterImages = res.data; renderImages(masterImages); checkDone(); } });
+            Papa.parse(INS_URL, { download: true, header: true, complete: (res) => { masterTexts = res.data; renderTexts(masterTexts); checkDone(); } });
+        }
+
+        function renderImages(data) {
+            const lib = document.getElementById('imageLib');
+            lib.innerHTML = data.filter(i => i.Name || i.ImageURL).map(item => {
+                const src = driveFix(item.ImageURL);
+                return `<div class="img-item" onclick="applyImage('${src}')"><img src="${src}" onerror="this.src='https://via.placeholder.com/60?text=No+Img'"><span>${item.Name || 'Ex'}</span></div>`;
+            }).join('');
+        }
+
+        function renderTexts(data) {
+            const lib = document.getElementById('insLib');
+            lib.innerHTML = data.filter(i => i.Title).map(item => `
+                <div class="text-item" onclick="applyText('${item.Title}', \`${item.Description}\`, '${item.Sets}', '${item.Reps}')">
+                    <strong>${item.Title}</strong>
+                </div>
+            `).join('');
+        }
+
+        function applyImage(src) { if (!selectedRow) addNewBlock(); selectedRow.querySelector('.row-img img').src = src; }
+
+        function applyText(title, desc, sets, reps) {
+            if (!selectedRow) addNewBlock();
+            selectedRow.querySelector('.ex-title').innerText = title;
+            selectedRow.querySelector('.ex-desc').innerText = desc;
+            const ins = selectedRow.querySelectorAll('.dosage-box input');
+            ins[0].value = sets || '3'; ins[1].value = reps || '10';
+        }
+
+        // IMPROVED BLOCK ADDITION LOGIC
+        function addNewBlock(referenceElement = null) {
+            const container = document.getElementById('mainChart');
+            
+            // Create Wrapper for Row + Add Button
+            const wrapper = document.createElement('div');
+            wrapper.className = 'row-wrapper';
+
+            const row = document.createElement('div');
+            row.className = 'exercise-row';
+            row.onclick = function() { selectRow(this); };
+            row.innerHTML = `
+                <button class="remove-row no-print" onclick="this.closest('.row-wrapper').remove()">?</button>
+                <div class="row-img"><img src="https://via.placeholder.com/200?text=Image"></div>
+                <div class="row-text">
+                    <h3 class="ex-title" contenteditable="true">Exercise Name</h3>
+                    <div class="ex-desc" contenteditable="true">Instructions will appear here (Center Aligned)...</div>
+                    <div class="dosage-row">
+                        <div class="dosage-box"><label>Sets</label><input value="3"></div>
+                        <div class="dosage-box"><label>Reps</label><input value="10"></div>
+                        <div class="dosage-box"><label>Hold</label><input value="5s"></div>
+                        <div class="dosage-box"><label>Freq</label><input value="Daily"></div>
+                    </div>
+                </div>
+            `;
+
+            const addBetween = document.createElement('div');
+            addBetween.className = 'add-between-container no-print';
+            addBetween.innerHTML = `<button class="btn-add-between" onclick="addNewBlock(this.closest('.row-wrapper'))">+ Add Block Here</button>`;
+
+            wrapper.appendChild(row);
+            wrapper.appendChild(addBetween);
+
+            if (referenceElement) {
+                referenceElement.after(wrapper);
+            } else {
+                container.appendChild(wrapper);
+            }
+            
+            selectRow(row);
+        }
+
+        function selectRow(row) {
+            if (selectedRow) selectedRow.classList.remove('active-row');
+            selectedRow = row; selectedRow.classList.add('active-row');
+        }
+
+        function addOtherField() {
+            const name = prompt("Heading Name (e.g. Side, Weight):");
+            if (!name) return;
+            const div = document.createElement('div');
+            div.className = 'field';
+            div.innerHTML = `<label>${name}</label><input type="text"><button class="remove-field-btn no-print" onclick="this.parentElement.remove()">?</button>`;
+            document.getElementById('demoContainer').appendChild(div);
+        }
+
+        function searchLib(id, cls) {
+            const val = document.getElementById(id).value.toLowerCase();
+            document.querySelectorAll('.'+cls).forEach(el => el.style.display = el.innerText.toLowerCase().includes(val) ? 'block' : 'none');
+        }
+
+        function loadLogo(e) {
+            const r = new FileReader();
+            r.onload = (ev) => { const i = document.getElementById('logoDisp'); i.src = ev.target.result; i.style.display = 'block'; document.getElementById('logoText').style.display = 'none'; };
+            r.readAsDataURL(e.target.files[0]);
+        }
+    </script>
+</body>
+</html>
