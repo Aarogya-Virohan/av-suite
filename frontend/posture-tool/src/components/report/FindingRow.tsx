@@ -1,15 +1,18 @@
-import type { Finding } from "@/src/types/posture"
+import type { Measurement } from "@/types/posture"
 
 interface FindingRowProps {
-  finding: Finding
+  finding: Measurement
 }
 
 export default function FindingRow({ finding }: FindingRowProps) {
   return (
     <div className="flex justify-between p-2 border">
-      <span>{finding.bodyPart}</span>
-      <span>{finding.observation}</span>
-      <span>{finding.severity}</span>
+      <span>{finding.label}</span>
+      <span>
+        {finding.value}
+        {finding.unit}
+      </span>
+      <span>{finding.severityLabel}</span>
     </div>
   )
 }

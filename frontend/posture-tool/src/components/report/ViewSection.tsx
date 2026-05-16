@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { ViewData } from "../../types/posture"
 import MeasurementCard from "./MeasurementCard"
 
@@ -25,10 +26,12 @@ export default function ViewSection({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
 
-        <img
+        <Image
           src={data.photoUrl}
           alt={viewName}
-          className="rounded-xl border"
+          width={640}
+          height={860}
+          className="h-auto w-full rounded-xl border"
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

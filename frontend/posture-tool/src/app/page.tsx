@@ -1,13 +1,28 @@
 "use client"
 
 import { useState } from "react"
-import Header from "@/src/components/layout/Header"
-import AnalysisPanel from "@/src/components/posture/AnalysisPanel"
-import ImagePreview from "@/src/components/posture/ImagePreview"
-import UploadZone from "@/src/components/posture/UploadZone"
-import data from "@/src/data/mockAnalysis.json"
+
+function Header() {
+  return (
+    <header className="border-b border-slate-200 bg-white">
+      <div className="mx-auto flex w-full max-w-7xl items-center px-4 py-4">
+        <span className="text-lg font-semibold text-slate-900">Arogya Virohan</span>
+      </div>
+    </header>
+  )
+}
+
+import UploadZone from "@/components/posture/UploadZone"
+import ImagePreview from "@/components/posture/ImagePreview"
+import AnalysisPanel from "@/components/posture/AnalysisPanel"
+
+import ReportCard from "@/components/report/ReportCard"
+
+import data from "@/data/mockAnalysis.json"
+import type { PostureReport } from "@/types/posture"
 
 type Step = "upload" | "analysis" | "report"
+const reportData = data as PostureReport
 
 export default function Page() {
   const [step, setStep] = useState<Step>("upload")
@@ -15,110 +30,185 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-slate-100">
+
+      {/* Top Navigation */}
       <Header />
 
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-        {step === "upload" && (
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h1 className="text-3xl font-semibold text-slate-900">Upload posture image</h1>
-            <p className="mt-2 text-slate-600">
-              Start by selecting a front or side posture photo for analysis.
-            </p>
+      {/* Main Layout */}
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8">
 
-            <div className="mt-6">
-              <UploadZone setImage={setImage} />
+        {/* =========================
+            UPLOAD STEP
+        ========================== */}
+        {step === "upload" && (
+          <section className="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+
+            <div className="max-w-2xl">
+              <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+                Clinical Posture Assessment
+              </h1>
+
+              <p className="mt-3 text-lg text-slate-600">
+                Upload patient posture images to generate a
+                multi-plane biomechanical analysis report.
+              </p>
             </div>
 
-            <ImagePreview image={image} />
+            <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
 
-            <button
-              type="button"
-              onClick={() => setStep("analysis")}
-              disabled={!image}
-              className="mt-6 rounded-full bg-slate-900 px-5 py-3 text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              Analyse Posture
-            </button>
+              {/* Upload */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Upload Patient Image
+                </h2>
+
+                <p className="mt-2 text-slate-600">
+                  Use a clear standing posture photograph with
+                  shoulders, spine, pelvis, and knees visible.
+                </p>
+
+                <div className="mt-6">
+                  <UploadZone setImage={setImage} />
+                </div>
+
+              </div>
+
+              {/* Preview */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Image Preview
+                </h2>
+
+                <p className="mt-2 text-slate-600">
+                  Uploaded posture image preview before analysis.
+                </p>
+
+                <div className="mt-6">
+                  <ImagePreview image={image} />
+                </div>
+
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="mt-8 flex justify-end">
+
+              <button
+                type="button"
+                onClick={() => setStep("analysis")}
+                disabled={!image}
+                className="
+                  rounded-full
+                  bg-slate-900
+                  px-6
+                  py-3
+                  text-white
+                  transition
+                  hover:bg-slate-800
+                  disabled:cursor-not-allowed
+                  disabled:bg-slate-300
+                "
+              >
+                Analyse Posture
+              </button>
+
+            </div>
           </section>
         )}
 
+        {/* =========================
+            ANALYSIS STEP
+        ========================== */}
         {step === "analysis" && (
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
+          <section className="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+
               <div>
-                <h1 className="text-3xl font-semibold text-slate-900">Analysis results</h1>
-                <p className="mt-2 text-slate-600">
-                  Review the posture findings before generating the report.
+                <h1 className="text-4xl font-bold tracking-tight text-slate-900">
+                  Analysis Results
+                </h1>
+
+                <p className="mt-3 text-lg text-slate-600">
+                  Review the detected biomechanical deviations
+                  before generating the production report.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setStep("upload")}
-                className="rounded-full border border-slate-300 px-4 py-2 text-sm text-slate-700"
+                className="
+                  rounded-full
+                  border
+                  border-slate-300
+                  px-5
+                  py-3
+                  text-slate-700
+                  transition
+                  hover:bg-slate-100
+                "
               >
                 Change Image
               </button>
+
             </div>
 
-            <div className="mt-6">
+            <div className="mt-8">
+
               <AnalysisPanel />
+
             </div>
 
-            <button
-              type="button"
-              onClick={() => setStep("report")}
-              className="mt-6 rounded-full bg-slate-900 px-5 py-3 text-white"
-            >
-              Generate Report
-            </button>
+            <div className="mt-8 flex justify-end">
+
+              <button
+                type="button"
+                onClick={() => setStep("report")}
+                className="
+                  rounded-full
+                  bg-slate-900
+                  px-6
+                  py-3
+                  text-white
+                  transition
+                  hover:bg-slate-800
+                "
+              >
+                Generate Clinical Report
+              </button>
+
+            </div>
+
           </section>
         )}
 
+        {/* =========================
+            REPORT STEP
+        ========================== */}
         {step === "report" && (
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-            <h1 className="text-3xl font-semibold text-slate-900">Posture report</h1>
-            <p className="mt-2 text-slate-600">
-              This is a simple summary view until dedicated report components are added.
-            </p>
+          <section className="space-y-6">
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 p-4">
-                <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-                  Patient
-                </h2>
-                <p className="mt-2 text-lg font-semibold text-slate-900">{data.patientName}</p>
-                <p className="text-slate-600">Age {data.patientAge}</p>
-                <p className="text-slate-600">{data.date}</p>
-              </div>
+            {/* Report */}
+            <ReportCard data={reportData} />
 
-              <div className="rounded-xl border border-slate-200 p-4">
-                <h2 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-                  Overall Score
-                </h2>
-                <p className="mt-2 text-4xl font-bold text-slate-900">{data.overallScore}</p>
-              </div>
-            </div>
+            {/* Actions */}
+            <div className="flex flex-wrap gap-4">
 
-            <div className="mt-6 rounded-xl border border-slate-200 p-4">
-              <h2 className="text-lg font-semibold text-slate-900">Recommendations</h2>
-              <ul className="mt-3 list-disc space-y-2 pl-5 text-slate-700">
-                {data.recommendations.map((recommendation) => (
-                  <li key={recommendation}>{recommendation}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="mt-6 rounded-xl border border-slate-200 p-4">
-              <h2 className="text-lg font-semibold text-slate-900">Therapist Notes</h2>
-              <p className="mt-3 text-slate-700">{data.therapistNotes}</p>
-            </div>
-
-            <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="rounded-full bg-slate-900 px-5 py-3 text-white"
+                className="
+                  rounded-full
+                  bg-slate-900
+                  px-6
+                  py-3
+                  text-white
+                  transition
+                  hover:bg-slate-800
+                "
               >
                 Export Report
               </button>
@@ -129,13 +219,26 @@ export default function Page() {
                   setImage(null)
                   setStep("upload")
                 }}
-                className="rounded-full border border-slate-300 px-5 py-3 text-slate-700"
+                className="
+                  rounded-full
+                  border
+                  border-slate-300
+                  bg-white
+                  px-6
+                  py-3
+                  text-slate-700
+                  transition
+                  hover:bg-slate-100
+                "
               >
                 Start Over
               </button>
+
             </div>
+
           </section>
         )}
+
       </main>
     </div>
   )
