@@ -2,48 +2,93 @@
 
 import { useState } from "react"
 
-function Header() {
-  return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex w-full max-w-7xl items-center px-4 py-4">
-        <span className="text-lg font-semibold text-slate-900">Arogya Virohan</span>
-      </div>
-    </header>
-  )
-}
-
 import UploadZone from "@/components/posture/UploadZone"
 import ImagePreview from "@/components/posture/ImagePreview"
 import AnalysisPanel from "@/components/posture/AnalysisPanel"
 
 import ReportCard from "@/components/report/ReportCard"
 
-import data from "@/data/mockAnalysis.json"
+import { analyzePosture } from "@/lib/api"
+
 import type { PostureReport } from "@/types/posture"
 
 type Step = "upload" | "analysis" | "report"
-const reportData = data as PostureReport
+
+function Header() {
+  return (
+    <header className="border-b border-slate-200 bg-white">
+      <div className="mx-auto flex w-full max-w-7xl items-center px-4 py-4">
+        <span className="text-lg font-semibold text-slate-900">
+          Arogya Virohan
+        </span>
+      </div>
+    </header>
+  )
+}
 
 export default function Page() {
-  const [step, setStep] = useState<Step>("upload")
-  const [image, setImage] = useState<string | null>(null)
+
+  const [step, setStep] =
+    useState<Step>("upload")
+
+  const [image, setImage] =
+    useState<string | null>(null)
+
+  const [imageFile, setImageFile] =
+    useState<File | null>(null)
+
+  const [report, setReport] =
+    useState<PostureReport | null>(null)
+
+  const [loading, setLoading] =
+    useState(false)
+
+  const handleAnalyze = async () => {
+
+    if (!imageFile) return
+
+    try {
+
+      setLoading(true)
+
+      const result = await analyzePosture(
+        imageFile
+      )
+
+      setReport(result)
+
+      setStep("analysis")
+
+    } catch (error) {
+
+      console.error(error)
+
+      alert("Analysis failed")
+
+    } finally {
+
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-100">
 
-      {/* Top Navigation */}
+      {/* Header */}
       <Header />
 
-      {/* Main Layout */}
+      {/* Main */}
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8">
 
         {/* =========================
             UPLOAD STEP
         ========================== */}
+
         {step === "upload" && (
-          <section className="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
 
             <div className="max-w-2xl">
+
               <h1 className="text-4xl font-bold tracking-tight text-slate-900">
                 Clinical Posture Assessment
               </h1>
@@ -52,6 +97,7 @@ export default function Page() {
                 Upload patient posture images to generate a
                 multi-plane biomechanical analysis report.
               </p>
+
             </div>
 
             <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -69,7 +115,12 @@ export default function Page() {
                 </p>
 
                 <div className="mt-6">
-                  <UploadZone setImage={setImage} />
+
+                  <UploadZone
+                    setImage={setImage}
+                    setImageFile={setImageFile}
+                  />
+
                 </div>
 
               </div>
@@ -92,13 +143,20 @@ export default function Page() {
               </div>
             </div>
 
+            {/* Loading */}
+            {loading && (
+              <p className="mt-6 text-slate-600">
+                Running posture analysis...
+              </p>
+            )}
+
             {/* CTA */}
             <div className="mt-8 flex justify-end">
 
               <button
                 type="button"
-                onClick={() => setStep("analysis")}
-                disabled={!image}
+                onClick={handleAnalyze}
+                disabled={!image || loading}
                 className="
                   rounded-full
                   bg-slate-900
@@ -111,22 +169,27 @@ export default function Page() {
                   disabled:bg-slate-300
                 "
               >
-                Analyse Posture
+                {loading
+                  ? "Analysing..."
+                  : "Analyse Posture"}
               </button>
 
             </div>
+
           </section>
         )}
 
         {/* =========================
             ANALYSIS STEP
         ========================== */}
+
         {step === "analysis" && (
-          <section className="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
 
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
 
               <div>
+
                 <h1 className="text-4xl font-bold tracking-tight text-slate-900">
                   Analysis Results
                 </h1>
@@ -135,6 +198,7 @@ export default function Page() {
                   Review the detected biomechanical deviations
                   before generating the production report.
                 </p>
+
               </div>
 
               <button
@@ -157,9 +221,7 @@ export default function Page() {
             </div>
 
             <div className="mt-8">
-
               <AnalysisPanel />
-
             </div>
 
             <div className="mt-8 flex justify-end">
@@ -188,11 +250,12 @@ export default function Page() {
         {/* =========================
             REPORT STEP
         ========================== */}
-        {step === "report" && (
+
+        {step === "report" && report && (
           <section className="space-y-6">
 
             {/* Report */}
-            <ReportCard data={reportData} />
+            <ReportCard data={report} />
 
             {/* Actions */}
             <div className="flex flex-wrap gap-4">
@@ -217,6 +280,8 @@ export default function Page() {
                 type="button"
                 onClick={() => {
                   setImage(null)
+                  setImageFile(null)
+                  setReport(null)
                   setStep("upload")
                 }}
                 className="

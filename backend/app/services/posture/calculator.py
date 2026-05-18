@@ -25,3 +25,23 @@ def angle_between_points(
     angle = math.degrees(math.acos(cosine))
 
     return angle
+
+
+from .schemas import Landmark
+
+
+def calc_cva(landmarks: list[Landmark]) -> float:
+
+    # MediaPipe:
+    # LEFT_EAR = 7
+    # LEFT_SHOULDER = 11
+
+    ear = landmarks[7]
+    shoulder = landmarks[11]
+
+    dx = ear.x - shoulder.x
+    dy = ear.y - shoulder.y
+
+    angle = math.degrees(math.atan2(dy, dx))
+
+    return abs(angle)
