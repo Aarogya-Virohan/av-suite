@@ -1,5 +1,17 @@
 import math
 
+LEFT_EAR = 7
+RIGHT_EAR = 8
+
+LEFT_SHOULDER = 11
+RIGHT_SHOULDER = 12
+
+LEFT_HIP = 23
+RIGHT_HIP = 24
+
+LEFT_KNEE = 25
+RIGHT_KNEE = 26
+
 
 def distance_between_points(a: tuple[float, float], b: tuple[float, float]) -> float:
 
@@ -17,6 +29,8 @@ def angle_between_points(
 
     mag_ba = math.sqrt(ba[0] ** 2 + ba[1] ** 2)
     mag_bc = math.sqrt(bc[0] ** 2 + bc[1] ** 2)
+    if mag_ba == 0 or mag_bc == 0:
+        return 0.0
 
     cosine = dot / (mag_ba * mag_bc)
 
@@ -32,16 +46,74 @@ from .schemas import Landmark
 
 def calc_cva(landmarks: list[Landmark]) -> float:
 
-    # MediaPipe:
-    # LEFT_EAR = 7
-    # LEFT_SHOULDER = 11
+    ear = landmarks[LEFT_EAR]
+    shoulder = landmarks[LEFT_SHOULDER]
 
-    ear = landmarks[7]
-    shoulder = landmarks[11]
+    horizontal_ref = (
+        shoulder.x + 1.0,
+        shoulder.y,
+    )
 
-    dx = ear.x - shoulder.x
-    dy = ear.y - shoulder.y
+    return angle_between_points(
+        (ear.x, ear.y),
+        (shoulder.x, shoulder.y),
+        horizontal_ref,
+    )
 
-    angle = math.degrees(math.atan2(dy, dx))
 
-    return abs(angle)
+def calc_shoulder_asymmetry(landmarks: list[Landmark]) -> float:
+
+    left = landmarks[LEFT_SHOULDER]
+    right = landmarks[RIGHT_SHOULDER]
+
+    return abs(left.y - right.y) * 100
+
+
+def calc_ear_level_asymmetry(landmarks: list[Landmark]) -> float:
+
+    left = landmarks[LEFT_EAR]
+    right = landmarks[RIGHT_EAR]
+
+    return abs(left.y - right.y) * 100
+
+
+def calc_pelvic_obliquity(landmarks: list[Landmark]) -> float:
+
+    left = landmarks[LEFT_HIP]
+    right = landmarks[RIGHT_HIP]
+
+    return abs(left.y - right.y) * 100
+
+
+def calc_trunk_lateral_shift(landmarks: list[Landmark]) -> float:
+
+    left_shoulder = landmarks[LEFT_SHOULDER]
+    right_shoulder = landmarks[RIGHT_SHOULDER]
+
+    left_hip = landmarks[LEFT_HIP]
+    right_hip = landmarks[RIGHT_HIP]
+
+    shoulder_mid = (left_shoulder.x + right_shoulder.x) / 2
+
+    hip_mid = (left_hip.x + right_hip.x) / 2
+
+    return abs(shoulder_mid - hip_mid) * 100
+
+
+def midpoint(
+    a: tuple[float, float],
+    b: tuple[float, float],
+) -> tuple[float, float]:
+
+    return (
+        (a[0] + b[0]) / 2,
+        (a[1] + b[1]) / 2,
+    )
+
+
+def calc_knee_alignment(landmarks: list[Landmark]) -> float:
+
+    left_knee = landmarks[LEFT_KNEE]
+    right_knee = landmarks[RIGHT_KNEE]
+
+    return abs(left_knee.y - right_knee.y) * 100
