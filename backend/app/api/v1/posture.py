@@ -25,6 +25,9 @@ from app.services.posture.report_builder import (
     measurement,
 )
 
+import json
+from pathlib import Path
+
 router = APIRouter(prefix="/posture", tags=["posture"])
 
 
@@ -155,5 +158,23 @@ async def analyze_posture(
         synthesis=synthesis,
         global_index=global_index,
     )
+
+    reports_dir = Path("data/reports")
+
+    reports_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    with open(
+        reports_dir / f"{case_ref}.json",
+        "w",
+    ) as file:
+
+        json.dump(
+            report,
+            file,
+            indent=2,
+        )
 
     return report
