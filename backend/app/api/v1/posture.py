@@ -6,7 +6,7 @@ from app.services.posture.detector import detect_pose
 from app.services.posture.calculator import calc_cva
 from app.services.posture.classifier import classify
 from app.services.posture.synthesizer import generate_synthesis
-from app.services.scoring import calculate_global_index
+from app.services.posture.scoring import calculate_global_index
 
 from app.services.posture.report_builder import (
     build_side_view_result,
