@@ -1,19 +1,27 @@
-from typing import Literal
+from typing import Literal, TypedDict
 
-Severity = Literal["none", "mild", "moderate", "severe"]
+Severity = Literal[
+    "none",
+    "mild",
+    "moderate",
+    "severe",
+]
 
 
-THRESHOLDS = {
-    # PT-L01
-    # Craniovertebral Angle (lower worse)
+class ThresholdRule(TypedDict):
+    direction: Literal[
+        "lower_worse",
+        "higher_worse",
+    ]
+
+
+THRESHOLDS: dict[str, dict] = {
     "PT-L01": {
         "direction": "lower_worse",
         "none_min": 50,
         "mild_min": 45,
         "moderate_min": 40,
     },
-    # PT-A02
-    # Shoulder asymmetry mm (higher worse)
     "PT-A02": {
         "direction": "higher_worse",
         "none_max": 5,
@@ -23,13 +31,34 @@ THRESHOLDS = {
 }
 
 
-def classify(param_id: str, value: float) -> Severity:
+def classify(
+    param_id: str,
+    value: float,
+) -> Severity:
+    """
+    Classify a posture measurement into a severity band.
+
+    Parameters
+    ----------
+    param_id:
+        Clinical posture parameter identifier
+        e.g. PT-L01
+
+    value:
+        Raw measurement value
+
+    Returns
+    -------
+    Severity
+    """
+
+    if param_id not in THRESHOLDS:
+        raise ValueError(f"Unknown parameter: {param_id}")
 
     rule = THRESHOLDS[param_id]
 
     direction = rule["direction"]
 
-    # LOWER WORSE
     if direction == "lower_worse":
 
         if value >= rule["none_min"]:
@@ -43,7 +72,6 @@ def classify(param_id: str, value: float) -> Severity:
 
         return "severe"
 
-    # HIGHER WORSE
     if direction == "higher_worse":
 
         if value <= rule["none_max"]:
