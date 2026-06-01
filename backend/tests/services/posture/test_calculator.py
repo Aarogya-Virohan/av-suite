@@ -4,6 +4,7 @@ from app.services.posture.calculator import (
     angle_between_points,
     calc_cva,
     calc_ear_level_asymmetry,
+    calc_knee_alignment,
     calc_pelvic_obliquity,
     calc_shoulder_asymmetry,
     calc_trunk_lateral_shift,
@@ -27,8 +28,6 @@ def landmarks() -> list[Landmark]:
         for index in range(33)
     ]
 
-    # Ears
-
     points[7] = Landmark(
         index=7,
         x=0.3,
@@ -44,8 +43,6 @@ def landmarks() -> list[Landmark]:
         z=0.0,
         visibility=1.0,
     )
-
-    # Shoulders
 
     points[11] = Landmark(
         index=11,
@@ -63,8 +60,6 @@ def landmarks() -> list[Landmark]:
         visibility=1.0,
     )
 
-    # Hips
-
     points[23] = Landmark(
         index=23,
         x=0.4,
@@ -81,6 +76,23 @@ def landmarks() -> list[Landmark]:
         visibility=1.0,
     )
 
+    points[25] = Landmark(
+        index=25,
+        x=0.4,
+        y=0.90,
+        z=0.0,
+        visibility=1.0,
+    )
+
+    points[26] = Landmark(
+        index=26,
+        x=0.8,
+        y=0.95,
+        z=0.0,
+        visibility=1.0,
+    )
+
+    return points
     return points
 
 
@@ -169,3 +181,12 @@ def test_calc_trunk_lateral_shift(
     )
 
     assert result == pytest.approx(10.0)
+
+
+def test_calc_knee_alignment(
+    landmarks: list[Landmark],
+) -> None:
+
+    result = calc_knee_alignment(landmarks)
+
+    assert result == pytest.approx(5.0)

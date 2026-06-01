@@ -12,6 +12,9 @@ RIGHT_HIP = 24
 LEFT_KNEE = 25
 RIGHT_KNEE = 26
 
+LEFT_ANKLE = 27
+RIGHT_ANKLE = 28
+
 
 def distance_between_points(a: tuple[float, float], b: tuple[float, float]) -> float:
 
@@ -117,3 +120,37 @@ def calc_knee_alignment(landmarks: list[Landmark]) -> float:
     right_knee = landmarks[RIGHT_KNEE]
 
     return abs(left_knee.y - right_knee.y) * 100
+
+
+def calc_forward_trunk_lean(landmarks: list[Landmark]) -> float:
+
+    shoulder = landmarks[LEFT_SHOULDER]
+    hip = landmarks[LEFT_HIP]
+
+    vertical_ref = (
+        hip.x,
+        hip.y - 1.0,
+    )
+
+    return angle_between_points(
+        (shoulder.x, shoulder.y),
+        (hip.x, hip.y),
+        vertical_ref,
+    )
+
+
+def calc_anterior_pelvic_tilt(landmarks: list[Landmark]) -> float:
+
+    hip = landmarks[LEFT_HIP]
+    knee = landmarks[LEFT_KNEE]
+
+    vertical_ref = (
+        hip.x,
+        hip.y - 1.0,
+    )
+
+    return angle_between_points(
+        (knee.x, knee.y),
+        (hip.x, hip.y),
+        vertical_ref,
+    )
