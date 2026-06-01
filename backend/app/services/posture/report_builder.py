@@ -1,7 +1,11 @@
-from .schemas import Measurement
+from typing import Any
 
 
-def build_side_view_result(cva: float, severity: str):
+def build_side_view_result(
+    cva: float,
+    severity: str,
+    photo_url: str,
+) -> dict[str, Any]:
 
     interpretation = (
         "Forward head posture detected."
@@ -10,10 +14,11 @@ def build_side_view_result(cva: float, severity: str):
     )
 
     return {
-        "photoUrl": "/mock/side_annotated.jpg",
+        "photoUrl": photo_url,
         "accuracy": 0.98,
         "measurements": [
             {
+                "paramId": "PT-L01",
                 "label": "Forward Head (CVA)",
                 "value": round(cva, 2),
                 "unit": "°",
@@ -25,31 +30,22 @@ def build_side_view_result(cva: float, severity: str):
     }
 
 
-def build_report_response(side_view, synthesis):
+def build_report_response(
+    patient: dict[str, Any],
+    side_view: dict[str, Any],
+    front_view: dict[str, Any],
+    back_view: dict[str, Any],
+    synthesis: dict[str, Any],
+    global_index: dict[str, Any],
+) -> dict[str, Any]:
 
     return {
-        "patient": {
-            "name": "Demo Patient",
-            "age": 28,
-            "caseRef": "PT-2026-001",
-            "assessmentDate": "2026-05-16",
-            "clinician": "Automated System",
-        },
+        "patient": patient,
         "views": {
             "side": side_view,
-            "front": {
-                "photoUrl": "/mock/front_annotated.jpg",
-                "accuracy": 0.97,
-                "measurements": [],
-                "interpretation": "Front plane pending implementation.",
-            },
-            "back": {
-                "photoUrl": "/mock/back_annotated.jpg",
-                "accuracy": 0.96,
-                "measurements": [],
-                "interpretation": "Back plane pending implementation.",
-            },
+            "front": front_view,
+            "back": back_view,
         },
         "synthesis": synthesis,
-        "globalIndex": {"score": 75, "descriptor": "Compensatory Pattern"},
+        "globalIndex": global_index,
     }

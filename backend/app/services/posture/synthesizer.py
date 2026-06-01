@@ -1,26 +1,75 @@
-def generate_synthesis(cva_severity: str):
+def generate_synthesis(findings: dict[str, str]):
 
-    hypertonic = []
-    inhibited = []
+    hypertonic = set()
+    inhibited = set()
+
     corrective = []
 
-    if cva_severity in ["moderate", "severe"]:
+    # Forward head posture
 
-        hypertonic.extend(
-            ["Upper Trapezius", "Levator Scapulae", "Sternocleidomastoid"]
+    if findings.get("PT-L01") in [
+        "moderate",
+        "severe",
+    ]:
+
+        hypertonic.update(
+            [
+                "Upper Trapezius",
+                "Levator Scapulae",
+                "Sternocleidomastoid",
+            ]
         )
 
-        inhibited.extend(["Deep Neck Flexors", "Lower Trapezius"])
+        inhibited.update(
+            [
+                "Deep Neck Flexors",
+                "Lower Trapezius",
+            ]
+        )
 
         corrective.extend(
             [
-                {"exercise": "Chin Tucks", "dosage": "3x12"},
-                {"exercise": "Wall Slides", "dosage": "3x10"},
+                {
+                    "exercise": "Chin Tucks",
+                    "dosage": "3x12",
+                },
+                {
+                    "exercise": "Wall Slides",
+                    "dosage": "3x10",
+                },
+            ]
+        )
+
+    # Shoulder asymmetry
+
+    if findings.get("PT-A02") in [
+        "moderate",
+        "severe",
+    ]:
+
+        hypertonic.update(
+            [
+                "Upper Trapezius",
+            ]
+        )
+
+        inhibited.update(
+            [
+                "Middle Trapezius",
+            ]
+        )
+
+        corrective.extend(
+            [
+                {
+                    "exercise": "Scapular Retraction",
+                    "dosage": "3x15",
+                }
             ]
         )
 
     return {
-        "hypertonic": hypertonic,
-        "inhibited": inhibited,
+        "hypertonic": sorted(list(hypertonic)),
+        "inhibited": sorted(list(inhibited)),
         "correctiveProtocol": corrective,
     }
