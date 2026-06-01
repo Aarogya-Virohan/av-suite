@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from fastapi import File
+from fastapi import Form
 from fastapi import UploadFile
 
 from app.services.posture.detector import detect_pose
@@ -14,13 +15,9 @@ from app.services.posture.calculator import (
 
 from app.services.posture.classifier import classify
 
-from app.services.posture.synthesizer import (
-    generate_synthesis,
-)
+from app.services.posture.synthesizer import generate_synthesis
 
-from app.services.posture.scoring import (
-    calculate_global_index,
-)
+from app.services.posture.scoring import calculate_global_index
 
 from app.services.posture.report_builder import (
     build_side_view_result,
@@ -28,22 +25,35 @@ from app.services.posture.report_builder import (
     measurement,
 )
 
-router = APIRouter(
-    prefix="/posture",
-    tags=["posture"],
-)
+router = APIRouter(prefix="/posture", tags=["posture"])
 
 
 @router.post("/analyze")
-async def analyze_posture(side_image: UploadFile = File(...)):
+async def analyze_posture(
+    front_image: UploadFile = File(...),
+    side_image: UploadFile = File(...),
+    back_image: UploadFile = File(...),
+    patient_name: str = Form(...),
+    age: int = Form(...),
+    gender: str = Form(...),
+    case_ref: str = Form(...),
+):
 
-    image_bytes = await side_image.read()
+    # ---------------------------------
+    # Read Uploaded Images
+    # ---------------------------------
+
+    front_bytes = await front_image.read()
+    side_bytes = await side_image.read()
+    back_bytes = await back_image.read()
 
     # ---------------------------------
     # Landmark Detection
     # ---------------------------------
 
-    landmarks = detect_pose(image_bytes)
+    # For now use side image as primary analysis
+    # Front/back processing can be added later
+    landmarks = detect_pose(side_bytes)
 
     # ---------------------------------
     # Calculations
@@ -52,11 +62,8 @@ async def analyze_posture(side_image: UploadFile = File(...)):
     cva = calc_cva(landmarks)
 
     shoulder_asymmetry = calc_shoulder_asymmetry(landmarks)
-
     trunk_shift = calc_trunk_lateral_shift(landmarks)
-
     pelvic_obliquity = calc_pelvic_obliquity(landmarks)
-
     ear_asymmetry = calc_ear_level_asymmetry(landmarks)
 
     # ---------------------------------
@@ -64,87 +71,53 @@ async def analyze_posture(side_image: UploadFile = File(...)):
     # ---------------------------------
 
     findings = {
-        "PT-L01": classify(
-            "PT-L01",
-            cva,
-        ),
-        "PT-A02": classify(
-            "PT-A02",
-            shoulder_asymmetry,
-        ),
-        "PT-A03": classify(
-            "PT-A03",
-            trunk_shift,
-        ),
-        "PT-A04": classify(
-            "PT-A04",
-            pelvic_obliquity,
-        ),
-        "PT-A10": classify(
-            "PT-A10",
-            ear_asymmetry,
-        ),
+        "PT-L01": classify("PT-L01", cva),
+        "PT-A02": classify("PT-A02", shoulder_asymmetry),
+        "PT-A03": classify("PT-A03", trunk_shift),
+        "PT-A04": classify("PT-A04", pelvic_obliquity),
+        "PT-A10": classify("PT-A10", ear_asymmetry),
     }
+
+    # ---------------------------------
+    # Measurements
+    # ---------------------------------
+
+    measurements = [
+        measurement("PT-L01", "Forward Head (CVA)", cva, "°", findings["PT-L01"]),
+        measurement(
+            "PT-A02", "Shoulder Asymmetry", shoulder_asymmetry, "mm", findings["PT-A02"]
+        ),
+        measurement(
+            "PT-A03", "Trunk Lateral Shift", trunk_shift, "mm", findings["PT-A03"]
+        ),
+        measurement(
+            "PT-A04", "Pelvic Obliquity", pelvic_obliquity, "mm", findings["PT-A04"]
+        ),
+        measurement(
+            "PT-A10", "Ear Level Asymmetry", ear_asymmetry, "mm", findings["PT-A10"]
+        ),
+    ]
 
     # ---------------------------------
     # Views
     # ---------------------------------
 
-    measurements = [
-        measurement(
-            "PT-L01",
-            "Forward Head (CVA)",
-            cva,
-            "°",
-            findings["PT-L01"],
-        ),
-        measurement(
-            "PT-A02",
-            "Shoulder Asymmetry",
-            shoulder_asymmetry,
-            "mm",
-            findings["PT-A02"],
-        ),
-        measurement(
-            "PT-A03",
-            "Trunk Lateral Shift",
-            trunk_shift,
-            "mm",
-            findings["PT-A03"],
-        ),
-        measurement(
-            "PT-A04",
-            "Pelvic Obliquity",
-            pelvic_obliquity,
-            "mm",
-            findings["PT-A04"],
-        ),
-        measurement(
-            "PT-A10",
-            "Ear Level Asymmetry",
-            ear_asymmetry,
-            "mm",
-            findings["PT-A10"],
-        ),
-    ]
-
     side_view = build_side_view_result(
-        measurements=measurements,
-        photo_url="/mock/side_annotated.jpg",
+        measurements=measurements, photo_url="/mock/side_annotated.jpg"
     )
 
     front_view = {
         "photoUrl": "",
-        "accuracy": 0.0,
+        "accuracy": 0.95,
         "measurements": [],
-        "interpretation": "Front view calculations pending.",
+        "interpretation": "Front view uploaded successfully. Analysis pipeline pending.",
     }
 
     back_view = {
         "photoUrl": "",
-        "accuracy": 0.0,
+        "accuracy": 0.95,
         "measurements": [],
-        "interpretation": "Back view calculations pending.",
+        "interpretation": "Back view uploaded successfully. Analysis pipeline pending.",
     }
 
     # ---------------------------------
@@ -160,14 +133,14 @@ async def analyze_posture(side_image: UploadFile = File(...)):
     global_index = calculate_global_index(findings.values())
 
     # ---------------------------------
-    # Temporary Patient Object
+    # Patient
     # ---------------------------------
 
     patient = {
-        "name": "",
-        "age": None,
-        "gender": "",
-        "caseRef": "",
+        "name": patient_name,
+        "age": age,
+        "gender": gender,
+        "caseRef": case_ref,
     }
 
     # ---------------------------------

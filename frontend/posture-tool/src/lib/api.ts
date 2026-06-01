@@ -1,27 +1,70 @@
+import type { PostureReport } from "@/types/posture"
+
+interface AnalyzePosturePayload {
+frontFile: File
+sideFile: File
+backFile: File
+
+patientName: string
+age: string
+gender: string
+caseRef: string
+}
+
 export async function analyzePosture(
-  file: File
-) {
+payload: AnalyzePosturePayload,
+): Promise<PostureReport> {
 
-  const formData = new FormData()
+const formData = new FormData()
 
-  formData.append(
-    "side_image",
-    file
-  )
+formData.append(
+"front_image",
+payload.frontFile,
+)
 
-  const response = await fetch(
-    "http://127.0.0.1:8000/posture/analyze",
-    {
-      method: "POST",
-      body: formData
-    }
-  )
+formData.append(
+"side_image",
+payload.sideFile,
+)
 
-  if (!response.ok) {
-    throw new Error(
-      "Failed to analyze posture"
-    )
-  }
+formData.append(
+"back_image",
+payload.backFile,
+)
 
-  return response.json()
+formData.append(
+"patient_name",
+payload.patientName,
+)
+
+formData.append(
+"age",
+payload.age,
+)
+
+formData.append(
+"gender",
+payload.gender,
+)
+
+formData.append(
+"case_ref",
+payload.caseRef,
+)
+
+const response = await fetch(
+"http://127.0.0.1:8000/posture/analyze",
+{
+method: "POST",
+body: formData,
+},
+)
+
+if (!response.ok) {
+throw new Error(
+"Failed to analyze posture",
+)
+}
+
+return response.json()
 }
