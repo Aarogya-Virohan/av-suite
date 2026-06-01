@@ -3,14 +3,29 @@ from fastapi import File
 from fastapi import UploadFile
 
 from app.services.posture.detector import detect_pose
-from app.services.posture.calculator import calc_cva
+
+from app.services.posture.calculator import (
+    calc_cva,
+    calc_shoulder_asymmetry,
+    calc_trunk_lateral_shift,
+    calc_pelvic_obliquity,
+    calc_ear_level_asymmetry,
+)
+
 from app.services.posture.classifier import classify
-from app.services.posture.synthesizer import generate_synthesis
-from app.services.posture.scoring import calculate_global_index
+
+from app.services.posture.synthesizer import (
+    generate_synthesis,
+)
+
+from app.services.posture.scoring import (
+    calculate_global_index,
+)
 
 from app.services.posture.report_builder import (
     build_side_view_result,
     build_report_response,
+    measurement,
 )
 
 router = APIRouter(
@@ -21,61 +36,133 @@ router = APIRouter(
 
 @router.post("/analyze")
 async def analyze_posture(side_image: UploadFile = File(...)):
-    """
-    Analyze a side-view posture image and generate
-    a clinical posture report.
-    """
 
     image_bytes = await side_image.read()
 
+    # ---------------------------------
     # Landmark Detection
+    # ---------------------------------
+
     landmarks = detect_pose(image_bytes)
 
+    # ---------------------------------
     # Calculations
+    # ---------------------------------
+
     cva = calc_cva(landmarks)
 
+    shoulder_asymmetry = calc_shoulder_asymmetry(landmarks)
+
+    trunk_shift = calc_trunk_lateral_shift(landmarks)
+
+    pelvic_obliquity = calc_pelvic_obliquity(landmarks)
+
+    ear_asymmetry = calc_ear_level_asymmetry(landmarks)
+
+    # ---------------------------------
     # Classification
-    cva_severity = classify(
-        "PT-L01",
-        cva,
-    )
+    # ---------------------------------
 
     findings = {
-        "PT-L01": cva_severity,
+        "PT-L01": classify(
+            "PT-L01",
+            cva,
+        ),
+        "PT-A02": classify(
+            "PT-A02",
+            shoulder_asymmetry,
+        ),
+        "PT-A03": classify(
+            "PT-A03",
+            trunk_shift,
+        ),
+        "PT-A04": classify(
+            "PT-A04",
+            pelvic_obliquity,
+        ),
+        "PT-A10": classify(
+            "PT-A10",
+            ear_asymmetry,
+        ),
     }
 
-    # View Results
+    # ---------------------------------
+    # Views
+    # ---------------------------------
+
+    measurements = [
+        measurement(
+            "PT-L01",
+            "Forward Head (CVA)",
+            cva,
+            "°",
+            findings["PT-L01"],
+        ),
+        measurement(
+            "PT-A02",
+            "Shoulder Asymmetry",
+            shoulder_asymmetry,
+            "mm",
+            findings["PT-A02"],
+        ),
+        measurement(
+            "PT-A03",
+            "Trunk Lateral Shift",
+            trunk_shift,
+            "mm",
+            findings["PT-A03"],
+        ),
+        measurement(
+            "PT-A04",
+            "Pelvic Obliquity",
+            pelvic_obliquity,
+            "mm",
+            findings["PT-A04"],
+        ),
+        measurement(
+            "PT-A10",
+            "Ear Level Asymmetry",
+            ear_asymmetry,
+            "mm",
+            findings["PT-A10"],
+        ),
+    ]
+
     side_view = build_side_view_result(
-        cva=cva,
-        severity=cva_severity,
+        measurements=measurements,
         photo_url="/mock/side_annotated.jpg",
     )
-
-    # Placeholder views until
-    # front/back calculations are implemented
 
     front_view = {
         "photoUrl": "",
         "accuracy": 0.0,
         "measurements": [],
-        "interpretation": "Front view not implemented yet.",
+        "interpretation": "Front view calculations pending.",
     }
 
     back_view = {
         "photoUrl": "",
         "accuracy": 0.0,
         "measurements": [],
-        "interpretation": "Back view not implemented yet.",
+        "interpretation": "Back view calculations pending.",
     }
 
+    # ---------------------------------
     # Clinical Synthesis
+    # ---------------------------------
+
     synthesis = generate_synthesis(findings)
 
+    # ---------------------------------
     # Global Stability Index
+    # ---------------------------------
+
     global_index = calculate_global_index(findings.values())
 
-    # Placeholder patient
-    # Will be replaced by intake flow
+    # ---------------------------------
+    # Temporary Patient Object
+    # ---------------------------------
+
     patient = {
         "name": "",
         "age": None,
@@ -83,7 +170,10 @@ async def analyze_posture(side_image: UploadFile = File(...)):
         "caseRef": "",
     }
 
+    # ---------------------------------
     # Final Report
+    # ---------------------------------
+
     report = build_report_response(
         patient=patient,
         side_view=side_view,

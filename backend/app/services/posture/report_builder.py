@@ -1,31 +1,44 @@
 from typing import Any
 
 
-def build_side_view_result(
-    cva: float,
+def measurement(
+    param_id: str,
+    label: str,
+    value: float,
+    unit: str,
     severity: str,
+) -> dict[str, Any]:
+
+    return {
+        "paramId": param_id,
+        "label": label,
+        "value": round(value, 2),
+        "unit": unit,
+        "severityLabel": severity.upper(),
+        "severity": severity,
+    }
+
+
+def build_side_view_result(
+    measurements: list[dict[str, Any]],
     photo_url: str,
 ) -> dict[str, Any]:
 
-    interpretation = (
-        "Forward head posture detected."
-        if severity in ["moderate", "severe"]
-        else "Cervical posture within acceptable range."
-    )
+    severe_findings = [
+        m["label"] for m in measurements if m["severity"] in ["moderate", "severe"]
+    ]
+
+    if severe_findings:
+        interpretation = "Postural deviations detected in: " + ", ".join(
+            severe_findings
+        )
+    else:
+        interpretation = "Posture appears within acceptable limits."
 
     return {
         "photoUrl": photo_url,
         "accuracy": 0.98,
-        "measurements": [
-            {
-                "paramId": "PT-L01",
-                "label": "Forward Head (CVA)",
-                "value": round(cva, 2),
-                "unit": "°",
-                "severityLabel": severity.upper(),
-                "severity": severity,
-            }
-        ],
+        "measurements": measurements,
         "interpretation": interpretation,
     }
 
