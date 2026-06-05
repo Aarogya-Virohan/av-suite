@@ -137,7 +137,6 @@ async def list_exercises(
         # JWT token decode se clinic_id set hota hai middleware mein
         clinic_id = request.state.clinic_id
         logger.debug(f"Fetching exercises for clinic: {clinic_id}")
-        print("CLINIC_ID:", request.state.clinic_id)
         # Service layer ko call karte hain
         # Exercises list aur total count return hota hai with filters applied
         exercises, total = await exercise_service.get_exercises(
