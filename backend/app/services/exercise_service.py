@@ -324,3 +324,59 @@ async def get_exercise_by_id(
         logger.error(f"Get exercise by id error: {str(e)}")
         raise
 
+
+async def get_exercises_by_condition(
+    db: AsyncSession,
+    clinic_id: str,
+    condition: str
+) -> List[Exercise]:
+    """
+    Function ka purpose: Get exercises mapped to a specific medical condition
+    CDSS hook for recommending exercises based on condition.
+    """
+    try:
+        logger.debug(f"Fetching exercises for condition {condition} in clinic {clinic_id}")
+        
+        # Mapping conditions to body parts
+        condition_map = {
+            "shoulder_pain": "Shoulder",
+            "back_pain": "Spine",
+            "knee_pain": "Knee",
+            "neck_pain": "Cervical",
+            "hip_pain": "Hip"
+        }
+        
+        mapped_body_part = condition_map.get(condition.lower())
+        
+        query = select(Exercise).where(
+            or_(
+                Exercise.clinic_id == uuid.UUID(clinic_id),
+                Exercise.clinic_id.is_(None)
+            )
+        )
+        
+        if mapped_body_part:
+            query = query.where(Exercise.body_part == mapped_body_part)
+        else:
+            # Fallback to text search if no direct mapping
+            search_term = condition.replace("_", " ")
+            query = query.where(
+                or_(
+                    Exercise.title.ilike(f"%{search_term}%"),
+                    Exercise.description.ilike(f"%{search_term}%")
+                )
+            )
+            
+        result = await db.execute(query)
+        exercises = result.scalars().all()
+        
+        logger.info(f"Retrieved {len(exercises)} exercises for condition: {condition}")
+        return list(exercises)
+        
+    except ValueError as e:
+        logger.error(f"Invalid clinic_id format: {clinic_id}")
+        raise
+    except Exception as e:
+        logger.error(f"Get exercises by condition error: {str(e)}")
+        raise
+

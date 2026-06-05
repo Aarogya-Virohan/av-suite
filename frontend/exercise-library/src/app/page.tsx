@@ -10,16 +10,27 @@ import { PrescriptionBuilder } from "@/components/prescription/PrescriptionBuild
 import { A4PrintView } from "@/components/report/A4PrintView";
 
 import { Exercise, PrescriptionItem } from "@/types/exercise";
-import exerciseData from "@/data/exercises.json";
+import { useQuery } from "@tanstack/react-query";
+import { fetchExercises, login, savePrescription, generatePdf } from "@/lib/api";
 
 export default function Home() {
-  const [exercises] = useState<Exercise[]>(exerciseData as Exercise[]);
   const [prescription, setPrescription] = useState<PrescriptionItem[]>([]);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   
   const [showPrintView, setShowPrintView] = useState(false);
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
+  
+  // Login on mount automatically for dev
+  React.useEffect(() => {
+    login().catch(console.error);
+  }, []);
+
+  const { data: exercises = [], isLoading } = useQuery<Exercise[]>({
+    queryKey: ["exercises"],
+    queryFn: () => fetchExercises()
+  });
 
   // Derived state for filtering
   const allBodyParts = useMemo(() => {
@@ -96,7 +107,20 @@ export default function Home() {
             prescription={prescription}
             onChange={updatePrescriptionItem}
             onRemove={removeExercise}
-            onGenerateReport={() => setShowPrintView(true)}
+            onGenerateReport={async () => {
+              try {
+                // 1. Save Prescription to backend
+                const saved = await savePrescription(prescription);
+                // 2. Generate PDF
+                const pdfUrl = await generatePdf(saved.id);
+                setGeneratedPdfUrl(pdfUrl);
+                window.open(`http://localhost:8000${pdfUrl}`, '_blank');
+              } catch (e) {
+                console.error("Error generating report", e);
+                // Fallback
+                setShowPrintView(true);
+              }
+            }}
           />
         }
       />

@@ -284,6 +284,35 @@ async def create_exercise(
         raise
 
 
+
+@router.get(
+    "/by-condition",
+    response_model=ResponseEnvelope[List[ExerciseRead]],
+    tags=["Exercises"]
+)
+async def get_exercises_by_condition(
+    request: Request,
+    condition: str = Query(..., description="Medical condition (e.g., shoulder_pain)"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint ka purpose: Condition ke base par exercises recommend karna
+    CDSS hook for intelligent exercise recommendations.
+    """
+    logger.info(f"Get exercises by condition request - condition: {condition}")
+    
+    try:
+        clinic_id = request.state.clinic_id
+        
+        exercises = await exercise_service.get_exercises_by_condition(db, clinic_id, condition)
+        
+        return ResponseEnvelope(data=exercises)
+        
+    except Exception as e:
+        logger.error(f"Get exercises by condition error: {str(e)}")
+        raise
+
+
 @router.get(
     "/{id}",
     response_model=ResponseEnvelope[ExerciseRead],
@@ -385,4 +414,5 @@ async def get_exercise(
     except Exception as e:
         logger.error(f"Get exercise error: {str(e)}")
         raise
+
 

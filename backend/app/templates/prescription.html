@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Clinical Prescription</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+        .header { border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+        .clinic-name { font-size: 24px; font-weight: bold; color: #2563eb; }
+        .patient-info { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; }
+        .patient-info div { margin-bottom: 5px; }
+        
+        .section-title { font-size: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-top: 40px; margin-bottom: 20px; }
+        
+        .exercise { border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px; page-break-inside: avoid; }
+        .exercise-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #1e40af; }
+        
+        .dosage-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 15px; border-radius: 6px; }
+        .dosage-item { text-align: center; }
+        .dosage-label { font-size: 12px; color: #64748b; text-transform: uppercase; }
+        .dosage-value { font-size: 16px; font-weight: bold; color: #0f172a; margin-top: 4px; }
+        
+        .notes { margin-top: 15px; font-size: 14px; color: #475569; border-left: 3px solid #eab308; padding-left: 10px; }
+        
+        .footer { margin-top: 50px; border-top: 1px solid #e5e7eb; padding-top: 20px; font-size: 12px; color: #94a3b8; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="clinic-name">{{ clinic_name }}</div>
+        
+        <div class="patient-info">
+            <div><strong>Patient Name:</strong> {{ patient_name }}</div>
+            <div><strong>Patient ID:</strong> {{ patient_id }}</div>
+            <div><strong>Age:</strong> {{ patient_age }}</div>
+            <div><strong>Gender:</strong> {{ patient_gender }}</div>
+        </div>
+    </div>
+
+    <div class="section-title">Prescribed Exercises</div>
+
+    {% for item in exercises %}
+    <div class="exercise">
+        <div class="exercise-title">{{ item.exercise.title }}</div>
+        
+        <div class="dosage-grid">
+            <div class="dosage-item">
+                <div class="dosage-label">Sets</div>
+                <div class="dosage-value">{{ item.sets }}</div>
+            </div>
+            <div class="dosage-item">
+                <div class="dosage-label">Reps</div>
+                <div class="dosage-value">{{ item.reps }}</div>
+            </div>
+            <div class="dosage-item">
+                <div class="dosage-label">Hold</div>
+                <div class="dosage-value">{{ item.hold }}s</div>
+            </div>
+            <div class="dosage-item">
+                <div class="dosage-label">Frequency</div>
+                <div class="dosage-value">{{ item.frequency }}</div>
+            </div>
+        </div>
+
+        {% if item.hold_angle %}
+        <div style="font-size: 14px; margin-bottom: 10px;">
+            <strong>Target Angle:</strong> {{ item.hold_angle }}&deg;
+        </div>
+        {% endif %}
+
+        {% if item.note %}
+        <div class="notes">
+            <strong>Notes:</strong> {{ item.note }}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        Generated on {{ generated_date }} | AV Suite
+    </div>
+</body>
+</html>
