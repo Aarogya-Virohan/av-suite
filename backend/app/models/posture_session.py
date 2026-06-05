@@ -95,6 +95,13 @@ class PostureSession(Base, TimestampMixin):
     patient_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("patients.id", ondelete="CASCADE")
     )
+    
+    # Posture Analysis Data
+    overall_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    annotated_front_image: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    annotated_back_image: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    annotated_left_image: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    annotated_right_image: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Relationships - Database connections
     # Yeh relationships SQLAlchemy lazy loading aur traversal enable karte hain
@@ -196,6 +203,10 @@ class PostureMeasurement(Base, TimestampMixin):
     # Nullable: Unit kabhi included na ho sakta hai
     # Usage: Display aur calculation mein unit clarity ke liye
     unit: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    
+    # Severity and Visibility
+    severity: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    visibility: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     
     # Notes/Observations - Optional detailed field
     # Doctor observations, findings, or additional context

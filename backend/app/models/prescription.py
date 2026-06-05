@@ -32,6 +32,7 @@ class PrescriptionItem(Base, TimestampMixin):
     hold: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     frequency: Mapped[str] = mapped_column(String(100), nullable=False, default="Daily")
     hold_angle: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     prescription = relationship("Prescription", back_populates="items")
     exercise = relationship("Exercise", back_populates="prescription_items")
