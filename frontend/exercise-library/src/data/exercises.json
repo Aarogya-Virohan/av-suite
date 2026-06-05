@@ -1,0 +1,62 @@
+[
+  {
+    "id": "ex_001",
+    "name": "Neck Retraction (Chin Tuck)",
+    "bodyPart": "Neck",
+    "condition": "Forward Head Posture",
+    "instructions": "Sit up straight. Gently pull your chin straight back as if making a double chin. Hold, then relax.",
+    "sets": 3,
+    "reps": 10,
+    "hold": 5,
+    "frequency": "Twice daily",
+    "isFree": true
+  },
+  {
+    "id": "ex_002",
+    "name": "Shoulder Blade Squeezes",
+    "bodyPart": "Upper Back",
+    "condition": "Rounded Shoulders",
+    "instructions": "Sit or stand tall. Squeeze your shoulder blades together as if holding a pencil between them.",
+    "sets": 3,
+    "reps": 15,
+    "hold": 5,
+    "frequency": "Twice daily",
+    "isFree": true
+  },
+  {
+    "id": "ex_003",
+    "name": "Clamshell Exercise",
+    "bodyPart": "Hip",
+    "condition": "Hip Weakness",
+    "instructions": "Lie on your side with knees bent at 90°. Keeping feet together, raise your top knee without rotating your pelvis.",
+    "sets": 3,
+    "reps": 12,
+    "hold": 2,
+    "frequency": "Once daily",
+    "isFree": false
+  },
+  {
+    "id": "ex_004",
+    "name": "Thoracic Extension Stretch",
+    "bodyPart": "Spine",
+    "condition": "Thoracic Kyphosis",
+    "instructions": "Sit in a chair. Place your hands behind your head. Gently arch your upper back over the top edge of the chair.",
+    "sets": 2,
+    "reps": 8,
+    "hold": 10,
+    "frequency": "Once daily",
+    "isFree": true
+  },
+  {
+    "id": "ex_005",
+    "name": "Terminal Knee Extension",
+    "bodyPart": "Knee",
+    "condition": "Knee Valgus",
+    "instructions": "Stand with a resistance band behind your knee. Slightly bend the knee, then straighten it fully against the band's resistance.",
+    "sets": 3,
+    "reps": 15,
+    "hold": 2,
+    "frequency": "Twice daily",
+    "isFree": false
+  }
+]
