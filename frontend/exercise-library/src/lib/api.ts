@@ -3,9 +3,9 @@ const API_BASE = "http://localhost:8000/api/v1";
 export async function login() {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      username: "admin@avsuite.com",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: "admin@avsuite.com",
       password: "adminpassword"
     })
   });
