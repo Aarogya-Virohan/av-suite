@@ -1,0 +1,48 @@
+# Environment variables - NEVER commit this file
+# .env contains sensitive credentials like database passwords, JWT secrets, and API keys
+# Always use .env.example as template and configure .env locally for each environment
+.env
+.env.local
+.env.*.local
+
+# Python Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+
+# IDE Configuration
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+
+# Temporary & Working Files - These are development artifacts, not part of codebase
+plan.md
+# (Only temporary working notes excluded - all documentation MD files are INCLUDED)
+
+# Task-specific files (reference only, not part of production)
+tarun_task_03.txt
+FINAL_SUMMARY.txt
