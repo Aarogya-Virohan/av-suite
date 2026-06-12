@@ -9,8 +9,9 @@ from app.main import app
 from app.core.database import get_db
 from app.models.base import Base
 from app.core.config import settings
+import os
 
-TEST_DATABASE_URL = settings.DATABASE_URL
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
 
 @pytest.fixture(scope="session")
 def engine():

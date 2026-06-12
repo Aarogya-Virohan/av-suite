@@ -21,55 +21,68 @@ export function DosageFields({ item, onChange }: DosageFieldsProps) {
   };
 
   return (
-    <div className="grid grid-cols-4 gap-3 mt-3">
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Sets</Label>
-        <Input
-          type="number"
-          min={1}
-          value={item.sets}
-          onChange={(e) => updateField("sets", parseInt(e.target.value) || 0)}
-          className="h-8 text-sm shadow-sm"
-        />
+    <div className="flex flex-col gap-3 mt-3">
+      <div className="grid grid-cols-4 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Sets</Label>
+          <Input
+            type="number"
+            min={1}
+            value={item.sets}
+            onChange={(e) => updateField("sets", parseInt(e.target.value) || 0)}
+            className="h-8 text-sm shadow-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Reps</Label>
+          <Input
+            type="number"
+            min={1}
+            value={item.reps}
+            onChange={(e) => updateField("reps", parseInt(e.target.value) || 0)}
+            className="h-8 text-sm shadow-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Hold (s)</Label>
+          <Input
+            type="number"
+            min={0}
+            value={item.hold}
+            onChange={(e) => updateField("hold", parseInt(e.target.value) || 0)}
+            className="h-8 text-sm shadow-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Frequency</Label>
+          <Select
+            value={item.frequency}
+            onValueChange={(val) => updateField("frequency", val)}
+          >
+            <SelectTrigger className="h-8 text-sm px-2 shadow-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Once daily">Once daily</SelectItem>
+              <SelectItem value="Twice daily">Twice daily</SelectItem>
+              <SelectItem value="3 times daily">3 times daily</SelectItem>
+              <SelectItem value="Every other day">Every other day</SelectItem>
+              <SelectItem value="As needed">As needed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Reps</Label>
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Exercise Notes / Specifics</Label>
         <Input
-          type="number"
-          min={1}
-          value={item.reps}
-          onChange={(e) => updateField("reps", parseInt(e.target.value) || 0)}
-          className="h-8 text-sm shadow-sm"
+          type="text"
+          placeholder="e.g. Keep shoulder blade down, stop if pain occurs..."
+          value={item.note || ""}
+          onChange={(e) => updateField("note", e.target.value)}
+          className="h-8 text-xs shadow-sm bg-muted/20"
         />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Hold (s)</Label>
-        <Input
-          type="number"
-          min={0}
-          value={item.hold}
-          onChange={(e) => updateField("hold", parseInt(e.target.value) || 0)}
-          className="h-8 text-sm shadow-sm"
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Frequency</Label>
-        <Select
-          value={item.frequency}
-          onValueChange={(val) => updateField("frequency", val)}
-        >
-          <SelectTrigger className="h-8 text-sm px-2 shadow-sm">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Once daily">Once daily</SelectItem>
-            <SelectItem value="Twice daily">Twice daily</SelectItem>
-            <SelectItem value="3 times daily">3 times daily</SelectItem>
-            <SelectItem value="Every other day">Every other day</SelectItem>
-            <SelectItem value="As needed">As needed</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
     </div>
+
   );
 }

@@ -2,7 +2,7 @@ import React from "react";
 import { Exercise } from "@/types/exercise";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 
 interface ExerciseCardProps {
   exercise: Exercise;
@@ -21,6 +21,15 @@ export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
               <span className="font-medium text-primary/80">{exercise.bodyPart}</span>
               <span>•</span>
               <span>{exercise.condition}</span>
+              {!exercise.isFree && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1 font-semibold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded text-[10px] uppercase">
+                    <Lock className="h-2.5 w-2.5" />
+                    Paid Library
+                  </span>
+                </>
+              )}
             </div>
             <p className="text-sm text-muted-foreground line-clamp-2">
               {exercise.instructions}
@@ -47,3 +56,4 @@ export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
     </Card>
   );
 }
+

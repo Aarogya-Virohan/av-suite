@@ -42,6 +42,15 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+from fastapi.staticfiles import StaticFiles
+import os
+
+# Create static directory and mount it
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+logger.info("Static directory mounted at /static")
+
+
 
 # Clinic Gate Middleware
 # JWT token verification aur clinic isolation middleware

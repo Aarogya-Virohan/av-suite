@@ -96,6 +96,12 @@ class PostureSession(Base, TimestampMixin):
         ForeignKey("patients.id", ondelete="CASCADE")
     )
 
+    # Added columns for analysis extension
+    overall_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    annotated_front_image: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    annotated_back_image: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    annotated_side_image: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+
     # Relationships - Database connections
     # Yeh relationships SQLAlchemy lazy loading aur traversal enable karte hain
     
@@ -113,6 +119,7 @@ class PostureSession(Base, TimestampMixin):
         back_populates="session",
         cascade="all, delete-orphan"
     )
+
 
 
 class PostureMeasurement(Base, TimestampMixin):
@@ -204,9 +211,14 @@ class PostureMeasurement(Base, TimestampMixin):
     # Nullable: Kabhi notes available na ho
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Added severity and visibility for analysis extension
+    severity: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    visibility: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     # Relationships - Database connections
     # Yeh relationships SQLAlchemy lazy loading aur traversal enable karte hain
     
     # Session relationship - Back reference se session.measurements access kar sakte hain
     # Parent session reference taaki session data access kar sakein
     session = relationship("PostureSession", back_populates="measurements")
+

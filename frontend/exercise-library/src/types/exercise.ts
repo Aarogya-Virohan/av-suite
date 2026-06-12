@@ -9,6 +9,8 @@ export interface Exercise {
   hold: number;
   frequency: string;
   isFree: boolean;
+  videoUrl?: string;
+  imageUrl?: string;
 }
 
 export interface PrescriptionItem {
@@ -17,4 +19,6 @@ export interface PrescriptionItem {
   reps: number;
   hold: number;
   frequency: string;
+  note?: string;
 }
+

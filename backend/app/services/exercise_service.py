@@ -111,9 +111,13 @@ async def get_exercises(
         )
 
         # Body part filter - optional
-        # Exact match - filtering ke liye body part categorization
+        # Supports comma-separated body parts for multi-select (e.g. "Shoulder,Knee")
         if body_part:
-            query = query.where(Exercise.body_part == body_part)
+            if "," in body_part:
+                parts = [p.strip() for p in body_part.split(",") if p.strip()]
+                query = query.where(Exercise.body_part.in_(parts))
+            else:
+                query = query.where(Exercise.body_part == body_part)
             logger.debug(f"Filter applied: body_part = {body_part}")
         
         # Free/paid filter - optional
