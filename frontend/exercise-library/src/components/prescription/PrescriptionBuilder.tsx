@@ -48,6 +48,7 @@ export function PrescriptionBuilder({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [isCreatingPatient, setIsCreatingPatient] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,10 +84,12 @@ export function PrescriptionBuilder({
         first_name: firstName,
         last_name: lastName,
         phone: phone || undefined,
+        date_of_birth: dateOfBirth || undefined,
       });
       setFirstName("");
       setLastName("");
       setPhone("");
+      setDateOfBirth("");
       setShowAddPatient(false);
       await loadPatients(newPatient.id);
     } catch (err) {
@@ -271,6 +274,15 @@ export function PrescriptionBuilder({
                 placeholder="e.g. 9876543210"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-[10px] text-muted-foreground">Date of Birth</Label>
+              <Input
+                type="date"
+                className="h-8 text-xs"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
               />
             </div>
             {error && <span className="text-[10px] text-destructive font-medium">{error}</span>}

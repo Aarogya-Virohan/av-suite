@@ -227,7 +227,7 @@ async def generate_prescription_pdf(
         date_str = rx.created_at.strftime("%B %d, %Y") if rx.created_at else datetime.now().strftime("%B %d, %Y")
         patient_name = f"{rx.patient.first_name} {rx.patient.last_name}" if rx.patient else "Patient"
         patient_phone = rx.patient.phone if rx.patient and rx.patient.phone else "N/A"
-        physio_email = rx.physio.email if rx.physio else "therapist@avsuite.com"
+        patient_dob = rx.patient.date_of_birth.strftime("%B %d, %Y") if rx.patient and rx.patient.date_of_birth else "N/A"
         clinic_name = rx.clinic.name if rx.clinic else "Aarogya-Virohan Clinic"
         general_notes = f"<div class='general-notes'><h3>Clinical Notes & Guidance</h3><p>{rx.physio_notes}</p></div>" if rx.physio_notes else ""
 
@@ -430,14 +430,20 @@ async def generate_prescription_pdf(
                 <tr>
                     <td class="label">Patient Name</td>
                     <td class="value">{patient_name}</td>
-                    <td class="label">Prescribed Date</td>
-                    <td class="value">{date_str}</td>
+                    <td class="label">Date of Birth</td>
+                    <td class="value">{patient_dob}</td>
                 </tr>
                 <tr>
                     <td class="label">Contact Phone</td>
                     <td class="value">{patient_phone}</td>
-                    <td class="label">Lead Therapist</td>
-                    <td class="value">{physio_email}</td>
+                    <td class="label">Prescribed Date</td>
+                    <td class="value">{date_str}</td>
+                </tr>
+                <tr>
+                    <td class="label">Therapist</td>
+                    <td class="value">{clinic_name}</td>
+                    <td class="label"></td>
+                    <td class="value"></td>
                 </tr>
             </table>
 
