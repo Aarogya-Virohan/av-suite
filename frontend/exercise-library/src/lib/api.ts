@@ -107,10 +107,21 @@ export async function createPrescription(prescription: {
   return json.data;
 }
 
-// Update prescription notes or status
+// Update prescription notes, status, or items
 export async function updatePrescription(
   id: string,
-  patch: { physio_notes?: string; status?: string }
+  patch: {
+    physio_notes?: string;
+    status?: string;
+    items?: Array<{
+      exercise_id: string;
+      sets: number;
+      reps: number;
+      hold: number;
+      frequency: string;
+      note?: string;
+    }>;
+  }
 ): Promise<any> {
   const url = `${BASE_URL}/api/v1/prescriptions/${id}`;
   const response = await fetch(url, {

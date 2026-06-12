@@ -20,6 +20,7 @@ import {
   createPatient,
   createPrescription,
   generatePrescriptionPDF,
+  updatePrescription,
 } from "@/lib/api";
 
 interface PrescriptionBuilderProps {
@@ -40,6 +41,7 @@ export function PrescriptionBuilder({
   const [isSaving, setIsSaving] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
+  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
 
   // Patient Modal / Inline Create Form state
   const [showAddPatient, setShowAddPatient] = useState(false);
@@ -106,23 +108,33 @@ export function PrescriptionBuilder({
 
     setIsSaving(true);
     try {
-      const payload = {
-        patient_id: selectedPatientId,
-        physio_notes: "Please follow sets and reps instructions carefully. Reach out if you feel acute discomfort.",
-        status: "active",
-        items: prescription.map((item) => ({
-          exercise_id: item.exercise.id,
-          sets: item.sets,
-          reps: item.reps,
-          hold: item.hold,
-          frequency: item.frequency,
-          note: item.note,
-        })),
-      };
+      const itemsPayload = prescription.map((item) => ({
+        exercise_id: item.exercise.id,
+        sets: item.sets,
+        reps: item.reps,
+        hold: item.hold,
+        frequency: item.frequency,
+        note: item.note,
+      }));
 
-      const result = await createPrescription(payload);
-      setSavedPrescriptionId(result.id);
-      alert("Exercise Prescription saved successfully in the database!");
+      if (savedPrescriptionId) {
+        // Edit existing prescription
+        await updatePrescription(savedPrescriptionId, {
+          items: itemsPayload
+        });
+        alert("Exercise Prescription updated successfully in the database!");
+      } else {
+        // Create new prescription
+        const payload = {
+          patient_id: selectedPatientId,
+          physio_notes: "Please follow sets and reps instructions carefully. Reach out if you feel acute discomfort.",
+          status: "active",
+          items: itemsPayload,
+        };
+        const result = await createPrescription(payload);
+        setSavedPrescriptionId(result.id);
+        alert("Exercise Prescription saved successfully in the database!");
+      }
     } catch (err) {
       console.error(err);
       alert("Failed to save prescription.");
@@ -132,47 +144,54 @@ export function PrescriptionBuilder({
   };
 
   const handlePrintPDF = async () => {
+    if (!selectedPatientId) {
+      alert("Please select a patient first.");
+      return;
+    }
+    if (prescription.length === 0) {
+      alert("Please add at least one exercise.");
+      return;
+    }
+
+    setIsPrinting(true);
     let targetId = savedPrescriptionId;
-    
-    // Auto-save first if not saved
-    if (!targetId) {
-      if (!selectedPatientId) {
-        alert("Please select a patient first.");
-        return;
-      }
-      if (prescription.length === 0) {
-        alert("Please add at least one exercise.");
-        return;
-      }
-      setIsPrinting(true);
-      try {
+    try {
+      const itemsPayload = prescription.map((item) => ({
+        exercise_id: item.exercise.id,
+        sets: item.sets,
+        reps: item.reps,
+        hold: item.hold,
+        frequency: item.frequency,
+        note: item.note,
+      }));
+
+      if (targetId) {
+        // Update existing prescription before printing
+        await updatePrescription(targetId, {
+          items: itemsPayload
+        });
+      } else {
+        // Create new prescription
         const payload = {
           patient_id: selectedPatientId,
           physio_notes: "Follow instructions carefully.",
-          items: prescription.map((item) => ({
-            exercise_id: item.exercise.id,
-            sets: item.sets,
-            reps: item.reps,
-            hold: item.hold,
-            frequency: item.frequency,
-            note: item.note,
-          })),
+          items: itemsPayload,
         };
         const result = await createPrescription(payload);
         targetId = result.id;
         setSavedPrescriptionId(targetId);
-      } catch (err) {
-        console.error(err);
-        alert("Failed to save prescription automatically before printing.");
-        setIsPrinting(false);
-        return;
       }
-    }
 
-    setIsPrinting(true);
-    try {
+      // Generate PDF
       const pdfUrl = await generatePrescriptionPDF(targetId!);
-      window.open(pdfUrl, "_blank");
+      setGeneratedPdfUrl(pdfUrl);
+      
+      // Attempt to open in a new tab (might get blocked by browser popup blocker)
+      try {
+        window.open(pdfUrl, "_blank");
+      } catch (err) {
+        console.error("Popup blocker prevented auto-opening the PDF.", err);
+      }
     } catch (err) {
       console.error(err);
       alert("Failed to generate PDF report.");
@@ -181,9 +200,15 @@ export function PrescriptionBuilder({
     }
   };
 
-  // Reset prescription status when items list changes
+  // Reset prescription status and PDF URL when selected patient changes
   useEffect(() => {
     setSavedPrescriptionId(null);
+    setGeneratedPdfUrl(null);
+  }, [selectedPatientId]);
+
+  // Reset PDF URL when prescription items list changes
+  useEffect(() => {
+    setGeneratedPdfUrl(null);
   }, [prescription]);
 
   return (
@@ -334,18 +359,30 @@ export function PrescriptionBuilder({
               )}
               {savedPrescriptionId ? "Saved" : "Save Plan"}
             </Button>
-            <Button
-              onClick={handlePrintPDF}
-              disabled={isPrinting}
-              className="flex-1 shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 active:scale-[0.98] font-semibold h-11"
-            >
-              {isPrinting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Printer className="mr-2 h-4 w-4" />
-              )}
-              Print PDF
-            </Button>
+            {generatedPdfUrl ? (
+              <a
+                href={generatedPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/30 transition-all active:scale-[0.98]"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Open / Save PDF
+              </a>
+            ) : (
+              <Button
+                onClick={handlePrintPDF}
+                disabled={isPrinting}
+                className="flex-1 shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 active:scale-[0.98] font-semibold h-11"
+              >
+                {isPrinting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Printer className="mr-2 h-4 w-4" />
+                )}
+                Print PDF
+              </Button>
+            )}
           </div>
         </>
       )}

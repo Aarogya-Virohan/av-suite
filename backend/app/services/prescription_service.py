@@ -77,7 +77,8 @@ async def get_prescription_by_id(
             .options(
                 selectinload(Prescription.items).selectinload(PrescriptionItem.exercise),
                 selectinload(Prescription.patient),
-                selectinload(Prescription.physio)
+                selectinload(Prescription.physio),
+                selectinload(Prescription.clinic)
             )
         )
         result = await db.execute(query)
@@ -129,7 +130,7 @@ async def patch_prescription(
     db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID, patch: PrescriptionPatch
 ) -> Optional[Prescription]:
     """
-    Updates prescription notes or status.
+    Updates prescription notes, status, and optionally replaces prescription items.
     """
     try:
         logger.info(f"Patching prescription: {prescription_id} in clinic: {clinic_id}")
@@ -142,9 +143,34 @@ async def patch_prescription(
         if patch.status is not None:
             rx.status = patch.status
             
+        if patch.items is not None:
+            # Delete existing items
+            from sqlalchemy import delete
+            await db.execute(
+                delete(PrescriptionItem).where(PrescriptionItem.prescription_id == prescription_id)
+            )
+            
+            # Insert new items
+            db_items = []
+            for item in patch.items:
+                db_items.append(
+                    PrescriptionItem(
+                        prescription_id=prescription_id,
+                        exercise_id=item.exercise_id,
+                        sets=item.sets,
+                        reps=item.reps,
+                        hold=item.hold,
+                        frequency=item.frequency,
+                        hold_angle=item.hold_angle,
+                        note=item.note
+                    )
+                )
+            if db_items:
+                db.add_all(db_items)
+            
         await db.commit()
-        await db.refresh(rx)
-        return rx
+        # Fetch again to ensure all relationships are fresh and loaded
+        return await get_prescription_by_id(db, clinic_id, prescription_id)
     except Exception as e:
         logger.error(f"Error updating prescription {prescription_id}: {str(e)}")
         await db.rollback()

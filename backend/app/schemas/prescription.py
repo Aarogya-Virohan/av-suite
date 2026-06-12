@@ -60,3 +60,4 @@ class PrescriptionItemPatch(BaseModel):
 class PrescriptionPatch(BaseModel):
     physio_notes: Optional[str] = None
     status: Optional[str] = None
+    items: Optional[List[PrescriptionItemCreate]] = None
