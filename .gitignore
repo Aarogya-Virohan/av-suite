@@ -43,6 +43,10 @@ coverage/
 # Misc
 *.swp
 
-Tarun_Task_03_Backend_Foundation-1.pdf
-tarun_task_03.txt
-*.next
+.next/
+node_modules/
+*.tsbuildinfo
+.DS_Store
+.codex
+AGENTS.md
+CLAUDE.md

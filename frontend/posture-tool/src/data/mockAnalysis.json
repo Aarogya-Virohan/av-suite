@@ -1,0 +1,59 @@
+{
+  "patient": {
+    "name": "Anjali Sharma",
+    "age": 28,
+    "caseRef": "SCOL-AX-2026",
+    "assessmentDate": "2026-04-10",
+    "clinician": "Dr. Sameer"
+  },
+
+  "views": {
+    "side": {
+      "photoUrl": "/mock/side_annotated.jpg",
+      "accuracy": 0.986,
+
+      "measurements": [
+        {
+          "label": "Forward Head (CVA)",
+          "value": 22.2,
+          "unit": "°",
+          "severityLabel": "DEVIATED",
+          "severity": "moderate"
+        }
+      ],
+
+      "interpretation": "Forward head posture detected."
+    },
+
+    "front": {
+      "photoUrl": "/mock/front_annotated.jpg",
+      "accuracy": 0.981,
+      "measurements": [],
+      "interpretation": ""
+    },
+
+    "back": {
+      "photoUrl": "/mock/back_annotated.jpg",
+      "accuracy": 0.978,
+      "measurements": [],
+      "interpretation": ""
+    }
+  },
+
+  "synthesis": {
+    "hypertonic": ["Upper Trap"],
+    "inhibited": ["Deep Neck Flexors"],
+
+    "correctiveProtocol": [
+      {
+        "exercise": "Chin Tucks",
+        "dosage": "3x12"
+      }
+    ]
+  },
+
+  "globalIndex": {
+    "score": 75,
+    "descriptor": "Compensatory Pattern"
+  }
+}
