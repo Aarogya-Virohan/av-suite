@@ -1,0 +1,278 @@
+"""
+Module: patient_service.py
+Purpose: Patient database operations aur business logic
+Yeh module patient CRUD operations handle karta hai (create, read, list).
+Clinic-specific patient data ko query aur manage karta hai.
+
+Key Components:
+- get_patients: Clinic ke sare patients with pagination
+- create_patient: New patient create karna
+- get_patient_by_id: Single patient by ID fetch karna
+
+Features:
+- Multi-tenant isolation: Clinic-level data filtering
+- Pagination support: Large datasets handle karne ke liye
+- Clinic validation: Data security aur isolation ensure karta hai
+"""
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy import func
+from app.models.patient import Patient
+from app.schemas.patient import PatientCreate
+from app.schemas.common import PaginationParams
+from typing import Optional, List, Tuple
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+async def get_patients(
+    db: AsyncSession,
+    clinic_id: str,
+    pagination: PaginationParams
+) -> Tuple[List[Patient], int]:
+    """
+    Function ka purpose: Clinic ke sare patients ko list karna pagination ke saath
+    Yeh function patients ko clinic-wise filter karke paginated results return karta hai.
+    
+    Input:
+    - db (AsyncSession): Database session
+    - clinic_id (str): Clinic UUID (filtering ke liye)
+    - pagination (PaginationParams): Page number aur page size
+      - page: 1-based page number (1 = first page)
+      - page_size: Results per page (typically 10-50)
+    
+    Output: Tuple[List[Patient], int]
+    - List[Patient]: Current page ke patients
+    - int: Total patients count (pagination metadata ke liye)
+    
+    Error:
+    - SQLAlchemy exceptions (database connection issues)
+    - Invalid UUID format to ValueError
+    
+    Business Logic:
+    1. Clinic ID se patients filter karte hain (multi-tenant isolation)
+    2. Total count calculate karte hain (pagination metadata)
+    3. Offset/Limit apply karte hain (pagination)
+    4. Results return karte hain
+    
+    Pagination Logic:
+    - offset = (page - 1) * page_size
+    - Example: page=2, page_size=10 → skip 10 records, take 10
+    - Total count: Frontend pagination UI ke liye zaroori
+    
+    Database Optimization:
+    - Single query mein count + data fetch karte hain (efficiency)
+    - Subquery use karte hain count karne ke liye
+    - Limit/Offset efficient hai PostgreSQL mein
+    
+    Security:
+    - Clinic ID check: Only clinic ke patients visible
+    - Input validation: Clinic ID UUID format check
+    
+    Usage:
+    pagination = PaginationParams(page=1, page_size=10)
+    patients, total = await get_patients(db, clinic_id, pagination)
+    return {
+        "data": patients,
+        "total": total,
+        "page": pagination.page,
+        "page_size": pagination.page_size
+    }
+    """
+    
+    try:
+        # Clinic-specific query - Multi-tenant isolation
+        # Clinic ID se filter karte hain (security)
+        # UUID format mein convert karte hain string se
+        query = select(Patient).where(Patient.clinic_id == uuid.UUID(clinic_id))
+
+        # Total count calculate karte hain pagination metadata ke liye
+        # Subquery use karte hain counting ke liye
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar() or 0  # 0 if no results
+        
+        logger.debug(f"Total patients in clinic {clinic_id}: {total}")
+
+        # Pagination apply karte hain
+        # offset: Skip karte hain (page-1) * page_size records
+        # limit: Take karte hain page_size records
+        query = query.offset(
+            (pagination.page - 1) * pagination.page_size
+        ).limit(pagination.page_size)
+        
+        # Query execute karte hain
+        result = await db.execute(query)
+        patients = result.scalars().all()
+        
+        logger.info(f"Retrieved {len(patients)} patients from clinic {clinic_id}, page {pagination.page}")
+        return list(patients), total
+        
+    except ValueError as e:
+        logger.error(f"Invalid clinic_id format: {clinic_id}")
+        raise
+    except Exception as e:
+        logger.error(f"Get patients error: {str(e)}")
+        raise
+
+
+async def create_patient(
+    db: AsyncSession,
+    clinic_id: str,
+    patient_in: PatientCreate
+) -> Patient:
+    """
+    Function ka purpose: New patient create karna clinic mein
+    Yeh function patient registration handle karta hai.
+    
+    Input:
+    - db (AsyncSession): Database session
+    - clinic_id (str): Clinic UUID (patient associate karne ke liye)
+    - patient_in (PatientCreate): Patient data from request
+      - first_name: Required
+      - last_name: Required
+      - date_of_birth: Optional
+      - phone: Optional
+    
+    Output: Patient
+    - Created patient database record
+    
+    Error:
+    - SQLAlchemy exceptions (constraint violations)
+    - Invalid UUID format to ValueError
+    - Validation errors from schema
+    
+    Business Logic:
+    1. Patient object create karte hain clinic_id ke saath
+    2. Database mein insert karte hain
+    3. Created record return karte hain
+    
+    Database Operations:
+    - add(): Patient ko session mein add karte hain
+    - commit(): Database mein save karte hain
+    - refresh(): Auto-generated fields load karte hain (id, timestamps)
+    
+    Security:
+    - Clinic ID: Patient always clinic se associated
+    - Schema validation: Pydantic schema se validation
+    
+    Usage:
+    patient_data = PatientCreate(
+        first_name="John",
+        last_name="Doe",
+        phone="9876543210"
+    )
+    new_patient = await create_patient(db, clinic_id, patient_data)
+    return new_patient
+    """
+    
+    try:
+        logger.info(f"Creating patient in clinic {clinic_id}")
+        
+        # Patient object create karte hain
+        # model_dump(): Pydantic schema se dict extract karte hain
+        patient = Patient(
+            clinic_id=uuid.UUID(clinic_id),
+            **patient_in.model_dump()  # Unpacking schema fields
+        )
+        
+        # Database mein add karte hain
+        db.add(patient)
+        
+        # Transaction commit karte hain
+        await db.commit()
+        
+        # Auto-generated fields load karte hain (id, created_at, updated_at)
+        await db.refresh(patient)
+        
+        logger.info(f"Patient created successfully: {patient.id}")
+        return patient
+        
+    except ValueError as e:
+        logger.error(f"Invalid clinic_id format: {clinic_id}")
+        await db.rollback()
+        raise
+    except Exception as e:
+        logger.error(f"Create patient error: {str(e)}")
+        await db.rollback()
+        raise
+
+
+async def get_patient_by_id(
+    db: AsyncSession,
+    clinic_id: str,
+    patient_id: str
+) -> Optional[Patient]:
+    """
+    Function ka purpose: Specific patient ko fetch karna clinic context mein
+    Yeh function patient details retrieve karta hai ID se.
+    Clinic-level security: Sirf authorized clinic ke patients access kar sakte hain.
+    
+    Input:
+    - db (AsyncSession): Database session
+    - clinic_id (str): Clinic UUID (security ke liye)
+    - patient_id (str): Patient UUID
+    
+    Output: Optional[Patient]
+    - Patient object agar found, None otherwise
+    
+    Error:
+    - SQLAlchemy exceptions (database issues)
+    - Invalid UUID format to ValueError
+    
+    Business Logic:
+    1. Both clinic_id aur patient_id se filter karte hain (security)
+    2. Patient record fetch karte hain
+    3. NULL if not found
+    
+    Security:
+    - Clinic isolation: Sirf clinic ke patients accessible
+    - Patient ownership check: Patient clinic se linked
+    - Prevents cross-clinic data access
+    
+    Database Query:
+    - Multiple conditions: patient_id AND clinic_id (security)
+    - Single result: first() use karte hain
+    - Optional return: Not found ke liye None
+    
+    Usage:
+    patient = await get_patient_by_id(db, clinic_id, patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    return patient
+    """
+    
+    try:
+        logger.debug(f"Fetching patient {patient_id} from clinic {clinic_id}")
+        
+        # Query construct karte hain multiple conditions ke saath
+        # Patient ID aur Clinic ID both check karte hain (security)
+        query = select(Patient).where(
+            Patient.id == uuid.UUID(patient_id),
+            Patient.clinic_id == uuid.UUID(clinic_id)
+        )
+        
+        # Query execute karte hain
+        result = await db.execute(query)
+        
+        # first() use karte hain single result ke liye
+        # None return hota hai if not found
+        patient = result.scalars().first()
+        
+        if patient:
+            logger.info(f"Patient found: {patient_id}")
+        else:
+            logger.warning(f"Patient not found: {patient_id} in clinic {clinic_id}")
+            
+        return patient
+        
+    except ValueError as e:
+        logger.error(f"Invalid UUID format - clinic_id: {clinic_id}, patient_id: {patient_id}")
+        raise
+    except Exception as e:
+        logger.error(f"Get patient by id error: {str(e)}")
+        raise
+
