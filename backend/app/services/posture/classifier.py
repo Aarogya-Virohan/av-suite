@@ -34,6 +34,24 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 7,
         "moderate_max": 12,
     },
+    "PT-A03": {
+        "direction": "higher_worse",
+        "none_max": 5,
+        "mild_max": 10,
+        "moderate_max": 20,
+    },
+    "PT-A04": {
+        "direction": "higher_worse",
+        "none_max": 5,
+        "mild_max": 10,
+        "moderate_max": 20,
+    },
+    "PT-A10": {
+        "direction": "higher_worse",
+        "none_max": 3,
+        "mild_max": 7,
+        "moderate_max": 12,
+    },
     "PT-L04": {
         "direction": "higher_worse",
         "none_max": 10,

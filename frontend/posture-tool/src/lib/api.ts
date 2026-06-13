@@ -1,3 +1,5 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
+
 import type { PostureReport } from "@/types/posture"
 
 interface AnalyzePosturePayload {
@@ -53,7 +55,7 @@ payload.caseRef,
 )
 
 const response = await fetch(
-"http://127.0.0.1:8000/posture/analyze",
+`${API_URL}/posture/analyze`,
 {
 method: "POST",
 body: formData,
