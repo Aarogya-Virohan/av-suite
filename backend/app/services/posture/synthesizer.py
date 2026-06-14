@@ -158,24 +158,6 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
             {"exercise": "Forearm Stretch & Strengthen", "dosage": "3x15"},
         ],
     },
-    {
-        # PT-L08 (low) — Foot Arch Height below normal (pes planus / flat foot)
-        "param_id": "PT-L08_low",
-        "hypertonic": ["Peroneals", "Gastrocnemius"],
-        "inhibited": ["Tibialis Posterior", "Intrinsic Foot Muscles"],
-        "corrective": [
-            {"exercise": "Short Foot Exercise", "dosage": "3x10"},
-        ],
-    },
-    {
-        # PT-L08 (high) — Foot Arch Height above normal (pes cavus / high arch)
-        "param_id": "PT-L08_high",
-        "hypertonic": ["Tibialis Posterior", "Peroneus Longus"],
-        "inhibited": ["Peroneus Brevis"],
-        "corrective": [
-            {"exercise": "Calf Stretching & Ankle Mobility", "dosage": "3x30s"},
-        ],
-    },
 ]
 
 
@@ -196,9 +178,10 @@ def generate_synthesis(findings: dict[str, str]) -> dict[str, Any]:
             continue
 
         # Bilateral/sub-classified findings are keyed e.g.
-        # "PT-A05_left" / "PT-A06_right" / "PT-L08_low_left". The base
-        # param id is everything except the trailing side suffix; for
-        # keys with no underscore at all, the whole key is the base.
+        # "PT-A05_left" / "PT-A06_right", or potentially
+        # "<param>_<subtype>_<side>" for future multi-part keys. The
+        # base param id is everything except the trailing side suffix;
+        # for keys with no underscore at all, the whole key is the base.
         parts = finding_key.split("_")
 
         if len(parts) == 1:

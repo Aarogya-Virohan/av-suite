@@ -24,7 +24,6 @@ from app.services.posture.calculator import (
     calc_knee_frontal_deviation,
     calc_knee_hyperextension,
     calc_elbow_carrying_angle,
-    calc_foot_arch_height_mm,
     estimate_pixels_per_cm,
     calc_shoulder_asymmetry_mm,
     calc_ear_level_asymmetry_mm,
@@ -56,7 +55,7 @@ from app.services.posture.calculator import (
     RIGHT_FOOT_INDEX,
 )
 
-from app.services.posture.classifier import classify, THRESHOLDS
+from app.services.posture.classifier import classify
 
 from app.services.posture.annotator import annotate_pose
 
@@ -179,52 +178,6 @@ async def analyze_posture(
             measurement("PT-L06", "Knee Hyperextension", None, "\u00b0", "insufficient_data")
         )
 
-    # PT-L08 — Foot Arch Height (bilateral, mm-calibrated on the side image)
-
-    side_width_px, side_height_px = get_image_dimensions(side_bytes)
-
-    side_pixels_per_cm = estimate_pixels_per_cm(side_landmarks, side_height_px, patient_height_cm)
-
-    for foot_label, heel_i, foot_idx_i, ankle_i, foot_side_key in [
-        ("Left", LEFT_HEEL, LEFT_FOOT_INDEX, LEFT_ANKLE, "left"),
-        ("Right", RIGHT_HEEL, RIGHT_FOOT_INDEX, RIGHT_ANKLE, "right"),
-    ]:
-        try:
-            check_visibility(side_landmarks, [ankle_i, heel_i, foot_idx_i])
-
-            if side_pixels_per_cm is None:
-                side_measurements.append(
-                    measurement(
-                        "PT-L08", f"Foot Arch Height ({foot_label})", None, "mm", "not_available"
-                    )
-                )
-                continue
-
-            arch_height = calc_foot_arch_height_mm(
-                side_landmarks, foot_side_key, side_height_px, side_pixels_per_cm
-            )
-            severity = classify("PT-L08", arch_height)
-
-            if severity in ("moderate", "severe"):
-                pt_l08_rule = THRESHOLDS["PT-L08"]
-                direction_key = "low" if arch_height < pt_l08_rule["normal_min"] else "high"
-                findings[f"PT-L08_{direction_key}_{foot_side_key}"] = severity
-            else:
-                findings[f"PT-L08_{foot_side_key}"] = severity
-
-            side_measurements.append(
-                measurement(
-                    "PT-L08", f"Foot Arch Height ({foot_label})", arch_height, "mm", severity
-                )
-            )
-
-        except InsufficientVisibilityError:
-            side_measurements.append(
-                measurement(
-                    "PT-L08", f"Foot Arch Height ({foot_label})", None, "mm", "insufficient_data"
-                )
-            )
-
     side_photo_url = _annotate_or_blank(side_bytes, side_results)
 
     side_view = build_side_view_result(
@@ -340,7 +293,13 @@ async def analyze_posture(
 
             carrying_angle = calc_elbow_carrying_angle(front_landmarks, side_key)
 
-            if carrying_angle < 0:
+            if abs(carrying_angle) < 1.5:
+                # Near-zero deviation is measurement noise on an
+                # essentially straight arm, not a clinical finding -
+                # same "neutral" treatment as calc_knee_frontal_deviation
+                # (PT-A05/A06).
+                severity = "none"
+            elif carrying_angle < 0:
                 # Varus deviation is always severe, regardless of magnitude.
                 severity = "severe"
             else:

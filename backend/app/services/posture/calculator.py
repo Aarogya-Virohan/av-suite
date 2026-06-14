@@ -380,37 +380,6 @@ def calc_trunk_lateral_shift_mm(
     return (diff_px / pixels_per_cm) * 10
 
 
-def calc_foot_arch_height_mm(
-    landmarks: list[Landmark],
-    side: Literal["left", "right"],
-    image_height_px: int,
-    pixels_per_cm: float,
-) -> float:
-    """
-    PT-L08 — Foot Arch Height, lateral view. Approximation only.
-
-    Perpendicular distance from the Ankle landmark to the
-    Heel -> Foot Index line, used as a proxy for medial arch height.
-    Unit: millimetres.
-    """
-
-    ankle = landmarks[LEFT_ANKLE if side == "left" else RIGHT_ANKLE]
-    heel = landmarks[LEFT_HEEL if side == "left" else RIGHT_HEEL]
-    toe = landmarks[LEFT_FOOT_INDEX if side == "left" else RIGHT_FOOT_INDEX]
-
-    line_dx = toe.x - heel.x
-    line_dy = toe.y - heel.y
-    line_len = math.hypot(line_dx, line_dy)
-
-    if line_len == 0:
-        return 0.0
-
-    dist_norm = abs((ankle.x - heel.x) * line_dy - (ankle.y - heel.y) * line_dx) / line_len
-    dist_px = dist_norm * image_height_px
-
-    return (dist_px / pixels_per_cm) * 10
-
-
 # ---------------------------------------------------------------------------
 # Phase 3 — Posterior (Back) View Calculators
 # ---------------------------------------------------------------------------

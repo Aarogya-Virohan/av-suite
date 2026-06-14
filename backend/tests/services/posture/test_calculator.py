@@ -4,14 +4,10 @@ from app.services.posture.calculator import (
     angle_between_points,
     calc_cva,
     calc_elbow_carrying_angle,
-    calc_foot_arch_height_mm,
     calc_knee_hyperextension,
     calc_pelvic_obliquity,
     distance_between_points,
-    LEFT_ANKLE,
     LEFT_ELBOW,
-    LEFT_FOOT_INDEX,
-    LEFT_HEEL,
     LEFT_SHOULDER,
     LEFT_WRIST,
     RIGHT_SHOULDER,
@@ -260,34 +256,3 @@ def test_calc_elbow_carrying_angle_varus_is_negative() -> None:
     result = calc_elbow_carrying_angle(points, "left")
 
     assert result < 0
-
-
-def test_calc_foot_arch_height_mm() -> None:
-
-    points = _blank_landmarks()
-
-    # Heel-to-toe line is horizontal (y constant).
-    _set(points, LEFT_HEEL, 0.3, 0.9)
-    _set(points, LEFT_FOOT_INDEX, 0.5, 0.9)
-
-    # Ankle sits 0.05 (normalised) above the heel-toe line.
-    _set(points, LEFT_ANKLE, 0.35, 0.85)
-
-    # image_height_px=1000, pixels_per_cm=100 -> 1px = 0.1mm
-    result = calc_foot_arch_height_mm(points, "left", 1000, 100)
-
-    assert result == pytest.approx(5.0)
-
-
-def test_calc_foot_arch_height_mm_zero_length_line() -> None:
-
-    points = _blank_landmarks()
-
-    # Heel and toe at the same point -> zero-length reference line.
-    _set(points, LEFT_HEEL, 0.3, 0.9)
-    _set(points, LEFT_FOOT_INDEX, 0.3, 0.9)
-    _set(points, LEFT_ANKLE, 0.35, 0.85)
-
-    result = calc_foot_arch_height_mm(points, "left", 1000, 100)
-
-    assert result == 0.0

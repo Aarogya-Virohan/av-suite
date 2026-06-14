@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Arogya Virohan Posture Tool",
+  title: "Aarogya Virohan Posture Tool",
   description: "Clinical posture assessment and reporting tool",
 };
 

@@ -48,23 +48,16 @@ def test_synthesis_pt_a08_elbow_carrying_angle():
     assert "Forearm Extensors" in result["inhibited"]
 
 
-def test_synthesis_pt_l08_low_and_high_two_underscore_keys():
+def test_synthesis_three_part_key_does_not_crash():
 
-    # New pattern: keys with two underscores ("PT-L08_low_left" /
-    # "PT-L08_high_right") — base param id is everything except the
-    # trailing side suffix.
-    low = generate_synthesis({"PT-L08_low_left": "moderate"})
+    # "<param>_<subtype>_<side>" style keys (3 parts) derive
+    # base_param_id = "<param>_<subtype>". No current rule matches this
+    # made-up id, so it should simply find nothing rather than crash.
+    result = generate_synthesis({"PT-XX_low_left": "moderate"})
 
-    assert "Tibialis Posterior" in low["inhibited"]
-    assert any(ex["exercise"] == "Short Foot Exercise" for ex in low["correctiveProtocol"])
-
-    high = generate_synthesis({"PT-L08_high_right": "moderate"})
-
-    assert "Peroneus Longus" in high["hypertonic"]
-    assert any(
-        ex["exercise"] == "Calf Stretching & Ankle Mobility"
-        for ex in high["correctiveProtocol"]
-    )
+    assert result["hypertonic"] == []
+    assert result["inhibited"] == []
+    assert result["correctiveProtocol"] == []
 
 
 def test_synthesis_ignores_none_and_mild_severities():
@@ -72,7 +65,6 @@ def test_synthesis_ignores_none_and_mild_severities():
     findings = {
         "PT-L06": "none",
         "PT-A08_left": "mild",
-        "PT-L08_low_left": "insufficient_data",
     }
 
     result = generate_synthesis(findings)

@@ -15,7 +15,7 @@ type Step = "upload" | "report"
 
 function Header() {
 return ( <header className="border-b border-slate-200 bg-white"> <div className="mx-auto flex w-full max-w-7xl items-center px-4 py-4"> <span className="text-lg font-semibold text-slate-900">
-Arogya Virohan </span> </div> </header>
+Aarogya Virohan </span> </div> </header>
 )
 }
 
@@ -168,17 +168,22 @@ return ( <div className="min-h-screen bg-slate-100">
                 className="rounded-xl border p-3"
               />
 
-              <input
-                type="text"
-                placeholder="Gender"
+              <select
                 value={gender}
                 onChange={(e) =>
                   setGender(
                     e.target.value
                   )
                 }
-                className="rounded-xl border p-3"
-              />
+                className="rounded-xl border p-3 text-slate-900"
+              >
+                <option value="" disabled>
+                  Gender
+                </option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
 
               <input
                 type="text"
