@@ -449,3 +449,16 @@ def calc_bilateral_toe_asymmetry(landmarks: list[Landmark]) -> float:
     right_angle = calc_foot_axis_angle(landmarks, "right")
 
     return abs(left_angle - right_angle)
+
+
+def calc_detection_confidence(landmarks: list[Landmark]) -> float:
+    """
+    Rough per-view detection confidence: the average MediaPipe visibility
+    score across all landmarks, rounded to 2 decimals. Used as the
+    "Accuracy" badge instead of a hardcoded constant.
+    """
+
+    if not landmarks:
+        return 0.0
+
+    return sum(lm.visibility for lm in landmarks) / len(landmarks)

@@ -56,6 +56,9 @@ useState("")
 const [patientHeightCm, setPatientHeightCm] =
 useState("")
 
+const [clinicianName, setClinicianName] =
+useState("")
+
 const [report, setReport] =
 useState<PostureReport | null>(null)
 
@@ -88,6 +91,7 @@ try {
          gender,
          caseRef,
          patientHeightCm,
+         clinicianName,
        }
     )
 
@@ -194,6 +198,18 @@ return ( <div className="min-h-screen bg-slate-100">
                 value={patientHeightCm}
                 onChange={(e) =>
                   setPatientHeightCm(
+                    e.target.value
+                  )
+                }
+                className="rounded-xl border p-3"
+              />
+
+              <input
+                type="text"
+                placeholder="Lead Clinician"
+                value={clinicianName}
+                onChange={(e) =>
+                  setClinicianName(
                     e.target.value
                   )
                 }
@@ -358,6 +374,7 @@ return ( <div className="min-h-screen bg-slate-100">
                 setGender("")
                 setCaseRef("")
                 setPatientHeightCm("")
+                setClinicianName("")
 
                 setReport(
                   null

@@ -5,6 +5,7 @@ from fastapi import UploadFile
 
 import base64
 import json
+from datetime import date
 from pathlib import Path
 
 from app.services.posture.detector import (
@@ -30,6 +31,7 @@ from app.services.posture.calculator import (
     calc_heel_valgus,
     calc_pelvic_rotation,
     calc_bilateral_toe_asymmetry,
+    calc_detection_confidence,
     NOSE,
     LEFT_EAR,
     RIGHT_EAR,
@@ -82,6 +84,7 @@ async def analyze_posture(
     gender: str = Form(...),
     case_ref: str = Form(...),
     patient_height_cm: float | None = Form(None),
+    clinician_name: str = Form(""),
 ):
 
     # ---------------------------------
@@ -148,7 +151,9 @@ async def analyze_posture(
     side_photo_url = _annotate_or_blank(side_bytes, side_results)
 
     side_view = build_side_view_result(
-        measurements=side_measurements, photo_url=side_photo_url
+        measurements=side_measurements,
+        photo_url=side_photo_url,
+        accuracy=calc_detection_confidence(side_landmarks),
     )
 
     # =========================================================================
@@ -306,7 +311,9 @@ async def analyze_posture(
     front_photo_url = _annotate_or_blank(front_bytes, front_results)
 
     front_view = build_side_view_result(
-        measurements=front_measurements, photo_url=front_photo_url
+        measurements=front_measurements,
+        photo_url=front_photo_url,
+        accuracy=calc_detection_confidence(front_landmarks),
     )
 
     # =========================================================================
@@ -426,7 +433,9 @@ async def analyze_posture(
     back_photo_url = _annotate_or_blank(back_bytes, back_results)
 
     back_view = build_side_view_result(
-        measurements=back_measurements, photo_url=back_photo_url
+        measurements=back_measurements,
+        photo_url=back_photo_url,
+        accuracy=calc_detection_confidence(back_landmarks),
     )
 
     # ---------------------------------
@@ -450,6 +459,8 @@ async def analyze_posture(
         "age": age,
         "gender": gender,
         "caseRef": case_ref,
+        "assessmentDate": date.today().isoformat(),
+        "clinician": clinician_name,
     }
 
     # ---------------------------------

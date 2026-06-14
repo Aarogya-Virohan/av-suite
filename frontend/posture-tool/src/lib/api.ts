@@ -12,6 +12,7 @@ age: string
 gender: string
 caseRef: string
 patientHeightCm: string
+clinicianName: string
 }
 
 export async function analyzePosture(
@@ -59,6 +60,13 @@ if (payload.patientHeightCm) {
 formData.append(
 "patient_height_cm",
 payload.patientHeightCm,
+)
+}
+
+if (payload.clinicianName) {
+formData.append(
+"clinician_name",
+payload.clinicianName,
 )
 }
 
