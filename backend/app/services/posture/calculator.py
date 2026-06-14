@@ -1,4 +1,5 @@
 import math
+from typing import Literal
 
 LEFT_EAR = 7
 RIGHT_EAR = 8
@@ -47,10 +48,35 @@ def angle_between_points(
 from .schemas import Landmark
 
 
-def calc_cva(landmarks: list[Landmark]) -> float:
+def get_lateral_side(landmarks: list[Landmark]) -> Literal["left", "right"]:
+    """
+    For a side/lateral photo, only one side of the body faces the camera
+    with usable visibility. This picks whichever side (left/right) has
+    higher combined visibility across ear, shoulder, and hip landmarks.
+    """
 
-    ear = landmarks[LEFT_EAR]
-    shoulder = landmarks[LEFT_SHOULDER]
+    left_score = (
+        landmarks[LEFT_EAR].visibility
+        + landmarks[LEFT_SHOULDER].visibility
+        + landmarks[LEFT_HIP].visibility
+    )
+
+    right_score = (
+        landmarks[RIGHT_EAR].visibility
+        + landmarks[RIGHT_SHOULDER].visibility
+        + landmarks[RIGHT_HIP].visibility
+    )
+
+    return "left" if left_score >= right_score else "right"
+
+
+def calc_cva(landmarks: list[Landmark], side: Literal["left", "right"] | None = None) -> float:
+
+    if side is None:
+        side = get_lateral_side(landmarks)
+
+    ear = landmarks[LEFT_EAR if side == "left" else RIGHT_EAR]
+    shoulder = landmarks[LEFT_SHOULDER if side == "left" else RIGHT_SHOULDER]
 
     horizontal_ref = (
         shoulder.x + 1.0,
@@ -122,10 +148,15 @@ def calc_knee_alignment(landmarks: list[Landmark]) -> float:
     return abs(left_knee.y - right_knee.y) * 100
 
 
-def calc_forward_trunk_lean(landmarks: list[Landmark]) -> float:
+def calc_forward_trunk_lean(
+    landmarks: list[Landmark], side: Literal["left", "right"] | None = None
+) -> float:
 
-    shoulder = landmarks[LEFT_SHOULDER]
-    hip = landmarks[LEFT_HIP]
+    if side is None:
+        side = get_lateral_side(landmarks)
+
+    shoulder = landmarks[LEFT_SHOULDER if side == "left" else RIGHT_SHOULDER]
+    hip = landmarks[LEFT_HIP if side == "left" else RIGHT_HIP]
 
     vertical_ref = (
         hip.x,

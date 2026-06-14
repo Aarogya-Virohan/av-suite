@@ -3,17 +3,28 @@ from fastapi import File
 from fastapi import Form
 from fastapi import UploadFile
 
-from app.services.posture.detector import detect_pose
+import base64
+import json
+from pathlib import Path
+
+from app.services.posture.detector import detect_pose_full, check_visibility
+from app.services.posture.exceptions import InsufficientVisibilityError
 
 from app.services.posture.calculator import (
     calc_cva,
-    calc_shoulder_asymmetry,
-    calc_trunk_lateral_shift,
-    calc_pelvic_obliquity,
-    calc_ear_level_asymmetry,
+    calc_forward_trunk_lean,
+    get_lateral_side,
+    LEFT_EAR,
+    RIGHT_EAR,
+    LEFT_SHOULDER,
+    RIGHT_SHOULDER,
+    LEFT_HIP,
+    RIGHT_HIP,
 )
 
 from app.services.posture.classifier import classify
+
+from app.services.posture.annotator import annotate_pose
 
 from app.services.posture.synthesizer import generate_synthesis
 
@@ -24,9 +35,6 @@ from app.services.posture.report_builder import (
     build_report_response,
     measurement,
 )
-
-import json
-from pathlib import Path
 
 router = APIRouter(prefix="/posture", tags=["posture"])
 
@@ -51,79 +59,104 @@ async def analyze_posture(
     back_bytes = await back_image.read()
 
     # ---------------------------------
-    # Landmark Detection
+    # Landmark Detection (Side / Lateral Plane)
     # ---------------------------------
 
-    # For now use side image as primary analysis
-    # Front/back processing can be added later
     try:
-        landmarks = detect_pose(side_bytes)
+        landmarks, pose_results = detect_pose_full(side_bytes)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=f"Pose detection failed: {str(e)}")
 
-    # ---------------------------------
-    # Calculations
-    # ---------------------------------
+    # Pick whichever side (left/right) is actually facing the camera
+    lateral_side = get_lateral_side(landmarks)
 
-    cva = calc_cva(landmarks)
+    ear_idx = LEFT_EAR if lateral_side == "left" else RIGHT_EAR
+    shoulder_idx = LEFT_SHOULDER if lateral_side == "left" else RIGHT_SHOULDER
+    hip_idx = LEFT_HIP if lateral_side == "left" else RIGHT_HIP
 
-    shoulder_asymmetry = calc_shoulder_asymmetry(landmarks)
-    trunk_shift = calc_trunk_lateral_shift(landmarks)
-    pelvic_obliquity = calc_pelvic_obliquity(landmarks)
-    ear_asymmetry = calc_ear_level_asymmetry(landmarks)
-
-    # ---------------------------------
-    # Classification
-    # ---------------------------------
-
-    findings = {
-        "PT-L01": classify("PT-L01", cva),
-        "PT-A02": classify("PT-A02", shoulder_asymmetry),
-        "PT-A03": classify("PT-A03", trunk_shift),
-        "PT-A04": classify("PT-A04", pelvic_obliquity),
-        "PT-A10": classify("PT-A10", ear_asymmetry),
-    }
+    measurements = []
+    findings: dict[str, str] = {}
 
     # ---------------------------------
-    # Measurements
+    # PT-L01 — Craniovertebral Angle (Forward Head)
     # ---------------------------------
 
-    measurements = [
-        measurement("PT-L01", "Forward Head (CVA)", cva, "°", findings["PT-L01"]),
-        measurement(
-            "PT-A02", "Shoulder Asymmetry", shoulder_asymmetry, "mm", findings["PT-A02"]
-        ),
-        measurement(
-            "PT-A03", "Trunk Lateral Shift", trunk_shift, "mm", findings["PT-A03"]
-        ),
-        measurement(
-            "PT-A04", "Pelvic Obliquity", pelvic_obliquity, "mm", findings["PT-A04"]
-        ),
-        measurement(
-            "PT-A10", "Ear Level Asymmetry", ear_asymmetry, "mm", findings["PT-A10"]
-        ),
-    ]
+    try:
+        check_visibility(landmarks, [ear_idx, shoulder_idx])
+
+        cva = calc_cva(landmarks, side=lateral_side)
+        severity = classify("PT-L01", cva)
+        findings["PT-L01"] = severity
+
+        measurements.append(
+            measurement("PT-L01", "Forward Head (CVA)", cva, "\u00b0", severity)
+        )
+
+    except InsufficientVisibilityError:
+        measurements.append(
+            measurement("PT-L01", "Forward Head (CVA)", None, "\u00b0", "insufficient_data")
+        )
+
+    # ---------------------------------
+    # PT-L05 — Forward Trunk Lean
+    # ---------------------------------
+
+    try:
+        check_visibility(landmarks, [shoulder_idx, hip_idx])
+
+        trunk_lean = calc_forward_trunk_lean(landmarks, side=lateral_side)
+        severity = classify("PT-L05", trunk_lean)
+        findings["PT-L05"] = severity
+
+        measurements.append(
+            measurement("PT-L05", "Forward Trunk Lean", trunk_lean, "\u00b0", severity)
+        )
+
+    except InsufficientVisibilityError:
+        measurements.append(
+            measurement("PT-L05", "Forward Trunk Lean", None, "\u00b0", "insufficient_data")
+        )
+
+    # ---------------------------------
+    # Annotated Side Image (skeleton overlay)
+    # ---------------------------------
+
+    try:
+        annotated_bytes = annotate_pose(side_bytes, pose_results)
+        side_photo_url = (
+            "data:image/jpeg;base64," + base64.b64encode(annotated_bytes).decode("utf-8")
+        )
+    except ValueError:
+        side_photo_url = ""
 
     # ---------------------------------
     # Views
     # ---------------------------------
 
     side_view = build_side_view_result(
-        measurements=measurements, photo_url="/mock/side_annotated.jpg"
+        measurements=measurements, photo_url=side_photo_url
     )
 
     front_view = {
         "photoUrl": "",
         "accuracy": 0.95,
         "measurements": [],
-        "interpretation": "Front view uploaded successfully. Analysis pipeline pending.",
+        "interpretation": (
+            "Front view uploaded successfully. Anterior-plane analysis "
+            "(shoulder, pelvic, and knee alignment) is part of the next "
+            "update to this tool."
+        ),
     }
 
     back_view = {
         "photoUrl": "",
         "accuracy": 0.95,
         "measurements": [],
-        "interpretation": "Back view uploaded successfully. Analysis pipeline pending.",
+        "interpretation": (
+            "Back view uploaded successfully. Posterior-plane analysis "
+            "(spinal alignment, scapular symmetry) is part of the next "
+            "update to this tool."
+        ),
     }
 
     # ---------------------------------

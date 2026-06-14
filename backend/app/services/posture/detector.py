@@ -14,7 +14,16 @@ pose = mp_pose.Pose(static_image_mode=True, model_complexity=1)
 VISIBILITY_THRESHOLD = 0.65
 
 
-def detect_pose(image_bytes: bytes) -> list[Landmark]:
+def detect_pose_full(image_bytes: bytes):
+    """
+    Like detect_pose, but also returns the raw MediaPipe `results` object
+    (needed by annotator.annotate_pose to draw the skeleton overlay).
+
+    Returns
+    -------
+    tuple[list[Landmark], Any]
+        (parsed landmarks, raw mediapipe pose results)
+    """
 
     np_arr = np.frombuffer(image_bytes, np.uint8)
 
@@ -30,11 +39,11 @@ def detect_pose(image_bytes: bytes) -> list[Landmark]:
     if not results.pose_landmarks:
         raise ValueError("No person detected")
 
-    output = []
+    landmarks = []
 
     for idx, landmark in enumerate(results.pose_landmarks.landmark):
 
-        output.append(
+        landmarks.append(
             Landmark(
                 index=idx,
                 x=landmark.x,
@@ -44,7 +53,14 @@ def detect_pose(image_bytes: bytes) -> list[Landmark]:
             )
         )
 
-    return output
+    return landmarks, results
+
+
+def detect_pose(image_bytes: bytes) -> list[Landmark]:
+
+    landmarks, _results = detect_pose_full(image_bytes)
+
+    return landmarks
 
 
 def check_visibility(landmarks: list[Landmark], required_indices: list[int]) -> None:

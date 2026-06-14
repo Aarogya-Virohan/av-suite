@@ -36,21 +36,21 @@ THRESHOLDS: dict[str, dict] = {
     },
     "PT-A03": {
         "direction": "higher_worse",
-        "none_max": 5,
-        "mild_max": 10,
-        "moderate_max": 20,
+        "none_max": 10,
+        "mild_max": 20,
+        "moderate_max": 30,
     },
     "PT-A04": {
         "direction": "higher_worse",
-        "none_max": 5,
-        "mild_max": 10,
-        "moderate_max": 20,
+        "none_max": 3,
+        "mild_max": 5,
+        "moderate_max": 10,
     },
     "PT-A10": {
         "direction": "higher_worse",
         "none_max": 3,
-        "mild_max": 7,
-        "moderate_max": 12,
+        "mild_max": 6,
+        "moderate_max": 10,
     },
     "PT-L04": {
         "direction": "higher_worse",
@@ -60,10 +60,19 @@ THRESHOLDS: dict[str, dict] = {
     },
     "PT-L05": {
         "direction": "higher_worse",
-        "none_max": 5,
-        "mild_max": 10,
-        "moderate_max": 15,
+        "none_max": 3,
+        "mild_max": 6,
+        "moderate_max": 10,
     },
+}
+
+
+SEVERITY_LABELS: dict[str, str] = {
+    "none": "NONE",
+    "mild": "MILD",
+    "moderate": "MODERATE",
+    "severe": "SEVERE",
+    "insufficient_data": "INSUFFICIENT DATA \u2013 RETAKE PHOTO",
 }
 
 

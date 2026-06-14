@@ -1,5 +1,7 @@
 from typing import Any
 
+from app.services.posture.classifier import SEVERITY_LABELS
+
 
 def measurement(
     param_id: str,
@@ -12,9 +14,9 @@ def measurement(
     return {
         "paramId": param_id,
         "label": label,
-        "value": round(value, 2),
+        "value": round(value, 2) if isinstance(value, (int, float)) else value,
         "unit": unit,
-        "severityLabel": severity.upper(),
+        "severityLabel": SEVERITY_LABELS.get(severity, severity.upper()),
         "severity": severity,
     }
 
