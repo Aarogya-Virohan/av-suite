@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi import File
 from fastapi import Form
 from fastapi import UploadFile
@@ -56,7 +56,10 @@ async def analyze_posture(
 
     # For now use side image as primary analysis
     # Front/back processing can be added later
-    landmarks = detect_pose(side_bytes)
+    try:
+        landmarks = detect_pose(side_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Pose detection failed: {str(e)}")
 
     # ---------------------------------
     # Calculations
