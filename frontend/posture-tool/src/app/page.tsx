@@ -54,6 +54,9 @@ useState("")
 const [caseRef, setCaseRef] =
 useState("")
 
+const [patientHeightCm, setPatientHeightCm] =
+useState("")
+
 const [report, setReport] =
 useState<PostureReport | null>(null)
 
@@ -85,6 +88,7 @@ try {
          age,
          gender,
          caseRef,
+         patientHeightCm,
        }
     )
 
@@ -179,6 +183,18 @@ return ( <div className="min-h-screen bg-slate-100">
                 value={caseRef}
                 onChange={(e) =>
                   setCaseRef(
+                    e.target.value
+                  )
+                }
+                className="rounded-xl border p-3"
+              />
+
+              <input
+                type="number"
+                placeholder="Height (cm)"
+                value={patientHeightCm}
+                onChange={(e) =>
+                  setPatientHeightCm(
                     e.target.value
                   )
                 }
@@ -405,6 +421,7 @@ return ( <div className="min-h-screen bg-slate-100">
                 setAge("")
                 setGender("")
                 setCaseRef("")
+                setPatientHeightCm("")
 
                 setReport(
                   null

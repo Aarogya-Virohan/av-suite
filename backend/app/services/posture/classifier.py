@@ -5,6 +5,8 @@ Severity = Literal[
     "mild",
     "moderate",
     "severe",
+    "insufficient_data",
+    "not_available",
 ]
 
 
@@ -64,6 +66,19 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 6,
         "moderate_max": 10,
     },
+    "PT-A01": {
+        "direction": "higher_worse",
+        "none_max": 2,
+        "mild_max": 5,
+        "moderate_max": 10,
+    },
+    "PT-A05": {
+        "direction": "higher_worse",
+        "none_max": 5,
+        "none_max_female": 7,
+        "mild_max": 9,
+        "moderate_max": 13,
+    },
 }
 
 
@@ -73,12 +88,14 @@ SEVERITY_LABELS: dict[str, str] = {
     "moderate": "MODERATE",
     "severe": "SEVERE",
     "insufficient_data": "INSUFFICIENT DATA \u2013 RETAKE PHOTO",
+    "not_available": "PATIENT HEIGHT REQUIRED",
 }
 
 
 def classify(
     param_id: str,
     value: float,
+    gender: str | None = None,
 ) -> Severity:
     """
     Classify a posture measurement into a severity band.
@@ -92,6 +109,10 @@ def classify(
     value:
         Raw measurement value
 
+    gender:
+        Patient gender, only used for parameters with gender-dependent
+        normal ranges (currently PT-A05 — Knee Valgus).
+
     Returns
     -------
     Severity
@@ -103,6 +124,16 @@ def classify(
     rule = THRESHOLDS[param_id]
 
     direction = rule["direction"]
+
+    none_max = rule.get("none_max")
+
+    if (
+        param_id == "PT-A05"
+        and gender
+        and gender.strip().lower().startswith("f")
+        and "none_max_female" in rule
+    ):
+        none_max = rule["none_max_female"]
 
     if direction == "lower_worse":
 
@@ -119,7 +150,7 @@ def classify(
 
     if direction == "higher_worse":
 
-        if value <= rule["none_max"]:
+        if value <= none_max:
             return "none"
 
         if value <= rule["mild_max"]:

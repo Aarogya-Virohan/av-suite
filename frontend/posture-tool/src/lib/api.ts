@@ -11,6 +11,7 @@ patientName: string
 age: string
 gender: string
 caseRef: string
+patientHeightCm: string
 }
 
 export async function analyzePosture(
@@ -53,6 +54,13 @@ formData.append(
 "case_ref",
 payload.caseRef,
 )
+
+if (payload.patientHeightCm) {
+formData.append(
+"patient_height_cm",
+payload.patientHeightCm,
+)
+}
 
 const response = await fetch(
 `${API_URL}/posture/analyze`,

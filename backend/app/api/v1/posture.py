@@ -7,19 +7,35 @@ import base64
 import json
 from pathlib import Path
 
-from app.services.posture.detector import detect_pose_full, check_visibility
+from app.services.posture.detector import (
+    detect_pose_full,
+    check_visibility,
+    get_image_dimensions,
+)
 from app.services.posture.exceptions import InsufficientVisibilityError
 
 from app.services.posture.calculator import (
     calc_cva,
     calc_forward_trunk_lean,
     get_lateral_side,
+    calc_head_lateral_tilt,
+    calc_pelvic_obliquity,
+    calc_knee_frontal_deviation,
+    estimate_pixels_per_cm,
+    calc_shoulder_asymmetry_mm,
+    calc_ear_level_asymmetry_mm,
+    calc_trunk_lateral_shift_mm,
+    NOSE,
     LEFT_EAR,
     RIGHT_EAR,
     LEFT_SHOULDER,
     RIGHT_SHOULDER,
     LEFT_HIP,
     RIGHT_HIP,
+    LEFT_KNEE,
+    RIGHT_KNEE,
+    LEFT_ANKLE,
+    RIGHT_ANKLE,
 )
 
 from app.services.posture.classifier import classify
@@ -39,6 +55,14 @@ from app.services.posture.report_builder import (
 router = APIRouter(prefix="/posture", tags=["posture"])
 
 
+def _annotate_or_blank(image_bytes: bytes, pose_results) -> str:
+    try:
+        annotated_bytes = annotate_pose(image_bytes, pose_results)
+        return "data:image/jpeg;base64," + base64.b64encode(annotated_bytes).decode("utf-8")
+    except ValueError:
+        return ""
+
+
 @router.post("/analyze")
 async def analyze_posture(
     front_image: UploadFile = File(...),
@@ -48,6 +72,7 @@ async def analyze_posture(
     age: int = Form(...),
     gender: str = Form(...),
     case_ref: str = Form(...),
+    patient_height_cm: float | None = Form(None),
 ):
 
     # ---------------------------------
@@ -58,95 +83,226 @@ async def analyze_posture(
     side_bytes = await side_image.read()
     back_bytes = await back_image.read()
 
-    # ---------------------------------
-    # Landmark Detection (Side / Lateral Plane)
-    # ---------------------------------
-
-    try:
-        landmarks, pose_results = detect_pose_full(side_bytes)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Pose detection failed: {str(e)}")
-
-    # Pick whichever side (left/right) is actually facing the camera
-    lateral_side = get_lateral_side(landmarks)
-
-    ear_idx = LEFT_EAR if lateral_side == "left" else RIGHT_EAR
-    shoulder_idx = LEFT_SHOULDER if lateral_side == "left" else RIGHT_SHOULDER
-    hip_idx = LEFT_HIP if lateral_side == "left" else RIGHT_HIP
-
-    measurements = []
     findings: dict[str, str] = {}
 
-    # ---------------------------------
-    # PT-L01 — Craniovertebral Angle (Forward Head)
-    # ---------------------------------
+    # =========================================================================
+    # SIDE (LATERAL) PLANE
+    # =========================================================================
 
     try:
-        check_visibility(landmarks, [ear_idx, shoulder_idx])
+        side_landmarks, side_results = detect_pose_full(side_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Side image: pose detection failed: {str(e)}")
 
-        cva = calc_cva(landmarks, side=lateral_side)
+    lateral_side = get_lateral_side(side_landmarks)
+
+    ear_idx = LEFT_EAR if lateral_side == "left" else RIGHT_EAR
+    shoulder_idx_lat = LEFT_SHOULDER if lateral_side == "left" else RIGHT_SHOULDER
+    hip_idx_lat = LEFT_HIP if lateral_side == "left" else RIGHT_HIP
+
+    side_measurements = []
+
+    # PT-L01 — Forward Head (CVA)
+    try:
+        check_visibility(side_landmarks, [ear_idx, shoulder_idx_lat])
+
+        cva = calc_cva(side_landmarks, side=lateral_side)
         severity = classify("PT-L01", cva)
         findings["PT-L01"] = severity
 
-        measurements.append(
+        side_measurements.append(
             measurement("PT-L01", "Forward Head (CVA)", cva, "\u00b0", severity)
         )
 
     except InsufficientVisibilityError:
-        measurements.append(
+        side_measurements.append(
             measurement("PT-L01", "Forward Head (CVA)", None, "\u00b0", "insufficient_data")
         )
 
-    # ---------------------------------
     # PT-L05 — Forward Trunk Lean
-    # ---------------------------------
-
     try:
-        check_visibility(landmarks, [shoulder_idx, hip_idx])
+        check_visibility(side_landmarks, [shoulder_idx_lat, hip_idx_lat])
 
-        trunk_lean = calc_forward_trunk_lean(landmarks, side=lateral_side)
+        trunk_lean = calc_forward_trunk_lean(side_landmarks, side=lateral_side)
         severity = classify("PT-L05", trunk_lean)
         findings["PT-L05"] = severity
 
-        measurements.append(
+        side_measurements.append(
             measurement("PT-L05", "Forward Trunk Lean", trunk_lean, "\u00b0", severity)
         )
 
     except InsufficientVisibilityError:
-        measurements.append(
+        side_measurements.append(
             measurement("PT-L05", "Forward Trunk Lean", None, "\u00b0", "insufficient_data")
         )
 
-    # ---------------------------------
-    # Annotated Side Image (skeleton overlay)
-    # ---------------------------------
-
-    try:
-        annotated_bytes = annotate_pose(side_bytes, pose_results)
-        side_photo_url = (
-            "data:image/jpeg;base64," + base64.b64encode(annotated_bytes).decode("utf-8")
-        )
-    except ValueError:
-        side_photo_url = ""
-
-    # ---------------------------------
-    # Views
-    # ---------------------------------
+    side_photo_url = _annotate_or_blank(side_bytes, side_results)
 
     side_view = build_side_view_result(
-        measurements=measurements, photo_url=side_photo_url
+        measurements=side_measurements, photo_url=side_photo_url
     )
 
-    front_view = {
-        "photoUrl": "",
-        "accuracy": 0.95,
-        "measurements": [],
-        "interpretation": (
-            "Front view uploaded successfully. Anterior-plane analysis "
-            "(shoulder, pelvic, and knee alignment) is part of the next "
-            "update to this tool."
-        ),
+    # =========================================================================
+    # FRONT (ANTERIOR) PLANE
+    # =========================================================================
+
+    try:
+        front_landmarks, front_results = detect_pose_full(front_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Front image: pose detection failed: {str(e)}")
+
+    front_measurements = []
+
+    front_width_px, front_height_px = get_image_dimensions(front_bytes)
+
+    # PT-A01 — Head Lateral Tilt
+    try:
+        check_visibility(front_landmarks, [NOSE, LEFT_SHOULDER, RIGHT_SHOULDER])
+
+        head_tilt = calc_head_lateral_tilt(front_landmarks)
+        severity = classify("PT-A01", head_tilt)
+        findings["PT-A01"] = severity
+
+        front_measurements.append(
+            measurement("PT-A01", "Head Lateral Tilt", head_tilt, "\u00b0", severity)
+        )
+
+    except InsufficientVisibilityError:
+        front_measurements.append(
+            measurement("PT-A01", "Head Lateral Tilt", None, "\u00b0", "insufficient_data")
+        )
+
+    # PT-A04 — Pelvic Obliquity
+    try:
+        check_visibility(front_landmarks, [LEFT_HIP, RIGHT_HIP])
+
+        obliquity = calc_pelvic_obliquity(front_landmarks)
+        severity = classify("PT-A04", obliquity)
+        findings["PT-A04"] = severity
+
+        front_measurements.append(
+            measurement("PT-A04", "Pelvic Obliquity", obliquity, "\u00b0", severity)
+        )
+
+    except InsufficientVisibilityError:
+        front_measurements.append(
+            measurement("PT-A04", "Pelvic Obliquity", None, "\u00b0", "insufficient_data")
+        )
+
+    # PT-A05 / PT-A06 — Knee Valgus / Varus (bilateral)
+
+    direction_labels = {
+        "valgus": "Knee Valgus",
+        "varus": "Knee Varus",
+        "neutral": "Knee Alignment",
     }
+
+    direction_param = {
+        "valgus": "PT-A05",
+        "varus": "PT-A06",
+        "neutral": "PT-A06",
+    }
+
+    for side_label, hip_i, knee_i, ankle_i in [
+        ("Left", LEFT_HIP, LEFT_KNEE, LEFT_ANKLE),
+        ("Right", RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE),
+    ]:
+        try:
+            check_visibility(front_landmarks, [hip_i, knee_i, ankle_i])
+
+            side_key = "left" if side_label == "Left" else "right"
+            deviation, direction = calc_knee_frontal_deviation(front_landmarks, side_key)
+
+            param_id = direction_param[direction]
+            severity = classify(param_id, deviation, gender=gender)
+            findings[f"{param_id}_{side_key}"] = severity
+
+            front_measurements.append(
+                measurement(
+                    param_id,
+                    f"{direction_labels[direction]} ({side_label})",
+                    deviation,
+                    "\u00b0",
+                    severity,
+                )
+            )
+
+        except InsufficientVisibilityError:
+            front_measurements.append(
+                measurement(
+                    "PT-A05",
+                    f"Knee Alignment ({side_label})",
+                    None,
+                    "\u00b0",
+                    "insufficient_data",
+                )
+            )
+
+    # PT-A02 / PT-A03 / PT-A10 — millimetre measurements (need patient height for calibration)
+
+    pixels_per_cm = estimate_pixels_per_cm(front_landmarks, front_height_px, patient_height_cm)
+
+    mm_params = [
+        ("PT-A02", "Shoulder Level Asymmetry", LEFT_SHOULDER, RIGHT_SHOULDER, "y"),
+        ("PT-A10", "Ear Level Asymmetry", LEFT_EAR, RIGHT_EAR, "y"),
+    ]
+
+    for param_id, label, left_idx, right_idx, _axis in mm_params:
+        try:
+            check_visibility(front_landmarks, [left_idx, right_idx])
+
+            if pixels_per_cm is None:
+                front_measurements.append(
+                    measurement(param_id, label, None, "mm", "not_available")
+                )
+                continue
+
+            if param_id == "PT-A02":
+                value = calc_shoulder_asymmetry_mm(front_landmarks, front_height_px, pixels_per_cm)
+            else:
+                value = calc_ear_level_asymmetry_mm(front_landmarks, front_height_px, pixels_per_cm)
+
+            severity = classify(param_id, value)
+            findings[param_id] = severity
+
+            front_measurements.append(measurement(param_id, label, value, "mm", severity))
+
+        except InsufficientVisibilityError:
+            front_measurements.append(
+                measurement(param_id, label, None, "mm", "insufficient_data")
+            )
+
+    # PT-A03 — Trunk Lateral Shift
+    try:
+        check_visibility(front_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP])
+
+        if pixels_per_cm is None:
+            front_measurements.append(
+                measurement("PT-A03", "Trunk Lateral Shift", None, "mm", "not_available")
+            )
+        else:
+            trunk_shift = calc_trunk_lateral_shift_mm(front_landmarks, front_width_px, pixels_per_cm)
+            severity = classify("PT-A03", trunk_shift)
+            findings["PT-A03"] = severity
+
+            front_measurements.append(
+                measurement("PT-A03", "Trunk Lateral Shift", trunk_shift, "mm", severity)
+            )
+
+    except InsufficientVisibilityError:
+        front_measurements.append(
+            measurement("PT-A03", "Trunk Lateral Shift", None, "mm", "insufficient_data")
+        )
+
+    front_photo_url = _annotate_or_blank(front_bytes, front_results)
+
+    front_view = build_side_view_result(
+        measurements=front_measurements, photo_url=front_photo_url
+    )
+
+    # =========================================================================
+    # BACK (POSTERIOR) PLANE — Phase 3
+    # =========================================================================
 
     back_view = {
         "photoUrl": "",

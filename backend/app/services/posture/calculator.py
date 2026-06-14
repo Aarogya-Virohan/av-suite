@@ -1,6 +1,8 @@
 import math
 from typing import Literal
 
+NOSE = 0
+
 LEFT_EAR = 7
 RIGHT_EAR = 8
 
@@ -107,11 +109,18 @@ def calc_ear_level_asymmetry(landmarks: list[Landmark]) -> float:
 
 
 def calc_pelvic_obliquity(landmarks: list[Landmark]) -> float:
+    """
+    PT-A04 — Angle of the hip landmark line from horizontal.
+    Unit: degrees. (Previously this incorrectly returned a *100 pseudo-mm value.)
+    """
 
     left = landmarks[LEFT_HIP]
     right = landmarks[RIGHT_HIP]
 
-    return abs(left.y - right.y) * 100
+    dx = right.x - left.x
+    dy = right.y - left.y
+
+    return math.degrees(math.atan2(abs(dy), abs(dx)))
 
 
 def calc_trunk_lateral_shift(landmarks: list[Landmark]) -> float:
@@ -185,3 +194,141 @@ def calc_anterior_pelvic_tilt(landmarks: list[Landmark]) -> float:
         (hip.x, hip.y),
         vertical_ref,
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Anterior (Front) View Calculators
+# ---------------------------------------------------------------------------
+
+
+def calc_head_lateral_tilt(landmarks: list[Landmark]) -> float:
+    """
+    PT-A01 — Angle between the vertical axis and the
+    nose-to-mid-shoulder line. Unit: degrees.
+    """
+
+    nose = landmarks[NOSE]
+
+    mid_shoulder = midpoint(
+        (landmarks[LEFT_SHOULDER].x, landmarks[LEFT_SHOULDER].y),
+        (landmarks[RIGHT_SHOULDER].x, landmarks[RIGHT_SHOULDER].y),
+    )
+
+    vertical_ref = (
+        mid_shoulder[0],
+        mid_shoulder[1] - 1.0,
+    )
+
+    return angle_between_points(
+        (nose.x, nose.y),
+        mid_shoulder,
+        vertical_ref,
+    )
+
+
+def calc_knee_frontal_deviation(
+    landmarks: list[Landmark], side: Literal["left", "right"]
+) -> tuple[float, Literal["valgus", "varus", "neutral"]]:
+    """
+    PT-A05 / PT-A06 — Frontal-plane knee deviation (Hip-Knee-Ankle angle).
+
+    Returns
+    -------
+    tuple[float, "valgus" | "varus" | "neutral"]
+        (deviation in degrees from a straight hip-knee-ankle line,
+         direction of deviation)
+
+    Note: direction is an approximation based on the knee's horizontal
+    offset from the expected straight hip-ankle line. Should be reviewed
+    against real photos before clinical use.
+    """
+
+    hip = landmarks[LEFT_HIP if side == "left" else RIGHT_HIP]
+    knee = landmarks[LEFT_KNEE if side == "left" else RIGHT_KNEE]
+    ankle = landmarks[LEFT_ANKLE if side == "left" else RIGHT_ANKLE]
+
+    raw_angle = angle_between_points(
+        (hip.x, hip.y),
+        (knee.x, knee.y),
+        (ankle.x, ankle.y),
+    )
+
+    deviation = 180.0 - raw_angle
+
+    if ankle.y != hip.y:
+        t = (knee.y - hip.y) / (ankle.y - hip.y)
+    else:
+        t = 0.5
+
+    expected_x = hip.x + t * (ankle.x - hip.x)
+    offset = knee.x - expected_x
+
+    if deviation < 0.5:
+        direction: Literal["valgus", "varus", "neutral"] = "neutral"
+    elif side == "left":
+        direction = "valgus" if offset < 0 else "varus"
+    else:
+        direction = "valgus" if offset > 0 else "varus"
+
+    return deviation, direction
+
+
+def estimate_pixels_per_cm(
+    landmarks: list[Landmark],
+    image_height_px: int,
+    patient_height_cm: float,
+) -> float | None:
+    """
+    Rough calibration: estimate pixels-per-cm using the patient's known
+    height and the nose-to-ankle pixel span (approx. 97% of total height).
+    Used to convert normalised landmark differences into millimetres.
+    """
+
+    if not patient_height_cm or patient_height_cm <= 0:
+        return None
+
+    nose = landmarks[NOSE]
+    ankle_mid_y = (landmarks[LEFT_ANKLE].y + landmarks[RIGHT_ANKLE].y) / 2
+
+    body_span_normalised = abs(ankle_mid_y - nose.y)
+    body_span_px = body_span_normalised * image_height_px
+
+    if body_span_px <= 0:
+        return None
+
+    estimated_height_px = body_span_px / 0.97
+
+    return estimated_height_px / patient_height_cm
+
+
+def calc_shoulder_asymmetry_mm(
+    landmarks: list[Landmark], image_height_px: int, pixels_per_cm: float
+) -> float:
+    """PT-A02 — Shoulder level asymmetry in millimetres."""
+
+    diff_px = abs(landmarks[LEFT_SHOULDER].y - landmarks[RIGHT_SHOULDER].y) * image_height_px
+
+    return (diff_px / pixels_per_cm) * 10
+
+
+def calc_ear_level_asymmetry_mm(
+    landmarks: list[Landmark], image_height_px: int, pixels_per_cm: float
+) -> float:
+    """PT-A10 — Ear level asymmetry in millimetres."""
+
+    diff_px = abs(landmarks[LEFT_EAR].y - landmarks[RIGHT_EAR].y) * image_height_px
+
+    return (diff_px / pixels_per_cm) * 10
+
+
+def calc_trunk_lateral_shift_mm(
+    landmarks: list[Landmark], image_width_px: int, pixels_per_cm: float
+) -> float:
+    """PT-A03 — Trunk lateral shift (shoulder midpoint vs hip midpoint) in millimetres."""
+
+    shoulder_mid_x = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2
+    hip_mid_x = (landmarks[LEFT_HIP].x + landmarks[RIGHT_HIP].x) / 2
+
+    diff_px = abs(shoulder_mid_x - hip_mid_x) * image_width_px
+
+    return (diff_px / pixels_per_cm) * 10

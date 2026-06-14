@@ -14,6 +14,22 @@ pose = mp_pose.Pose(static_image_mode=True, model_complexity=1)
 VISIBILITY_THRESHOLD = 0.65
 
 
+def get_image_dimensions(image_bytes: bytes) -> tuple[int, int]:
+    """Returns (width_px, height_px) for an encoded image."""
+
+    np_arr = np.frombuffer(image_bytes, np.uint8)
+
+    image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+    if image is None:
+        raise ValueError("Failed to decode image")
+
+    height, width = image.shape[:2]
+
+    return width, height
+
+
+
 def detect_pose_full(image_bytes: bytes):
     """
     Like detect_pose, but also returns the raw MediaPipe `results` object

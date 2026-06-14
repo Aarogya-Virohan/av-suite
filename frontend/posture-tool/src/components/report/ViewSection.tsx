@@ -1,6 +1,6 @@
-import Image from "next/image"
 import { ViewData } from "../../types/posture"
 import MeasurementCard from "./MeasurementCard"
+import AnnotatedImage from "./AnnotatedImage"
 
 interface Props {
   viewName: string
@@ -26,13 +26,16 @@ export default function ViewSection({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
 
-        <Image
-          src={data.photoUrl}
-          alt={viewName}
-          width={640}
-          height={860}
-          className="h-auto w-full rounded-xl border"
-        />
+        {data.photoUrl ? (
+          <AnnotatedImage
+            src={data.photoUrl}
+            alt={viewName}
+          />
+        ) : (
+          <div className="flex h-full min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white text-sm text-slate-400">
+            No annotated image available
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {data.measurements.map((measurement, index) => (

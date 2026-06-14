@@ -4,10 +4,11 @@ export type Severity =
   | "moderate"
   | "severe"
   | "insufficient_data"
+  | "not_available"
 
 export interface Measurement {
   label: string
-  value: number | string
+  value: number | string | null
   unit: string
   severityLabel: string
   severity: Severity

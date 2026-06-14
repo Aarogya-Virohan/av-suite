@@ -15,8 +15,9 @@ export default function MeasurementCard({ measurement }: Props) {
       </p>
 
       <h2 className="text-3xl font-bold mt-2">
-        {measurement.value}
-        {measurement.unit}
+        {measurement.value === null || measurement.value === undefined
+          ? "\u2014"
+          : `${measurement.value}${measurement.unit}`}
       </h2>
 
       <div

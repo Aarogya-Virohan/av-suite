@@ -169,7 +169,9 @@ def test_calc_pelvic_obliquity(
         landmarks,
     )
 
-    assert result == pytest.approx(5.0)
+    # PT-A04 is now the angle of the L-Hip/R-Hip line from horizontal (degrees),
+    # not the old *100 pseudo-mm value.
+    assert result == pytest.approx(7.125, rel=1e-3)
 
 
 def test_calc_trunk_lateral_shift(
