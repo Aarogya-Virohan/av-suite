@@ -22,6 +22,9 @@ from app.services.posture.calculator import (
     calc_head_lateral_tilt,
     calc_pelvic_obliquity,
     calc_knee_frontal_deviation,
+    calc_knee_hyperextension,
+    calc_elbow_carrying_angle,
+    calc_foot_arch_height_mm,
     estimate_pixels_per_cm,
     calc_shoulder_asymmetry_mm,
     calc_ear_level_asymmetry_mm,
@@ -37,6 +40,10 @@ from app.services.posture.calculator import (
     RIGHT_EAR,
     LEFT_SHOULDER,
     RIGHT_SHOULDER,
+    LEFT_ELBOW,
+    RIGHT_ELBOW,
+    LEFT_WRIST,
+    RIGHT_WRIST,
     LEFT_HIP,
     RIGHT_HIP,
     LEFT_KNEE,
@@ -49,7 +56,7 @@ from app.services.posture.calculator import (
     RIGHT_FOOT_INDEX,
 )
 
-from app.services.posture.classifier import classify
+from app.services.posture.classifier import classify, THRESHOLDS
 
 from app.services.posture.annotator import annotate_pose
 
@@ -147,6 +154,76 @@ async def analyze_posture(
         side_measurements.append(
             measurement("PT-L05", "Forward Trunk Lean", None, "\u00b0", "insufficient_data")
         )
+
+    # PT-L06 — Knee Hyperextension (Genu Recurvatum)
+
+    knee_idx_lat = LEFT_KNEE if lateral_side == "left" else RIGHT_KNEE
+    ankle_idx_lat = LEFT_ANKLE if lateral_side == "left" else RIGHT_ANKLE
+
+    try:
+        check_visibility(
+            side_landmarks,
+            [hip_idx_lat, knee_idx_lat, ankle_idx_lat, ear_idx, shoulder_idx_lat],
+        )
+
+        knee_hyperext = calc_knee_hyperextension(side_landmarks, side=lateral_side)
+        severity = classify("PT-L06", knee_hyperext)
+        findings["PT-L06"] = severity
+
+        side_measurements.append(
+            measurement("PT-L06", "Knee Hyperextension", knee_hyperext, "\u00b0", severity)
+        )
+
+    except InsufficientVisibilityError:
+        side_measurements.append(
+            measurement("PT-L06", "Knee Hyperextension", None, "\u00b0", "insufficient_data")
+        )
+
+    # PT-L08 — Foot Arch Height (bilateral, mm-calibrated on the side image)
+
+    side_width_px, side_height_px = get_image_dimensions(side_bytes)
+
+    side_pixels_per_cm = estimate_pixels_per_cm(side_landmarks, side_height_px, patient_height_cm)
+
+    for foot_label, heel_i, foot_idx_i, ankle_i, foot_side_key in [
+        ("Left", LEFT_HEEL, LEFT_FOOT_INDEX, LEFT_ANKLE, "left"),
+        ("Right", RIGHT_HEEL, RIGHT_FOOT_INDEX, RIGHT_ANKLE, "right"),
+    ]:
+        try:
+            check_visibility(side_landmarks, [ankle_i, heel_i, foot_idx_i])
+
+            if side_pixels_per_cm is None:
+                side_measurements.append(
+                    measurement(
+                        "PT-L08", f"Foot Arch Height ({foot_label})", None, "mm", "not_available"
+                    )
+                )
+                continue
+
+            arch_height = calc_foot_arch_height_mm(
+                side_landmarks, foot_side_key, side_height_px, side_pixels_per_cm
+            )
+            severity = classify("PT-L08", arch_height)
+
+            if severity in ("moderate", "severe"):
+                pt_l08_rule = THRESHOLDS["PT-L08"]
+                direction_key = "low" if arch_height < pt_l08_rule["normal_min"] else "high"
+                findings[f"PT-L08_{direction_key}_{foot_side_key}"] = severity
+            else:
+                findings[f"PT-L08_{foot_side_key}"] = severity
+
+            side_measurements.append(
+                measurement(
+                    "PT-L08", f"Foot Arch Height ({foot_label})", arch_height, "mm", severity
+                )
+            )
+
+        except InsufficientVisibilityError:
+            side_measurements.append(
+                measurement(
+                    "PT-L08", f"Foot Arch Height ({foot_label})", None, "mm", "insufficient_data"
+                )
+            )
 
     side_photo_url = _annotate_or_blank(side_bytes, side_results)
 
@@ -246,6 +323,46 @@ async def analyze_posture(
                 measurement(
                     "PT-A05",
                     f"Knee Alignment ({side_label})",
+                    None,
+                    "\u00b0",
+                    "insufficient_data",
+                )
+            )
+
+    # PT-A08 — Elbow Carrying Angle (bilateral)
+
+    for side_label, shoulder_i, elbow_i, wrist_i, side_key in [
+        ("Left", LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST, "left"),
+        ("Right", RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST, "right"),
+    ]:
+        try:
+            check_visibility(front_landmarks, [shoulder_i, elbow_i, wrist_i])
+
+            carrying_angle = calc_elbow_carrying_angle(front_landmarks, side_key)
+
+            if carrying_angle < 0:
+                # Varus deviation is always severe, regardless of magnitude.
+                severity = "severe"
+            else:
+                severity = classify("PT-A08", carrying_angle, gender=gender)
+
+            findings[f"PT-A08_{side_key}"] = severity
+
+            front_measurements.append(
+                measurement(
+                    "PT-A08",
+                    f"Elbow Carrying Angle ({side_label})",
+                    carrying_angle,
+                    "\u00b0",
+                    severity,
+                )
+            )
+
+        except InsufficientVisibilityError:
+            front_measurements.append(
+                measurement(
+                    "PT-A08",
+                    f"Elbow Carrying Angle ({side_label})",
                     None,
                     "\u00b0",
                     "insufficient_data",

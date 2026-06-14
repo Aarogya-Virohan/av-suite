@@ -3,8 +3,18 @@ import pytest
 from app.services.posture.calculator import (
     angle_between_points,
     calc_cva,
+    calc_elbow_carrying_angle,
+    calc_foot_arch_height_mm,
+    calc_knee_hyperextension,
     calc_pelvic_obliquity,
     distance_between_points,
+    LEFT_ANKLE,
+    LEFT_ELBOW,
+    LEFT_FOOT_INDEX,
+    LEFT_HEEL,
+    LEFT_SHOULDER,
+    LEFT_WRIST,
+    RIGHT_SHOULDER,
 )
 
 from app.services.posture.schemas import Landmark
@@ -148,3 +158,136 @@ def test_calc_pelvic_obliquity(
     # PT-A04 is now the angle of the L-Hip/R-Hip line from horizontal (degrees),
     # not the old *100 pseudo-mm value.
     assert result == pytest.approx(7.125, rel=1e-3)
+
+
+def _blank_landmarks() -> list[Landmark]:
+
+    return [
+        Landmark(index=index, x=0.0, y=0.0, z=0.0, visibility=1.0)
+        for index in range(33)
+    ]
+
+
+def _set(points: list[Landmark], index: int, x: float, y: float) -> None:
+
+    points[index] = Landmark(index=index, x=x, y=y, z=0.0, visibility=1.0)
+
+
+def test_calc_knee_hyperextension_flexion_is_positive() -> None:
+
+    points = _blank_landmarks()
+
+    # Facing direction: ear.x > shoulder.x -> facing toward +x.
+    _set(points, RIGHT_SHOULDER, 0.5, 0.3)
+    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR
+
+    # Hip directly above ankle (straight vertical reference line).
+    _set(points, 24, 0.5, 0.5)  # RIGHT_HIP
+    _set(points, 28, 0.5, 1.0)  # RIGHT_ANKLE
+
+    # Knee anterior (toward facing direction, +x) of the hip-ankle line.
+    _set(points, 26, 0.6, 0.75)  # RIGHT_KNEE
+
+    result = calc_knee_hyperextension(points, "right")
+
+    assert result > 0
+
+
+def test_calc_knee_hyperextension_posterior_is_negative() -> None:
+
+    points = _blank_landmarks()
+
+    # Facing direction: ear.x > shoulder.x -> facing toward +x.
+    _set(points, RIGHT_SHOULDER, 0.5, 0.3)
+    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR
+
+    # Hip directly above ankle (straight vertical reference line).
+    _set(points, 24, 0.5, 0.5)  # RIGHT_HIP
+    _set(points, 28, 0.5, 1.0)  # RIGHT_ANKLE
+
+    # Knee posterior (away from facing direction, -x) of the hip-ankle line.
+    _set(points, 26, 0.4, 0.75)  # RIGHT_KNEE
+
+    result = calc_knee_hyperextension(points, "right")
+
+    assert result < 0
+
+
+def test_calc_knee_hyperextension_straight_leg_is_zero() -> None:
+
+    points = _blank_landmarks()
+
+    _set(points, RIGHT_SHOULDER, 0.5, 0.3)
+    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR
+
+    _set(points, 24, 0.5, 0.5)  # RIGHT_HIP
+    _set(points, 26, 0.5, 0.75)  # RIGHT_KNEE, on the hip-ankle line
+    _set(points, 28, 0.5, 1.0)  # RIGHT_ANKLE
+
+    result = calc_knee_hyperextension(points, "right")
+
+    assert result == pytest.approx(0.0)
+
+
+def test_calc_elbow_carrying_angle_valgus_is_positive() -> None:
+
+    points = _blank_landmarks()
+
+    # Body midline (mean of both shoulders) at x = 0.5.
+    _set(points, LEFT_SHOULDER, 0.3, 0.3)
+    _set(points, RIGHT_SHOULDER, 0.7, 0.3)
+
+    _set(points, LEFT_ELBOW, 0.3, 0.5)
+    # Left side: wrist.x < midline_x (0.5) -> valgus -> positive.
+    _set(points, LEFT_WRIST, 0.2, 0.7)
+
+    result = calc_elbow_carrying_angle(points, "left")
+
+    assert result > 0
+
+
+def test_calc_elbow_carrying_angle_varus_is_negative() -> None:
+
+    points = _blank_landmarks()
+
+    _set(points, LEFT_SHOULDER, 0.3, 0.3)
+    _set(points, RIGHT_SHOULDER, 0.7, 0.3)
+
+    _set(points, LEFT_ELBOW, 0.3, 0.5)
+    # Left side: wrist.x >= midline_x (0.5) -> varus -> negative.
+    _set(points, LEFT_WRIST, 0.6, 0.7)
+
+    result = calc_elbow_carrying_angle(points, "left")
+
+    assert result < 0
+
+
+def test_calc_foot_arch_height_mm() -> None:
+
+    points = _blank_landmarks()
+
+    # Heel-to-toe line is horizontal (y constant).
+    _set(points, LEFT_HEEL, 0.3, 0.9)
+    _set(points, LEFT_FOOT_INDEX, 0.5, 0.9)
+
+    # Ankle sits 0.05 (normalised) above the heel-toe line.
+    _set(points, LEFT_ANKLE, 0.35, 0.85)
+
+    # image_height_px=1000, pixels_per_cm=100 -> 1px = 0.1mm
+    result = calc_foot_arch_height_mm(points, "left", 1000, 100)
+
+    assert result == pytest.approx(5.0)
+
+
+def test_calc_foot_arch_height_mm_zero_length_line() -> None:
+
+    points = _blank_landmarks()
+
+    # Heel and toe at the same point -> zero-length reference line.
+    _set(points, LEFT_HEEL, 0.3, 0.9)
+    _set(points, LEFT_FOOT_INDEX, 0.3, 0.9)
+    _set(points, LEFT_ANKLE, 0.35, 0.85)
+
+    result = calc_foot_arch_height_mm(points, "left", 1000, 100)
+
+    assert result == 0.0

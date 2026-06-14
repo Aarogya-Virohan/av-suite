@@ -109,6 +109,30 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 8,
         "moderate_max": 12,
     },
+    "PT-L06": {
+        "direction": "lower_worse",
+        "none_min": -5,
+        "mild_min": -10,
+        "moderate_min": -15,
+    },
+    "PT-A08": {
+        "direction": "higher_worse",
+        "none_max": 10,
+        "none_max_female": 15,
+        "mild_max": 15,
+        "mild_max_female": 20,
+        "moderate_max": 20,
+        "moderate_max_female": 25,
+    },
+    "PT-L08": {
+        "direction": "range_centered",
+        "normal_min": 8,
+        "normal_max": 15,
+        "mild_min_low": 5,
+        "moderate_min_low": 3,
+        "mild_max_high": 20,
+        "moderate_max_high": 25,
+    },
 }
 
 
@@ -156,14 +180,15 @@ def classify(
     direction = rule["direction"]
 
     none_max = rule.get("none_max")
+    mild_max = rule.get("mild_max")
+    moderate_max = rule.get("moderate_max")
 
-    if (
-        param_id == "PT-A05"
-        and gender
-        and gender.strip().lower().startswith("f")
-        and "none_max_female" in rule
-    ):
-        none_max = rule["none_max_female"]
+    is_female = bool(gender) and gender.strip().lower().startswith("f")
+
+    if is_female:
+        none_max = rule.get("none_max_female", none_max)
+        mild_max = rule.get("mild_max_female", mild_max)
+        moderate_max = rule.get("moderate_max_female", moderate_max)
 
     if direction == "lower_worse":
 
@@ -183,10 +208,38 @@ def classify(
         if value <= none_max:
             return "none"
 
-        if value <= rule["mild_max"]:
+        if value <= mild_max:
             return "mild"
 
-        if value <= rule["moderate_max"]:
+        if value <= moderate_max:
+            return "moderate"
+
+        return "severe"
+
+    if direction == "range_centered":
+
+        normal_min = rule["normal_min"]
+        normal_max = rule["normal_max"]
+
+        if normal_min <= value <= normal_max:
+            return "none"
+
+        if value < normal_min:
+
+            if value >= rule["mild_min_low"]:
+                return "mild"
+
+            if value >= rule["moderate_min_low"]:
+                return "moderate"
+
+            return "severe"
+
+        # value > normal_max
+
+        if value <= rule["mild_max_high"]:
+            return "mild"
+
+        if value <= rule["moderate_max_high"]:
             return "moderate"
 
         return "severe"

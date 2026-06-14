@@ -9,6 +9,12 @@ RIGHT_EAR = 8
 LEFT_SHOULDER = 11
 RIGHT_SHOULDER = 12
 
+LEFT_ELBOW = 13
+RIGHT_ELBOW = 14
+
+LEFT_WRIST = 15
+RIGHT_WRIST = 16
+
 LEFT_HIP = 23
 RIGHT_HIP = 24
 
@@ -149,6 +155,57 @@ def calc_forward_trunk_lean(
     )
 
 
+def calc_knee_hyperextension(
+    landmarks: list[Landmark], side: Literal["left", "right"]
+) -> float:
+    """
+    PT-L06 — Knee Hyperextension (Genu Recurvatum), lateral view.
+
+    Returns the hip-knee-ankle deviation in degrees, signed:
+    positive = knee flexed/anterior to the hip-ankle line (normal),
+    negative = knee hyperextended (posterior to the hip-ankle line),
+    relative to the direction the subject is facing (ear-shoulder line).
+
+    Note: sign convention is a geometric approximation based on the
+    knee's horizontal offset from the expected straight hip-ankle line
+    and the subject's facing direction. Should be reviewed against real
+    photos before clinical use (same caveat as
+    calc_knee_frontal_deviation).
+    """
+
+    hip = landmarks[LEFT_HIP if side == "left" else RIGHT_HIP]
+    knee = landmarks[LEFT_KNEE if side == "left" else RIGHT_KNEE]
+    ankle = landmarks[LEFT_ANKLE if side == "left" else RIGHT_ANKLE]
+    ear = landmarks[LEFT_EAR if side == "left" else RIGHT_EAR]
+    shoulder = landmarks[LEFT_SHOULDER if side == "left" else RIGHT_SHOULDER]
+
+    raw_angle = angle_between_points(
+        (hip.x, hip.y),
+        (knee.x, knee.y),
+        (ankle.x, ankle.y),
+    )
+
+    deviation = 180.0 - raw_angle
+
+    if ankle.y != hip.y:
+        t = (knee.y - hip.y) / (ankle.y - hip.y)
+    else:
+        t = 0.5
+
+    expected_x = hip.x + t * (ankle.x - hip.x)
+    offset = knee.x - expected_x
+
+    facing_dx = ear.x - shoulder.x
+
+    # Knee anterior (toward the facing direction) = flexion/normal,
+    # positive. Knee posterior (away from facing direction) =
+    # hyperextension, negative.
+    if (offset >= 0) == (facing_dx >= 0):
+        return deviation
+
+    return -deviation
+
+
 # ---------------------------------------------------------------------------
 # Phase 2 — Anterior (Front) View Calculators
 # ---------------------------------------------------------------------------
@@ -226,6 +283,42 @@ def calc_knee_frontal_deviation(
     return deviation, direction
 
 
+def calc_elbow_carrying_angle(
+    landmarks: list[Landmark], side: Literal["left", "right"]
+) -> float:
+    """
+    PT-A08 — Elbow Carrying Angle, anterior view.
+
+    Returns the shoulder-elbow-wrist deviation from a straight line, in
+    degrees, signed: positive = valgus (forearm deviates away from the
+    body midline), negative = varus.
+
+    Note: sign convention is a geometric approximation based on the
+    wrist's horizontal position relative to the body midline (mean of
+    both shoulders). Should be reviewed against real photos before
+    clinical use.
+    """
+
+    shoulder = landmarks[LEFT_SHOULDER if side == "left" else RIGHT_SHOULDER]
+    elbow = landmarks[LEFT_ELBOW if side == "left" else RIGHT_ELBOW]
+    wrist = landmarks[LEFT_WRIST if side == "left" else RIGHT_WRIST]
+
+    raw_angle = angle_between_points(
+        (shoulder.x, shoulder.y),
+        (elbow.x, elbow.y),
+        (wrist.x, wrist.y),
+    )
+
+    deviation = 180.0 - raw_angle
+
+    midline_x = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2
+
+    if side == "left":
+        return deviation if wrist.x < midline_x else -deviation
+
+    return deviation if wrist.x > midline_x else -deviation
+
+
 def estimate_pixels_per_cm(
     landmarks: list[Landmark],
     image_height_px: int,
@@ -287,6 +380,37 @@ def calc_trunk_lateral_shift_mm(
     return (diff_px / pixels_per_cm) * 10
 
 
+def calc_foot_arch_height_mm(
+    landmarks: list[Landmark],
+    side: Literal["left", "right"],
+    image_height_px: int,
+    pixels_per_cm: float,
+) -> float:
+    """
+    PT-L08 — Foot Arch Height, lateral view. Approximation only.
+
+    Perpendicular distance from the Ankle landmark to the
+    Heel -> Foot Index line, used as a proxy for medial arch height.
+    Unit: millimetres.
+    """
+
+    ankle = landmarks[LEFT_ANKLE if side == "left" else RIGHT_ANKLE]
+    heel = landmarks[LEFT_HEEL if side == "left" else RIGHT_HEEL]
+    toe = landmarks[LEFT_FOOT_INDEX if side == "left" else RIGHT_FOOT_INDEX]
+
+    line_dx = toe.x - heel.x
+    line_dy = toe.y - heel.y
+    line_len = math.hypot(line_dx, line_dy)
+
+    if line_len == 0:
+        return 0.0
+
+    dist_norm = abs((ankle.x - heel.x) * line_dy - (ankle.y - heel.y) * line_dx) / line_len
+    dist_px = dist_norm * image_height_px
+
+    return (dist_px / pixels_per_cm) * 10
+
+
 # ---------------------------------------------------------------------------
 # Phase 3 — Posterior (Back) View Calculators
 # ---------------------------------------------------------------------------
@@ -297,9 +421,9 @@ def calc_scoliosis_screen_mm(
 ) -> float:
     """
     PT-P01 — Scoliosis screen. Lateral deviation of the trunk midline
-    (shoulder midpoint) from the plumb line dropped through the ankle
-    midpoint. Unit: millimetres. MediaPipe approximation only — NOT a
-    Cobb angle, screening purposes only.
+    (shoulder midpoint) from the pelvic midline (hip midpoint), used as
+    a stable proxy for the plumb line. Unit: millimetres. MediaPipe
+    approximation only — NOT a Cobb angle, screening purposes only.
     """
 
     mid_shoulder_x = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2

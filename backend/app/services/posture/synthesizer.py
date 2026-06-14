@@ -138,6 +138,44 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
             {"exercise": "Hip Internal/External Rotation Stretch", "dosage": "3x30s each side"},
         ],
     },
+    {
+        # PT-L06 — Knee Hyperextension (Genu Recurvatum)
+        "param_id": "PT-L06",
+        "hypertonic": ["Gastrocnemius", "Soleus"],
+        "inhibited": ["Quadriceps", "Hamstrings"],
+        "corrective": [
+            {"exercise": "Terminal Knee Extension Control", "dosage": "3x15"},
+        ],
+    },
+    {
+        # PT-A08 — Elbow Carrying Angle
+        # Low clinical confidence (geometric approximation) — flagged
+        # for clinician review; kept generic until validated.
+        "param_id": "PT-A08",
+        "hypertonic": ["Forearm Flexors"],
+        "inhibited": ["Forearm Extensors"],
+        "corrective": [
+            {"exercise": "Forearm Stretch & Strengthen", "dosage": "3x15"},
+        ],
+    },
+    {
+        # PT-L08 (low) — Foot Arch Height below normal (pes planus / flat foot)
+        "param_id": "PT-L08_low",
+        "hypertonic": ["Peroneals", "Gastrocnemius"],
+        "inhibited": ["Tibialis Posterior", "Intrinsic Foot Muscles"],
+        "corrective": [
+            {"exercise": "Short Foot Exercise", "dosage": "3x10"},
+        ],
+    },
+    {
+        # PT-L08 (high) — Foot Arch Height above normal (pes cavus / high arch)
+        "param_id": "PT-L08_high",
+        "hypertonic": ["Tibialis Posterior", "Peroneus Longus"],
+        "inhibited": ["Peroneus Brevis"],
+        "corrective": [
+            {"exercise": "Calf Stretching & Ankle Mobility", "dosage": "3x30s"},
+        ],
+    },
 ]
 
 
@@ -157,8 +195,16 @@ def generate_synthesis(findings: dict[str, str]) -> dict[str, Any]:
         if severity not in TRIGGER_SEVERITIES:
             continue
 
-        # Bilateral findings are keyed e.g. "PT-A05_left" / "PT-A06_right"
-        base_param_id = finding_key.split("_")[0]
+        # Bilateral/sub-classified findings are keyed e.g.
+        # "PT-A05_left" / "PT-A06_right" / "PT-L08_low_left". The base
+        # param id is everything except the trailing side suffix; for
+        # keys with no underscore at all, the whole key is the base.
+        parts = finding_key.split("_")
+
+        if len(parts) == 1:
+            base_param_id = parts[0]
+        else:
+            base_param_id = "_".join(parts[:-1])
 
         for rule in SYNTHESIS_RULES:
 
