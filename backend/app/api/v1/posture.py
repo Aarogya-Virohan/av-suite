@@ -25,6 +25,11 @@ from app.services.posture.calculator import (
     calc_shoulder_asymmetry_mm,
     calc_ear_level_asymmetry_mm,
     calc_trunk_lateral_shift_mm,
+    calc_scoliosis_screen_mm,
+    calc_scapular_height_asymmetry_mm,
+    calc_heel_valgus,
+    calc_pelvic_rotation,
+    calc_bilateral_toe_asymmetry,
     NOSE,
     LEFT_EAR,
     RIGHT_EAR,
@@ -36,6 +41,10 @@ from app.services.posture.calculator import (
     RIGHT_KNEE,
     LEFT_ANKLE,
     RIGHT_ANKLE,
+    LEFT_HEEL,
+    RIGHT_HEEL,
+    LEFT_FOOT_INDEX,
+    RIGHT_FOOT_INDEX,
 )
 
 from app.services.posture.classifier import classify
@@ -301,19 +310,124 @@ async def analyze_posture(
     )
 
     # =========================================================================
-    # BACK (POSTERIOR) PLANE — Phase 3
+    # BACK (POSTERIOR) PLANE
     # =========================================================================
 
-    back_view = {
-        "photoUrl": "",
-        "accuracy": 0.95,
-        "measurements": [],
-        "interpretation": (
-            "Back view uploaded successfully. Posterior-plane analysis "
-            "(spinal alignment, scapular symmetry) is part of the next "
-            "update to this tool."
-        ),
-    }
+    try:
+        back_landmarks, back_results = detect_pose_full(back_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Back image: pose detection failed: {str(e)}")
+
+    back_measurements = []
+
+    back_width_px, back_height_px = get_image_dimensions(back_bytes)
+
+    back_pixels_per_cm = estimate_pixels_per_cm(back_landmarks, back_height_px, patient_height_cm)
+
+    # PT-P01 — Scoliosis Screen
+    try:
+        check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ANKLE, RIGHT_ANKLE])
+
+        if back_pixels_per_cm is None:
+            back_measurements.append(
+                measurement("PT-P01", "Scoliosis Screen", None, "mm", "not_available")
+            )
+        else:
+            scoliosis = calc_scoliosis_screen_mm(back_landmarks, back_width_px, back_pixels_per_cm)
+            severity = classify("PT-P01", scoliosis)
+            findings["PT-P01"] = severity
+
+            back_measurements.append(
+                measurement("PT-P01", "Scoliosis Screen", scoliosis, "mm", severity)
+            )
+
+    except InsufficientVisibilityError:
+        back_measurements.append(
+            measurement("PT-P01", "Scoliosis Screen", None, "mm", "insufficient_data")
+        )
+
+    # PT-P02 — Scapular Height Asymmetry
+    try:
+        check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER])
+
+        if back_pixels_per_cm is None:
+            back_measurements.append(
+                measurement("PT-P02", "Scapular Height Asymmetry", None, "mm", "not_available")
+            )
+        else:
+            scapular = calc_scapular_height_asymmetry_mm(back_landmarks, back_height_px, back_pixels_per_cm)
+            severity = classify("PT-P02", scapular)
+            findings["PT-P02"] = severity
+
+            back_measurements.append(
+                measurement("PT-P02", "Scapular Height Asymmetry", scapular, "mm", severity)
+            )
+
+    except InsufficientVisibilityError:
+        back_measurements.append(
+            measurement("PT-P02", "Scapular Height Asymmetry", None, "mm", "insufficient_data")
+        )
+
+    # PT-P03 — Heel Valgus (bilateral)
+    for side_label, knee_i, ankle_i, heel_i, side_key in [
+        ("Left", LEFT_KNEE, LEFT_ANKLE, LEFT_HEEL, "left"),
+        ("Right", RIGHT_KNEE, RIGHT_ANKLE, RIGHT_HEEL, "right"),
+    ]:
+        try:
+            check_visibility(back_landmarks, [knee_i, ankle_i, heel_i])
+
+            heel_valgus = calc_heel_valgus(back_landmarks, side_key)
+            severity = classify("PT-P03", heel_valgus)
+            findings[f"PT-P03_{side_key}"] = severity
+
+            back_measurements.append(
+                measurement("PT-P03", f"Heel Valgus ({side_label})", heel_valgus, "\u00b0", severity)
+            )
+
+        except InsufficientVisibilityError:
+            back_measurements.append(
+                measurement("PT-P03", f"Heel Valgus ({side_label})", None, "\u00b0", "insufficient_data")
+            )
+
+    # PT-P04 — Pelvic Rotation
+    try:
+        check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP])
+
+        pelvic_rotation = calc_pelvic_rotation(back_landmarks)
+        severity = classify("PT-P04", pelvic_rotation)
+        findings["PT-P04"] = severity
+
+        back_measurements.append(
+            measurement("PT-P04", "Pelvic Rotation", pelvic_rotation, "\u00b0", severity)
+        )
+
+    except InsufficientVisibilityError:
+        back_measurements.append(
+            measurement("PT-P04", "Pelvic Rotation", None, "\u00b0", "insufficient_data")
+        )
+
+    # PT-P05 — Bilateral Toe Angle Asymmetry
+    try:
+        check_visibility(back_landmarks, [LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX])
+
+        toe_asymmetry = calc_bilateral_toe_asymmetry(back_landmarks)
+        severity = classify("PT-P05", toe_asymmetry)
+        findings["PT-P05"] = severity
+
+        back_measurements.append(
+            measurement("PT-P05", "Bilateral Toe Angle Asymmetry", toe_asymmetry, "\u00b0", severity)
+        )
+
+    except InsufficientVisibilityError:
+        back_measurements.append(
+            measurement("PT-P05", "Bilateral Toe Angle Asymmetry", None, "\u00b0", "insufficient_data")
+        )
+
+    back_photo_url = _annotate_or_blank(back_bytes, back_results)
+
+    back_view = build_side_view_result(
+        measurements=back_measurements, photo_url=back_photo_url
+    )
 
     # ---------------------------------
     # Clinical Synthesis

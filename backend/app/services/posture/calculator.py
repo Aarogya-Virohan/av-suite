@@ -18,6 +18,12 @@ RIGHT_KNEE = 26
 LEFT_ANKLE = 27
 RIGHT_ANKLE = 28
 
+LEFT_HEEL = 29
+RIGHT_HEEL = 30
+
+LEFT_FOOT_INDEX = 31
+RIGHT_FOOT_INDEX = 32
+
 
 def distance_between_points(a: tuple[float, float], b: tuple[float, float]) -> float:
 
@@ -335,3 +341,111 @@ def calc_trunk_lateral_shift_mm(
     diff_px = abs(shoulder_mid_x - hip_mid_x) * image_width_px
 
     return (diff_px / pixels_per_cm) * 10
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — Posterior (Back) View Calculators
+# ---------------------------------------------------------------------------
+
+
+def calc_scoliosis_screen_mm(
+    landmarks: list[Landmark], image_width_px: int, pixels_per_cm: float
+) -> float:
+    """
+    PT-P01 — Scoliosis screen. Lateral deviation of the trunk midline
+    (shoulder midpoint) from the plumb line dropped through the ankle
+    midpoint. Unit: millimetres. MediaPipe approximation only — NOT a
+    Cobb angle, screening purposes only.
+    """
+
+    mid_shoulder_x = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2
+    mid_ankle_x = (landmarks[LEFT_ANKLE].x + landmarks[RIGHT_ANKLE].x) / 2
+
+    diff_px = abs(mid_shoulder_x - mid_ankle_x) * image_width_px
+
+    return (diff_px / pixels_per_cm) * 10
+
+
+def calc_scapular_height_asymmetry_mm(
+    landmarks: list[Landmark], image_height_px: int, pixels_per_cm: float
+) -> float:
+    """PT-P02 — Scapular height asymmetry (posterior shoulder line). Unit: millimetres."""
+
+    diff_px = abs(landmarks[LEFT_SHOULDER].y - landmarks[RIGHT_SHOULDER].y) * image_height_px
+
+    return (diff_px / pixels_per_cm) * 10
+
+
+def calc_heel_valgus(landmarks: list[Landmark], side: Literal["left", "right"]) -> float:
+    """
+    PT-P03 — Heel Valgus / Subtalar Alignment. Deviation of the heel
+    from the knee-ankle (lower leg) axis, in degrees. Magnitude only
+    (direction not distinguished in this version).
+    """
+
+    knee = landmarks[LEFT_KNEE if side == "left" else RIGHT_KNEE]
+    ankle = landmarks[LEFT_ANKLE if side == "left" else RIGHT_ANKLE]
+    heel = landmarks[LEFT_HEEL if side == "left" else RIGHT_HEEL]
+
+    raw_angle = angle_between_points(
+        (knee.x, knee.y),
+        (ankle.x, ankle.y),
+        (heel.x, heel.y),
+    )
+
+    return 180.0 - raw_angle
+
+
+def calc_pelvic_rotation(landmarks: list[Landmark]) -> float:
+    """
+    PT-P04 — Pelvic Rotation (Axial). Angular difference between the
+    shoulder-line orientation and hip-line orientation, in degrees.
+    A larger difference indicates the pelvis is rotated relative to
+    the shoulder girdle.
+    """
+
+    shoulder_dx = landmarks[RIGHT_SHOULDER].x - landmarks[LEFT_SHOULDER].x
+    shoulder_dy = landmarks[RIGHT_SHOULDER].y - landmarks[LEFT_SHOULDER].y
+    shoulder_angle = math.degrees(math.atan2(shoulder_dy, shoulder_dx))
+
+    hip_dx = landmarks[RIGHT_HIP].x - landmarks[LEFT_HIP].x
+    hip_dy = landmarks[RIGHT_HIP].y - landmarks[LEFT_HIP].y
+    hip_angle = math.degrees(math.atan2(hip_dy, hip_dx))
+
+    diff = abs(shoulder_angle - hip_angle)
+
+    # A line and its 180-degree-reversed direction represent the same
+    # orientation, so fold the difference into [0, 90].
+    if diff > 90:
+        diff = 180.0 - diff
+
+    return diff
+
+
+def calc_foot_axis_angle(landmarks: list[Landmark], side: Literal["left", "right"]) -> float:
+    """
+    Helper for PT-P05 — angle of the heel-to-foot-index line from
+    vertical, in degrees. Used to compare left vs right foot
+    orientation from a posterior photo.
+    """
+
+    heel = landmarks[LEFT_HEEL if side == "left" else RIGHT_HEEL]
+    foot_index = landmarks[LEFT_FOOT_INDEX if side == "left" else RIGHT_FOOT_INDEX]
+
+    dx = foot_index.x - heel.x
+    dy = foot_index.y - heel.y
+
+    return math.degrees(math.atan2(abs(dx), abs(dy)))
+
+
+def calc_bilateral_toe_asymmetry(landmarks: list[Landmark]) -> float:
+    """
+    PT-P05 — Bilateral Toe Angle Asymmetry. Absolute difference between
+    the left and right foot-axis angles (see calc_foot_axis_angle), in
+    degrees.
+    """
+
+    left_angle = calc_foot_axis_angle(landmarks, "left")
+    right_angle = calc_foot_axis_angle(landmarks, "right")
+
+    return abs(left_angle - right_angle)
