@@ -101,22 +101,6 @@ def calc_cva(landmarks: list[Landmark], side: Literal["left", "right"] | None = 
     return math.degrees(math.atan2(abs(dy), abs(dx)))
 
 
-def calc_shoulder_asymmetry(landmarks: list[Landmark]) -> float:
-
-    left = landmarks[LEFT_SHOULDER]
-    right = landmarks[RIGHT_SHOULDER]
-
-    return abs(left.y - right.y) * 100
-
-
-def calc_ear_level_asymmetry(landmarks: list[Landmark]) -> float:
-
-    left = landmarks[LEFT_EAR]
-    right = landmarks[RIGHT_EAR]
-
-    return abs(left.y - right.y) * 100
-
-
 def calc_pelvic_obliquity(landmarks: list[Landmark]) -> float:
     """
     PT-A04 — Angle of the hip landmark line from horizontal.
@@ -132,21 +116,6 @@ def calc_pelvic_obliquity(landmarks: list[Landmark]) -> float:
     return math.degrees(math.atan2(abs(dy), abs(dx)))
 
 
-def calc_trunk_lateral_shift(landmarks: list[Landmark]) -> float:
-
-    left_shoulder = landmarks[LEFT_SHOULDER]
-    right_shoulder = landmarks[RIGHT_SHOULDER]
-
-    left_hip = landmarks[LEFT_HIP]
-    right_hip = landmarks[RIGHT_HIP]
-
-    shoulder_mid = (left_shoulder.x + right_shoulder.x) / 2
-
-    hip_mid = (left_hip.x + right_hip.x) / 2
-
-    return abs(shoulder_mid - hip_mid) * 100
-
-
 def midpoint(
     a: tuple[float, float],
     b: tuple[float, float],
@@ -156,14 +125,6 @@ def midpoint(
         (a[0] + b[0]) / 2,
         (a[1] + b[1]) / 2,
     )
-
-
-def calc_knee_alignment(landmarks: list[Landmark]) -> float:
-
-    left_knee = landmarks[LEFT_KNEE]
-    right_knee = landmarks[RIGHT_KNEE]
-
-    return abs(left_knee.y - right_knee.y) * 100
 
 
 def calc_forward_trunk_lean(
@@ -183,23 +144,6 @@ def calc_forward_trunk_lean(
 
     return angle_between_points(
         (shoulder.x, shoulder.y),
-        (hip.x, hip.y),
-        vertical_ref,
-    )
-
-
-def calc_anterior_pelvic_tilt(landmarks: list[Landmark]) -> float:
-
-    hip = landmarks[LEFT_HIP]
-    knee = landmarks[LEFT_KNEE]
-
-    vertical_ref = (
-        hip.x,
-        hip.y - 1.0,
-    )
-
-    return angle_between_points(
-        (knee.x, knee.y),
         (hip.x, hip.y),
         vertical_ref,
     )

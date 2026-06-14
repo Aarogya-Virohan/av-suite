@@ -3,11 +3,7 @@ import pytest
 from app.services.posture.calculator import (
     angle_between_points,
     calc_cva,
-    calc_ear_level_asymmetry,
-    calc_knee_alignment,
     calc_pelvic_obliquity,
-    calc_shoulder_asymmetry,
-    calc_trunk_lateral_shift,
     distance_between_points,
 )
 
@@ -141,28 +137,6 @@ def test_calc_cva(
     assert 0 <= result <= 90
 
 
-def test_calc_shoulder_asymmetry(
-    landmarks: list[Landmark],
-) -> None:
-
-    result = calc_shoulder_asymmetry(
-        landmarks,
-    )
-
-    assert result == pytest.approx(5.0)
-
-
-def test_calc_ear_level_asymmetry(
-    landmarks: list[Landmark],
-) -> None:
-
-    result = calc_ear_level_asymmetry(
-        landmarks,
-    )
-
-    assert result == pytest.approx(5.0)
-
-
 def test_calc_pelvic_obliquity(
     landmarks: list[Landmark],
 ) -> None:
@@ -174,23 +148,3 @@ def test_calc_pelvic_obliquity(
     # PT-A04 is now the angle of the L-Hip/R-Hip line from horizontal (degrees),
     # not the old *100 pseudo-mm value.
     assert result == pytest.approx(7.125, rel=1e-3)
-
-
-def test_calc_trunk_lateral_shift(
-    landmarks: list[Landmark],
-) -> None:
-
-    result = calc_trunk_lateral_shift(
-        landmarks,
-    )
-
-    assert result == pytest.approx(10.0)
-
-
-def test_calc_knee_alignment(
-    landmarks: list[Landmark],
-) -> None:
-
-    result = calc_knee_alignment(landmarks)
-
-    assert result == pytest.approx(5.0)
