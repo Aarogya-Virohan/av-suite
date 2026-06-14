@@ -359,9 +359,9 @@ def calc_scoliosis_screen_mm(
     """
 
     mid_shoulder_x = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2
-    mid_ankle_x = (landmarks[LEFT_ANKLE].x + landmarks[RIGHT_ANKLE].x) / 2
+    mid_hip_x = (landmarks[LEFT_HIP].x + landmarks[RIGHT_HIP].x) / 2
 
-    diff_px = abs(mid_shoulder_x - mid_ankle_x) * image_width_px
+    diff_px = abs(mid_shoulder_x - mid_hip_x) * image_width_px
 
     return (diff_px / pixels_per_cm) * 10
 
