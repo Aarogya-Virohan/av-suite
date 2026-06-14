@@ -4,7 +4,6 @@ import { useState } from "react"
 
 import UploadZone from "@/components/posture/UploadZone"
 import ImagePreview from "@/components/posture/ImagePreview"
-import AnalysisPanel from "@/components/posture/AnalysisPanel"
 
 import ReportCard from "@/components/report/ReportCard"
 
@@ -12,7 +11,7 @@ import { analyzePosture } from "@/lib/api"
 
 import type { PostureReport } from "@/types/posture"
 
-type Step = "upload" | "analysis" | "report"
+type Step = "upload" | "report"
 
 function Header() {
 return ( <header className="border-b border-slate-200 bg-white"> <div className="mx-auto flex w-full max-w-7xl items-center px-4 py-4"> <span className="text-lg font-semibold text-slate-900">
@@ -94,7 +93,7 @@ try {
 
   setReport(result)
 
-  setStep("analysis")
+  setStep("report")
 
 } catch (error) {
 
@@ -297,69 +296,6 @@ return ( <div className="min-h-screen bg-slate-100">
             {loading
               ? "Analysing..."
               : "Analyse Posture"}
-          </button>
-
-        </div>
-
-      </section>
-    )}
-
-    {step === "analysis" && (
-      <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-
-          <div>
-
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900">
-              Analysis Results
-            </h1>
-
-            <p className="mt-3 text-lg text-slate-600">
-              Review the detected biomechanical deviations.
-            </p>
-
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              setStep("upload")
-            }
-            className="
-              rounded-full
-              border
-              border-slate-300
-              px-5
-              py-3
-              text-slate-700
-            "
-          >
-            Change Images
-          </button>
-
-        </div>
-
-        <div className="mt-8">
-          <AnalysisPanel />
-        </div>
-
-        <div className="mt-8 flex justify-end">
-
-          <button
-            type="button"
-            onClick={() =>
-              setStep("report")
-            }
-            className="
-              rounded-full
-              bg-slate-900
-              px-6
-              py-3
-              text-white
-            "
-          >
-            Generate Clinical Report
           </button>
 
         </div>
