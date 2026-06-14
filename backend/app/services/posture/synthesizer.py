@@ -1,75 +1,138 @@
-def generate_synthesis(findings: dict[str, str]):
+"""
+Maps clinical findings (param_id -> severity) to muscle imbalance
+synthesis: hypertonic (tight/overactive) muscles, inhibited (weak)
+muscles, and a corrective exercise protocol.
 
-    hypertonic = set()
-    inhibited = set()
+Only findings classified as "moderate" or "severe" trigger a rule —
+mild/none findings are not actionable enough to drive corrective work.
+"""
 
-    corrective = []
+from typing import Any
 
-    # Forward head posture
 
-    if findings.get("PT-L01") in [
-        "moderate",
-        "severe",
-    ]:
+SYNTHESIS_RULES: list[dict[str, Any]] = [
+    {
+        # PT-L01 — Forward Head Posture (CVA)
+        "param_id": "PT-L01",
+        "hypertonic": ["Upper Trapezius", "Levator Scapulae", "Sternocleidomastoid"],
+        "inhibited": ["Deep Neck Flexors", "Lower Trapezius"],
+        "corrective": [
+            {"exercise": "Chin Tucks", "dosage": "3x12"},
+            {"exercise": "Wall Slides", "dosage": "3x10"},
+        ],
+    },
+    {
+        # PT-L05 — Forward Trunk Lean
+        "param_id": "PT-L05",
+        "hypertonic": ["Hip Flexors", "Erector Spinae"],
+        "inhibited": ["Gluteus Maximus", "Abdominals"],
+        "corrective": [
+            {"exercise": "Hip Flexor Stretch", "dosage": "3x30s each side"},
+        ],
+    },
+    {
+        # PT-A01 — Head Lateral Tilt
+        "param_id": "PT-A01",
+        "hypertonic": ["Upper Trapezius", "Scalenes"],
+        "inhibited": ["Deep Neck Flexors", "Lower Trapezius"],
+        "corrective": [
+            {"exercise": "Lateral Neck Stretch", "dosage": "3x30s each side"},
+        ],
+    },
+    {
+        # PT-A02 — Shoulder Level Asymmetry
+        "param_id": "PT-A02",
+        "hypertonic": ["Upper Trapezius"],
+        "inhibited": ["Middle Trapezius"],
+        "corrective": [
+            {"exercise": "Scapular Retraction", "dosage": "3x15"},
+        ],
+    },
+    {
+        # PT-A03 — Trunk Lateral Shift
+        "param_id": "PT-A03",
+        "hypertonic": ["Quadratus Lumborum", "Obliques (one side)"],
+        "inhibited": ["Gluteus Medius"],
+        "corrective": [
+            {"exercise": "Side Plank", "dosage": "3x20s each side"},
+        ],
+    },
+    {
+        # PT-A04 — Pelvic Obliquity
+        "param_id": "PT-A04",
+        "hypertonic": ["Quadratus Lumborum"],
+        "inhibited": ["Gluteus Medius"],
+        "corrective": [
+            {"exercise": "Side-Lying Hip Abduction", "dosage": "3x15 each side"},
+        ],
+    },
+    {
+        # PT-A05 — Knee Valgus
+        "param_id": "PT-A05",
+        "hypertonic": ["Adductors", "IT Band / TFL"],
+        "inhibited": ["Gluteus Medius", "VMO"],
+        "corrective": [
+            {"exercise": "Clamshells", "dosage": "3x15 each side"},
+        ],
+    },
+    {
+        # PT-A06 — Knee Varus
+        "param_id": "PT-A06",
+        "hypertonic": ["IT Band / TFL"],
+        "inhibited": ["Adductors"],
+        "corrective": [
+            {"exercise": "Adductor Strengthening", "dosage": "3x15"},
+        ],
+    },
+    {
+        # PT-A10 — Ear Level Asymmetry
+        "param_id": "PT-A10",
+        "hypertonic": ["Sternocleidomastoid", "Upper Trapezius"],
+        "inhibited": ["Deep Neck Flexors"],
+        "corrective": [
+            {"exercise": "Cervical Side-Bend Stretch", "dosage": "3x10 each side"},
+        ],
+    },
+]
 
-        hypertonic.update(
-            [
-                "Upper Trapezius",
-                "Levator Scapulae",
-                "Sternocleidomastoid",
-            ]
-        )
 
-        inhibited.update(
-            [
-                "Deep Neck Flexors",
-                "Lower Trapezius",
-            ]
-        )
+TRIGGER_SEVERITIES = {"moderate", "severe"}
 
-        corrective.extend(
-            [
-                {
-                    "exercise": "Chin Tucks",
-                    "dosage": "3x12",
-                },
-                {
-                    "exercise": "Wall Slides",
-                    "dosage": "3x10",
-                },
-            ]
-        )
 
-    # Shoulder asymmetry
+def generate_synthesis(findings: dict[str, str]) -> dict[str, Any]:
 
-    if findings.get("PT-A02") in [
-        "moderate",
-        "severe",
-    ]:
+    hypertonic: set[str] = set()
+    inhibited: set[str] = set()
 
-        hypertonic.update(
-            [
-                "Upper Trapezius",
-            ]
-        )
+    corrective: list[dict[str, str]] = []
+    seen_exercises: set[str] = set()
 
-        inhibited.update(
-            [
-                "Middle Trapezius",
-            ]
-        )
+    for finding_key, severity in findings.items():
 
-        corrective.extend(
-            [
-                {
-                    "exercise": "Scapular Retraction",
-                    "dosage": "3x15",
-                }
-            ]
-        )
+        if severity not in TRIGGER_SEVERITIES:
+            continue
+
+        # Bilateral findings are keyed e.g. "PT-A05_left" / "PT-A06_right"
+        base_param_id = finding_key.split("_")[0]
+
+        for rule in SYNTHESIS_RULES:
+
+            if rule["param_id"] != base_param_id:
+                continue
+
+            hypertonic.update(rule["hypertonic"])
+            inhibited.update(rule["inhibited"])
+
+            for exercise in rule["corrective"]:
+
+                if exercise["exercise"] in seen_exercises:
+                    continue
+
+                seen_exercises.add(exercise["exercise"])
+                corrective.append(exercise)
 
     return {
-        "hypertonic": sorted(list(hypertonic)),
-        "inhibited": sorted(list(inhibited)),
+        "hypertonic": sorted(hypertonic),
+        "inhibited": sorted(inhibited),
         "correctiveProtocol": corrective,
     }

@@ -73,6 +73,15 @@ def get_lateral_side(landmarks: list[Landmark]) -> Literal["left", "right"]:
 
 
 def calc_cva(landmarks: list[Landmark], side: Literal["left", "right"] | None = None) -> float:
+    """
+    PT-L01 — Craniovertebral Angle (Forward Head Posture).
+
+    Returns the acute angle (0-90°) between the ear-shoulder line and
+    horizontal. Using atan2(|dy|, |dx|) instead of a fixed +x horizontal
+    reference makes this independent of which way the subject faces in
+    the photo (a fixed reference can otherwise produce an obtuse/reflex
+    angle like 114° for a person facing the other direction).
+    """
 
     if side is None:
         side = get_lateral_side(landmarks)
@@ -80,16 +89,10 @@ def calc_cva(landmarks: list[Landmark], side: Literal["left", "right"] | None = 
     ear = landmarks[LEFT_EAR if side == "left" else RIGHT_EAR]
     shoulder = landmarks[LEFT_SHOULDER if side == "left" else RIGHT_SHOULDER]
 
-    horizontal_ref = (
-        shoulder.x + 1.0,
-        shoulder.y,
-    )
+    dx = ear.x - shoulder.x
+    dy = ear.y - shoulder.y
 
-    return angle_between_points(
-        (ear.x, ear.y),
-        (shoulder.x, shoulder.y),
-        horizontal_ref,
-    )
+    return math.degrees(math.atan2(abs(dy), abs(dx)))
 
 
 def calc_shoulder_asymmetry(landmarks: list[Landmark]) -> float:

@@ -136,7 +136,9 @@ def test_calc_cva(
         landmarks,
     )
 
-    assert result > 0
+    # CVA is, by definition, the acute angle between the ear-shoulder
+    # line and horizontal — always between 0 and 90 degrees.
+    assert 0 <= result <= 90
 
 
 def test_calc_shoulder_asymmetry(
