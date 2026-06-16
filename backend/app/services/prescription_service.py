@@ -229,6 +229,7 @@ async def generate_prescription_pdf(
         patient_phone = rx.patient.phone if rx.patient and rx.patient.phone else "N/A"
         patient_dob = rx.patient.date_of_birth.strftime("%B %d, %Y") if rx.patient and rx.patient.date_of_birth else "N/A"
         clinic_name = rx.clinic.name if rx.clinic else "Aarogya-Virohan Clinic"
+        physio_name = rx.physio.email if rx.physio else "N/A"
         general_notes = f"<div class='general-notes'><h3>Clinical Notes & Guidance</h3><p>{rx.physio_notes}</p></div>" if rx.physio_notes else ""
 
         html_content = f"""
@@ -441,7 +442,7 @@ async def generate_prescription_pdf(
                 </tr>
                 <tr>
                     <td class="label">Therapist</td>
-                    <td class="value">{clinic_name}</td>
+                    <td class="value">{physio_name}</td>
                     <td class="label"></td>
                     <td class="value"></td>
                 </tr>
