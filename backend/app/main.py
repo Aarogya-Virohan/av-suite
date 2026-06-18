@@ -42,13 +42,11 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-from fastapi.staticfiles import StaticFiles
 import os
 
-# Create static directory and mount it
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-logger.info("Static directory mounted at /static")
+# NOTE: removed public StaticFiles mount for /static -- prescription PDFs
+# contain patient PHI and must only be served via the authenticated
+# download route (GET /api/v1/prescriptions/{id}/pdf/download)
 
 
 

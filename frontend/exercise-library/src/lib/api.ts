@@ -134,18 +134,22 @@ export async function updatePrescription(
   return json.data;
 }
 
-// Request PDF generation for prescription
+// Request PDF generation, then fetch the file securely (auth required, no public static access)
 export async function generatePrescriptionPDF(id: string): Promise<string> {
-  const url = `${BASE_URL}/api/v1/prescriptions/${id}/pdf`;
-  const response = await fetch(url, {
+  const genUrl = `${BASE_URL}/api/v1/prescriptions/${id}/pdf`;
+  const genResponse = await fetch(genUrl, {
     method: "POST",
     headers: getHeaders(),
   });
-  if (!response.ok) throw new Error("Failed to generate PDF");
-  const json = await response.json();
-  // Return the full URL path
-  const pdfUrl = json.data?.pdf_url;
-  return pdfUrl.startsWith("http") ? pdfUrl : `${BASE_URL}${pdfUrl}`;
+  if (!genResponse.ok) throw new Error("Failed to generate PDF");
+
+  const downloadUrl = `${BASE_URL}/api/v1/prescriptions/${id}/pdf/download`;
+  const fileResponse = await fetch(downloadUrl, {
+    headers: getHeaders(),
+  });
+  if (!fileResponse.ok) throw new Error("Failed to download PDF");
+  const blob = await fileResponse.blob();
+  return URL.createObjectURL(blob);
 }
 
 // Save posture diagnostic session

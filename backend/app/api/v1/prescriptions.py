@@ -10,6 +10,8 @@ from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
 from app.services import prescription_service
+from fastapi.responses import FileResponse
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -174,3 +176,26 @@ async def generate_pdf(
     except Exception as e:
         logger.error(f"Error generating PDF for prescription {id}: {str(e)}")
         raise
+
+
+@router.get(
+    "/{id}/pdf/download",
+    tags=["Prescriptions"]
+)
+async def download_pdf(
+    request: Request,
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Securely streams the prescription PDF, scoped to the requester's clinic.
+    Replaces the old public /static/... access (no auth, no tenant check).
+    """
+    clinic_id = request.state.clinic_id
+    rx = await prescription_service.get_prescription_by_id(db, uuid.UUID(clinic_id), id)
+    if not rx or not rx.pdf_key:
+        raise HTTPException(status_code=404, detail="PDF not found")
+    file_path = os.path.join("static", "prescriptions", rx.pdf_key)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="PDF file not found on server")
+    return FileResponse(file_path, media_type="application/pdf", filename=rx.pdf_key)

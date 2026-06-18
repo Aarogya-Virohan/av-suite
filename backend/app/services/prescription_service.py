@@ -469,7 +469,7 @@ async def generate_prescription_pdf(
         await db.commit()
         
         logger.info(f"PDF successfully generated for prescription: {rx.id} at {pdf_path}")
-        return f"/static/prescriptions/{pdf_filename}"
+        return f"/api/v1/prescriptions/{rx.id}/pdf/download"
     except Exception as e:
         logger.error(f"Error generating PDF for prescription {prescription_id}: {str(e)}")
         raise
