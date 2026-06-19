@@ -285,6 +285,66 @@ async def create_exercise(
 
 
 @router.get(
+    "/by-condition",
+    response_model=ResponseEnvelope[List[ExerciseRead]],
+    tags=["Exercises"]
+)
+async def get_exercises_by_condition(
+    request: Request,
+    condition: str = Query(..., description="Condition name to filter by"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint to filter exercises by condition name.
+    Maps known conditions to exercise titles, or searches title/description.
+    """
+    logger.info(f"Get exercises by condition: {condition}")
+    try:
+        clinic_id = request.state.clinic_id
+        cond_clean = condition.strip().lower()
+        
+        condition_map = {
+            "forward head posture": ["chin tucks", "cervical flexion isometrics (front press)", "cervical  extension isometrics  (back press)", " lateral flexion  isometric  – right side", "neck side stretch"],
+            "rounded shoulders": ["wall slides", "scapular squeezes", "wall push ups"],
+            "pelvic tilt": ["bridging", "glute squeeze"],
+            "scoliosis": ["cat cow stretch", "scapular squeezes"],
+            "hip weakness": ["bridging", "glute squeeze"],
+            "shoulder mobility": ["pendulum exercise", "wall slides"],
+            "neck pain": ["chin tucks", "neck side stretch"],
+        }
+        
+        from sqlalchemy import or_
+        from sqlalchemy.future import select
+        from app.models.exercise import Exercise
+        
+        query = select(Exercise).where(
+            or_(
+                Exercise.clinic_id == uuid.UUID(clinic_id),
+                Exercise.clinic_id.is_(None)
+            )
+        )
+        
+        if cond_clean in condition_map:
+            titles = condition_map[cond_clean]
+            title_filters = [Exercise.title.ilike(f"%{t}%") for t in titles]
+            query = query.where(or_(*title_filters))
+        else:
+            query = query.where(
+                or_(
+                    Exercise.title.ilike(f"%{condition}%"),
+                    Exercise.description.ilike(f"%{condition}%")
+                )
+            )
+            
+        result = await db.execute(query)
+        exercises = result.scalars().all()
+        return ResponseEnvelope(data=list(exercises))
+    except Exception as e:
+        logger.error(f"Error fetching exercises by condition: {str(e)}")
+        raise
+
+
+@router.get(
     "/{id}",
     response_model=ResponseEnvelope[ExerciseRead],
     tags=["Exercises"]

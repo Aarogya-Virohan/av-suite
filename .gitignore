@@ -42,11 +42,10 @@ coverage/
 
 # Misc
 *.swp
-
-.next/
-node_modules/
+*.next
+*.txt
+*.pdf
 *.tsbuildinfo
-.DS_Store
 .codex
 AGENTS.md
 CLAUDE.md
