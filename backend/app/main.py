@@ -9,6 +9,7 @@ Key Components:
 - ClinicGateMiddleware: JWT token verification aur clinic isolation
 - CORSMiddleware: Cross-Origin Resource Sharing configuration
 - API Router: V1 API endpoints
+- Posture Router: Posture analysis endpoints
 - Health endpoint: Application health monitoring
 
 Middleware Order (Bottom-up):
@@ -27,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.middleware.clinic_gate import ClinicGateMiddleware
 from app.api.v1.router import api_router
+from app.api.v1.posture import router as posture_router
 import logging
 
 logger = logging.getLogger(__name__)
@@ -109,6 +111,11 @@ app.include_router(
     prefix=settings.API_V1_PREFIX  # "/api/v1" from settings
 )
 logger.info(f"API router registered with prefix: {settings.API_V1_PREFIX}")
+
+# Posture Tool Router Registration
+# Posture analysis endpoints (anterior/lateral/posterior plane)
+app.include_router(posture_router)
+logger.info("Posture router registered")
 
 
 # Health Check Endpoint
@@ -213,4 +220,3 @@ if __name__ == "__main__":
         reload=settings.DEBUG,  # Auto-reload development mein
         log_level="info",
     )
-

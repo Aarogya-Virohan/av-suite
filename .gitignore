@@ -45,3 +45,7 @@ coverage/
 *.next
 *.txt
 *.pdf
+*.tsbuildinfo
+.codex
+AGENTS.md
+CLAUDE.md
