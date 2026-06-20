@@ -34,9 +34,17 @@ export function Header() {
         <Link href="/" className="text-muted-foreground hover:text-primary transition-colors">
           Exercise Library
         </Link>
-        <Link href="/posture" className="text-muted-foreground hover:text-primary transition-colors">
+        {/* Links out to the real, clinically-validated Posture Tool app (separate
+            deployment) instead of the internal /posture page, which only embedded an
+            unfinished placeholder/demo tool. */}
+        <a
+          href="https://av-suite.vercel.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted-foreground hover:text-primary transition-colors"
+        >
           Posture Diagnostics
-        </Link>
+        </a>
 
         {email && (
           <div className="flex items-center gap-4 border-l pl-6 border-border">
