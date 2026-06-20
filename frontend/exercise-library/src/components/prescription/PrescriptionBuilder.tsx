@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { PrescriptionItem } from "@/types/exercise";
 import { ExerciseRow } from "./ExerciseRow";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,19 @@ export function PrescriptionBuilder({
   const [isPrinting, setIsPrinting] = useState(false);
   const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
   const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(true);
+
+  // Tracks the live blob URL so we can revoke it before creating a new one —
+  // generatePrescriptionPDF() creates a fresh object URL each call, and without
+  // revoking the previous one, repeated edit -> print cycles leak memory.
+  const generatedPdfUrlRef = useRef<string | null>(null);
+  const setPdfUrl = (url: string | null) => {
+    if (generatedPdfUrlRef.current) {
+      URL.revokeObjectURL(generatedPdfUrlRef.current);
+    }
+    generatedPdfUrlRef.current = url;
+    setGeneratedPdfUrl(url);
+  };
 
   // Patient Modal / Inline Create Form state
   const [showAddPatient, setShowAddPatient] = useState(false);
@@ -63,9 +76,9 @@ export function PrescriptionBuilder({
       setPatients(data);
       if (autoSelectId) {
         setSelectedPatientId(autoSelectId);
-      } else if (data.length > 0 && !selectedPatientId) {
-        setSelectedPatientId(data[0].id);
       }
+      // Intentionally NOT auto-selecting the first patient on initial load.
+      // Auto-selecting risked silently prescribing exercises to the wrong patient.
     } catch (err) {
       console.error("Failed to fetch patients", err);
     }
@@ -93,7 +106,7 @@ export function PrescriptionBuilder({
       setShowAddPatient(false);
       await loadPatients(newPatient.id);
     } catch (err) {
-      setError("Failed to register patient");
+      setError(err instanceof Error ? err.message : "Failed to register patient");
     } finally {
       setIsCreatingPatient(false);
     }
@@ -125,6 +138,7 @@ export function PrescriptionBuilder({
         await updatePrescription(savedPrescriptionId, {
           items: itemsPayload
         });
+        setHasUnsavedChanges(false);
         alert("Exercise Prescription updated successfully in the database!");
       } else {
         // Create new prescription
@@ -136,11 +150,12 @@ export function PrescriptionBuilder({
         };
         const result = await createPrescription(payload);
         setSavedPrescriptionId(result.id);
+        setHasUnsavedChanges(false);
         alert("Exercise Prescription saved successfully in the database!");
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to save prescription.");
+      alert(err instanceof Error ? err.message : "Failed to save prescription.");
     } finally {
       setIsSaving(false);
     }
@@ -177,7 +192,7 @@ export function PrescriptionBuilder({
         // Create new prescription
         const payload = {
           patient_id: selectedPatientId,
-          physio_notes: "Follow instructions carefully.",
+          physio_notes: "Please follow sets and reps instructions carefully. Reach out if you feel acute discomfort.",
           items: itemsPayload,
         };
         const result = await createPrescription(payload);
@@ -185,9 +200,11 @@ export function PrescriptionBuilder({
         setSavedPrescriptionId(targetId);
       }
 
+      setHasUnsavedChanges(false);
+
       // Generate PDF
       const pdfUrl = await generatePrescriptionPDF(targetId!);
-      setGeneratedPdfUrl(pdfUrl);
+      setPdfUrl(pdfUrl);
       
       // Attempt to open in a new tab (might get blocked by browser popup blocker)
       try {
@@ -197,7 +214,7 @@ export function PrescriptionBuilder({
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to generate PDF report.");
+      alert(err instanceof Error ? err.message : "Failed to generate PDF report.");
     } finally {
       setIsPrinting(false);
     }
@@ -206,12 +223,22 @@ export function PrescriptionBuilder({
   // Reset prescription status and PDF URL when selected patient changes
   useEffect(() => {
     setSavedPrescriptionId(null);
-    setGeneratedPdfUrl(null);
+    setPdfUrl(null);
   }, [selectedPatientId]);
 
-  // Reset PDF URL when prescription items list changes
+  // Revoke any live blob URL when the component unmounts
   useEffect(() => {
-    setGeneratedPdfUrl(null);
+    return () => {
+      if (generatedPdfUrlRef.current) {
+        URL.revokeObjectURL(generatedPdfUrlRef.current);
+      }
+    };
+  }, []);
+
+  // Reset PDF URL and mark unsaved when prescription items list changes
+  useEffect(() => {
+    setPdfUrl(null);
+    setHasUnsavedChanges(true);
   }, [prescription]);
 
   return (
@@ -369,7 +396,7 @@ export function PrescriptionBuilder({
               ) : (
                 <Save className="mr-2 h-4 w-4 text-primary" />
               )}
-              {savedPrescriptionId ? "Saved" : "Save Plan"}
+              {savedPrescriptionId && !hasUnsavedChanges ? "Saved" : "Save Plan"}
             </Button>
             {generatedPdfUrl ? (
               <a

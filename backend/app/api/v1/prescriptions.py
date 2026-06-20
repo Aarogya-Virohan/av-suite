@@ -133,6 +133,14 @@ async def update_prescription(
     logger.info(f"Patching prescription: {id}")
     try:
         clinic_id = request.state.clinic_id
+
+        role = request.state.role
+        if role not in ["admin", "physio"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only therapists or admins can update prescriptions"
+            )
+
         prescription = await prescription_service.patch_prescription(
             db, uuid.UUID(clinic_id), id, patch_in
         )

@@ -23,7 +23,7 @@ export function ExerciseRow({ item, onChange, onRemove }: ExerciseRowProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 absolute top-3 right-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100"
+            className="h-6 w-6 absolute top-3 right-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
             onClick={() => onRemove(item.exercise.id)}
           >
             <X className="h-4 w-4" />

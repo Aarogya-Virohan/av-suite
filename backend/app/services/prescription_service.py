@@ -1,6 +1,7 @@
 import logging
 import uuid
 import os
+import html
 from datetime import datetime
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -194,21 +195,41 @@ async def generate_prescription_pdf(
         pdf_path = os.path.join("static/prescriptions", pdf_filename)
         
         # Formulate HTML content
+        # Inline SVG fallback (no network dependency — avoids relying on external
+        # placeholder services that can be slow, down, or removed in production)
+        FALLBACK_IMG_SRC = (
+            "data:image/svg+xml;utf8,"
+            "<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'>"
+            "<rect width='150' height='150' fill='%23f1f5f9'/>"
+            "<text x='50%25' y='50%25' font-family='Helvetica, Arial, sans-serif' "
+            "font-size='12' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'>"
+            "No Image</text></svg>"
+        )
+
         items_html = ""
         for index, item in enumerate(rx.items):
             ex = item.exercise
-            img_src = ex.video_url if ex and ex.video_url else "https://via.placeholder.com/150"
-            note_text = f"<p class='note'><strong>Special Notes:</strong> {item.note}</p>" if item.note else ""
+            img_src = ex.video_url if ex and ex.video_url else FALLBACK_IMG_SRC
+
+            # Escape all user-supplied / DB text before interpolating into HTML,
+            # since WeasyPrint renders raw HTML — unescaped text could break the
+            # layout or inject markup (e.g. via a note field with "<" or ">").
+            ex_title = html.escape(ex.title) if ex and ex.title else "Rehab Exercise"
+            ex_body_part = html.escape(ex.body_part) if ex and ex.body_part else "General"
+            ex_description = html.escape(ex.description) if ex and ex.description else "Perform as advised by therapist."
+            item_note_escaped = html.escape(item.note) if item.note else None
+
+            note_text = f"<p class='note'><strong>Special Notes:</strong> {item_note_escaped}</p>" if item_note_escaped else ""
             items_html += f"""
             <div class="exercise-card">
                 <div class="exercise-header">
                     <span class="exercise-num">#{index + 1}</span>
-                    <span class="exercise-title">{ex.title if ex else 'Rehab Exercise'}</span>
-                    <span class="exercise-part">{ex.body_part if ex and ex.body_part else 'General'}</span>
+                    <span class="exercise-title">{ex_title}</span>
+                    <span class="exercise-part">{ex_body_part}</span>
                 </div>
                 <div class="exercise-body">
                     <div class="exercise-img-container">
-                        <img src="{img_src}" class="exercise-img" alt="{ex.title if ex else 'Exercise'}" />
+                        <img src="{img_src}" class="exercise-img" alt="{ex_title}" />
                     </div>
                     <div class="exercise-details">
                         <div class="dosage-grid">
@@ -217,7 +238,7 @@ async def generate_prescription_pdf(
                             <div class="dosage-cell"><span class="label">Hold Time</span><span class="value">{item.hold}s</span></div>
                             <div class="dosage-cell"><span class="label">Frequency</span><span class="value">{item.frequency}</span></div>
                         </div>
-                        <p class="desc"><strong>Instructions:</strong> {ex.description if ex else 'Perform as advised by therapist.'}</p>
+                        <p class="desc"><strong>Instructions:</strong> {ex_description}</p>
                         {note_text}
                     </div>
                 </div>
@@ -225,16 +246,17 @@ async def generate_prescription_pdf(
             """
 
         date_str = rx.created_at.strftime("%B %d, %Y") if rx.created_at else datetime.now().strftime("%B %d, %Y")
-        patient_name = f"{rx.patient.first_name} {rx.patient.last_name}" if rx.patient else "Patient"
-        patient_phone = rx.patient.phone if rx.patient and rx.patient.phone else "N/A"
+        patient_name = html.escape(f"{rx.patient.first_name} {rx.patient.last_name}") if rx.patient else "Patient"
+        patient_phone = html.escape(rx.patient.phone) if rx.patient and rx.patient.phone else "N/A"
         patient_dob = rx.patient.date_of_birth.strftime("%B %d, %Y") if rx.patient and rx.patient.date_of_birth else "N/A"
-        clinic_name = rx.clinic.name if rx.clinic else "Aarogya-Virohan Clinic"
-        physio_name = (
+        clinic_name = html.escape(rx.clinic.name) if rx.clinic else "Aarogya-Virohan Clinic"
+        physio_name = html.escape(
             f"{rx.physio.first_name} {rx.physio.last_name}".strip()
             if rx.physio and rx.physio.first_name
             else (rx.physio.email if rx.physio else "N/A")
         )
-        general_notes = f"<div class='general-notes'><h3>Clinical Notes & Guidance</h3><p>{rx.physio_notes}</p></div>" if rx.physio_notes else ""
+        physio_notes_escaped = html.escape(rx.physio_notes) if rx.physio_notes else None
+        general_notes = f"<div class='general-notes'><h3>Clinical Notes & Guidance</h3><p>{physio_notes_escaped}</p></div>" if physio_notes_escaped else ""
 
         html_content = f"""
         <!DOCTYPE html>

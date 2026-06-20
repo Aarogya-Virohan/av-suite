@@ -14,6 +14,20 @@ function getHeaders(): HeadersInit {
   return headers;
 }
 
+// Reads the backend's actual error detail (FastAPI HTTPException -> {"detail": "..."})
+// instead of swallowing it behind a generic message. Falls back to a generic
+// message + status code if the response body isn't JSON or has no detail.
+async function throwApiError(response: Response, fallbackMessage: string): Promise<never> {
+  let detail: string | undefined;
+  try {
+    const data = await response.json();
+    detail = data?.detail || data?.message;
+  } catch {
+    // response body wasn't JSON / already consumed — ignore
+  }
+  throw new Error(detail || `${fallbackMessage} (HTTP ${response.status})`);
+}
+
 // Map backend exercise fields to camelCase frontend model
 export function mapBackendExerciseToFrontend(be: any): Exercise {
   return {
@@ -39,7 +53,7 @@ export async function fetchExercises(search?: string, bodyPart?: string): Promis
   if (bodyPart) url += `&body_part=${encodeURIComponent(bodyPart)}`;
 
   const response = await fetch(url, { headers: getHeaders() });
-  if (!response.ok) throw new Error("Failed to fetch exercises");
+  if (!response.ok) await throwApiError(response, "Failed to fetch exercises");
   const json = await response.json();
   const data = json.data || [];
   return data.map(mapBackendExerciseToFrontend);
@@ -49,7 +63,7 @@ export async function fetchExercises(search?: string, bodyPart?: string): Promis
 export async function fetchExercisesByCondition(condition: string): Promise<Exercise[]> {
   const url = `${BASE_URL}/api/v1/exercises/by-condition?condition=${encodeURIComponent(condition)}`;
   const response = await fetch(url, { headers: getHeaders() });
-  if (!response.ok) throw new Error("Failed to fetch exercises by condition");
+  if (!response.ok) await throwApiError(response, "Failed to fetch exercises by condition");
   const json = await response.json();
   const data = json.data || [];
   return data.map(mapBackendExerciseToFrontend);
@@ -59,7 +73,7 @@ export async function fetchExercisesByCondition(condition: string): Promise<Exer
 export async function fetchPatients(): Promise<any[]> {
   const url = `${BASE_URL}/api/v1/patients?page_size=100`;
   const response = await fetch(url, { headers: getHeaders() });
-  if (!response.ok) throw new Error("Failed to fetch patients");
+  if (!response.ok) await throwApiError(response, "Failed to fetch patients");
   const json = await response.json();
   return json.data || [];
 }
@@ -77,7 +91,7 @@ export async function createPatient(patient: {
     headers: getHeaders(),
     body: JSON.stringify(patient),
   });
-  if (!response.ok) throw new Error("Failed to create patient");
+  if (!response.ok) await throwApiError(response, "Failed to create patient");
   const json = await response.json();
   return json.data;
 }
@@ -102,7 +116,7 @@ export async function createPrescription(prescription: {
     headers: getHeaders(),
     body: JSON.stringify(prescription),
   });
-  if (!response.ok) throw new Error("Failed to create prescription");
+  if (!response.ok) await throwApiError(response, "Failed to create prescription");
   const json = await response.json();
   return json.data;
 }
@@ -129,7 +143,7 @@ export async function updatePrescription(
     headers: getHeaders(),
     body: JSON.stringify(patch),
   });
-  if (!response.ok) throw new Error("Failed to update prescription");
+  if (!response.ok) await throwApiError(response, "Failed to update prescription");
   const json = await response.json();
   return json.data;
 }
@@ -141,13 +155,13 @@ export async function generatePrescriptionPDF(id: string): Promise<string> {
     method: "POST",
     headers: getHeaders(),
   });
-  if (!genResponse.ok) throw new Error("Failed to generate PDF");
+  if (!genResponse.ok) await throwApiError(genResponse, "Failed to generate PDF");
 
   const downloadUrl = `${BASE_URL}/api/v1/prescriptions/${id}/pdf/download`;
   const fileResponse = await fetch(downloadUrl, {
     headers: getHeaders(),
   });
-  if (!fileResponse.ok) throw new Error("Failed to download PDF");
+  if (!fileResponse.ok) await throwApiError(fileResponse, "Failed to download PDF");
   const blob = await fileResponse.blob();
   return URL.createObjectURL(blob);
 }
@@ -174,7 +188,7 @@ export async function savePostureSession(session: {
     headers: getHeaders(),
     body: JSON.stringify(session),
   });
-  if (!response.ok) throw new Error("Failed to save posture session");
+  if (!response.ok) await throwApiError(response, "Failed to save posture session");
   const json = await response.json();
   return json.data;
 }
