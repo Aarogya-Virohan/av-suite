@@ -20,6 +20,24 @@ export function DosageFields({ item, onChange }: DosageFieldsProps) {
     onChange({ ...item, [field]: value });
   };
 
+  // Clamps numeric dosage fields to clinically sensible ranges. Browser `min`
+  // attributes alone don't block typed/pasted negative numbers, so we enforce
+  // bounds here too.
+  const updateNumericField = (
+    field: "sets" | "reps" | "hold",
+    rawValue: string,
+    min: number,
+    max: number
+  ) => {
+    const parsed = parseInt(rawValue, 10);
+    if (isNaN(parsed)) {
+      updateField(field, min);
+      return;
+    }
+    const clamped = Math.min(Math.max(parsed, min), max);
+    updateField(field, clamped);
+  };
+
   return (
     <div className="flex flex-col gap-3 mt-3">
       <div className="grid grid-cols-4 gap-3">
@@ -28,8 +46,9 @@ export function DosageFields({ item, onChange }: DosageFieldsProps) {
           <Input
             type="number"
             min={1}
+            max={20}
             value={item.sets}
-            onChange={(e) => updateField("sets", parseInt(e.target.value) || 0)}
+            onChange={(e) => updateNumericField("sets", e.target.value, 1, 20)}
             className="h-8 text-sm shadow-sm"
           />
         </div>
@@ -38,8 +57,9 @@ export function DosageFields({ item, onChange }: DosageFieldsProps) {
           <Input
             type="number"
             min={1}
+            max={200}
             value={item.reps}
-            onChange={(e) => updateField("reps", parseInt(e.target.value) || 0)}
+            onChange={(e) => updateNumericField("reps", e.target.value, 1, 200)}
             className="h-8 text-sm shadow-sm"
           />
         </div>
@@ -48,8 +68,9 @@ export function DosageFields({ item, onChange }: DosageFieldsProps) {
           <Input
             type="number"
             min={0}
+            max={600}
             value={item.hold}
-            onChange={(e) => updateField("hold", parseInt(e.target.value) || 0)}
+            onChange={(e) => updateNumericField("hold", e.target.value, 0, 600)}
             className="h-8 text-sm shadow-sm"
           />
         </div>

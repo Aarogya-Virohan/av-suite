@@ -84,18 +84,32 @@ export function PrescriptionBuilder({
     }
   }
 
+  const NAME_PATTERN = /^[A-Za-z][A-Za-z .'-]{0,99}$/;
+  const PHONE_PATTERN = /^[0-9]{10}$/;
+
   const handleCreatePatient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName || !lastName) {
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+
+    if (!trimmedFirst || !trimmedLast) {
       setError("First and Last name are required");
+      return;
+    }
+    if (!NAME_PATTERN.test(trimmedFirst) || !NAME_PATTERN.test(trimmedLast)) {
+      setError("Names may only contain letters, spaces, hyphens, apostrophes, and periods");
+      return;
+    }
+    if (phone && !PHONE_PATTERN.test(phone)) {
+      setError("Phone number must be exactly 10 digits");
       return;
     }
     setError(null);
     setIsCreatingPatient(true);
     try {
       const newPatient = await createPatient({
-        first_name: firstName,
-        last_name: lastName,
+        first_name: trimmedFirst,
+        last_name: trimmedLast,
         phone: phone || undefined,
         date_of_birth: dateOfBirth || undefined,
       });
@@ -279,7 +293,7 @@ export function PrescriptionBuilder({
                   className="h-8 text-xs"
                   placeholder="e.g. John"
                   value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  onChange={(e) => setFirstName(e.target.value.replace(/[^A-Za-z .'-]/g, ""))}
                   required
                 />
               </div>
@@ -289,7 +303,7 @@ export function PrescriptionBuilder({
                   className="h-8 text-xs"
                   placeholder="e.g. Doe"
                   value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  onChange={(e) => setLastName(e.target.value.replace(/[^A-Za-z .'-]/g, ""))}
                   required
                 />
               </div>
@@ -299,8 +313,11 @@ export function PrescriptionBuilder({
               <Input
                 className="h-8 text-xs"
                 placeholder="e.g. 9876543210"
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
               />
             </div>
             <div className="flex flex-col gap-1">
