@@ -43,3 +43,5 @@ build/
 
 # Alembic cache
 alembic/versions/__pycache__/
+
+.agent.md
