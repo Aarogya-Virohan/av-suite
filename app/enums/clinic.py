@@ -3,9 +3,9 @@ from __future__ import annotations
 from enum import StrEnum
 
 
-class ClinicStatus(StrEnum):
-    """Status values for a clinic."""
+class ClinicPlanTier(StrEnum):
+    """Subscription tiers available to a clinic."""
 
-    ACTIVE = "ACTIVE"
-    INACTIVE = "INACTIVE"
-    SUSPENDED = "SUSPENDED"
+    FREE = "free"
+    PRACTICE = "practice"
+    CLINICAL_PRO = "clinical_pro"

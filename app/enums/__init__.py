@@ -1,3 +1,3 @@
-from app.enums.clinic import ClinicStatus
+from app.enums.clinic import ClinicPlanTier
 
-__all__ = ["ClinicStatus"]
+__all__ = ["ClinicPlanTier"]
