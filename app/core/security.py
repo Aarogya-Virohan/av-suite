@@ -1,0 +1,81 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+from typing import TypedDict, cast
+from uuid import UUID
+
+from jose import JWTError, jwt
+from passlib.context import CryptContext  # pyright: ignore[reportMissingTypeStubs] - passlib does not ship usable stubs here.
+
+from app.core.config import settings
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+class TokenClaims(TypedDict):
+    """JWT claims used by the CRM authentication layer."""
+
+    sub: str
+    clinic_id: str
+    role: str
+    exp: int
+
+
+def get_password_hash(password: str) -> str:
+    """Return a bcrypt password hash for the provided password."""
+
+    return pwd_context.hash(password)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType] - passlib types are unavailable.
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Check whether a plain password matches a stored bcrypt hash."""
+
+    verification_result = cast(
+        bool,
+        pwd_context.verify(plain_password, hashed_password),  # pyright: ignore[reportUnknownMemberType] - passlib types are unavailable.
+    )
+    return verification_result
+
+
+def create_access_token(
+    *,
+    user_id: UUID,
+    clinic_id: UUID,
+    role: str,
+    expires_delta: timedelta | None = None,
+) -> str:
+    """Create a signed access token containing the CRM identity claims."""
+
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    payload: dict[str, str | int] = {
+        "sub": str(user_id),
+        "clinic_id": str(clinic_id),
+        "role": role,
+        "exp": int(expire.timestamp()),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_access_token(token: str) -> TokenClaims:
+    """Decode and validate a CRM access token."""
+
+    try:
+        decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError as exc:  # pragma: no cover - library raises many token-specific subclasses
+        raise ValueError("Invalid access token") from exc
+
+    sub = decoded_token.get("sub")
+    clinic_id = decoded_token.get("clinic_id")
+    role = decoded_token.get("role")
+    exp = decoded_token.get("exp")
+
+    if not isinstance(sub, str) or not isinstance(clinic_id, str) or not isinstance(role, str) or not isinstance(exp, int):
+        raise ValueError("Invalid access token payload")
+
+    return {
+        "sub": sub,
+        "clinic_id": clinic_id,
+        "role": role,
+        "exp": exp,
+    }
