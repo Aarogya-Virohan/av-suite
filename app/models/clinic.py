@@ -11,8 +11,8 @@ from app.enums.clinic import ClinicStatus
 class Clinic(UUIDMixin, TimestampMixin, Base):
     """Clinic profile and contact details."""
 
-    __tablename__ = "clinics"
-    __table_args__ = (
+    __tablename__: str = "clinics"
+    __table_args__: tuple[Index, ...] = (
         Index("ix_clinics_name", "name"),
         Index("ix_clinics_status", "status"),
     )

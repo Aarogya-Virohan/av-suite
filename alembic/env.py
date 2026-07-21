@@ -15,13 +15,15 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from app.common.base import Base
-from app.core.config import settings
-from app.models import Clinic
+from app.common.base import Base  # noqa: E402
+from app.core.config import settings  # noqa: E402
+import app.models  # noqa: E402
 
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
+_ = app.models
 
 
 target_metadata = Base.metadata

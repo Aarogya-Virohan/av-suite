@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Generic, Protocol, TypeVar, cast
+from typing import Generic, Protocol, TypeVar
 from uuid import UUID
 
-from sqlalchemy import exists, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SupportsUUIDPrimaryKey(Protocol):
-    """Protocol-style base for ORM models with a UUID primary key."""
+    """Protocol for ORM instances that expose a UUID primary key."""
 
-    id: Any
+    id: UUID
 
 
 ModelT = TypeVar("ModelT", bound=SupportsUUIDPrimaryKey)
@@ -21,16 +21,21 @@ class BaseRepository(Generic[ModelT]):
     """Generic async repository for SQLAlchemy ORM models."""
 
     model: type[ModelT]
+    session: AsyncSession
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, model: type[ModelT]) -> None:
         """Store the active async database session."""
 
         self.session = session
+        self.model = model
 
-    async def create(self, obj_in: Mapping[str, Any]) -> ModelT:
+    async def create(self, obj_in: Mapping[str, object]) -> ModelT:
         """Create and persist a new ORM instance without committing."""
 
-        obj = self.model(**dict(obj_in))
+        obj = self.model()
+        for field_name, value in obj_in.items():
+            setattr(obj, field_name, value)
+
         self.session.add(obj)
         await self.session.flush()
         await self.session.refresh(obj)
@@ -51,7 +56,7 @@ class BaseRepository(Generic[ModelT]):
         result = await self.session.scalars(statement)
         return list(result.all())
 
-    async def update(self, db_obj: ModelT, obj_in: Mapping[str, Any]) -> ModelT:
+    async def update(self, db_obj: ModelT, obj_in: Mapping[str, object]) -> ModelT:
         """Apply field updates to an existing ORM instance without committing."""
 
         for field_name, value in obj_in.items():
@@ -71,6 +76,4 @@ class BaseRepository(Generic[ModelT]):
     async def exists(self, id: UUID) -> bool:
         """Check whether a row exists for the given primary key."""
 
-        statement = select(exists().where(cast(Any, self.model).id == id))
-        result = await self.session.scalar(statement)
-        return bool(result)
+        return (await self.session.get(self.model, id)) is not None
