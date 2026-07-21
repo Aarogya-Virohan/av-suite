@@ -17,10 +17,12 @@ if str(BASE_DIR) not in sys.path:
 
 from app.common.base import Base
 from app.core.config import settings
+from app.models import Clinic
 
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
 
 target_metadata = Base.metadata
 
