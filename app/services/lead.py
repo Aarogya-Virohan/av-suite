@@ -67,16 +67,18 @@ class LeadService:
         *,
         stage: LeadStage | None = None,
         assigned_to: UUID | None = None,
+        source: str | None = None,
         search: str | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[Lead]:
-        """List leads for a clinic with stage/assignee filtering and search."""
+        """List leads for a clinic with stage/assignee/source filtering and search."""
 
         return await self.lead_repository.list_leads(
             clinic_id=clinic_id,
             stage=stage,
             assigned_to=assigned_to,
+            source=source,
             search=search,
             offset=offset,
             limit=limit,
