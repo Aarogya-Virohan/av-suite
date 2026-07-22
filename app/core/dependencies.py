@@ -58,7 +58,7 @@ async def get_authenticated_context(token: str, session: AsyncSession) -> Authen
 
     try:
         claims = decode_access_token(token)
-        user_id = UUID(claims["sub"])
+        user_id = UUID(claims["user_id"])
         clinic_id = UUID(claims["clinic_id"])
         role = normalize_user_role(claims["role"])
     except (ValueError, KeyError) as exc:

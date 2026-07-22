@@ -18,6 +18,7 @@ class TokenClaims(TypedDict):
     """JWT claims used by the CRM authentication layer."""
 
     sub: str
+    user_id: str
     clinic_id: str
     role: str
     exp: int
@@ -41,18 +42,24 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(
     *,
-    user_id: UUID,
-    clinic_id: UUID,
+    user_id: UUID | str | None = None,
+    subject: UUID | str | None = None,
+    clinic_id: UUID | str,
     role: UserRole | str,
     expires_delta: timedelta | None = None,
 ) -> str:
     """Create a signed access token containing the CRM identity claims."""
 
+    token_user_id = user_id or subject
+    if token_user_id is None:
+        raise ValueError("user_id or subject is required")
+
     canonical_role = normalize_user_role(role)
     issued_at = datetime.now(UTC)
     expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     payload: dict[str, str | int] = {
-        "sub": str(user_id),
+        "sub": str(token_user_id),
+        "user_id": str(token_user_id),
         "clinic_id": str(clinic_id),
         "role": canonical_role.value,
         "iat": int(issued_at.timestamp()),
@@ -69,12 +76,12 @@ def decode_access_token(token: str) -> TokenClaims:
     except JWTError as exc:  # pragma: no cover - library raises many token-specific subclasses
         raise ValueError("Invalid access token") from exc
 
-    sub = decoded_token.get("sub")
+    user_identifier = decoded_token.get("user_id") or decoded_token.get("sub")
     clinic_id = decoded_token.get("clinic_id")
     role = decoded_token.get("role")
     exp = decoded_token.get("exp")
 
-    if not isinstance(sub, str) or not isinstance(clinic_id, str) or not isinstance(role, str) or not isinstance(exp, int):
+    if not isinstance(user_identifier, str) or not isinstance(clinic_id, str) or not isinstance(role, str) or not isinstance(exp, int):
         raise ValueError("Invalid access token payload")
 
     try:
@@ -83,7 +90,8 @@ def decode_access_token(token: str) -> TokenClaims:
         raise ValueError("Invalid access token payload") from exc
 
     return {
-        "sub": sub,
+        "sub": user_identifier,
+        "user_id": user_identifier,
         "clinic_id": clinic_id,
         "role": canonical_role.value,
         "exp": exp,
