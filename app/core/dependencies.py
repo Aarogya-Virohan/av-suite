@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 from uuid import UUID
 
@@ -26,6 +27,20 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 SessionDep = Annotated[AsyncSession, Depends(get_async_session)]
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
+
+RoleDependency = Callable[..., Awaitable[User]]
+
+
+def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User:
+    """Ensure the authenticated user has one of the allowed roles."""
+
+    if current_user.role not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to perform this action.",
+        )
+
+    return current_user
 
 
 async def get_current_user(
@@ -62,3 +77,32 @@ async def get_current_user(
         )
 
     return user
+
+
+def require_roles(*roles: UserRole) -> RoleDependency:
+    """Return a dependency that requires any of the specified roles."""
+
+    async def dependency(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+        """Validate role membership for the authenticated user."""
+
+        return _require_user_roles(current_user, roles)
+
+    return dependency
+
+
+async def require_admin(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """Require the authenticated user to have the admin role."""
+
+    return _require_user_roles(current_user, (UserRole.ADMIN,))
+
+
+async def require_therapist(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """Require the authenticated user to have the therapist role."""
+
+    return _require_user_roles(current_user, (UserRole.THERAPIST,))
+
+
+async def require_front_desk(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    """Require the authenticated user to have the front desk role."""
+
+    return _require_user_roles(current_user, (UserRole.FRONT_DESK,))
