@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any, Generic, Protocol, TypeVar, cast
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -34,16 +34,18 @@ class BaseRepository(Generic[ModelT]):
 
         return hasattr(self.model, "clinic_id")
 
-    def _apply_clinic_scope(self, statement: Select[tuple[ModelT]], clinic_id: UUID | None) -> Select[tuple[ModelT]]:
-        """Apply an optional clinic filter when the model supports tenancy."""
+    def _apply_clinic_scope(self, statement: Select[Any], clinic_id: UUID | None) -> Select[Any]:
+        """Apply a clinic filter when the model supports tenancy."""
 
-        if clinic_id is None or not self._has_clinic_scope():
-            return statement
+        if self._has_clinic_scope():
+            if clinic_id is None:
+                raise ValueError(f"clinic_id is required for clinic-scoped model '{self.model.__name__}'.")
+            clinic_column = cast(Any, getattr(self.model, "clinic_id"))
+            return statement.where(clinic_column == clinic_id)
 
-        clinic_column = cast(Any, getattr(self.model, "clinic_id"))
-        return statement.where(clinic_column == clinic_id)
+        return statement
 
-    def _apply_id_filter(self, statement: Select[tuple[ModelT]], id: UUID) -> Select[tuple[ModelT]]:
+    def _apply_id_filter(self, statement: Select[Any], id: UUID) -> Select[Any]:
         """Apply the primary-key filter in a type-safe SQLAlchemy-friendly way."""
 
         id_column = cast(Any, getattr(self.model, "id"))
@@ -69,26 +71,25 @@ class BaseRepository(Generic[ModelT]):
     async def get_by_id(self, id: UUID, *, clinic_id: UUID | None = None) -> ModelT | None:
         """Return a single row by primary key with optional clinic scoping."""
 
-        if clinic_id is None or not self._has_clinic_scope():
-            return await self.session.get(self.model, id)
+        if self._has_clinic_scope():
+            statement = self._apply_id_filter(select(self.model), id)
+            statement = self._apply_clinic_scope(statement, clinic_id)
+            result = await self.session.scalars(statement)
+            return result.one_or_none()
 
-        statement = self._apply_id_filter(select(self.model), id)
-        statement = self._apply_clinic_scope(statement, clinic_id)
-        result = await self.session.scalars(statement)
-        return result.one_or_none()
+        return await self.session.get(self.model, id)
 
     async def list(
         self,
         *,
         offset: int = 0,
-        limit: int | None = None,
+        limit: int = 100,
         clinic_id: UUID | None = None,
     ) -> list[ModelT]:
         """Return rows for the repository model with optional pagination and clinic scope."""
 
-        statement = self._apply_clinic_scope(select(self.model), clinic_id).offset(offset)
-        if limit is not None:
-            statement = statement.limit(limit)
+        effective_limit = 100 if limit is None else min(limit, 500)
+        statement = self._apply_clinic_scope(select(self.model), clinic_id).offset(offset).limit(effective_limit)
 
         result = await self.session.scalars(statement)
         return list(result.all())
@@ -97,7 +98,7 @@ class BaseRepository(Generic[ModelT]):
         self,
         *,
         offset: int = 0,
-        limit: int | None = None,
+        limit: int = 100,
         clinic_id: UUID | None = None,
     ) -> list[ModelT]:
         """Backward-compatible alias for list()."""
@@ -124,4 +125,9 @@ class BaseRepository(Generic[ModelT]):
     async def exists(self, id: UUID, *, clinic_id: UUID | None = None) -> bool:
         """Check whether a row exists for the given primary key and optional clinic scope."""
 
-        return (await self.get_by_id(id, clinic_id=clinic_id)) is not None
+        statement = self._apply_id_filter(select(1).select_from(self.model), id)
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        query = select(exists(statement))
+        result = await self.session.scalar(query)
+        return bool(result)
+
