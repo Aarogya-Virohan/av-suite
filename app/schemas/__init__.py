@@ -13,6 +13,18 @@ from app.schemas.patient import (
     PatientResponse,
     PatientUpdate,
 )
+from app.schemas.treatment import (
+    SoapAssessmentBase,
+    SoapAssessmentCreate,
+    SoapAssessmentListResponse,
+    SoapAssessmentResponse,
+    SoapAssessmentUpdate,
+    TreatmentSessionBase,
+    TreatmentSessionCreate,
+    TreatmentSessionListResponse,
+    TreatmentSessionResponse,
+    TreatmentSessionUpdate,
+)
 from app.schemas.user import UserBase, UserCreate, UserRead, UserUpdate
 
 __all__ = [
@@ -27,12 +39,23 @@ __all__ = [
     "PatientListResponse",
     "PatientResponse",
     "PatientUpdate",
+    "SoapAssessmentBase",
+    "SoapAssessmentCreate",
+    "SoapAssessmentListResponse",
+    "SoapAssessmentResponse",
+    "SoapAssessmentUpdate",
     "TokenPayload",
     "TokenResponse",
+    "TreatmentSessionBase",
+    "TreatmentSessionCreate",
+    "TreatmentSessionListResponse",
+    "TreatmentSessionResponse",
+    "TreatmentSessionUpdate",
     "UserBase",
     "UserCreate",
     "UserRead",
     "UserUpdate",
 ]
+
 
 
