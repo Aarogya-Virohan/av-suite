@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime, time, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -54,6 +55,7 @@ class PatientPackageRepository(BaseRepository[PatientPackage]):
         *,
         clinic_id: UUID | None = None,
         patient_id: UUID | None = None,
+        package_id: UUID | None = None,
         status: PackageStatus | None = None,
         offset: int = 0,
         limit: int = 100,
@@ -65,6 +67,9 @@ class PatientPackageRepository(BaseRepository[PatientPackage]):
 
         if patient_id is not None:
             statement = statement.where(PatientPackage.patient_id == patient_id)
+
+        if package_id is not None:
+            statement = statement.where(PatientPackage.package_id == package_id)
 
         if status is not None:
             statement = statement.where(PatientPackage.status == status)
@@ -100,10 +105,12 @@ class InvoiceRepository(BaseRepository[Invoice]):
         clinic_id: UUID | None = None,
         patient_id: UUID | None = None,
         status: InvoiceStatus | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[Invoice]:
-        """List invoices with optional patient and status filters."""
+        """List invoices with optional patient, status, and date range filters."""
 
         effective_limit = min(limit, 500)
         statement = select(Invoice).options(selectinload(Invoice.items))
@@ -113,6 +120,14 @@ class InvoiceRepository(BaseRepository[Invoice]):
 
         if status is not None:
             statement = statement.where(Invoice.status == status)
+
+        if start_date is not None:
+            start_dt = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+            statement = statement.where(Invoice.issue_date >= start_dt)
+
+        if end_date is not None:
+            end_dt = datetime.combine(end_date, time.max, tzinfo=timezone.utc)
+            statement = statement.where(Invoice.issue_date <= end_dt)
 
         statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
@@ -142,10 +157,12 @@ class PaymentRepository(BaseRepository[Payment]):
         clinic_id: UUID | None = None,
         invoice_id: UUID | None = None,
         patient_id: UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[Payment]:
-        """List payments with optional invoice and patient filters."""
+        """List payments with optional invoice, patient, and date range filters."""
 
         effective_limit = min(limit, 500)
         statement = select(Payment)
@@ -155,6 +172,14 @@ class PaymentRepository(BaseRepository[Payment]):
 
         if patient_id is not None:
             statement = statement.where(Payment.patient_id == patient_id)
+
+        if start_date is not None:
+            start_dt = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+            statement = statement.where(Payment.payment_date >= start_dt)
+
+        if end_date is not None:
+            end_dt = datetime.combine(end_date, time.max, tzinfo=timezone.utc)
+            statement = statement.where(Payment.payment_date <= end_dt)
 
         statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)

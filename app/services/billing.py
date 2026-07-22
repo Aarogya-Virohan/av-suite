@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -157,6 +158,7 @@ class BillingService:
         clinic_id: UUID,
         *,
         patient_id: UUID | None = None,
+        package_id: UUID | None = None,
         status: PackageStatus | None = None,
         offset: int = 0,
         limit: int = 100,
@@ -166,6 +168,7 @@ class BillingService:
         return await self.patient_package_repository.list_packages(
             clinic_id=clinic_id,
             patient_id=patient_id,
+            package_id=package_id,
             status=status,
             offset=offset,
             limit=limit,
@@ -299,6 +302,8 @@ class BillingService:
         *,
         patient_id: UUID | None = None,
         status: InvoiceStatus | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[Invoice]:
@@ -308,6 +313,8 @@ class BillingService:
             clinic_id=clinic_id,
             patient_id=patient_id,
             status=status,
+            start_date=start_date,
+            end_date=end_date,
             offset=offset,
             limit=limit,
         )
@@ -387,6 +394,8 @@ class BillingService:
         *,
         invoice_id: UUID | None = None,
         patient_id: UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[Payment]:
@@ -396,6 +405,8 @@ class BillingService:
             clinic_id=clinic_id,
             invoice_id=invoice_id,
             patient_id=patient_id,
+            start_date=start_date,
+            end_date=end_date,
             offset=offset,
             limit=limit,
         )
@@ -418,3 +429,18 @@ class BillingService:
             f"Total: {invoice.total_amount}\n"
         ).encode("utf-8")
         return pdf_content
+
+    async def get_outstanding_balance(self, clinic_id: UUID, patient_id: UUID | None = None) -> Decimal:
+        """Calculate total outstanding unpaid balance for a patient or clinic."""
+
+        invoices = await self.invoice_repository.list_invoices(
+            clinic_id=clinic_id,
+            patient_id=patient_id,
+        )
+        total_outstanding = Decimal("0.00")
+        for inv in invoices:
+            if inv.status in (InvoiceStatus.ISSUED, InvoiceStatus.UNPAID, InvoiceStatus.PARTIAL, InvoiceStatus.OVERDUE):
+                outstanding = inv.total_amount - inv.paid_amount
+                if outstanding > Decimal("0.00"):
+                    total_outstanding += outstanding
+        return total_outstanding
