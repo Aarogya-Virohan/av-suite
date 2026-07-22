@@ -4,7 +4,7 @@ from enum import StrEnum
 
 
 class LeadStage(StrEnum):
-    """Kanban stages for CRM leads."""
+    """Lifecycle stages for CRM sales leads."""
 
     NEW = "new"
     CONTACTED = "contacted"
