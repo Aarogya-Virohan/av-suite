@@ -120,8 +120,8 @@ export const PatientsModule: React.FC = () => {
 
       {/* Intake Form Modal */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-          <div className="bg-white dark:bg-[#1C2541] border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-xl p-6 shadow-2xl space-y-4">
+        <div className="modal-backdrop">
+          <div className="modal-card max-w-xl p-6 space-y-4">
             <h3 className="text-base font-extrabold text-[var(--foreground)] border-b border-slate-100 dark:border-slate-800 pb-3">
               Patient Clinical Intake
             </h3>

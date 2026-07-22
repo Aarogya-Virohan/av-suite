@@ -357,8 +357,8 @@ export const AppointmentsModule: React.FC = () => {
 
       {/* Book Slot Modal */}
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-          <div className="bg-white dark:bg-[#1C2541] border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+        <div className="modal-backdrop">
+          <div className="modal-card max-w-lg p-6 space-y-4">
             <h3 className="text-base font-extrabold text-[var(--foreground)] border-b border-slate-100 dark:border-slate-800 pb-3">
               Book Appointment Slot
             </h3>
@@ -369,8 +369,8 @@ export const AppointmentsModule: React.FC = () => {
 
       {/* Approval Details Modal */}
       {approveReqId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
-          <div className="bg-white dark:bg-[#1C2541] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-md space-y-4 text-xs font-semibold">
+        <div className="modal-backdrop">
+          <div className="modal-card max-w-md p-6 space-y-4 text-xs font-semibold">
             <h3 className="text-base font-extrabold text-[var(--foreground)]">Confirm Booking Details</h3>
             <p className="text-slate-400">Select the treating therapist and session duration for this patient.</p>
 
