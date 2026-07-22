@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.common.base import Base
-from app.common.mixins import TimestampMixin, UUIDMixin
+from app.common.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from app.enums.patient import PatientStatus
 from app.models.clinic import Clinic
 
@@ -18,7 +18,7 @@ def _patient_status_values(enum_cls: type[PatientStatus]) -> list[str]:
     return [member.value for member in enum_cls]
 
 
-class Patient(UUIDMixin, TimestampMixin, Base):
+class Patient(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """Clinic-scoped patient entity representing demographic and clinical intake data."""
 
     __tablename__: str = "patients"

@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.common.base import Base
-from app.common.mixins import TimestampMixin, UUIDMixin
+from app.common.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from app.enums.appointment import AppointmentSource, AppointmentStatus
 from app.models.clinic import Clinic
 from app.models.patient import Patient
@@ -27,7 +27,7 @@ def _appointment_source_values(enum_cls: type[AppointmentSource]) -> list[str]:
     return [member.value for member in enum_cls]
 
 
-class Appointment(UUIDMixin, TimestampMixin, Base):
+class Appointment(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """Clinic-scoped appointment entity representing scheduled clinical visits."""
 
     __tablename__: str = "appointments"

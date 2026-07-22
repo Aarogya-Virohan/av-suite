@@ -32,3 +32,24 @@ class TimestampMixin:
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class SoftDeleteMixin:
+    """Reusable soft-delete mixin for entity deletion and recovery."""
+
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    )
+    deleted_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        nullable=True,
+        default=None,
+    )
+
+    @property
+    def is_deleted(self) -> bool:
+        """Return True if record is soft-deleted."""
+
+        return self.deleted_at is not None

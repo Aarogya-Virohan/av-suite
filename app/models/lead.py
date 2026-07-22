@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.common.base import Base
-from app.common.mixins import TimestampMixin, UUIDMixin
+from app.common.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from app.enums.lead import LeadStage
 from app.models.clinic import Clinic
 from app.models.patient import Patient
@@ -20,7 +20,7 @@ def _lead_stage_values(enum_cls: type[LeadStage]) -> list[str]:
     return [member.value for member in enum_cls]
 
 
-class Lead(UUIDMixin, TimestampMixin, Base):
+class Lead(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """CRM Lead entity representing prospective patients."""
 
     __tablename__: str = "leads"

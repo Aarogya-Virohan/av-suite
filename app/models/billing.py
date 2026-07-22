@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.common.base import Base
-from app.common.mixins import TimestampMixin, UUIDMixin
+from app.common.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from app.enums.billing import InvoiceStatus, PaymentMethod
 from app.enums.package import PackageStatus
 from app.models.appointment import Appointment
@@ -131,7 +131,7 @@ class PatientPackage(UUIDMixin, TimestampMixin, Base):
         return max(0, self.total_sessions - self.completed_sessions)
 
 
-class Invoice(UUIDMixin, TimestampMixin, Base):
+class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """Clinic-scoped billing invoice."""
 
     __tablename__: str = "invoices"

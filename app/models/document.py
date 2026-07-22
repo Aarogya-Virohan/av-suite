@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.common.base import Base
-from app.common.mixins import TimestampMixin, UUIDMixin
+from app.common.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
 from app.enums.document import DocumentCategory
 from app.models.clinic import Clinic
 from app.models.patient import Patient
@@ -21,7 +21,7 @@ def _document_category_values(enum_cls: type[DocumentCategory]) -> list[str]:
     return [member.value for member in enum_cls]
 
 
-class PatientDocument(UUIDMixin, TimestampMixin, Base):
+class PatientDocument(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """Patient document and medical file metadata entity."""
 
     __tablename__: str = "patient_documents"
