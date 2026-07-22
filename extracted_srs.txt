@@ -1,0 +1,399 @@
+=== PAGE 1 ===
+AV Suite — CRM · Software Requirements Specification
+AAROGYA VIROHAN
+AV Suite — CRM Module
+Software Requirements Specification (SRS)
+Author Onkar
+Assigned to Sparsh (Backend) · Tarun (Frontend)
+Scope Build the AV Suite CRM module to production standard on 
+the existing FastAPI + PostgreSQL + Next.js stack.
+Version 1.0  —  July 2026
+Repo Aarogya-Virohan/av-suite (private monorepo) · branch: dev
+READ THIS FIRST
+This document is the single source of truth for the CRM build. It defines the data model, endpoints, and engineering 
+standards in full — build from this specification, not from the prototype files. Read Section 2 before writing any code.
+Page 1 of 14
+=== PAGE 2 ===
+AV Suite — CRM · Software Requirements Specification
+1  Purpose & Context
+A working prototype of the clinic CRM already exists — a full-featured HTML app backed by Google Apps Script and 
+Google Sheets. It establishes the exact features, screens, and data a clinic needs day-to-day. The goal of this module is to 
+rebuild that validated design on our production stack (FastAPI + PostgreSQL + Next.js) so it runs as part of the same 
+system that already powers the Posture Tool and Exercise Library.
+1.1 Why the prototype is a reference, not a codebase to port
+Google Sheets cannot serve as the database for a multi-clinic SaaS product — it does not provide the concurrency, data 
+isolation between clinics, or reliability required for patient data. The prototype is also single-clinic by design (one sheet = 
+one clinic), so it has no concept of many clinics sharing one system. We therefore take its feature set and data as the 
+blueprint, and implement it fresh on a proper multi-tenant relational database.
+1.2 Reference material
+• Tarun (frontend): you'll receive the prototype UI file (crm.docx) as a visual reference for the screens, tabs, and 
+layout. Use it to understand what to build — not how to build it. Follow the component structure and design tokens 
+already used in the Posture Tool and Exercise Library frontends; do not carry over the prototype's HTML, CSS, or JS.
+• Sparsh (backend): everything you need — the data model, endpoints, and rules — is defined in this document. Build 
+against this specification. If a requirement isn't covered here, flag it before building rather than inferring it from the 
+prototype.
+Page 2 of 14
+=== PAGE 3 ===
+AV Suite — CRM · Software Requirements Specification
+2  Engineering Standards — Read Before Writing Any Code
+These are non-negotiable standards for this module. Treat any violation as a bug.
+STANDARD 1 — EVERY TABLE AND EVERY QUERY IS SCOPED BY CLINIC_ID
+This is a multi-tenant system: many clinics share one database. A case where Clinic A can read or edit Clinic B's data 
+is a data breach, not a minor issue. Use the existing ClinicGateMiddleware (backend/app/middleware/clinic_gate.py) 
+— do not write separate scoping logic. Any new table holding clinic-specific data must carry a clinic_id foreign key, 
+and every SELECT/UPDATE/DELETE on it must be filtered by the authenticated user's clinic_id.
+STANDARD 2 — NO PUBLIC FILE OR DOCUMENT ROUTES
+Every endpoint that serves a PDF, image, or document (invoices, prescriptions, patient documents) must require a 
+valid JWT and verify the file belongs to the requester's clinic. There are no public or unauthenticated file routes 
+anywhere in this system. Files live in a private Supabase Storage bucket and are served only through authenticated, 
+clinic-scoped endpoints.
+STANDARD 3 — REUSE THE SHARED BUILDING BLOCKS
+Auth (JWT + bcrypt), the response-envelope pattern, ClinicGateMiddleware, and WeasyPrint PDF generation already 
+exist and are in use. Import and reuse them. Do not add a second auth system or a second PDF pipeline.
+STANDARD 4 — ONE SHARED BACKEND
+backend/app/main.py and the Alembic migration history are shared across the Posture Tool, Exercise Library, and 
+CRM. Never recreate main.py, and never redefine a model (User, Clinic, Patient) that already exists — extend it with 
+a migration. After every merge, confirm main.py still registers all middleware and routers (ClinicGateMiddleware, 
+logger, settings, api_router) — standard merge hygiene.
+STANDARD 5 — CONNECT TO POSTGRES THROUGH THE POOLER
+Use the Supabase connection pooler (Supavisor, transaction mode, port 6543) in the async SQLAlchemy engine URL 
+— not the direct port 5432. This lets many requests share a small pool of real database connections. Confirm 
+DATABASE_URL uses the pooler port before merging.
+STANDARD 6 — SUBMIT COMPLETE FILES FOR REVIEW
+When submitting a change for review, share the complete file rather than a diff or patch — it keeps line endings 
+consistent and review unambiguous.
+Page 3 of 14
+=== PAGE 4 ===
+AV Suite — CRM · Software Requirements Specification
+3  Architecture Overview
+3.1 Stack
+Layer Technology Notes
+Backend FastAPI, Python 3.11, SQLAlchemy 2.0 async, Alembic, 
+Pydantic v2
+Python 3.9 is incompatible — confirm 
+your venv
+Auth JWT + bcrypt (existing) Reuse app/core/security.py
+Database PostgreSQL via Supabase, ap-south-1 Mumbai Connect via pooler (Standard 5)
+File storage Supabase Storage (private buckets) Patient documents, invoice PDFs
+PDF generation WeasyPrint (existing) Reuse the current service
+Frontend Next.js 14, TypeScript (strict), Tailwind, TanStack Query, 
+Zustand
+New app in frontend/crm/
+Deploy Railway (backend) + Vercel (frontend), auto-deploy from dev Frontend needs a manual 'Promote to 
+Production' on Vercel
+3.2 Where the CRM lives in the monorepo
+av-suite/ ├── backend/app/ │   ├── main.py                       ← shared app — all routers register 
+here │   ├── middleware/clinic_gate.py     ← reuse for every CRM endpoint │   ├── models/ 
+← add: lead, appointment, invoice, payment, │   │                                     package, 
+treatment, assessment, │   │                                     patient_document, audit_log, 
+appointment_request │   ├── api/v1/ │   │   ├── patients.py               ← exists — extend, don't 
+duplicate │   │   ├── leads.py                  ← new │   │   ├── appointments.py           ← new │   │ 
+├── billing.py                ← new (invoices + payments) │   │   ├── packages.py               ← new │ 
+│   ├── treatments.py             ← new (SOAP notes, assessments) │   │   ├── booking.py 
+← new (public booking + appointment requests) │   │   └── analytics.py              ← new │   └── 
+services/pdf/                 ← reuse existing WeasyPrint service └── frontend/crm/src/ 
+← new Next.js app: dashboard, leads, patients,                                           appointments, 
+therapists, billing, analytics,                                           recycle, settings
+3.3 The CRM is the anchor of the suite
+A patient exists once, in one place. A posture analysis attaches to that patient's record; an exercise prescription attaches to 
+the same record. This is the core integration point of AV Suite and what makes it more than a practice-management tool. 
+The Patients table built in Phase 1 is what the Posture Tool and Exercise Library will both point to.
+Page 4 of 14
+=== PAGE 5 ===
+AV Suite — CRM · Software Requirements Specification
+4  Data Model
+Every table below is derived from the prototype's data, implemented as a proper relational schema. Clinics and Users are 
+new tables — the prototype had no concept of them because it was single-clinic. These two are the foundation of 
+everything else and are built first (Phase 1).
+4.1 Clinics  (foundation)
+Field Type Notes
+id UUID, PK
+name varchar
+branding_logo_url varchar, nullable booking form + PDF headers
+branding_color varchar, nullable
+plan_tier enum(free, practice, 
+clinical_pro)
+drives feature gating later
+is_partner_clinic boolean, default false flag for later ranking logic; not used in Phase 1–3
+created_at / updated_at timestamptz
+4.2 Users  (foundation)
+Field Type Notes
+id UUID, PK
+clinic_id UUID, FK → Clinics every user belongs to one clinic
+name, email, phone varchar email unique
+password_hash varchar bcrypt, via existing auth
+role enum(admin, therapist, 
+front_desk)
+drives permission checks
+is_active boolean, default true
+created_at / updated_at timestamptz
+4.3 Patients  (extends existing model)
+Field Type Notes
+id UUID, PK already exists
+clinic_id UUID, FK → Clinics confirm it exists; add via migration if not
+full_name, phone, age, gender varchar/int/enum from patient intake
+chief_complaint text
+referral_source varchar, nullable "how did you find us"
+status enum(active, inactive, 
+discharged)
+created_at / updated_at timestamptz
+4.4 Leads
+Field Type Notes
+id UUID, PK
+clinic_id UUID, FK
+name, phone, source varchar
+Page 5 of 14
+=== PAGE 6 ===
+AV Suite — CRM · Software Requirements Specification
+Field Type Notes
+stage enum(new, contacted, qualified, 
+converted, lost)
+kanban columns
+assigned_to UUID, FK → Users, nullable
+notes text, nullable
+converted_patient_id UUID, FK → Patients, nullable set on conversion
+created_at / updated_at timestamptz
+4.5 Appointments
+Field Type Notes
+id UUID, PK
+clinic_id UUID, FK
+patient_id UUID, FK → Patients
+therapist_id UUID, FK → Users
+scheduled_at timestamptz
+duration_minutes int, default 30
+status enum(scheduled, completed, 
+cancelled, no_show)
+source enum(manual, public_booking) staff-created vs public form
+created_at / updated_at timestamptz
+4.6 AppointmentRequests  (public booking form)
+Field Type Notes
+id UUID, PK
+clinic_id UUID, FK resolved from booking-form clinic param
+name, phone, age, gender varchar/int/enum
+chief_complaint, notes text
+preferred_date, preferred_slot date, varchar
+status enum(pending, approved, 
+rejected)
+front desk approves into an Appointment
+created_at timestamptz
+4.7 Assessments & Treatments  (SOAP notes)
+Field Type Notes
+id UUID, PK
+clinic_id, patient_id, 
+therapist_id
+UUID, FK
+appointment_id UUID, FK, nullable the visit it was recorded during
+subjective, objective, 
+assessment, plan
+text SOAP fields
+progression_notes text, nullable "Progression" tab
+created_at timestamptz
+Page 6 of 14
+=== PAGE 7 ===
+AV Suite — CRM · Software Requirements Specification
+4.8 Packages & Patient Packages
+Field Type Notes
+Packages: id, clinic_id, name UUID/varchar
+total_sessions, price, validity_days int, decimal, int
+PatientPackages: id, clinic_id, patient_id, 
+package_id
+UUID, FK a package sold to a patient
+sessions_used, sessions_remaining int
+purchased_at, expires_at timestamptz
+4.9 Invoices & Payments
+Field Type Notes
+Invoices: id, clinic_id, patient_id UUID, FK
+line_items jsonb array of {description, amount}
+total_amount, status decimal, enum(unpaid, paid, partial)
+Payments: id, invoice_id, clinic_id UUID, FK
+amount, method, paid_at decimal, enum(cash, upi, card), 
+timestamptz
+4.10 PatientDocuments · AuditLogs
+Field Type Notes
+PatientDocuments: id, clinic_id, patient_id UUID, FK
+file_url, file_type, label varchar private Supabase Storage path (Standard 2)
+uploaded_by, created_at UUID FK, timestamptz
+AuditLogs: id, clinic_id, user_id UUID, FK
+action, entity_type, entity_id varchar, varchar, UUID e.g. patient.created, invoice.paid
+metadata, created_at jsonb, timestamptz
+TRANSLATING TO A RELATIONAL SCHEMA
+Use real foreign keys, real enums, and real timestamptz columns throughout. Any field that behaves like a dropdown 
+in the prototype (status, stage, role, method) becomes a Postgres enum here — not a free-text string.
+Page 7 of 14
+=== PAGE 8 ===
+AV Suite — CRM · Software Requirements Specification
+5  API Endpoints
+All endpoints sit under /api/v1/, require a valid JWT (except the public booking routes), and are clinic-scoped via 
+ClinicGateMiddleware. Follow the existing response-envelope pattern.
+5.1 Patients
+Method Path Behavior
+POST /patients create — reuse existing model
+GET /patients list, paginated, searchable by name/phone
+GET /patients/{id} full profile incl. linked appointments/invoices
+PATCH /patients/{id} edit
+5.2 Leads
+Method Path Behavior
+POST /leads create
+GET /leads list, filterable by stage (kanban)
+PATCH /leads/{id} update stage / assign / notes
+POST /leads/{id}/convert create a Patient from this lead
+5.3 Appointments
+Method Path Behavior
+POST /appointments create (staff-scheduled)
+GET /appointments list, filter by date / therapist / patient
+PATCH /appointments/{id} reschedule / change status
+DELETE /appointments/{id} soft-cancel (see 5.8)
+5.4 Public Booking  (only unauthenticated routes — handle with care)
+Method Path Behavior
+GET /booking/branding/{clinic_slug} public — clinic name/logo/color only. No patient data.
+POST /booking/request public — creates AppointmentRequest. Rate-limit; validate 
+phone server-side.
+GET /appointment-requests authenticated — front desk approve/reject queue
+POST /appointment-requests/{id}/approve authenticated — creates a real Appointment
+POST /appointment-requests/{id}/reject authenticated
+5.5 Treatments / Assessments (SOAP)
+Method Path Behavior
+POST /treatments create SOAP entry, linked to patient + appointment
+GET /treatments?patient_id= history / progression view
+PATCH /treatments/{id} edit before finalized
+5.6 Billing (Packages, Invoices, Payments)
+Method Path Behavior
+POST / GET /packages clinic package catalogue
+POST /patients/{id}/packages sell a package to a patient
+POST /invoices create invoice with line items
+Page 8 of 14
+=== PAGE 9 ===
+AV Suite — CRM · Software Requirements Specification
+Method Path Behavior
+POST /invoices/{id}/payments record a payment
+POST /invoices/{id}/pdf generate PDF (reuse WeasyPrint service)
+GET /invoices/{id}/pdf/download authenticated, clinic-scoped (Standard 2)
+5.7 Patient Documents
+Method Path Behavior
+POST /patients/{id}/documents upload to private Supabase Storage
+GET /patients/{id}/documents list, clinic-scoped
+GET /documents/{id}/download authenticated, clinic-scoped (Standard 2)
+5.8 Recycle Bin, Audit Logs & Analytics
+Method Path Behavior
+DELETE any resource soft-delete: set deleted_at, never hard-delete
+GET /recycle-bin list soft-deleted items, clinic-scoped
+POST /recycle-bin/{type}/{id}/restore undo soft-delete
+GET /analytics/overview patients, appointments this week, revenue this month, conversion 
+rate
+Write an AuditLog entry on every create/update/delete of Patients, Invoices, and Appointments — surfaced in Settings › Audit Log.
+Page 9 of 14
+=== PAGE 10 ===
+AV Suite — CRM · Software Requirements Specification
+6  Build Plan
+This is a one-week sprint. Both of you work against it daily and self-organize on who owns what within each workstream. 
+Sync Monday and Thursday — blockers only. Build in the order below; Phase 1 is the foundation everything else depends 
+on, so it lands first, with Phases 2 and 3 following as it stabilizes.
+Phase 1 — Foundation
+• Clinics + Users tables + migration. First confirm whether a Clinics table already exists from earlier work — do not 
+create a duplicate.
+• Wire ClinicGateMiddleware to the Users/Clinics model.
+• Auth: login endpoint issuing a JWT with clinic_id + role in the claims.
+• Patients CRUD and Appointments CRUD, fully clinic-scoped.
+• Done when: two test clinics exist, each with their own users and patients, and a passing test proves Clinic A's token 
+cannot read Clinic B's patients.
+Phase 2 — Clinical & Billing
+• Treatments / Assessments (SOAP) linked to appointments.
+• Packages, Patient Packages, Invoices, Payments.
+• Invoice PDF via the existing WeasyPrint service.
+• Patient Documents upload/download — private Supabase Storage only.
+• Done when: a patient can be invoiced, paid, and the invoice downloaded as a PDF only by an authenticated user of 
+the correct clinic.
+Phase 3 — Growth & Ops
+• Leads + kanban stage transitions + convert-to-patient.
+• Public booking form + AppointmentRequests + approve/reject flow.
+• Analytics overview + dashboard cards.
+• Recycle Bin (soft-delete) + Audit Logs + Settings (clinic branding).
+• Done when: a lead from the public booking form can be approved into an appointment, with the audit trail visible in 
+Settings.
+Page 10 of 14
+=== PAGE 11 ===
+AV Suite — CRM · Software Requirements Specification
+7  Non-Functional Requirements
+7.1 Security
+• Every request touching patient data carries a valid JWT and passes through ClinicGateMiddleware.
+• No patient data (name, phone, condition, documents) appears in any public response.
+• Passwords: bcrypt only, via the existing security module — never stored or logged in plaintext.
+7.2 Performance
+• Expected load is well within Supabase Pro limits — the priority is query quality, not capacity. Add indexes on 
+clinic_id, patient_id, and any column used in a WHERE filter.
+• Use the Supabase connection pooler (Standard 5).
+7.3 Data integrity
+• Foreign keys enforced at the database level, not only in application code.
+• Soft-delete (deleted_at) for anything in the Recycle Bin — never hard-delete patient-related records.
+7.4 Testing
+• Every new endpoint gets at least one test proving clinic isolation — the most important test category in this module.
+• Follow the existing test patterns in backend/tests/.
+Page 11 of 14
+=== PAGE 12 ===
+AV Suite — CRM · Software Requirements Specification
+8  Deliverables & Process
+For each phase, submit:
+1. A pull request to the dev branch.
+2. A short validation note where the phase involves billing math (invoice totals, package session counts) — showing the 
+math checks out on a test case.
+3. A short screen recording of the flow working end-to-end (e.g. create lead → convert → book → invoice → pay → 
+download PDF).
+4. A completed done-checklist (per-phase, from Section 6) in the PR description.
+Working process
+• One-week sprint; self-organize on ownership within each phase.
+• Sync Monday and Thursday — standup-style, blockers only.
+• If blocked on a local environment issue for more than an hour, push to dev and test against the deploy rather than 
+losing time.
+• Use full absolute paths in shared commands, and confirm your branch before every push.
+Page 12 of 14
+=== PAGE 13 ===
+AV Suite — CRM · Software Requirements Specification
+9  Working in a Shared Codebase
+The CRM lives in the same repo and the same backend as the Posture Tool and Exercise Library — that's deliberate: it's 
+what lets a patient exist once and have their posture reports and prescriptions attach to that same record. It also means a few 
+habits matter more here than they would in a standalone project. These are small things, and getting them right from day 
+one will save us both a lot of pain later.
+For Sparsh — Backend
+You're building the foundation the entire suite sits on. Three habits, specific to working in a shared backend:
+• Check for a single migration head before every merge. Run alembic heads — if it returns more than one head, stop 
+and rebase rather than merging. Two heads will break the deploy for all three tools, and it's much easier to prevent 
+than to untangle afterwards.
+• Register routers in api/v1/__init__.py, not in main.py. main.py is shared by every tool, so the less it changes, the 
+fewer merge conflicts we all hit. Keep it thin — add your router to api_router and main.py never needs touching.
+• The CRM owns Clinic, User, and Patient. These are the shared models the other tools reference by foreign key. 
+Extend them through a migration when you need to — but they're yours to define, and nothing else should be 
+redefining them. If you ever find a second definition somewhere, flag it.
+Beyond that: clinic-scope every query, keep endpoints consistent with the existing envelope pattern, and write the isolation test as 
+you build rather than after. You'll enjoy Phase 2 a lot more if Phase 1 is solid.
+For Tarun — Frontend
+You're building what the clinic actually sees and touches every day, so polish here is the product. A few things worth 
+keeping in mind:
+• Match the existing design language. The Posture Tool and Exercise Library frontends already establish our 
+component structure and design tokens. Follow them — the CRM should feel like the same product, not a third app 
+bolted on.
+• Use the prototype for what, not how. crm.docx shows the screens, tabs, and layout we want. Take the structure and 
+the intent from it; build it fresh in Next.js + Tailwind. If something in it conflicts with this specification, the 
+specification wins — flag it and I'll clarify.
+• Build against the API contract in Section 5. The endpoints are defined there, so you're not blocked waiting on the 
+backend — mock the responses and build the screens in parallel. If an endpoint you need isn't specified, tell me before 
+assuming its shape.
+Beyond that: this is a tool physios will use for hours a day, so favour clarity over cleverness — fast, obvious, forgiving. Loading 
+states, empty states, and error states are part of the work, not an afterthought.
+BOTH OF YOU
+You're working on the same foundation from two sides, so a quick message to each other before touching something 
+shared is always cheaper than untangling it afterwards. Ask early, ask often — that's not friction, that's the job.
+Page 13 of 14
+=== PAGE 14 ===
+AV Suite — CRM · Software Requirements Specification
+10  Flag Before You Guess
+If you hit any of the following, raise it before building rather than assuming an answer:
+• Whether a Clinics or Users table already exists from earlier work — confirm before creating a new one.
+• Any business rule not explicitly in this specification (e.g. how partial payments against a package are handled) — do 
+not invent business logic.
+• Any point where the prototype UI conflicts with this specification — this specification wins; flag the conflict rather 
+than silently following the prototype.
+THE THREE THAT MATTER MOST
+1 — Clinic-scope everything (Standard 1).   2 — No public file or document routes (Standard 2).   3 — Reuse the 
+shared building blocks: auth, middleware, PDF service (Standard 3). Everything else in this document follows from 
+these.
+Page 14 of 14

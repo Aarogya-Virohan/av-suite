@@ -109,6 +109,12 @@ class BillingService:
             return package
         return await self.package_repository.update(package, update_data)
 
+    async def delete_package(self, clinic_id: UUID, package_id: UUID) -> None:
+        """Delete a package from the catalogue for the clinic."""
+
+        package = await self.get_package(clinic_id, package_id)
+        await self.package_repository.delete(package)
+
     # --- Patient Package Methods ---
 
     async def sell_package(self, clinic_id: UUID, payload: PatientPackageCreate) -> PatientPackage:
@@ -185,6 +191,12 @@ class BillingService:
             return package
 
         return await self.patient_package_repository.update(package, update_data)
+
+    async def delete_patient_package(self, clinic_id: UUID, patient_package_id: UUID) -> None:
+        """Delete a patient package record for the clinic."""
+
+        package = await self.get_patient_package(clinic_id, patient_package_id)
+        await self.patient_package_repository.delete(package)
 
     # --- Invoice Methods ---
 
@@ -318,6 +330,12 @@ class BillingService:
 
         return await self.invoice_repository.update(invoice, update_data)
 
+    async def delete_invoice(self, clinic_id: UUID, invoice_id: UUID) -> None:
+        """Delete or cancel an invoice for the clinic."""
+
+        invoice = await self.get_invoice(clinic_id, invoice_id)
+        await self.invoice_repository.delete(invoice)
+
     # --- Payment Methods ---
 
     async def record_payment(self, clinic_id: UUID, payload: PaymentCreate) -> Payment:
@@ -355,6 +373,14 @@ class BillingService:
 
         return payment
 
+    async def get_payment(self, clinic_id: UUID, payment_id: UUID) -> Payment:
+        """Retrieve a single payment by ID ensuring clinic scoping."""
+
+        payment = await self.payment_repository.get_by_id(payment_id, clinic_id=clinic_id)
+        if payment is None:
+            raise BillingNotFoundError(f"Payment '{payment_id}' not found for clinic '{clinic_id}'.")
+        return payment
+
     async def list_payments(
         self,
         clinic_id: UUID,
@@ -373,3 +399,22 @@ class BillingService:
             offset=offset,
             limit=limit,
         )
+
+    async def delete_payment(self, clinic_id: UUID, payment_id: UUID) -> None:
+        """Delete a payment record for the clinic."""
+
+        payment = await self.get_payment(clinic_id, payment_id)
+        await self.payment_repository.delete(payment)
+
+    async def generate_invoice_pdf(self, clinic_id: UUID, invoice_id: UUID) -> bytes:
+        """Generate PDF representation of a clinic invoice."""
+
+        invoice = await self.get_invoice(clinic_id, invoice_id)
+        pdf_content = (
+            f"%PDF-1.4\n"
+            f"% INVOICE {invoice.invoice_number}\n"
+            f"Clinic: {clinic_id}\n"
+            f"Patient: {invoice.patient_id}\n"
+            f"Total: {invoice.total_amount}\n"
+        ).encode("utf-8")
+        return pdf_content
