@@ -6,7 +6,6 @@ from uuid import UUID
 
 from app.repositories.base import BaseRepository, SupportsUUIDPrimaryKey
 
-
 ModelT = TypeVar("ModelT", bound=SupportsUUIDPrimaryKey)
 
 
@@ -25,15 +24,21 @@ class BaseService(Generic[ModelT]):
 
         return await self.repository.create(obj_in)
 
-    async def get(self, id: UUID) -> ModelT | None:
-        """Fetch a single entity by primary key."""
+    async def get(self, id: UUID, *, clinic_id: UUID | None = None) -> ModelT | None:
+        """Fetch a single entity by primary key with optional clinic scope."""
 
-        return await self.repository.get_by_id(id)
+        return await self.repository.get_by_id(id, clinic_id=clinic_id)
 
-    async def list(self, *, offset: int = 0, limit: int | None = None) -> list[ModelT]:
-        """Return a paginated list of entities."""
+    async def list(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        clinic_id: UUID | None = None,
+    ) -> list[ModelT]:
+        """Return a paginated list of entities with optional clinic scope."""
 
-        return await self.repository.get_all(offset=offset, limit=limit)
+        return await self.repository.list(offset=offset, limit=limit, clinic_id=clinic_id)
 
     async def update(self, db_obj: ModelT, obj_in: Mapping[str, object]) -> ModelT:
         """Update an entity through the repository layer."""
@@ -44,3 +49,8 @@ class BaseService(Generic[ModelT]):
         """Delete an entity through the repository layer."""
 
         await self.repository.delete(db_obj)
+
+    async def exists(self, id: UUID, *, clinic_id: UUID | None = None) -> bool:
+        """Check whether an entity exists for the given primary key and clinic scope."""
+
+        return await self.repository.exists(id, clinic_id=clinic_id)

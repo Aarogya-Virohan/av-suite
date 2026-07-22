@@ -6,12 +6,15 @@ from uuid import UUID
 
 from sqlalchemy import Select, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Mapped
 
 
 class SupportsUUIDPrimaryKey(Protocol):
     """Protocol for ORM instances that expose a UUID primary key."""
 
-    id: UUID
+    @property
+    def id(self) -> UUID | Mapped[UUID]: ...
+
 
 
 ModelT = TypeVar("ModelT", bound=SupportsUUIDPrimaryKey)
@@ -40,7 +43,7 @@ class BaseRepository(Generic[ModelT]):
         if self._has_clinic_scope():
             if clinic_id is None:
                 raise ValueError(f"clinic_id is required for clinic-scoped model '{self.model.__name__}'.")
-            clinic_column = cast(Any, getattr(self.model, "clinic_id"))
+            clinic_column = getattr(self.model, "clinic_id")
             return statement.where(clinic_column == clinic_id)
 
         return statement
@@ -48,7 +51,7 @@ class BaseRepository(Generic[ModelT]):
     def _apply_id_filter(self, statement: Select[Any], id: UUID) -> Select[Any]:
         """Apply the primary-key filter in a type-safe SQLAlchemy-friendly way."""
 
-        id_column = cast(Any, getattr(self.model, "id"))
+        id_column = getattr(self.model, "id")
         return statement.where(id_column == id)
 
     async def _delete_instance(self, db_obj: ModelT) -> None:
@@ -88,8 +91,9 @@ class BaseRepository(Generic[ModelT]):
     ) -> list[ModelT]:
         """Return rows for the repository model with optional pagination and clinic scope."""
 
-        effective_limit = 100 if limit is None else min(limit, 500)
+        effective_limit = min(limit, 500)
         statement = self._apply_clinic_scope(select(self.model), clinic_id).offset(offset).limit(effective_limit)
+
 
         result = await self.session.scalars(statement)
         return list(result.all())

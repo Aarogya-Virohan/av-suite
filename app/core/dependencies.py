@@ -53,8 +53,9 @@ def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User
     return current_user
 
 
-async def get_authenticated_context(token: str, session: AsyncSession) -> AuthenticatedContext:
+async def get_authenticated_context(token: TokenDep, session: SessionDep) -> AuthenticatedContext:
     """Resolve the authenticated user and clinic from an access token."""
+
 
     try:
         claims = decode_access_token(token)

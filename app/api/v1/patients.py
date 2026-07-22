@@ -4,8 +4,9 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import SessionDep, get_current_clinic
+from app.core.dependencies import get_async_session, get_current_clinic
 from app.models.clinic import Clinic
 from app.repositories.patient import PatientRepository
 from app.schemas.patient import (
@@ -19,7 +20,9 @@ from app.services.patient import PatientNotFoundError, PatientService, PatientVa
 router = APIRouter()
 
 
-def get_patient_service(session: SessionDep) -> PatientService:
+async def get_patient_service(
+    session: AsyncSession = Depends(get_async_session),
+) -> PatientService:
     """Inject PatientService with a session-bound repository."""
 
     return PatientService(PatientRepository(session))
@@ -48,10 +51,10 @@ async def create_patient(
 async def list_patients(
     clinic: CurrentClinicDep,
     service: PatientServiceDep,
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, ge=1, le=500),
-    query: str | None = Query(default=None),
-    active_only: bool = Query(default=False),
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    query: Annotated[str | None, Query()] = None,
+    active_only: Annotated[bool, Query()] = False,
 ) -> PatientListResponse:
     """List or search patients for the authenticated clinic with pagination."""
 
