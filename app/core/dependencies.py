@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
@@ -32,6 +33,14 @@ TokenDep = Annotated[str, Depends(oauth2_scheme)]
 RoleDependency = Callable[..., Awaitable[User]]
 
 
+@dataclass(slots=True)
+class AuthenticatedContext:
+    """Authenticated request identity resolved from the access token."""
+
+    user: User
+    clinic: Clinic
+
+
 def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User:
     """Ensure the authenticated user has one of the allowed roles."""
 
@@ -44,11 +53,8 @@ def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User
     return current_user
 
 
-async def get_current_user(
-    token: TokenDep,
-    session: SessionDep,
-) -> User:
-    """Return the authenticated user resolved from the access token."""
+async def get_authenticated_context(token: str, session: AsyncSession) -> AuthenticatedContext:
+    """Resolve the authenticated user and clinic from an access token."""
 
     try:
         claims = decode_access_token(token)
@@ -77,16 +83,7 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return user
-
-
-async def get_current_clinic(
-    current_user: Annotated[User, Depends(get_current_user)],
-    session: SessionDep,
-) -> Clinic:
-    """Return the authenticated clinic for the current user."""
-
-    clinic = await session.get(Clinic, current_user.clinic_id)
+    clinic = await session.get(Clinic, clinic_id)
     if clinic is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -94,7 +91,26 @@ async def get_current_clinic(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return clinic
+    return AuthenticatedContext(user=user, clinic=clinic)
+
+
+AuthenticatedContextDep = Annotated[AuthenticatedContext, Depends(get_authenticated_context)]
+
+
+async def get_current_user(
+    auth_context: AuthenticatedContextDep,
+) -> User:
+    """Return the authenticated user resolved from the access token."""
+
+    return auth_context.user
+
+
+async def get_current_clinic(
+    auth_context: AuthenticatedContextDep,
+) -> Clinic:
+    """Return the authenticated clinic for the current user."""
+
+    return auth_context.clinic
 
 
 def require_roles(*roles: UserRole) -> RoleDependency:

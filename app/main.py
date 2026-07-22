@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 
 from app.core.config import settings
+from app.middleware import ClinicGateMiddleware
 
 
 app: FastAPI = FastAPI(
@@ -10,6 +11,8 @@ app: FastAPI = FastAPI(
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
 )
+
+app.add_middleware(ClinicGateMiddleware)
 
 
 @app.get("/")
