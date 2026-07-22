@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1.appointments import router as appointments_router
 from app.api.v1.assessments import router as assessments_router
 from app.api.v1.billing import router as billing_router
+from app.api.v1.booking import router as booking_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.leads import router as leads_router
 from app.api.v1.patients import router as patients_router
@@ -20,5 +21,6 @@ api_router.include_router(billing_router, prefix="", tags=["billing"])
 api_router.include_router(documents_router, prefix="/documents", tags=["documents"])
 api_router.include_router(documents_router, prefix="", tags=["documents"])
 api_router.include_router(leads_router, prefix="/leads", tags=["leads"])
+api_router.include_router(booking_router, prefix="", tags=["booking"])
 
 __all__ = ["api_router"]
