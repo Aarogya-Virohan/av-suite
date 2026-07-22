@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.models.clinic import Clinic
 from app.enums.user import UserRole
 from app.models.user import User
 
@@ -77,6 +78,23 @@ async def get_current_user(
         )
 
     return user
+
+
+async def get_current_clinic(
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: SessionDep,
+) -> Clinic:
+    """Return the authenticated clinic for the current user."""
+
+    clinic = await session.get(Clinic, current_user.clinic_id)
+    if clinic is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return clinic
 
 
 def require_roles(*roles: UserRole) -> RoleDependency:
