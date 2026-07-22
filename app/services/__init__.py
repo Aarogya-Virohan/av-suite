@@ -5,6 +5,7 @@ from app.services.appointment import (
 )
 from app.services.auth import AuthService, AuthenticationError
 from app.services.base import BaseService
+from app.services.billing import BillingNotFoundError, BillingService, BillingValidationError
 from app.services.patient import PatientNotFoundError, PatientService, PatientValidationError
 from app.services.treatment import (
     SoapAssessmentService,
@@ -20,6 +21,9 @@ __all__ = [
     "AuthService",
     "AuthenticationError",
     "BaseService",
+    "BillingNotFoundError",
+    "BillingService",
+    "BillingValidationError",
     "PatientNotFoundError",
     "PatientService",
     "PatientValidationError",
@@ -28,6 +32,7 @@ __all__ = [
     "TreatmentSessionService",
     "TreatmentValidationError",
 ]
+
 
 
 

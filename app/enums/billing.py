@@ -4,25 +4,33 @@ from enum import StrEnum
 
 
 class InvoiceStatus(StrEnum):
-    """Payment states for invoices."""
+    """Lifecycle states for billing invoices."""
 
     UNPAID = "unpaid"
     PAID = "paid"
     PARTIAL = "partial"
+    DRAFT = "draft"
+    ISSUED = "issued"
+    CANCELLED = "cancelled"
+    OVERDUE = "overdue"
 
 
 class PaymentMethod(StrEnum):
-    """Supported payment collection methods."""
+    """Payment channels supported for billing settlement."""
 
     CASH = "cash"
     UPI = "upi"
     CARD = "card"
+    BANK_TRANSFER = "bank_transfer"
+    INSURANCE = "insurance"
+    OTHER = "other"
 
 
-class PaymentStatus(StrEnum):
-    """Processing states for payment records."""
 
-    PENDING = "pending"
+class PackageStatus(StrEnum):
+    """Status of patient treatment packages."""
+
+    ACTIVE = "active"
     COMPLETED = "completed"
-    FAILED = "failed"
-    REFUNDED = "refunded"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"

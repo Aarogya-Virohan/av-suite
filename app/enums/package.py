@@ -8,4 +8,7 @@ class PackageStatus(StrEnum):
 
     ACTIVE = "active"
     INACTIVE = "inactive"
+    COMPLETED = "completed"
     EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
