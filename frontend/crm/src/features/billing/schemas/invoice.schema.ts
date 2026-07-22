@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const invoiceSchema = z.zodObject || z.object({
+export const invoiceSchema = z.object({
   patient_id: z.string().min(1, 'Patient selection is required'),
   description: z.string().min(1, 'Description is required'),
   amount: z.number().min(1, 'Base Amount must be at least ₹1'),
@@ -8,7 +8,7 @@ export const invoiceSchema = z.zodObject || z.object({
   discount: z.number().min(0, 'Discount cannot be negative')
 });
 
-export const paymentSchema = z.zodObject || z.object({
+export const paymentSchema = z.object({
   invoice_id: z.string().min(1, 'Invoice selection is required'),
   amount: z.number().min(1, 'Payment Amount must be at least ₹1'),
   mode: z.enum(['Cash', 'UPI', 'Card', 'Bank Transfer']),

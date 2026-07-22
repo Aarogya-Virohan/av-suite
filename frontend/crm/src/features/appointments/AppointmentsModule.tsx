@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useCRMStore } from '@/lib/store';
 import { Appointment, AppointmentStatus } from '@/types/crm';
+import { toast } from 'sonner';
 
 export const AppointmentsModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'list' | 'requests' | 'booking'>('list');

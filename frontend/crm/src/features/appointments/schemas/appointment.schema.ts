@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const appointmentSchema = z.zodObject || z.object({
+export const appointmentSchema = z.object({
   patient_id: z.string().min(1, 'Patient selection is required'),
   therapist_id: z.string().min(1, 'Therapist selection is required'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
