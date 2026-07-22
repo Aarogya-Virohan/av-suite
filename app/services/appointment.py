@@ -102,27 +102,28 @@ class AppointmentService:
         appointment = await self.get_appointment(clinic_id, appointment_id)
         update_data = payload.model_dump(exclude_unset=True)
 
-        if "duration_minutes" in update_data and update_data["duration_minutes"] is not None:
-            if update_data["duration_minutes"] <= 0:
+        if payload.duration_minutes is not None:
+            if payload.duration_minutes <= 0:
                 raise AppointmentValidationError("duration_minutes must be greater than 0.")
 
-        if "patient_id" in update_data and update_data["patient_id"] is not None:
+        if payload.patient_id is not None:
             patient = await self.patient_repository.get_by_patient_id(
-                update_data["patient_id"], clinic_id=clinic_id
+                payload.patient_id, clinic_id=clinic_id
             )
             if patient is None:
                 raise AppointmentValidationError(
-                    f"Patient '{update_data['patient_id']}' does not exist or does not belong to clinic '{clinic_id}'."
+                    f"Patient '{payload.patient_id}' does not exist or does not belong to clinic '{clinic_id}'."
                 )
 
-        if "therapist_id" in update_data and update_data["therapist_id"] is not None:
+        if payload.therapist_id is not None:
             therapist = await self.user_repository.get_by_id(
-                update_data["therapist_id"], clinic_id=clinic_id
+                payload.therapist_id, clinic_id=clinic_id
             )
             if therapist is None:
                 raise AppointmentValidationError(
-                    f"Therapist '{update_data['therapist_id']}' does not exist or does not belong to clinic '{clinic_id}'."
+                    f"Therapist '{payload.therapist_id}' does not exist or does not belong to clinic '{clinic_id}'."
                 )
+
 
         if not update_data:
             return appointment
