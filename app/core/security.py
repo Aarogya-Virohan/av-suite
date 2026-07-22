@@ -8,6 +8,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext  # pyright: ignore[reportMissingTypeStubs] - passlib does not ship usable stubs here.
 
 from app.core.config import settings
+from app.enums.user import UserRole, normalize_user_role
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -42,16 +43,19 @@ def create_access_token(
     *,
     user_id: UUID,
     clinic_id: UUID,
-    role: str,
+    role: UserRole | str,
     expires_delta: timedelta | None = None,
 ) -> str:
     """Create a signed access token containing the CRM identity claims."""
 
+    canonical_role = normalize_user_role(role)
+    issued_at = datetime.now(UTC)
     expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     payload: dict[str, str | int] = {
         "sub": str(user_id),
         "clinic_id": str(clinic_id),
-        "role": role,
+        "role": canonical_role.value,
+        "iat": int(issued_at.timestamp()),
         "exp": int(expire.timestamp()),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -73,9 +77,14 @@ def decode_access_token(token: str) -> TokenClaims:
     if not isinstance(sub, str) or not isinstance(clinic_id, str) or not isinstance(role, str) or not isinstance(exp, int):
         raise ValueError("Invalid access token payload")
 
+    try:
+        canonical_role = normalize_user_role(role)
+    except ValueError as exc:
+        raise ValueError("Invalid access token payload") from exc
+
     return {
         "sub": sub,
         "clinic_id": clinic_id,
-        "role": role,
+        "role": canonical_role.value,
         "exp": exp,
     }

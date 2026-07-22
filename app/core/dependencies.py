@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import decode_access_token
 from app.models.clinic import Clinic
-from app.enums.user import UserRole
+from app.enums.user import UserRole, normalize_user_role
 from app.models.user import User
 
 
@@ -60,7 +60,7 @@ async def get_authenticated_context(token: str, session: AsyncSession) -> Authen
         claims = decode_access_token(token)
         user_id = UUID(claims["sub"])
         clinic_id = UUID(claims["clinic_id"])
-        role = UserRole(claims["role"])
+        role = normalize_user_role(claims["role"])
     except (ValueError, KeyError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

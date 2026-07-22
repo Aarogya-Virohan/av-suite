@@ -47,3 +47,39 @@ class User(UUIDMixin, TimestampMixin, Base):
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+    @property
+    def first_name(self) -> str:
+        """Return an AV Suite-compatible first-name view of the SRS name field."""
+
+        return self._split_name()[0]
+
+    @first_name.setter
+    def first_name(self, value: str) -> None:
+        """Set the first-name portion while preserving the SRS name field."""
+
+        _, last_name = self._split_name()
+        self.name = f"{value.strip()} {last_name}".strip()
+
+    @property
+    def last_name(self) -> str:
+        """Return an AV Suite-compatible last-name view of the SRS name field."""
+
+        return self._split_name()[1]
+
+    @last_name.setter
+    def last_name(self, value: str) -> None:
+        """Set the last-name portion while preserving the SRS name field."""
+
+        first_name, _ = self._split_name()
+        self.name = f"{first_name} {value.strip()}".strip()
+
+    def _split_name(self) -> tuple[str, str]:
+        """Split the canonical SRS name into AV Suite-compatible name parts."""
+
+        name = getattr(self, "name", "").strip()
+        first_name, separator, last_name = name.partition(" ")
+        if not separator:
+            return first_name, ""
+
+        return first_name, last_name
