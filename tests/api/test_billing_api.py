@@ -322,6 +322,24 @@ async def test_get_invoice_api_success(
 
 
 @pytest.mark.asyncio
+async def test_get_outstanding_balance_api_success(
+    mock_clinic: Clinic, mock_billing_service: AsyncMock, auth_headers: dict[str, str]
+) -> None:
+    """Test GET /api/v1/billing/invoices/outstanding-balance returns total balance."""
+
+    mock_billing_service.get_outstanding_balance.return_value = Decimal("2500.00")
+    app.dependency_overrides[get_current_clinic] = lambda: mock_clinic
+    app.dependency_overrides[get_billing_service] = lambda: mock_billing_service
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/api/v1/billing/invoices/outstanding-balance", headers=auth_headers)
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["outstanding_balance"] == "2500.00"
+
+
+@pytest.mark.asyncio
 async def test_invoice_pdf_download_api_success(
     mock_clinic: Clinic, mock_invoice: Invoice, mock_billing_service: AsyncMock, auth_headers: dict[str, str]
 ) -> None:

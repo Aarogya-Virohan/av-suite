@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -171,6 +172,7 @@ async def list_patient_packages_by_patient(
     patient_id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    package_id: Annotated[UUID | None, Query(alias="package")] = None,
     status_filter: Annotated[PackageStatus | None, Query(alias="status")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
@@ -178,7 +180,7 @@ async def list_patient_packages_by_patient(
     """List treatment packages purchased by a specific patient."""
 
     packages = await service.list_patient_packages(
-        clinic.id, patient_id=patient_id, status=status_filter, offset=offset, limit=limit
+        clinic.id, patient_id=patient_id, package_id=package_id, status=status_filter, offset=offset, limit=limit
     )
     items = [PatientPackageResponse.model_validate(p) for p in packages]
     return PatientPackageListResponse(items=items, total=len(items), offset=offset, limit=limit)
@@ -248,19 +250,39 @@ async def create_invoice(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/invoices/outstanding-balance")
+async def get_outstanding_balance(
+    clinic: CurrentClinicDep,
+    service: BillingServiceDep,
+    patient_id: Annotated[UUID | None, Query(alias="patient_id")] = None,
+) -> dict[str, str]:
+    """Retrieve total outstanding unpaid invoice balance."""
+
+    balance = await service.get_outstanding_balance(clinic.id, patient_id=patient_id)
+    return {"outstanding_balance": str(balance)}
+
+
 @router.get("/invoices", response_model=InvoiceListResponse)
 async def list_invoices(
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
-    patient_id: Annotated[UUID | None, Query()] = None,
+    patient_id: Annotated[UUID | None, Query(alias="patient_id")] = None,
     status_filter: Annotated[InvoiceStatus | None, Query(alias="status")] = None,
+    start_date: Annotated[date | None, Query(alias="start_date")] = None,
+    end_date: Annotated[date | None, Query(alias="end_date")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> InvoiceListResponse:
     """List invoices for the authenticated clinic with optional filtering."""
 
     invoices = await service.list_invoices(
-        clinic.id, patient_id=patient_id, status=status_filter, offset=offset, limit=limit
+        clinic.id,
+        patient_id=patient_id,
+        status=status_filter,
+        start_date=start_date,
+        end_date=end_date,
+        offset=offset,
+        limit=limit,
     )
     items = [InvoiceResponse.model_validate(inv) for inv in invoices]
     return InvoiceListResponse(items=items, total=len(items), offset=offset, limit=limit)
@@ -391,15 +413,23 @@ async def record_payment(
 async def list_payments(
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
-    invoice_id: Annotated[UUID | None, Query()] = None,
-    patient_id: Annotated[UUID | None, Query()] = None,
+    invoice_id: Annotated[UUID | None, Query(alias="invoice_id")] = None,
+    patient_id: Annotated[UUID | None, Query(alias="patient_id")] = None,
+    start_date: Annotated[date | None, Query(alias="start_date")] = None,
+    end_date: Annotated[date | None, Query(alias="end_date")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> PaymentListResponse:
     """List payment transactions for the clinic."""
 
     payments = await service.list_payments(
-        clinic.id, invoice_id=invoice_id, patient_id=patient_id, offset=offset, limit=limit
+        clinic.id,
+        invoice_id=invoice_id,
+        patient_id=patient_id,
+        start_date=start_date,
+        end_date=end_date,
+        offset=offset,
+        limit=limit,
     )
     items = [PaymentResponse.model_validate(p) for p in payments]
     return PaymentListResponse(items=items, total=len(items), offset=offset, limit=limit)
