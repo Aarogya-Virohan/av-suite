@@ -42,7 +42,8 @@ coverage/
 
 # Misc
 *.swp
-*.next
+.next/
+**/.next/
 *.txt
 *.pdf
 *.tsbuildinfo
