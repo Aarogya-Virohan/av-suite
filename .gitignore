@@ -45,3 +45,6 @@ build/
 alembic/versions/__pycache__/
 
 .agent.md
+av-suite-dev.zip
+docs/
+.codex/
