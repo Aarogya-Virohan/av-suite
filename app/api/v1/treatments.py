@@ -5,8 +5,9 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import SessionDep, get_current_clinic
+from app.core.dependencies import get_async_session, get_current_clinic
 from app.models.clinic import Clinic
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.patient import PatientRepository
@@ -27,7 +28,9 @@ from app.services.treatment import (
 router = APIRouter()
 
 
-async def get_treatment_service(session: SessionDep) -> TreatmentSessionService:
+async def get_treatment_service(
+    session: AsyncSession = Depends(get_async_session),
+) -> TreatmentSessionService:
     """Inject TreatmentSessionService bound to active session."""
 
     return TreatmentSessionService(

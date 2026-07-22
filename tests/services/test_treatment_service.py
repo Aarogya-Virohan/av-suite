@@ -11,9 +11,7 @@ from app.models.treatment import SoapAssessment, TreatmentSession
 from app.models.user import User
 from app.schemas.treatment import (
     SoapAssessmentCreate,
-    SoapAssessmentUpdate,
     TreatmentSessionCreate,
-    TreatmentSessionUpdate,
 )
 from app.services.treatment import (
     SoapAssessmentService,
