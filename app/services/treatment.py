@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from uuid import UUID
 
 from app.models.treatment import SoapAssessment, TreatmentSession
@@ -90,16 +91,25 @@ class TreatmentSessionService:
         clinic_id: UUID,
         *,
         patient_id: UUID | None = None,
+        appointment_id: UUID | None = None,
+        therapist_id: UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[TreatmentSession]:
-        """List treatment sessions for a clinic or specific patient."""
+        """List treatment sessions for a clinic with optional filters."""
 
-        if patient_id is not None:
-            return await self.repository.list_by_patient(
-                patient_id, clinic_id=clinic_id, offset=offset, limit=limit
-            )
-        return await self.repository.list(offset=offset, limit=limit, clinic_id=clinic_id)
+        return await self.repository.list_sessions(
+            clinic_id=clinic_id,
+            patient_id=patient_id,
+            appointment_id=appointment_id,
+            therapist_id=therapist_id,
+            start_date=start_date,
+            end_date=end_date,
+            offset=offset,
+            limit=limit,
+        )
 
     async def update_session(
         self, clinic_id: UUID, session_id: UUID, payload: TreatmentSessionUpdate
@@ -130,6 +140,12 @@ class TreatmentSessionService:
             return session
 
         return await self.repository.update(session, update_data)
+
+    async def delete_session(self, clinic_id: UUID, session_id: UUID) -> None:
+        """Delete a treatment session ensuring clinic scoping."""
+
+        session = await self.get_session(clinic_id, session_id)
+        await self.repository.delete(session)
 
 
 class SoapAssessmentService:
@@ -187,16 +203,23 @@ class SoapAssessmentService:
         clinic_id: UUID,
         *,
         patient_id: UUID | None = None,
+        appointment_id: UUID | None = None,
+        specialty: str | None = None,
+        is_reassessment: bool | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[SoapAssessment]:
-        """List SOAP assessments for a clinic or specific patient."""
+        """List SOAP assessments for a clinic with optional filters."""
 
-        if patient_id is not None:
-            return await self.repository.list_by_patient(
-                patient_id, clinic_id=clinic_id, offset=offset, limit=limit
-            )
-        return await self.repository.list(offset=offset, limit=limit, clinic_id=clinic_id)
+        return await self.repository.list_assessments(
+            clinic_id=clinic_id,
+            patient_id=patient_id,
+            appointment_id=appointment_id,
+            specialty=specialty,
+            is_reassessment=is_reassessment,
+            offset=offset,
+            limit=limit,
+        )
 
     async def update_assessment(
         self, clinic_id: UUID, assessment_id: UUID, payload: SoapAssessmentUpdate

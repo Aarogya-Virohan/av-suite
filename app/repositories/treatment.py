@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime, time, timezone
 from uuid import UUID
 
 from sqlalchemy import select
@@ -17,20 +18,40 @@ class TreatmentSessionRepository(BaseRepository[TreatmentSession]):
 
         super().__init__(session, TreatmentSession)
 
-    async def list_by_patient(
+    async def list_sessions(
         self,
-        patient_id: UUID,
         *,
-        clinic_id: UUID,
+        clinic_id: UUID | None = None,
+        patient_id: UUID | None = None,
+        appointment_id: UUID | None = None,
+        therapist_id: UUID | None = None,
+        start_date: date | None = None,
+        end_date: date | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[TreatmentSession]:
-        """List treatment sessions for a patient scoped to clinic."""
+        """List treatment sessions with optional clinic, patient, appointment, therapist, and date range filters."""
 
         effective_limit = min(limit, 500)
-        statement = select(TreatmentSession).where(
-            TreatmentSession.patient_id == patient_id
-        )
+        statement = select(TreatmentSession)
+
+        if patient_id is not None:
+            statement = statement.where(TreatmentSession.patient_id == patient_id)
+
+        if appointment_id is not None:
+            statement = statement.where(TreatmentSession.appointment_id == appointment_id)
+
+        if therapist_id is not None:
+            statement = statement.where(TreatmentSession.therapist_id == therapist_id)
+
+        if start_date is not None:
+            start_dt = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+            statement = statement.where(TreatmentSession.treatment_date >= start_dt)
+
+        if end_date is not None:
+            end_dt = datetime.combine(end_date, time.max, tzinfo=timezone.utc)
+            statement = statement.where(TreatmentSession.treatment_date <= end_dt)
+
         statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())
@@ -44,20 +65,34 @@ class SoapAssessmentRepository(BaseRepository[SoapAssessment]):
 
         super().__init__(session, SoapAssessment)
 
-    async def list_by_patient(
+    async def list_assessments(
         self,
-        patient_id: UUID,
         *,
-        clinic_id: UUID,
+        clinic_id: UUID | None = None,
+        patient_id: UUID | None = None,
+        appointment_id: UUID | None = None,
+        specialty: str | None = None,
+        is_reassessment: bool | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[SoapAssessment]:
-        """List SOAP assessments for a patient scoped to clinic."""
+        """List SOAP assessments with optional clinic, patient, appointment, specialty, and reassessment filters."""
 
         effective_limit = min(limit, 500)
-        statement = select(SoapAssessment).where(
-            SoapAssessment.patient_id == patient_id
-        )
+        statement = select(SoapAssessment)
+
+        if patient_id is not None:
+            statement = statement.where(SoapAssessment.patient_id == patient_id)
+
+        if appointment_id is not None:
+            statement = statement.where(SoapAssessment.appointment_id == appointment_id)
+
+        if specialty is not None:
+            statement = statement.where(SoapAssessment.specialty == specialty)
+
+        if is_reassessment is not None:
+            statement = statement.where(SoapAssessment.is_reassessment == is_reassessment)
+
         statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())
