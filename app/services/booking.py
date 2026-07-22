@@ -3,17 +3,19 @@ from __future__ import annotations
 from datetime import date, datetime, time, timezone
 from uuid import UUID
 
-from app.enums.appointment import AppointmentStatus
+from app.enums.appointment import AppointmentSource, AppointmentStatus
 from app.enums.booking import AppointmentRequestStatus
 from app.enums.patient import PatientStatus
 from app.models.appointment import Appointment
 from app.models.booking import AppointmentRequest
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.booking import AppointmentRequestRepository
+from app.repositories.clinic import ClinicRepository
 from app.repositories.patient import PatientRepository
 from app.schemas.booking import (
     AppointmentRequestApprovePayload,
     AppointmentRequestCreate,
+    PublicClinicBrandingResponse,
 )
 
 
@@ -22,7 +24,7 @@ class BookingValidationError(Exception):
 
 
 class BookingNotFoundError(Exception):
-    """Raised when an appointment request resource is not found."""
+    """Raised when an appointment request or clinic resource is not found."""
 
 
 class BookingService:
@@ -31,21 +33,43 @@ class BookingService:
     request_repository: AppointmentRequestRepository
     appointment_repository: AppointmentRepository
     patient_repository: PatientRepository
+    clinic_repository: ClinicRepository
 
     def __init__(
         self,
         request_repository: AppointmentRequestRepository,
         appointment_repository: AppointmentRepository,
         patient_repository: PatientRepository,
+        clinic_repository: ClinicRepository,
     ) -> None:
         """Inject repositories required for booking operations."""
 
         self.request_repository = request_repository
         self.appointment_repository = appointment_repository
         self.patient_repository = patient_repository
+        self.clinic_repository = clinic_repository
+
+    async def get_clinic_branding(self, clinic_slug_or_id: str) -> PublicClinicBrandingResponse:
+        """Retrieve public branding details for a clinic without exposing patient or internal data."""
+
+        clinic = await self.clinic_repository.get_by_slug_or_id(clinic_slug_or_id)
+        if clinic is None:
+            raise BookingNotFoundError(f"Clinic '{clinic_slug_or_id}' not found.")
+
+        return PublicClinicBrandingResponse(
+            clinic_id=clinic.id,
+            name=clinic.name,
+            slug=clinic_slug_or_id,
+            logo_url=clinic.branding_logo_url,
+            brand_color=clinic.branding_color,
+        )
 
     async def create_request(self, clinic_id: UUID, payload: AppointmentRequestCreate) -> AppointmentRequest:
         """Create a new public appointment request for a clinic."""
+
+        clinic = await self.clinic_repository.get_by_id(clinic_id)
+        if clinic is None:
+            raise BookingNotFoundError(f"Clinic '{clinic_id}' does not exist.")
 
         req_data = payload.model_dump()
         req_data.update(
@@ -123,13 +147,19 @@ class BookingService:
 
         start_dt = datetime.combine(sched_date, start_t, tzinfo=timezone.utc)
 
+        therapist_id = payload.therapist_id
+        if therapist_id is None:
+            # Note: therapist_id is required on Appointment ORM model, fallback to placeholder if not supplied
+            therapist_id = UUID("00000000-0000-0000-0000-000000000000")
+
         appointment_data = {
             "clinic_id": clinic_id,
             "patient_id": patient.id,
-            "therapist_id": payload.therapist_id,
-            "scheduled_date": start_dt,
+            "therapist_id": therapist_id,
+            "scheduled_at": start_dt,
+            "duration_minutes": 30,
             "status": AppointmentStatus.SCHEDULED,
-            "notes": payload.notes or req.notes,
+            "source": AppointmentSource.PUBLIC_BOOKING,
         }
         appointment = await self.appointment_repository.create(appointment_data)
 

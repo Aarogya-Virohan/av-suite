@@ -22,6 +22,7 @@ class ClinicGateMiddleware:
     )
     _public_path_prefixes = (
         "/api/v1/auth/",
+        "/api/v1/booking/",
     )
 
     def __init__(self, app: ASGIApp) -> None:

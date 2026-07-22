@@ -8,6 +8,7 @@ from app.repositories.billing import (
     PaymentRepository,
 )
 from app.repositories.booking import AppointmentRequestRepository
+from app.repositories.clinic import ClinicRepository
 from app.repositories.document import PatientDocumentRepository
 from app.repositories.lead import LeadRepository
 from app.repositories.patient import PatientRepository
@@ -18,6 +19,7 @@ __all__ = [
     "AppointmentRepository",
     "AppointmentRequestRepository",
     "BaseRepository",
+    "ClinicRepository",
     "InvoiceItemRepository",
     "InvoiceRepository",
     "LeadRepository",
