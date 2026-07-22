@@ -12,6 +12,7 @@ from app.api.v1.documents import router as documents_router
 from app.api.v1.leads import router as leads_router
 from app.api.v1.patients import router as patients_router
 from app.api.v1.recycle_bin import router as recycle_bin_router
+from app.api.v1.settings import router as settings_router
 from app.api.v1.treatments import router as treatments_router
 
 api_router = APIRouter()
@@ -28,5 +29,6 @@ api_router.include_router(booking_router, prefix="", tags=["booking"])
 api_router.include_router(analytics_router, prefix="", tags=["analytics"])
 api_router.include_router(recycle_bin_router, prefix="", tags=["recycle-bin"])
 api_router.include_router(audit_router, prefix="", tags=["audit-logs"])
+api_router.include_router(settings_router, prefix="", tags=["settings"])
 
 __all__ = ["api_router"]
