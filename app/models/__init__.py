@@ -1,4 +1,5 @@
 from app.models.appointment import Appointment
+from app.models.audit import AuditLog
 from app.models.billing import Invoice, InvoiceItem, Package, PatientPackage, Payment
 from app.models.booking import AppointmentRequest
 from app.models.clinic import Clinic
@@ -11,6 +12,7 @@ from app.models.user import User
 __all__ = [
     "Appointment",
     "AppointmentRequest",
+    "AuditLog",
     "Clinic",
     "Invoice",
     "InvoiceItem",

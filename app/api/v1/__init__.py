@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.appointments import router as appointments_router
 from app.api.v1.assessments import router as assessments_router
+from app.api.v1.audit import router as audit_router
 from app.api.v1.billing import router as billing_router
 from app.api.v1.booking import router as booking_router
 from app.api.v1.documents import router as documents_router
@@ -26,5 +27,6 @@ api_router.include_router(leads_router, prefix="/leads", tags=["leads"])
 api_router.include_router(booking_router, prefix="", tags=["booking"])
 api_router.include_router(analytics_router, prefix="", tags=["analytics"])
 api_router.include_router(recycle_bin_router, prefix="", tags=["recycle-bin"])
+api_router.include_router(audit_router, prefix="", tags=["audit-logs"])
 
 __all__ = ["api_router"]

@@ -1,4 +1,5 @@
 from app.repositories.appointment import AppointmentRepository
+from app.repositories.audit import AuditLogRepository
 from app.repositories.base import BaseRepository
 from app.repositories.billing import (
     InvoiceItemRepository,
@@ -18,6 +19,7 @@ from app.repositories.user import UserRepository
 __all__ = [
     "AppointmentRepository",
     "AppointmentRequestRepository",
+    "AuditLogRepository",
     "BaseRepository",
     "ClinicRepository",
     "InvoiceItemRepository",
