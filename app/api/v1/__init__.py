@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from app.api.v1.analytics import router as analytics_router
 from app.api.v1.appointments import router as appointments_router
 from app.api.v1.assessments import router as assessments_router
 from app.api.v1.billing import router as billing_router
@@ -22,5 +23,6 @@ api_router.include_router(documents_router, prefix="/documents", tags=["document
 api_router.include_router(documents_router, prefix="", tags=["documents"])
 api_router.include_router(leads_router, prefix="/leads", tags=["leads"])
 api_router.include_router(booking_router, prefix="", tags=["booking"])
+api_router.include_router(analytics_router, prefix="", tags=["analytics"])
 
 __all__ = ["api_router"]
