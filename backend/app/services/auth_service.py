@@ -110,7 +110,7 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
             clinic_id=new_clinic.id,
             email=request.email,
             password_hash=get_password_hash(request.password),  # Hash karte hain, plain nahi store
-            role=UserRole.admin,  # First user = admin
+            role=UserRole.ADMIN,  # First user = admin
             first_name=request.first_name,
             last_name=request.last_name
         )

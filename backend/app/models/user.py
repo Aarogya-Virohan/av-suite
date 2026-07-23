@@ -1,13 +1,16 @@
 import uuid
 import enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Enum, ForeignKey
+from sqlalchemy import String, Enum, ForeignKey, Boolean
 from app.models.base import Base, TimestampMixin
+
 
 class UserRole(str, enum.Enum):
     admin = "admin"
     physio = "physio"
     patient = "patient"
+    front_desk = "front_desk"
+
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
@@ -19,6 +22,8 @@ class User(Base, TimestampMixin):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     clinic = relationship("Clinic", back_populates="users")
     patient_profile = relationship("Patient", back_populates="user", uselist=False)
