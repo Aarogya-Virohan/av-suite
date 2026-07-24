@@ -22,12 +22,14 @@ export const api = axios.create({
   },
 });
 
+import { getAuthToken, removeAuthToken } from '@/lib/cookieAuth';
+
 // Request interceptor to start timer
 api.interceptors.request.use((config: CustomAxiosRequestConfig) => {
   config.startTime = Date.now();
   
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken() || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -67,6 +69,7 @@ api.interceptors.response.use((response) => {
       case 401:
         toast.error('Session expired. Please log in again.');
         if (typeof window !== 'undefined') {
+          removeAuthToken();
           localStorage.removeItem('token');
           window.location.href = '/login';
         }
