@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Menu, RefreshCw, Sun, Moon } from 'lucide-react';
+import { Menu, RefreshCw, Sun, Moon, LogOut } from 'lucide-react';
 import { NavTab } from './Sidebar';
+import { authApi } from '@/features/auth/services/auth.api';
 
 interface TopbarProps {
   activeTab: NavTab;
@@ -46,6 +47,16 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, onOpenMenu, onRefresh
     } else {
       document.documentElement.removeAttribute('data-theme');
       localStorage.setItem('aarogya_theme', 'light');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
   };
 
@@ -109,6 +120,15 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, onOpenMenu, onRefresh
           aria-label="Toggle theme"
         >
           {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+        </button>
+
+        <button
+          onClick={handleLogout}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
+          title="Log out of session"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Logout</span>
         </button>
       </div>
     </header>
