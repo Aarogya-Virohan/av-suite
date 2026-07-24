@@ -10,11 +10,13 @@ import {
   CheckCircle,
   FileText,
   IndianRupee,
-  Trash2
+  Trash2,
+  MessageCircle
 } from 'lucide-react';
 import { useCRMStore } from '@/lib/store';
 import { Invoice } from '@/types/crm';
 import { RecordPaymentModal } from './RecordPaymentModal';
+import { openWhatsAppChat } from '@/lib/whatsapp';
 
 export const BillingView: React.FC<{ onOpenInvoiceModal: () => void }> = ({
   onOpenInvoiceModal
@@ -221,6 +223,17 @@ export const BillingView: React.FC<{ onOpenInvoiceModal: () => void }> = ({
             <div className="flex items-center justify-between border-b pb-4 no-print">
               <h3 className="font-bold text-lg">Invoice Preview</h3>
               <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const msg = `Hello ${previewInvoice.patientName}, thank you for visiting ${branding.clinicName}. Your invoice #${previewInvoice.id} for total amount ₹${previewInvoice.total} is ready.`;
+                    openWhatsAppChat('', msg);
+                  }}
+                  className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 inline-flex items-center gap-1.5"
+                  title="Send Invoice details via WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Send via WhatsApp
+                </button>
                 <button
                   onClick={() => window.print()}
                   className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 inline-flex items-center gap-1.5"

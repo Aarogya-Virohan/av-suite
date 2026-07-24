@@ -12,10 +12,12 @@ import {
   ExternalLink,
   QrCode,
   Check,
-  X
+  X,
+  MessageCircle
 } from 'lucide-react';
 import { useCRMStore } from '@/lib/store';
 import { AppointmentStatus } from '@/types/crm';
+import { openWhatsAppChat } from '@/lib/whatsapp';
 
 export const AppointmentsView: React.FC<{ onOpenBookModal: () => void }> = ({
   onOpenBookModal
@@ -271,24 +273,37 @@ export const AppointmentsView: React.FC<{ onOpenBookModal: () => void }> = ({
                     )}
                   </div>
 
-                  {req.status === 'Pending' && (
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setApproveReqId(req.id)}
-                        className="px-4 py-2 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors inline-flex items-center gap-1"
+                        onClick={() => {
+                          const msg = `Hello ${req.name}, your booking request for ${req.preferredDate} at ${req.preferredTime} at ${branding.clinicName} has been confirmed. Thank you!`;
+                          openWhatsAppChat(req.mobile || '', msg);
+                        }}
+                        className="px-3 py-2 bg-emerald-600/10 border border-emerald-500/30 text-emerald-600 text-xs font-bold rounded-lg hover:bg-emerald-600/20 transition-colors inline-flex items-center gap-1.5"
+                        title="Send confirmation via WhatsApp"
                       >
-                        <Check className="w-3.5 h-3.5" />
-                        Approve
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        WhatsApp
                       </button>
-                      <button
-                        onClick={() => rejectRequest(req.id)}
-                        className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors inline-flex items-center gap-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Reject
-                      </button>
+                      {req.status === 'Pending' && (
+                        <>
+                          <button
+                            onClick={() => setApproveReqId(req.id)}
+                            className="px-4 py-2 bg-emerald-500 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors inline-flex items-center gap-1"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => rejectRequest(req.id)}
+                            className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors inline-flex items-center gap-1"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Reject
+                          </button>
+                        </>
+                      )}
                     </div>
-                  )}
                 </div>
               ))
             )}
