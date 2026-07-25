@@ -1,15 +1,8 @@
 import uuid
-import enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, Enum, ForeignKey, Boolean
+from app.enums.user import UserRole
 from app.models.base import Base, TimestampMixin
-
-
-class UserRole(str, enum.Enum):
-    admin = "admin"
-    physio = "physio"
-    patient = "patient"
-    front_desk = "front_desk"
 
 
 class User(Base, TimestampMixin):

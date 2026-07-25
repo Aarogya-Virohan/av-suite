@@ -25,6 +25,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+PUBLIC_PATH_PREFIXES = (
+    f"{settings.API_V1_PREFIX}/auth",
+    f"{settings.API_V1_PREFIX}/booking/branding",
+    f"{settings.API_V1_PREFIX}/booking/request",
+)
+
 
 class ClinicGateMiddleware(BaseHTTPMiddleware):
     """
@@ -34,7 +40,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
     
     Flow:
     1. Request intercept (BaseHTTPMiddleware from Starlette)
-    2. Public endpoints skip karte hain (/auth endpoints)
+    2. Public endpoints skip karte hain (PUBLIC_PATH_PREFIXES)
     3. Protected endpoints ke liye token check karte hain
     4. Token verify karte hain aur claim extract karte hain
     5. request.state mein clinic_id, user_id, role set karte hain
@@ -93,10 +99,10 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
         logger.debug(f"Middleware processing request: {request.method} {path}")
         
         # Skip public endpoints
-        # /api/v1/auth/* endpoints ko middleware bypass karte hain (no token needed)
-        # Authentication endpoints (register, login) publicly accessible
+        # PUBLIC_PATH_PREFIXES endpoints ko middleware bypass karte hain (no token needed)
+        # Authentication aur public booking endpoints publicly accessible
         # Yeh configuration se configurable hai (settings.API_V1_PREFIX)
-        if not path.startswith(settings.API_V1_PREFIX) or path.startswith(f"{settings.API_V1_PREFIX}/auth"):
+        if not path.startswith(settings.API_V1_PREFIX) or path.startswith(PUBLIC_PATH_PREFIXES):
             logger.debug(f"Public endpoint, skipping authentication: {path}")
             return await call_next(request)
 
