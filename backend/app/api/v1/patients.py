@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 import uuid
 import logging
+from app.enums.user import UserRole
 
 from app.core.database import get_db
 from app.schemas.patient import PatientCreate, PatientRead
@@ -70,8 +71,8 @@ def check_physio_or_admin(request: Request):
     # Role JWT token decode se set hota hai middleware mein
     role = request.state.role
     
-    # Admin ya physio role check karte hain
-    if role not in ["admin", "physio"]:
+    # Admin ya physio/therapist role check karte hain
+    if role not in [UserRole.ADMIN, UserRole.THERAPIST]:
         logger.warning(f"Unauthorized patient access attempt with role: {role}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 import uuid
 import logging
+from app.enums.user import UserRole
 
 from app.core.database import get_db
 from app.schemas.exercise import ExerciseCreate, ExerciseRead
@@ -256,7 +257,7 @@ async def create_exercise(
         role = request.state.role
         
         # Admin-only check
-        if role != "admin":
+        if role != UserRole.ADMIN:
             logger.warning(f"Unauthorized exercise creation attempt with role: {role}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

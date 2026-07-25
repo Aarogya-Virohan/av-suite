@@ -21,6 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from jose import jwt, JWTError
 from app.core.config import settings
+from app.enums.user import normalize_user_role
 import logging
 
 logger = logging.getLogger(__name__)
@@ -157,14 +158,20 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             # "role": User role (admin, physio, patient, nurse, etc.)
             clinic_id = payload.get("clinic_id")
             user_id = payload.get("sub")
-            role = payload.get("role")
+            raw_role = payload.get("role")
             
             # Validate all required claims present
             # Required claims ensure karte hain complete user context available
             # Missing claims = corrupted token
-            if not clinic_id or not user_id or not role:
+            if not clinic_id or not user_id or not raw_role:
                 logger.warning(f"Missing required JWT claims for {path}")
                 raise JWTError("Invalid token payload")
+
+            try:
+                role = normalize_user_role(raw_role)
+            except ValueError as exc:
+                logger.warning(f"Invalid user role in token for {path}: {raw_role}")
+                raise JWTError("Invalid token payload") from exc
 
             # Set request context
             # request.state mein middleware data store karte hain

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import uuid
 import logging
+from app.enums.user import UserRole
 
 from app.core.database import get_db
 from app.schemas.prescription import PrescriptionCreate, PrescriptionRead, PrescriptionPatch
@@ -37,9 +38,9 @@ async def create_prescription(
         clinic_id = request.state.clinic_id
         physio_id = request.state.user_id
         
-        # Verify role is admin or physio (though gate handles basic auth)
+        # Verify role is admin or physio/therapist (though gate handles basic auth)
         role = request.state.role
-        if role not in ["admin", "physio"]:
+        if role not in [UserRole.ADMIN, UserRole.THERAPIST]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only therapists or admins can prescribe exercises"
@@ -135,7 +136,7 @@ async def update_prescription(
         clinic_id = request.state.clinic_id
 
         role = request.state.role
-        if role not in ["admin", "physio"]:
+        if role not in [UserRole.ADMIN, UserRole.THERAPIST]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only therapists or admins can update prescriptions"
