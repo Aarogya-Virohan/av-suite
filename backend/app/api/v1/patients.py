@@ -72,7 +72,7 @@ def check_physio_or_admin(request: Request):
     role = request.state.role
     
     # Admin ya physio/therapist role check karte hain
-    if role not in [UserRole.ADMIN, UserRole.THERAPIST]:
+    if role not in {UserRole.ADMIN, UserRole.THERAPIST}:
         logger.warning(f"Unauthorized patient access attempt with role: {role}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

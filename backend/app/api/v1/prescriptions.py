@@ -40,7 +40,7 @@ async def create_prescription(
         
         # Verify role is admin or physio/therapist (though gate handles basic auth)
         role = request.state.role
-        if role not in [UserRole.ADMIN, UserRole.THERAPIST]:
+        if role not in {UserRole.ADMIN, UserRole.THERAPIST}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only therapists or admins can prescribe exercises"
@@ -136,7 +136,7 @@ async def update_prescription(
         clinic_id = request.state.clinic_id
 
         role = request.state.role
-        if role not in [UserRole.ADMIN, UserRole.THERAPIST]:
+        if role not in {UserRole.ADMIN, UserRole.THERAPIST}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only therapists or admins can update prescriptions"
