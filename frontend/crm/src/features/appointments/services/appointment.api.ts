@@ -19,7 +19,13 @@ export const appointmentApi = {
   },
 
   create: async (data: AppointmentInput): Promise<Appointment> => {
-    const response = await api.post('/appointments', data);
+    const payload = {
+      patient_id: data.patient_id,
+      therapist_id: data.therapist_id,
+      scheduled_at: new Date(`${data.date}T${data.time}`).toISOString(),
+      duration_minutes: data.duration_minutes
+    };
+    const response = await api.post('/appointments', payload);
     return response.data.data || response.data;
   },
 
