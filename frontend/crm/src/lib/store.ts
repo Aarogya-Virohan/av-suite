@@ -737,7 +737,7 @@ export const useCRMStore = create<CRMStore>()(
           entityType: 'patient',
           entityId: 'p_101',
           description: 'Aarogya CRM initialized with demo datasets',
-          createdAt: new Date().toISOString()
+          createdAt: '2026-07-26T12:00:00Z'
         }
       ],
       logAudit: (action, entityType, entityId, description) =>

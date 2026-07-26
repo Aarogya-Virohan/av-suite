@@ -45,7 +45,8 @@ export const appointmentApi = {
 
   fetchRequests: async (): Promise<AppointmentRequest[]> => {
     const response = await api.get('/appointment-requests');
-    return response.data.data || response.data;
+    // Extract array from standard envelope (data) or paginated envelope (items)
+    return response.data.items || response.data.data || response.data;
   },
 
   approveRequest: async (id: string, therapistId?: string, duration?: number): Promise<void> => {

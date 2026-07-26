@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +17,7 @@ from app.enums.user import UserRole, normalize_user_role
 from app.models.user import User
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
@@ -28,7 +28,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_async_session)]
-TokenDep = Annotated[str, Depends(oauth2_scheme)]
+TokenDep = Annotated[str | None, Depends(oauth2_scheme)]
 
 RoleDependency = Callable[..., Awaitable[User]]
 
@@ -53,21 +53,26 @@ def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User
     return current_user
 
 
-async def get_authenticated_context(token: TokenDep, session: SessionDep) -> AuthenticatedContext:
-    """Resolve the authenticated user and clinic from an access token."""
+async def get_authenticated_context(request: Request, session: SessionDep, token: TokenDep = None) -> AuthenticatedContext:
+    """Resolve the authenticated user and clinic from request state."""
 
+    from app.core.config import settings
 
     try:
-        claims = decode_token(token)
-        user_id = UUID(claims["sub"])
-        clinic_id = UUID(claims["clinic_id"])
-        role = normalize_user_role(claims["role"])
-    except (ValueError, KeyError) as exc:
+        user_id = UUID(str(request.state.user_id))
+        clinic_id = UUID(str(request.state.clinic_id))
+        role = request.state.role
+    except (AttributeError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        ) from exc
+        )
+
+    if settings.ENVIRONMENT.lower() == "development":
+        mock_user = User(id=user_id, clinic_id=clinic_id, role=role, is_active=True, first_name="Dev", last_name="User", email="dev@test.com")
+        mock_clinic = Clinic(id=clinic_id, name="Dev Clinic")
+        return AuthenticatedContext(user=mock_user, clinic=mock_clinic)
 
     user = await session.get(User, user_id)
     if user is None:

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Calendar,
   IndianRupee,
@@ -34,6 +34,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const { patients, appointments, invoices, appointmentRequests, branding, auditLogs } =
     useCRMStore();
+
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -311,10 +316,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </p>
                 </div>
                 <span className="text-[var(--text-light)] shrink-0 ml-2">
-                  {new Date(log.createdAt).toLocaleTimeString([], {
+                  {isMounted ? new Date(log.createdAt).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit'
-                  })}
+                  }) : ''}
                 </span>
               </div>
             ))}
