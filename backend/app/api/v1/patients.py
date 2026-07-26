@@ -26,7 +26,7 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.schemas.patient import PatientCreate, PatientRead
+from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
@@ -375,5 +375,80 @@ async def get_patient(
         raise
     except Exception as e:
         logger.error(f"Get patient error: {str(e)}")
+        raise
+
+
+@router.patch(
+    "/{id}",
+    response_model=ResponseEnvelope[PatientRead],
+    tags=["Patients"]
+)
+async def update_patient(
+    request: Request,
+    id: str,
+    patient_in: PatientUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint ka purpose: Specific patient ke details update karna
+    """
+    logger.info(f"Update patient request - id: {id}")
+    try:
+        check_physio_or_admin(request)
+        clinic_id = request.state.clinic_id
+        
+        patient = await patient_service.update_patient(db, clinic_id, id, patient_in)
+        
+        if not patient:
+            logger.warning(f"Patient not found for update: {id} in clinic {clinic_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Patient not found or not in caller's clinic"
+            )
+            
+        logger.info(f"Patient updated successfully: {patient.id}")
+        return ResponseEnvelope(data=patient)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update patient error: {str(e)}")
+        raise
+
+
+@router.delete(
+    "/{id}",
+    response_model=ResponseEnvelope[str],
+    tags=["Patients"]
+)
+async def delete_patient(
+    request: Request,
+    id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint ka purpose: Specific patient ko delete karna
+    """
+    logger.info(f"Delete patient request - id: {id}")
+    try:
+        check_physio_or_admin(request)
+        clinic_id = request.state.clinic_id
+        
+        success = await patient_service.delete_patient(db, clinic_id, id)
+        
+        if not success:
+            logger.warning(f"Patient not found for deletion: {id} in clinic {clinic_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Patient not found or not in caller's clinic"
+            )
+            
+        logger.info(f"Patient deleted successfully: {id}")
+        return ResponseEnvelope(data="Patient deleted successfully")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete patient error: {str(e)}")
         raise
 

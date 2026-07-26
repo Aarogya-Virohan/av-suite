@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
 from app.models.patient import Patient
-from app.schemas.patient import PatientCreate
+from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.common import PaginationParams
 from typing import Optional, List, Tuple
 import uuid
@@ -274,5 +274,58 @@ async def get_patient_by_id(
         raise
     except Exception as e:
         logger.error(f"Get patient by id error: {str(e)}")
+        raise
+
+
+async def update_patient(
+    db: AsyncSession,
+    clinic_id: str,
+    patient_id: str,
+    patient_in: PatientUpdate
+) -> Optional[Patient]:
+    """
+    Function ka purpose: Existing patient update karna
+    """
+    try:
+        patient = await get_patient_by_id(db, clinic_id, patient_id)
+        if not patient:
+            return None
+            
+        # exclude_unset=True se sirf wo fields update honge jo request mein pass kiye gaye hain
+        update_data = patient_in.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(patient, field, value)
+            
+        db.add(patient)
+        await db.commit()
+        await db.refresh(patient)
+        logger.info(f"Patient updated successfully: {patient_id}")
+        return patient
+    except Exception as e:
+        logger.error(f"Update patient error: {str(e)}")
+        await db.rollback()
+        raise
+
+
+async def delete_patient(
+    db: AsyncSession,
+    clinic_id: str,
+    patient_id: str
+) -> bool:
+    """
+    Function ka purpose: Existing patient ko delete karna
+    """
+    try:
+        patient = await get_patient_by_id(db, clinic_id, patient_id)
+        if not patient:
+            return False
+            
+        await db.delete(patient)
+        await db.commit()
+        logger.info(f"Patient deleted successfully: {patient_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Delete patient error: {str(e)}")
+        await db.rollback()
         raise
 

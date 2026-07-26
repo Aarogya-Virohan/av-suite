@@ -75,13 +75,16 @@ export const PatientTable: React.FC<PatientTableProps> = ({
                   >
                     <MessageCircle className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={() => onDelete(p.id)}
-                    className="p-2 rounded-xl border border-slate-250 text-red-500 hover:bg-red-500/10 transition-all"
-                    title="Move to Recycle Bin"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {/*
+                    TODO: Enable when backend implements PATCH/DELETE patients endpoints.
+                    <button
+                      onClick={() => onDelete(p.id)}
+                      className="p-2 rounded-xl border border-slate-250 text-red-500 hover:bg-red-500/10 transition-all"
+                      title="Move to Recycle Bin"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  */}
                 </div>
               </td>
             </tr>

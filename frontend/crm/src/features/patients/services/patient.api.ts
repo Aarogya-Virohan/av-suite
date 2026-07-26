@@ -28,22 +28,13 @@ export const patientApi = {
   },
 
   update: async (id: string, data: Partial<PatientIntakeInput>): Promise<Patient> => {
-    const payload: Record<string, any> = {};
-    if (data.full_name !== undefined) {
-      const nameParts = data.full_name.trim().split(/\s+/);
-      payload.first_name = nameParts[0] || '';
-      payload.last_name = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0] || '';
-    }
-    if (data.phone !== undefined) {
-      payload.phone = data.phone;
-    }
-
-    const response = await api.patch(`/patients/${id}`, payload);
-    return response.data.data || response.data;
+    // TODO: Enable when backend implements PATCH/DELETE patients endpoints.
+    throw new Error('Not implemented: Update patient');
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/patients/${id}`);
+    // TODO: Enable when backend implements PATCH/DELETE patients endpoints.
+    throw new Error('Not implemented: Delete patient');
   }
 };
 export default patientApi;
