@@ -215,56 +215,9 @@ const INITIAL_LEADS: Lead[] = [
   }
 ];
 
-const INITIAL_APPOINTMENTS: Appointment[] = [
-  {
-    id: 'apt_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    patientName: 'Rajesh Malhotra',
-    patientMobile: '9820112233',
-    therapist: 'Dr. Ramesh Sharma',
-    date: new Date().toISOString().slice(0, 10),
-    time: '10:30',
-    durationMinutes: 45,
-    status: 'Confirmed',
-    source: 'manual',
-    notes: 'Session 4: Lumbar traction & core stabilization',
-    createdAt: '2026-07-19T08:00:00Z'
-  },
-  {
-    id: 'apt_2',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_102',
-    patientName: 'Sunita Deshmukh',
-    patientMobile: '9833445566',
-    therapist: 'Dr. Priya Ananth',
-    date: new Date().toISOString().slice(0, 10),
-    time: '14:00',
-    durationMinutes: 30,
-    status: 'Scheduled',
-    source: 'manual',
-    notes: 'Quadriceps strengthening & ROM check',
-    createdAt: '2026-07-19T09:00:00Z'
-  }
-];
+const INITIAL_APPOINTMENTS: Appointment[] = [];
 
-const INITIAL_REQUESTS: AppointmentRequest[] = [
-  {
-    id: 'req_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Meena Shah',
-    mobile: '9845012345',
-    age: 42,
-    gender: 'Female',
-    preferredDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-    preferredTime: '11:00',
-    chiefComplaint: 'Severe neck stiffness and upper back spasm',
-    source: 'Website Booking Form',
-    refId: 'PUB-88912',
-    status: 'Pending',
-    createdAt: '2026-07-20T08:30:00Z'
-  }
-];
+const INITIAL_REQUESTS: AppointmentRequest[] = [];
 
 const INITIAL_TREATMENTS: TreatmentSession[] = [
   {
