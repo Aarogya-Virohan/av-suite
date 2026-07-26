@@ -16,6 +16,11 @@ import { Chart as ChartJS, registerables } from 'chart.js';
 import { Line, Bar } from 'react-chartjs-2';
 import { useCRMStore } from '@/lib/store';
 import { NavTab } from '../layout/Sidebar';
+import { useAnalyticsOverview } from '@/features/analytics/hooks/useAnalytics';
+import { useAppointments, useAppointmentRequests } from '@/features/appointments/hooks/useAppointments';
+import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 ChartJS.register(...registerables);
 
@@ -32,8 +37,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenApptModal,
   onOpenInvoiceModal
 }) => {
-  const { patients, appointments, invoices, appointmentRequests, branding, auditLogs } =
-    useCRMStore();
+  const { branding } = useCRMStore();
+
+  const { data: analytics, isLoading: analyticsLoading, isError: analyticsError, refetch: refetchAnalytics } = useAnalyticsOverview();
+  const { data: appointments = [], isLoading: apptsLoading, isError: apptsError, refetch: refetchAppts } = useAppointments();
+  const { data: appointmentRequests = [] } = useAppointmentRequests();
 
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
@@ -43,92 +51,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // Today's Appointments Count
-  const todayAppts = appointments.filter((a) => a.date === todayStr);
-
-  // Today's Revenue
-  const todayRevenue = invoices
-    .filter((i) => i.date === todayStr && i.status === 'Paid')
-    .reduce((sum, i) => sum + i.total, 0);
-
-  // Pending Payments Total
-  const pendingPaymentsTotal = invoices
-    .filter((i) => i.status === 'Due' || i.status === 'Partial')
-    .reduce((sum, i) => sum + (i.total - i.paidAmount), 0);
-
-  // Active Patients Count
-  const activePatientsCount = patients.filter((p) => p.status === 'Active').length;
+  const todayAppts = appointments.filter((a: any) => a.date === todayStr);
 
   // Pending Requests Count
-  const pendingRequests = appointmentRequests.filter((r) => r.status === 'Pending');
+  const pendingRequests = appointmentRequests.filter((r: any) => r.status === 'Pending');
 
-  // Chart Data: Revenue Trend (Last 7 Days)
-  const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().slice(0, 10);
-  });
-
-  const revenueByDay = last7Days.map((day) => {
-    return invoices
-      .filter((i) => i.date === day && i.status === 'Paid')
-      .reduce((sum, i) => sum + i.total, 0);
-  });
-
-  const revenueChartData = {
-    labels: last7Days.map((d) => d.slice(5)),
-    datasets: [
-      {
-        label: 'Revenue (₹)',
-        data: revenueByDay,
-        borderColor: branding.brandColor || '#1BB7B0',
-        backgroundColor: 'rgba(27, 183, 176, 0.1)',
-        fill: true,
-        tension: 0.4,
-        pointRadius: 4,
-        pointHoverRadius: 6
-      }
-    ]
+  const isLoading = analyticsLoading || apptsLoading;
+  const isError = analyticsError || apptsError;
+  const retryAll = () => {
+    refetchAnalytics();
+    refetchAppts();
   };
 
-  const revenueChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false } },
-      y: {
-        beginAtZero: true,
-        ticks: {
-          callback: (value: any) => `₹${value}`
-        }
-      }
-    }
-  };
+  if (isLoading) return <LoadingSkeleton />;
+  if (isError) return <ErrorState onRetry={retryAll} />;
 
-  // Chart Data: Patient Growth by Month (Last 6 Months)
-  const monthLabels = ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
-  const patientGrowthData = {
-    labels: monthLabels,
-    datasets: [
-      {
-        label: 'New Patients',
-        data: [4, 7, 9, 12, 15, patients.length],
-        backgroundColor: '#0B2C5F',
-        borderRadius: 6,
-        barThickness: 24
-      }
-    ]
-  };
+  // Safely get stats from analytics
+  const todayApptsCount = analytics?.appointments.today_appointments || 0;
+  const revenueThisMonth = analytics?.revenue.revenue_this_month || 0;
+  const pendingPaymentsTotal = analytics?.revenue.total_outstanding_amount || 0;
+  const activePatientsCount = analytics?.patients.active_patients || 0;
 
-  const patientGrowthOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false } },
-      y: { beginAtZero: true, ticks: { stepSize: 2 } }
-    }
-  };
+
 
   const handleWhatsAppClick = (mobile: string, name: string) => {
     const cleanMobile = mobile.replace(/\D/g, '');
@@ -173,21 +117,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Calendar className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-2xl font-extrabold text-[var(--text)]">{todayAppts.length}</p>
+          <p className="text-2xl font-extrabold text-[var(--text)]">{todayApptsCount}</p>
           <p className="text-xs text-[var(--text-light)]">Scheduled for today</p>
         </div>
 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] p-5 rounded-xl shadow-sm space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-[var(--text-light)] uppercase tracking-wider">
-              Today's Revenue
+              Revenue This Month
             </span>
             <div className="p-2.5 rounded-lg bg-emerald-500/15 text-emerald-600">
               <IndianRupee className="w-5 h-5" />
             </div>
           </div>
-          <p className="text-2xl font-extrabold text-[var(--text)]">₹{todayRevenue.toLocaleString('en-IN')}</p>
-          <p className="text-xs text-emerald-600 font-semibold">Collected today</p>
+          <p className="text-2xl font-extrabold text-[var(--text)]">₹{revenueThisMonth.toLocaleString('en-IN')}</p>
+          <p className="text-xs text-emerald-600 font-semibold">Collected this month</p>
         </div>
 
         <div className="bg-[var(--card-bg)] border border-[var(--border)] p-5 rounded-xl shadow-sm space-y-2">
@@ -231,8 +175,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Full Analytics →
             </button>
           </div>
-          <div className="h-64">
-            <Line data={revenueChartData} options={revenueChartOptions} />
+          <div className="flex-1 flex items-center justify-center p-4">
+            <EmptyState
+              title="Coming Soon"
+              description="Revenue trend chart backend integration is pending."
+              hideAction
+            />
           </div>
         </div>
 
@@ -240,8 +188,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
             <h3 className="font-bold text-base text-[var(--text)]">Patient Growth</h3>
           </div>
-          <div className="h-64">
-            <Bar data={patientGrowthData} options={patientGrowthOptions} />
+          <div className="flex-1 flex items-center justify-center p-4">
+            <EmptyState
+              title="Coming Soon"
+              description="Patient growth chart backend integration is pending."
+              hideAction
+            />
           </div>
         </div>
       </div>
@@ -272,18 +224,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   className="flex items-center justify-between p-3 rounded-lg border border-[var(--border)] bg-[var(--bg)] hover:border-[var(--teal)] transition-colors"
                 >
                   <div>
-                    <p className="font-bold text-sm text-[var(--text)]">{appt.patientName}</p>
+                    <p className="font-bold text-sm text-[var(--text)]">{appt.patient_name || appt.patientName}</p>
                     <p className="text-xs text-[var(--text-light)]">
-                      {appt.time} • {appt.therapist || 'Unassigned'}
+                      {appt.time} • {appt.therapist_id || appt.therapist || 'Unassigned'}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-teal-500/15 text-teal-600">
                       {appt.status}
                     </span>
-                    {appt.patientMobile && (
+                    {(appt.patient_mobile || appt.patientMobile) && (
                       <button
-                        onClick={() => handleWhatsAppClick(appt.patientMobile!, appt.patientName)}
+                        onClick={() => handleWhatsAppClick(appt.patient_mobile || appt.patientMobile, appt.patient_name || appt.patientName)}
                         className="p-1.5 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
                         title="Send WhatsApp Reminder"
                       >
@@ -304,25 +256,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="space-y-3">
-            {auditLogs.slice(0, 5).map((log) => (
-              <div
-                key={log.id}
-                className="flex items-start justify-between border-b border-[var(--border)] pb-2 text-xs"
-              >
-                <div>
-                  <p className="font-semibold text-[var(--text)]">{log.description}</p>
-                  <p className="text-[var(--text-light)] uppercase tracking-wider text-[10px] mt-0.5">
-                    {log.action}
-                  </p>
-                </div>
-                <span className="text-[var(--text-light)] shrink-0 ml-2">
-                  {isMounted ? new Date(log.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }) : ''}
-                </span>
-              </div>
-            ))}
+            <EmptyState
+              title="Coming Soon"
+              description="Audit logs backend integration is pending."
+              hideAction
+            />
           </div>
         </div>
       </div>

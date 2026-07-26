@@ -134,53 +134,7 @@ const INITIAL_THERAPISTS: Therapist[] = [
   }
 ];
 
-const INITIAL_PATIENTS: Patient[] = [
-  {
-    id: 'p_101',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Rajesh Malhotra',
-    mobile: '9820112233',
-    age: 48,
-    gender: 'Male',
-    email: 'rajesh.m@example.com',
-    address: 'B-402, Green Acres, Andheri West',
-    referralSource: 'Doctor Referral',
-    status: 'Active',
-    diagnosis: 'Chronic Lower Back Pain (L4-L5 Disc Herniation)',
-    medicalHistory: 'Hypertension, Sedentary desk job',
-    createdAt: '2026-07-01T10:00:00Z'
-  },
-  {
-    id: 'p_102',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Sunita Deshmukh',
-    mobile: '9833445566',
-    age: 54,
-    gender: 'Female',
-    email: 'sunita.d@example.com',
-    address: '12-A, Shiv Shahi Society, Dadar',
-    referralSource: 'Google Search',
-    status: 'Active',
-    diagnosis: 'Post-op Knee Arthroscopy (Right Knee)',
-    medicalHistory: 'No major comorbidities',
-    createdAt: '2026-07-05T14:30:00Z'
-  },
-  {
-    id: 'p_103',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Anil Kapoor',
-    mobile: '7500294955',
-    age: 35,
-    gender: 'Male',
-    email: 'anil.k@example.com',
-    address: 'Flat 501, Horizon Tower, Bandra',
-    referralSource: 'Instagram',
-    status: 'Discharged',
-    diagnosis: 'Acute Cervical Spondylosis',
-    medicalHistory: 'Frequent computer use',
-    createdAt: '2026-06-15T09:15:00Z'
-  }
-];
+const INITIAL_PATIENTS: Patient[] = [];
 
 const INITIAL_LEADS: Lead[] = [];
 
@@ -605,17 +559,7 @@ export const useCRMStore = create<CRMStore>()(
           recycleBin: state.recycleBin.filter((r) => r.id !== id)
         })),
 
-      auditLogs: [
-        {
-          id: 'aud_1',
-          clinicId: DEFAULT_CLINIC_ID,
-          action: 'SYSTEM_INIT',
-          entityType: 'patient',
-          entityId: 'p_101',
-          description: 'Aarogya CRM initialized with demo datasets',
-          createdAt: '2026-07-26T12:00:00Z'
-        }
-      ],
+      auditLogs: [],
       logAudit: (action, entityType, entityId, description) =>
         set((state) => ({
           auditLogs: [
