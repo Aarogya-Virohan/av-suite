@@ -5,7 +5,7 @@ import { InvoiceInput, PaymentInput } from '../schemas/invoice.schema';
 export const billingApi = {
   fetchInvoices: async (): Promise<Invoice[]> => {
     const response = await api.get('/invoices');
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   createInvoice: async (data: InvoiceInput): Promise<Invoice> => {
@@ -20,7 +20,7 @@ export const billingApi = {
 
   fetchPackages: async (): Promise<PatientPackage[]> => {
     const response = await api.get('/packages');
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   sellPackage: async (patientId: string, data: any): Promise<PatientPackage> => {
