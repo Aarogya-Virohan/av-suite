@@ -18,6 +18,11 @@ export const appointmentApi = {
     return data;
   },
 
+  fetchById: async (id: string): Promise<Appointment> => {
+    const response = await api.get(`/appointments/${id}`);
+    return response.data.data || response.data;
+  },
+
   create: async (data: AppointmentInput): Promise<Appointment> => {
     const payload = {
       patient_id: data.patient_id,
