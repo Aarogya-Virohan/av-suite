@@ -2,9 +2,12 @@
 
 import React, { useState } from 'react';
 import { Plus, UserCheck, X, ArrowRight, MessageCircle, Trash2, Edit3, Tag } from 'lucide-react';
-import { useCRMStore } from '@/lib/store';
 import { Lead, LeadStage } from '@/types/crm';
 import { toast } from 'sonner';
+import { useLeads, useCreateLead, useUpdateLead, useConvertLead } from '@/features/leads/hooks/useLeads';
+import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 const LEAD_STAGES: LeadStage[] = [
   'New Lead',
@@ -15,7 +18,10 @@ const LEAD_STAGES: LeadStage[] = [
 ];
 
 export const LeadsView: React.FC = () => {
-  const { leads, addLead, updateLead, deleteLead, convertLeadToPatient } = useCRMStore();
+  const { data: leads = [], isLoading, isError, refetch } = useLeads();
+  const createMutation = useCreateLead();
+  const updateMutation = useUpdateLead();
+  const convertMutation = useConvertLead();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
@@ -54,23 +60,25 @@ export const LeadsView: React.FC = () => {
     }
 
     if (editingLead) {
-      updateLead(editingLead.id, {
-        name: name.trim(),
-        mobile: mobile.trim() || undefined,
-        source,
-        stage,
-        notes: notes.trim() || undefined
+      updateMutation.mutate({
+        id: editingLead.id,
+        data: {
+          name: name.trim(),
+          mobile: mobile.trim() || undefined,
+          source,
+          stage,
+          notes: notes.trim() || undefined
+        }
       });
-      toast.success('Lead updated successfully');
     } else {
-      addLead({
+      createMutation.mutate({
         name: name.trim(),
         mobile: mobile.trim() || undefined,
         source,
         stage,
-        notes: notes.trim() || undefined
-      });
-      toast.success('New prospect lead added');
+        notes: notes.trim() || undefined,
+        clinic_id: 'default_clinic' // Usually backend derives this or it's provided
+      } as any);
     }
 
     setIsModalOpen(false);
@@ -85,8 +93,7 @@ export const LeadsView: React.FC = () => {
   };
 
   const handleConvert = (leadId: string, leadName: string) => {
-    convertLeadToPatient(leadId);
-    toast.success(`${leadName} converted to Active Patient profile!`);
+    convertMutation.mutate(leadId);
   };
 
   return (
@@ -114,9 +121,20 @@ export const LeadsView: React.FC = () => {
         </button>
       </div>
 
-      {/* Kanban Board Columns */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {LEAD_STAGES.map((colStage) => {
+      {isLoading ? (
+        <LoadingSkeleton />
+      ) : isError ? (
+        <ErrorState onRetry={refetch} />
+      ) : leads.length === 0 ? (
+        <EmptyState
+          title="No Leads Found"
+          description="Start building your patient pipeline by adding prospect leads."
+          actionLabel="Add First Lead"
+          onAction={openAddModal}
+        />
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {LEAD_STAGES.map((colStage) => {
           const colLeads = leads.filter((l) => l.stage === colStage);
           return (
             <div
@@ -206,6 +224,7 @@ export const LeadsView: React.FC = () => {
           );
         })}
       </div>
+      )}
 
       {/* Solid Opaque Add / Edit Lead Modal */}
       {isModalOpen && (

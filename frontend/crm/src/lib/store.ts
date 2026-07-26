@@ -182,38 +182,7 @@ const INITIAL_PATIENTS: Patient[] = [
   }
 ];
 
-const INITIAL_LEADS: Lead[] = [
-  {
-    id: 'ld_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Amitabh Verma',
-    mobile: '9988776655',
-    source: 'Google',
-    stage: 'New Lead',
-    notes: 'Inquired about shoulder impingement treatment package',
-    createdAt: '2026-07-18T11:00:00Z'
-  },
-  {
-    id: 'ld_2',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Kavita Patel',
-    mobile: '9811223344',
-    source: 'Instagram',
-    stage: 'Contacted',
-    notes: 'Called back on 19th July, interested in home exercise sessions',
-    createdAt: '2026-07-17T15:20:00Z'
-  },
-  {
-    id: 'ld_3',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Vikram Joshi',
-    mobile: '9700112233',
-    source: 'Referral',
-    stage: 'Appointment Booked',
-    notes: 'Booked consultation for tomorrow 4 PM',
-    createdAt: '2026-07-19T16:00:00Z'
-  }
-];
+const INITIAL_LEADS: Lead[] = [];
 
 const INITIAL_APPOINTMENTS: Appointment[] = [];
 
