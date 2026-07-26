@@ -11,16 +11,10 @@ export const useInvoices = () => {
     queryKey: ['invoices'],
     queryFn: async () => {
       const startTime = Date.now();
-      try {
-        const data = await billingApi.fetchInvoices();
-        const latency = Date.now() - startTime;
-        localStorage.setItem('api_last_latency', `${latency}ms`);
-        return data;
-      } catch (err) {
-        const latency = Date.now() - startTime;
-        localStorage.setItem('api_last_latency', `${latency}ms (Mock)`);
-        return store.invoices;
-      }
+      const data = await billingApi.fetchInvoices();
+      const latency = Date.now() - startTime;
+      localStorage.setItem('api_last_latency', `${latency}ms`);
+      return data;
     }
   });
 };
@@ -31,28 +25,7 @@ export const useCreateInvoice = () => {
 
   return useMutation({
     mutationFn: async (data: InvoiceInput) => {
-      try {
-        return await billingApi.createInvoice(data);
-      } catch (err) {
-        const pt = store.patients.find(p => p.id === data.patient_id);
-        const totals = calculateInvoiceTotals({
-          baseAmount: data.amount,
-          discountAmount: data.discount,
-          gstPercent: data.gst_percent
-        });
-        
-        store.addInvoice({
-          patientId: data.patient_id,
-          patientName: pt ? pt.name : 'Unknown Patient',
-          description: data.description,
-          amount: totals.subtotal,
-          tax: totals.tax,
-          discount: totals.discount,
-          total: totals.grandTotal,
-          date: new Date().toISOString().slice(0, 10)
-        });
-        return store.invoices[0];
-      }
+      return await billingApi.createInvoice(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -67,19 +40,7 @@ export const useRecordPayment = () => {
 
   return useMutation({
     mutationFn: async ({ invoiceId, data }: { invoiceId: string; data: PaymentInput }) => {
-      try {
-        return await billingApi.recordPayment(invoiceId, data);
-      } catch (err) {
-        store.recordPayment({
-          invoiceId,
-          patientId: store.invoices.find(i => i.id === invoiceId)?.patientId || '',
-          amount: data.amount,
-          mode: data.mode,
-          reference: data.reference,
-          date: new Date().toISOString().slice(0, 10)
-        });
-        return store.payments[0];
-      }
+      return await billingApi.recordPayment(invoiceId, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -93,11 +54,7 @@ export const usePackages = () => {
   return useQuery({
     queryKey: ['packages'],
     queryFn: async () => {
-      try {
-        return await billingApi.fetchPackages();
-      } catch (err) {
-        return store.packages;
-      }
+      return await billingApi.fetchPackages();
     }
   });
 };
@@ -108,22 +65,7 @@ export const useCreatePackage = () => {
 
   return useMutation({
     mutationFn: async ({ patientId, data }: { patientId: string; data: any }) => {
-      try {
-        return await billingApi.sellPackage(patientId, data);
-      } catch (err) {
-        const pt = store.patients.find(p => p.id === patientId);
-        store.addPackage({
-          patientId,
-          patientName: pt ? pt.name : 'Unknown Patient',
-          packageName: data.packageName,
-          totalSessions: data.totalSessions,
-          sessionsUsed: 0,
-          amount: data.amount,
-          startDate: new Date().toISOString().slice(0, 10),
-          status: 'Active'
-        });
-        return store.packages[0];
-      }
+      return await billingApi.sellPackage(patientId, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['packages'] });

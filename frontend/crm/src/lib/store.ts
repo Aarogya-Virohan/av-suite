@@ -302,55 +302,9 @@ const INITIAL_TREATMENTS: TreatmentSession[] = [
   }
 ];
 
-const INITIAL_PACKAGES: PatientPackage[] = [
-  {
-    id: 'pkg_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    patientName: 'Rajesh Malhotra',
-    packageName: 'Standard 10-Session Rehab Package',
-    totalSessions: 10,
-    sessionsUsed: 3,
-    amount: 12000,
-    startDate: '2026-07-01',
-    validTill: '2026-08-31',
-    status: 'Active',
-    createdAt: '2026-07-01T10:30:00Z'
-  }
-];
+const INITIAL_PACKAGES: PatientPackage[] = [];
 
-const INITIAL_INVOICES: Invoice[] = [
-  {
-    id: 'INV-2026-001',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    patientName: 'Rajesh Malhotra',
-    description: 'Standard 10-Session Rehab Package + Initial Consultation',
-    amount: 12000,
-    tax: 2160,
-    discount: 500,
-    total: 13660,
-    paidAmount: 13660,
-    status: 'Paid',
-    date: '2026-07-01',
-    createdAt: '2026-07-01T10:35:00Z'
-  },
-  {
-    id: 'INV-2026-002',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_102',
-    patientName: 'Sunita Deshmukh',
-    description: 'Post-op Knee Rehabilitation - 5 Sessions',
-    amount: 7500,
-    tax: 1350,
-    discount: 0,
-    total: 8850,
-    paidAmount: 4000,
-    status: 'Partial',
-    date: '2026-07-05',
-    createdAt: '2026-07-05T15:00:00Z'
-  }
-];
+const INITIAL_INVOICES: Invoice[] = [];
 
 const INITIAL_RUNNING_COSTS: RunningCost[] = [
   { id: 'rc_1', label: 'Clinic Rent', amount: 35000 },

@@ -24,8 +24,9 @@ export const billingApi = {
   },
 
   sellPackage: async (patientId: string, data: any): Promise<PatientPackage> => {
-    const response = await api.post(`/patients/${patientId}/packages`, data);
-    return response.data.data || response.data;
+    const payload = { ...data, patient_id: patientId };
+    const response = await api.post(`/patients/${patientId}/packages`, payload);
+    return response.data.items || response.data.data || response.data;
   }
 };
 export default billingApi;
