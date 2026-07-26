@@ -5,7 +5,17 @@ import { AppointmentInput } from '../schemas/appointment.schema';
 export const appointmentApi = {
   fetch: async (): Promise<Appointment[]> => {
     const response = await api.get('/appointments');
-    return response.data.data || response.data;
+    const data = response.data.data || response.data;
+    
+    if (data && Array.isArray(data.items)) {
+      const items = data.items as Appointment[] & { total?: number; offset?: number; limit?: number };
+      items.total = data.total;
+      items.offset = data.offset;
+      items.limit = data.limit;
+      return items;
+    }
+    
+    return data;
   },
 
   create: async (data: AppointmentInput): Promise<Appointment> => {
