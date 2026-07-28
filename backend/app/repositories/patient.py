@@ -88,3 +88,14 @@ class PatientRepository(BaseRepository[Patient]):
         statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())
+
+    async def update_patient(self, db_obj: Patient, update_data: dict) -> Patient:
+        """Update only supplied fields and preserve updated_at."""
+        
+        return await self.update(db_obj, update_data)
+
+    async def soft_delete_patient(self, db_obj: Patient, deleted_by: UUID | None = None) -> None:
+        """Soft delete a patient."""
+        
+        await self.delete(db_obj, deleted_by)
+

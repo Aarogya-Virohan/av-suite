@@ -20,13 +20,13 @@ All responses ResponseEnvelope mein wrapped hote hain with pagination metadata.
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 import uuid
 import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.schemas.patient import PatientCreate, PatientRead
+from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
@@ -89,6 +89,7 @@ def check_physio_or_admin(request: Request):
 )
 async def list_patients(
     request: Request,
+    search: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db)
 ):
@@ -168,7 +169,10 @@ async def list_patients(
         
         # Service layer ko call karte hain
         # Patients list aur total count return hota hai
-        patients, total = await patient_service.get_patients(db, clinic_id, pagination)
+        if search:
+            patients, total = await patient_service.search_patients(db, clinic_id, search, pagination)
+        else:
+            patients, total = await patient_service.get_patients(db, clinic_id, pagination)
         
         # Pagination metadata prepare karte hain
         # Frontend pagination UI ke liye total aur current page info
@@ -376,4 +380,55 @@ async def get_patient(
     except Exception as e:
         logger.error(f"Get patient error: {str(e)}")
         raise
+
+@router.patch(
+    "/{id}",
+    response_model=ResponseEnvelope[PatientRead],
+    tags=["Patients"]
+)
+async def update_patient(
+    request: Request,
+    id: str,
+    patient_in: PatientUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    logger.info(f"Update patient request - id: {id}")
+    try:
+        check_physio_or_admin(request)
+        clinic_id = request.state.clinic_id
+        
+        patient = await patient_service.update_patient(db, clinic_id, id, patient_in)
+        return ResponseEnvelope(data=patient)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update patient error: {str(e)}")
+        raise
+
+@router.delete(
+    "/{id}",
+    response_model=ResponseEnvelope[None],
+    tags=["Patients"]
+)
+async def delete_patient(
+    request: Request,
+    id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    logger.info(f"Delete patient request - id: {id}")
+    try:
+        check_physio_or_admin(request)
+        clinic_id = request.state.clinic_id
+        user_id = request.state.user_id
+        
+        await patient_service.delete_patient(db, clinic_id, id, user_id)
+        return ResponseEnvelope(data=None)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete patient error: {str(e)}")
+        raise
+
 
