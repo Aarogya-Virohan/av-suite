@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
 from app.models.patient import Patient
-from app.schemas.patient import PatientCreate
+from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.common import PaginationParams
 from typing import Optional, List, Tuple
 import uuid
@@ -280,7 +280,7 @@ async def update_patient(
     db: AsyncSession,
     clinic_id: str,
     patient_id: str,
-    patient_in: "PatientUpdate"
+    patient_in: PatientUpdate
 ) -> Patient:
     from app.repositories.patient import PatientRepository
     try:
