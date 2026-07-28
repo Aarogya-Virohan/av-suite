@@ -15,11 +15,13 @@ import {
 import { useCRMStore } from '@/lib/store';
 import { Invoice } from '@/types/crm';
 import { RecordPaymentModal } from './RecordPaymentModal';
+import { useInvoices } from '@/features/billing/hooks/useBilling';
 
 export const BillingView: React.FC<{ onOpenInvoiceModal: () => void }> = ({
   onOpenInvoiceModal
 }) => {
-  const { invoices, deleteInvoice, branding } = useCRMStore();
+  const { deleteInvoice, branding } = useCRMStore();
+  const { data: invoices = [], isLoading, isError } = useInvoices();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -40,6 +42,14 @@ export const BillingView: React.FC<{ onOpenInvoiceModal: () => void }> = ({
   const totalOutstanding = invoices
     .filter((i) => i.status === 'Due' || i.status === 'Partial')
     .reduce((sum, i) => sum + (i.total - i.paidAmount), 0);
+
+  if (isLoading) {
+    return <div className="p-8 text-center text-[var(--text-light)]">Loading billing data...</div>;
+  }
+
+  if (isError) {
+    return <div className="p-8 text-center text-red-500">Failed to load billing data. Please try again.</div>;
+  }
 
   return (
     <div className="space-y-6">

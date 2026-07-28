@@ -5,6 +5,10 @@ import { LeadInput } from '../schemas/lead.schema';
 export const leadApi = {
   fetch: async (): Promise<Lead[]> => {
     const response = await api.get('/leads');
+    // If backend returns a paginated schema { items, total }, return items
+    if (response.data && Array.isArray(response.data.items)) {
+      return response.data.items;
+    }
     return response.data.data || response.data;
   },
 

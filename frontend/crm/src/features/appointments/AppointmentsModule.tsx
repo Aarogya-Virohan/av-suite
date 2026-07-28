@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, QrCode, Plus, Check, X, Copy, MessageCircle } from 'lucide-react';
 import {
   useAppointments,
@@ -72,7 +72,10 @@ export const AppointmentsModule: React.FC = () => {
     window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
   };
 
-  const lastLatency = typeof window !== 'undefined' ? localStorage.getItem('api_last_latency') : '';
+  const [lastLatency, setLastLatency] = useState('');
+  useEffect(() => {
+    setLastLatency(localStorage.getItem('api_last_latency') || '');
+  }, [appointments]);
 
   return (
     <div className="space-y-6">

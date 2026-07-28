@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus } from 'lucide-react';
 import {
   usePatients,
@@ -51,7 +51,10 @@ export const PatientsModule: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const lastLatency = typeof window !== 'undefined' ? localStorage.getItem('api_last_latency') : '';
+  const [lastLatency, setLastLatency] = useState('');
+  useEffect(() => {
+    setLastLatency(localStorage.getItem('api_last_latency') || '');
+  }, [patients]);
 
   return (
     <div className="space-y-6">

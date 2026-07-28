@@ -14,26 +14,27 @@ export const patientApi = {
   },
 
   create: async (data: PatientIntakeInput): Promise<Patient> => {
-    // Translate fields to snake_case if required by fastapi backend
+    const nameParts = (data.full_name || '').trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0] || '';
+
     const payload = {
-      full_name: data.full_name,
-      phone: data.phone,
-      age: data.age,
-      gender: data.gender,
-      chief_complaint: data.chief_complaint,
-      referral_source: data.referral_source
+      first_name: firstName,
+      last_name: lastName,
+      phone: data.phone || undefined
     };
     const response = await api.post('/patients', payload);
     return response.data.data || response.data;
   },
 
   update: async (id: string, data: Partial<PatientIntakeInput>): Promise<Patient> => {
-    const response = await api.patch(`/patients/${id}`, data);
-    return response.data.data || response.data;
+    // TODO: Enable when backend implements PATCH/DELETE patients endpoints.
+    throw new Error('Not implemented: Update patient');
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/patients/${id}`);
+    // TODO: Enable when backend implements PATCH/DELETE patients endpoints.
+    throw new Error('Not implemented: Delete patient');
   }
 };
 export default patientApi;

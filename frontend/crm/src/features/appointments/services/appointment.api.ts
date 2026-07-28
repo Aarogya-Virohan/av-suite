@@ -5,11 +5,32 @@ import { AppointmentInput } from '../schemas/appointment.schema';
 export const appointmentApi = {
   fetch: async (): Promise<Appointment[]> => {
     const response = await api.get('/appointments');
+    const data = response.data.data || response.data;
+    
+    if (data && Array.isArray(data.items)) {
+      const items = data.items as Appointment[] & { total?: number; offset?: number; limit?: number };
+      items.total = data.total;
+      items.offset = data.offset;
+      items.limit = data.limit;
+      return items;
+    }
+    
+    return data;
+  },
+
+  fetchById: async (id: string): Promise<Appointment> => {
+    const response = await api.get(`/appointments/${id}`);
     return response.data.data || response.data;
   },
 
   create: async (data: AppointmentInput): Promise<Appointment> => {
-    const response = await api.post('/appointments', data);
+    const payload = {
+      patient_id: data.patient_id,
+      therapist_id: data.therapist_id,
+      scheduled_at: new Date(`${data.date}T${data.time}`).toISOString(),
+      duration_minutes: data.duration_minutes
+    };
+    const response = await api.post('/appointments', payload);
     return response.data.data || response.data;
   },
 
@@ -24,7 +45,8 @@ export const appointmentApi = {
 
   fetchRequests: async (): Promise<AppointmentRequest[]> => {
     const response = await api.get('/appointment-requests');
-    return response.data.data || response.data;
+    // Extract array from standard envelope (data) or paginated envelope (items)
+    return response.data.items || response.data.data || response.data;
   },
 
   approveRequest: async (id: string, therapistId?: string, duration?: number): Promise<void> => {

@@ -21,7 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from jose import jwt, JWTError
 from app.core.config import settings
-from app.enums.user import normalize_user_role
+from app.enums.user import UserRole, normalize_user_role
 import logging
 
 logger = logging.getLogger(__name__)
@@ -108,6 +108,13 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         logger.debug(f"Protected endpoint, checking authorization: {path}")
+        
+        # TODO: Remove development-only authentication bypass before release
+        if settings.ENVIRONMENT.lower() == "development":
+            request.state.user_id = "00000000-0000-0000-0000-000000000001"
+            request.state.clinic_id = "00000000-0000-0000-0000-000000000001"
+            request.state.role = UserRole.ADMIN
+            return await call_next(request)
         
         # Extract Authorization header
         # Format: Authorization: Bearer {jwt_token}

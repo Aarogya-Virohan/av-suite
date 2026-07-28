@@ -10,16 +10,10 @@ export const useAppointments = () => {
     queryKey: ['appointments'],
     queryFn: async () => {
       const startTime = Date.now();
-      try {
-        const data = await appointmentApi.fetch();
-        const latency = Date.now() - startTime;
-        localStorage.setItem('api_last_latency', `${latency}ms`);
-        return data;
-      } catch (err) {
-        const latency = Date.now() - startTime;
-        localStorage.setItem('api_last_latency', `${latency}ms (Mock)`);
-        return store.appointments;
-      }
+      const data = await appointmentApi.fetch();
+      const latency = Date.now() - startTime;
+      localStorage.setItem('api_last_latency', `${latency}ms`);
+      return data;
     }
   });
 };
@@ -30,26 +24,7 @@ export const useCreateAppointment = () => {
 
   return useMutation({
     mutationFn: async (data: AppointmentInput) => {
-      try {
-        return await appointmentApi.create(data);
-      } catch (err) {
-        const pt = store.patients.find(p => p.id === data.patient_id);
-        const ther = store.therapists.find(t => t.id === data.therapist_id);
-        
-        store.addAppointment({
-          patientId: data.patient_id,
-          patientName: pt ? pt.name : 'Unknown Patient',
-          patientMobile: pt?.mobile,
-          therapist: ther ? ther.name : 'Unassigned',
-          date: data.date,
-          time: data.time,
-          durationMinutes: data.duration_minutes,
-          status: 'Confirmed',
-          source: 'manual',
-          notes: data.notes
-        });
-        return store.appointments[0];
-      }
+      return await appointmentApi.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
@@ -64,12 +39,7 @@ export const useUpdateAppointmentStatus = () => {
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      try {
-        return await appointmentApi.updateStatus(id, status);
-      } catch (err) {
-        store.updateAppointmentStatus(id, status as any);
-        return store.appointments.find(a => a.id === id);
-      }
+      return await appointmentApi.updateStatus(id, status);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
@@ -84,11 +54,7 @@ export const useDeleteAppointment = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      try {
-        await appointmentApi.delete(id);
-      } catch (err) {
-        store.deleteAppointment(id);
-      }
+      await appointmentApi.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
@@ -102,11 +68,7 @@ export const useAppointmentRequests = () => {
   return useQuery({
     queryKey: ['appointmentRequests'],
     queryFn: async () => {
-      try {
-        return await appointmentApi.fetchRequests();
-      } catch (err) {
-        return store.appointmentRequests;
-      }
+      return await appointmentApi.fetchRequests();
     }
   });
 };
@@ -117,11 +79,7 @@ export const useApproveRequest = () => {
 
   return useMutation({
     mutationFn: async ({ id, therapistId, duration }: { id: string; therapistId?: string; duration?: number }) => {
-      try {
-        await appointmentApi.approveRequest(id, therapistId, duration);
-      } catch (err) {
-        store.approveRequest(id, therapistId, duration);
-      }
+      await appointmentApi.approveRequest(id, therapistId, duration);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointmentRequests'] });
@@ -139,11 +97,7 @@ export const useRejectRequest = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      try {
-        await appointmentApi.rejectRequest(id);
-      } catch (err) {
-        store.rejectRequest(id);
-      }
+      await appointmentApi.rejectRequest(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointmentRequests'] });

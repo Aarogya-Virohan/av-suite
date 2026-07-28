@@ -134,137 +134,13 @@ const INITIAL_THERAPISTS: Therapist[] = [
   }
 ];
 
-const INITIAL_PATIENTS: Patient[] = [
-  {
-    id: 'p_101',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Rajesh Malhotra',
-    mobile: '9820112233',
-    age: 48,
-    gender: 'Male',
-    email: 'rajesh.m@example.com',
-    address: 'B-402, Green Acres, Andheri West',
-    referralSource: 'Doctor Referral',
-    status: 'Active',
-    diagnosis: 'Chronic Lower Back Pain (L4-L5 Disc Herniation)',
-    medicalHistory: 'Hypertension, Sedentary desk job',
-    createdAt: '2026-07-01T10:00:00Z'
-  },
-  {
-    id: 'p_102',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Sunita Deshmukh',
-    mobile: '9833445566',
-    age: 54,
-    gender: 'Female',
-    email: 'sunita.d@example.com',
-    address: '12-A, Shiv Shahi Society, Dadar',
-    referralSource: 'Google Search',
-    status: 'Active',
-    diagnosis: 'Post-op Knee Arthroscopy (Right Knee)',
-    medicalHistory: 'No major comorbidities',
-    createdAt: '2026-07-05T14:30:00Z'
-  },
-  {
-    id: 'p_103',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Anil Kapoor',
-    mobile: '7500294955',
-    age: 35,
-    gender: 'Male',
-    email: 'anil.k@example.com',
-    address: 'Flat 501, Horizon Tower, Bandra',
-    referralSource: 'Instagram',
-    status: 'Discharged',
-    diagnosis: 'Acute Cervical Spondylosis',
-    medicalHistory: 'Frequent computer use',
-    createdAt: '2026-06-15T09:15:00Z'
-  }
-];
+const INITIAL_PATIENTS: Patient[] = [];
 
-const INITIAL_LEADS: Lead[] = [
-  {
-    id: 'ld_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Amitabh Verma',
-    mobile: '9988776655',
-    source: 'Google',
-    stage: 'New Lead',
-    notes: 'Inquired about shoulder impingement treatment package',
-    createdAt: '2026-07-18T11:00:00Z'
-  },
-  {
-    id: 'ld_2',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Kavita Patel',
-    mobile: '9811223344',
-    source: 'Instagram',
-    stage: 'Contacted',
-    notes: 'Called back on 19th July, interested in home exercise sessions',
-    createdAt: '2026-07-17T15:20:00Z'
-  },
-  {
-    id: 'ld_3',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Vikram Joshi',
-    mobile: '9700112233',
-    source: 'Referral',
-    stage: 'Appointment Booked',
-    notes: 'Booked consultation for tomorrow 4 PM',
-    createdAt: '2026-07-19T16:00:00Z'
-  }
-];
+const INITIAL_LEADS: Lead[] = [];
 
-const INITIAL_APPOINTMENTS: Appointment[] = [
-  {
-    id: 'apt_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    patientName: 'Rajesh Malhotra',
-    patientMobile: '9820112233',
-    therapist: 'Dr. Ramesh Sharma',
-    date: new Date().toISOString().slice(0, 10),
-    time: '10:30',
-    durationMinutes: 45,
-    status: 'Confirmed',
-    source: 'manual',
-    notes: 'Session 4: Lumbar traction & core stabilization',
-    createdAt: '2026-07-19T08:00:00Z'
-  },
-  {
-    id: 'apt_2',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_102',
-    patientName: 'Sunita Deshmukh',
-    patientMobile: '9833445566',
-    therapist: 'Dr. Priya Ananth',
-    date: new Date().toISOString().slice(0, 10),
-    time: '14:00',
-    durationMinutes: 30,
-    status: 'Scheduled',
-    source: 'manual',
-    notes: 'Quadriceps strengthening & ROM check',
-    createdAt: '2026-07-19T09:00:00Z'
-  }
-];
+const INITIAL_APPOINTMENTS: Appointment[] = [];
 
-const INITIAL_REQUESTS: AppointmentRequest[] = [
-  {
-    id: 'req_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    name: 'Meena Shah',
-    mobile: '9845012345',
-    age: 42,
-    gender: 'Female',
-    preferredDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-    preferredTime: '11:00',
-    chiefComplaint: 'Severe neck stiffness and upper back spasm',
-    source: 'Website Booking Form',
-    refId: 'PUB-88912',
-    status: 'Pending',
-    createdAt: '2026-07-20T08:30:00Z'
-  }
-];
+const INITIAL_REQUESTS: AppointmentRequest[] = [];
 
 const INITIAL_TREATMENTS: TreatmentSession[] = [
   {
@@ -302,55 +178,9 @@ const INITIAL_TREATMENTS: TreatmentSession[] = [
   }
 ];
 
-const INITIAL_PACKAGES: PatientPackage[] = [
-  {
-    id: 'pkg_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    patientName: 'Rajesh Malhotra',
-    packageName: 'Standard 10-Session Rehab Package',
-    totalSessions: 10,
-    sessionsUsed: 3,
-    amount: 12000,
-    startDate: '2026-07-01',
-    validTill: '2026-08-31',
-    status: 'Active',
-    createdAt: '2026-07-01T10:30:00Z'
-  }
-];
+const INITIAL_PACKAGES: PatientPackage[] = [];
 
-const INITIAL_INVOICES: Invoice[] = [
-  {
-    id: 'INV-2026-001',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    patientName: 'Rajesh Malhotra',
-    description: 'Standard 10-Session Rehab Package + Initial Consultation',
-    amount: 12000,
-    tax: 2160,
-    discount: 500,
-    total: 13660,
-    paidAmount: 13660,
-    status: 'Paid',
-    date: '2026-07-01',
-    createdAt: '2026-07-01T10:35:00Z'
-  },
-  {
-    id: 'INV-2026-002',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_102',
-    patientName: 'Sunita Deshmukh',
-    description: 'Post-op Knee Rehabilitation - 5 Sessions',
-    amount: 7500,
-    tax: 1350,
-    discount: 0,
-    total: 8850,
-    paidAmount: 4000,
-    status: 'Partial',
-    date: '2026-07-05',
-    createdAt: '2026-07-05T15:00:00Z'
-  }
-];
+const INITIAL_INVOICES: Invoice[] = [];
 
 const INITIAL_RUNNING_COSTS: RunningCost[] = [
   { id: 'rc_1', label: 'Clinic Rent', amount: 35000 },
@@ -729,17 +559,7 @@ export const useCRMStore = create<CRMStore>()(
           recycleBin: state.recycleBin.filter((r) => r.id !== id)
         })),
 
-      auditLogs: [
-        {
-          id: 'aud_1',
-          clinicId: DEFAULT_CLINIC_ID,
-          action: 'SYSTEM_INIT',
-          entityType: 'patient',
-          entityId: 'p_101',
-          description: 'Aarogya CRM initialized with demo datasets',
-          createdAt: new Date().toISOString()
-        }
-      ],
+      auditLogs: [],
       logAudit: (action, entityType, entityId, description) =>
         set((state) => ({
           auditLogs: [
