@@ -8,7 +8,7 @@ export const settingsApi = {
   },
 
   saveBranding: async (data: ClinicBranding): Promise<void> => {
-    await api.post('/save-branding', data);
+    await api.patch('/api/v1/settings/clinic', data);
   }
 };
 export default settingsApi;
