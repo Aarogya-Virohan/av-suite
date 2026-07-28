@@ -77,10 +77,17 @@ async def get_authenticated_context(token: TokenDep, session: SessionDep) -> Aut
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if user.clinic_id != clinic_id or user.role != role or not user.is_active:
+    if user.clinic_id != clinic_id or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if user.role != role:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please log in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

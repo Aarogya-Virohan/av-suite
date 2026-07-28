@@ -20,7 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
 from app.models.clinic import Clinic
-from app.models.user import User, UserRole
+from app.models.user import User
+from app.enums.user import UserRole
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from app.core.security import get_password_hash, verify_password, create_access_token
 import logging
@@ -232,4 +233,3 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Login failed"
         )
-

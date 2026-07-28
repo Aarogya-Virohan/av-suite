@@ -1,15 +1,8 @@
 import uuid
-import enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String, Enum, ForeignKey, Boolean
+from app.enums.user import UserRole
 from app.models.base import Base, TimestampMixin
-
-
-class UserRole(str, enum.Enum):
-    admin = "admin"
-    physio = "physio"
-    patient = "patient"
-    front_desk = "front_desk"
 
 
 class User(Base, TimestampMixin):
@@ -19,7 +12,15 @@ class User(Base, TimestampMixin):
     clinic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinics.id", ondelete="CASCADE"))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(
+            UserRole,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+            name="userrole",
+        ),
+        nullable=False,
+    )
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)

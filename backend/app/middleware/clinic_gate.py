@@ -21,9 +21,16 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from jose import jwt, JWTError
 from app.core.config import settings
+from app.enums.user import normalize_user_role
 import logging
 
 logger = logging.getLogger(__name__)
+
+PUBLIC_PATH_PREFIXES = (
+    f"{settings.API_V1_PREFIX}/auth",
+    f"{settings.API_V1_PREFIX}/booking/branding",
+    f"{settings.API_V1_PREFIX}/booking/request",
+)
 
 
 class ClinicGateMiddleware(BaseHTTPMiddleware):
@@ -34,7 +41,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
     
     Flow:
     1. Request intercept (BaseHTTPMiddleware from Starlette)
-    2. Public endpoints skip karte hain (/auth endpoints)
+    2. Public endpoints skip karte hain (PUBLIC_PATH_PREFIXES)
     3. Protected endpoints ke liye token check karte hain
     4. Token verify karte hain aur claim extract karte hain
     5. request.state mein clinic_id, user_id, role set karte hain
@@ -93,10 +100,10 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
         logger.debug(f"Middleware processing request: {request.method} {path}")
         
         # Skip public endpoints
-        # /api/v1/auth/* endpoints ko middleware bypass karte hain (no token needed)
-        # Authentication endpoints (register, login) publicly accessible
+        # PUBLIC_PATH_PREFIXES endpoints ko middleware bypass karte hain (no token needed)
+        # Authentication aur public booking endpoints publicly accessible
         # Yeh configuration se configurable hai (settings.API_V1_PREFIX)
-        if not path.startswith(settings.API_V1_PREFIX) or path.startswith(f"{settings.API_V1_PREFIX}/auth"):
+        if not path.startswith(settings.API_V1_PREFIX) or path.startswith(PUBLIC_PATH_PREFIXES):
             logger.debug(f"Public endpoint, skipping authentication: {path}")
             return await call_next(request)
 
@@ -151,14 +158,20 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             # "role": User role (admin, physio, patient, nurse, etc.)
             clinic_id = payload.get("clinic_id")
             user_id = payload.get("sub")
-            role = payload.get("role")
+            raw_role = payload.get("role")
             
             # Validate all required claims present
             # Required claims ensure karte hain complete user context available
             # Missing claims = corrupted token
-            if not clinic_id or not user_id or not role:
+            if not clinic_id or not user_id or not raw_role:
                 logger.warning(f"Missing required JWT claims for {path}")
                 raise JWTError("Invalid token payload")
+
+            try:
+                role = normalize_user_role(raw_role)
+            except ValueError as exc:
+                logger.warning(f"Invalid user role in token for {path}: {raw_role}")
+                raise JWTError("Invalid token payload") from exc
 
             # Set request context
             # request.state mein middleware data store karte hain
