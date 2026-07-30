@@ -26,6 +26,7 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
+from app.core.dependencies import require_roles
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
@@ -39,47 +40,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def check_physio_or_admin(request: Request):
-    """
-    Function ka purpose: Role-based access control - Physios aur admins ko check karna
-    Yeh function middleware/dependency se call hota hai request context check karne ke liye.
-    
-    Input: request (Request) - FastAPI request object jismein state.role stored hai
-    
-    Output: None (agar authorized), HTTPException 403 (agar unauthorized)
-    
-    Error:
-    - HTTPException 403 FORBIDDEN: Agar role physio ya admin nahi hai
-    
-    Authorization Logic:
-    - Admin: Clinic ka owner/superuser
-    - Physio: Physio/therapist jo patients handle karte hain
-    - Other roles: Patient, nurse, etc. - patient data access nahi
-    
-    Security:
-    - request.state.role: JWT token se set hota hai
-    - Role-based access: Different features different roles ke liye
-    
-    Usage:
-    @router.get("/patients")
-    async def get_patients(request: Request, ...):
-        check_physio_or_admin(request)  # Authorization check
-        # Protected code...
-    """
-    
-    # request.state se role extract karte hain
-    # Role JWT token decode se set hota hai middleware mein
-    role = request.state.role
-    
-    # Admin ya physio/therapist role check karte hain
-    if role not in {UserRole.ADMIN, UserRole.THERAPIST}:
-        logger.warning(f"Unauthorized patient access attempt with role: {role}")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only physios or admins can access patients"
-        )
-    
-    logger.debug(f"Authorization check passed for role: {role}")
 
 
 @router.get(
@@ -91,7 +51,8 @@ async def list_patients(
     request: Request,
     search: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
 ):
     """
     Endpoint ka purpose: Clinic ke sare patients ko list karna pagination ke saath
@@ -159,8 +120,7 @@ async def list_patients(
     logger.info(f"List patients request - page: {pagination.page}, size: {pagination.page_size}")
     
     try:
-        # Authorization check - physio ya admin required
-        check_physio_or_admin(request)
+        # Authorization check is handled by Depends
         
         # request.state se clinic_id extract karte hain
         # JWT token decode se clinic_id set hota hai middleware mein
@@ -199,7 +159,8 @@ async def list_patients(
 async def create_patient(
     request: Request,
     patient_in: PatientCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
 ):
     """
     Endpoint ka purpose: New patient create karna clinic mein
@@ -268,8 +229,7 @@ async def create_patient(
     logger.info(f"Create patient request - {patient_in.first_name} {patient_in.last_name}")
     
     try:
-        # Authorization check - physio ya admin required
-        check_physio_or_admin(request)
+        # Authorization check is handled by Depends
         
         # request.state se clinic_id extract karte hain
         clinic_id = request.state.clinic_id
@@ -295,7 +255,8 @@ async def create_patient(
 async def get_patient(
     request: Request,
     id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
 ):
     """
     Endpoint ka purpose: Specific patient ke details fetch karna
@@ -352,8 +313,7 @@ async def get_patient(
     logger.info(f"Get patient request - id: {id}")
     
     try:
-        # Authorization check - physio ya admin required
-        check_physio_or_admin(request)
+        # Authorization check is handled by Depends
         
         # request.state se clinic_id extract karte hain
         clinic_id = request.state.clinic_id
@@ -390,11 +350,11 @@ async def update_patient(
     request: Request,
     id: str,
     patient_in: PatientUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
 ):
     logger.info(f"Update patient request - id: {id}")
     try:
-        check_physio_or_admin(request)
         clinic_id = request.state.clinic_id
         
         patient = await patient_service.update_patient(db, clinic_id, id, patient_in)
@@ -414,11 +374,11 @@ async def update_patient(
 async def delete_patient(
     request: Request,
     id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
 ):
     logger.info(f"Delete patient request - id: {id}")
     try:
-        check_physio_or_admin(request)
         clinic_id = request.state.clinic_id
         user_id = request.state.user_id
         

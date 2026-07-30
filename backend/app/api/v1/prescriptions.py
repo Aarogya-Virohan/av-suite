@@ -6,6 +6,7 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
+from app.core.dependencies import require_roles
 from app.schemas.prescription import PrescriptionCreate, PrescriptionRead, PrescriptionPatch
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
@@ -27,7 +28,8 @@ router = APIRouter()
 async def create_prescription(
     request: Request,
     prescription_in: PrescriptionCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
 ):
     """
     Creates a new exercise prescription for a patient.
@@ -38,14 +40,7 @@ async def create_prescription(
         clinic_id = request.state.clinic_id
         physio_id = request.state.user_id
         
-        # Verify role is admin or physio/therapist (though gate handles basic auth)
-        role = request.state.role
-        if role not in {UserRole.ADMIN, UserRole.THERAPIST}:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only therapists or admins can prescribe exercises"
-            )
-            
+
         prescription = await prescription_service.create_prescription(
             db, uuid.UUID(clinic_id), uuid.UUID(physio_id), prescription_in
         )
@@ -126,7 +121,8 @@ async def update_prescription(
     request: Request,
     id: uuid.UUID,
     patch_in: PrescriptionPatch,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
 ):
     """
     Patches/updates prescription details.
@@ -135,12 +131,6 @@ async def update_prescription(
     try:
         clinic_id = request.state.clinic_id
 
-        role = request.state.role
-        if role not in {UserRole.ADMIN, UserRole.THERAPIST}:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only therapists or admins can update prescriptions"
-            )
 
         prescription = await prescription_service.patch_prescription(
             db, uuid.UUID(clinic_id), id, patch_in

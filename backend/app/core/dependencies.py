@@ -20,11 +20,9 @@ from app.models.user import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_async_session(session: AsyncSession = Depends(get_db)) -> AsyncGenerator[AsyncSession, None]:
     """Yield an async database session for route dependencies."""
-
-    async for session in get_db():
-        yield session
+    yield session
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_async_session)]
@@ -65,7 +63,7 @@ async def get_authenticated_context(token: TokenDep, session: SessionDep) -> Aut
     except (ValueError, KeyError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Could not validate credentials clinic mismatch",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
@@ -73,21 +71,21 @@ async def get_authenticated_context(token: TokenDep, session: SessionDep) -> Aut
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="User is None",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     if user.clinic_id != clinic_id or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Clinic ID mismatch or not active",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if user.role != role:
+    if normalize_user_role(user.role) != role:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expired. Please log in again.",
+            detail=f"Role mismatch: {user.role} != {role}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -95,7 +93,7 @@ async def get_authenticated_context(token: TokenDep, session: SessionDep) -> Aut
     if clinic is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Clinic is None",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

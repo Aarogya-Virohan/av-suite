@@ -5,6 +5,8 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from app.core.dependencies import require_admin
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session, get_current_clinic
@@ -13,7 +15,7 @@ from app.repositories.audit import AuditLogRepository
 from app.schemas.audit import AuditLogListResponse, AuditLogResponse
 from app.services.audit import AuditLogService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 async def get_audit_log_service(
