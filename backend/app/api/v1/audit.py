@@ -12,8 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_async_session, get_current_clinic
 from app.models.clinic import Clinic
 from app.repositories.audit import AuditLogRepository
-from app.schemas.audit import AuditLogListResponse, AuditLogResponse
+from app.schemas.audit import AuditLogResponse
 from app.services.audit import AuditLogService
+from app.schemas.envelope import ResponseEnvelope
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -30,7 +31,7 @@ AuditLogServiceDep = Annotated[AuditLogService, Depends(get_audit_log_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 
 
-@router.get("/audit-logs", response_model=AuditLogListResponse)
+@router.get("/audit-logs", response_model=ResponseEnvelope[list[AuditLogResponse]])
 async def list_audit_logs(
     clinic: CurrentClinicDep,
     service: AuditLogServiceDep,
@@ -41,7 +42,7 @@ async def list_audit_logs(
     end_date: Annotated[datetime | None, Query(alias="end_date")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
-) -> AuditLogListResponse:
+) -> ResponseEnvelope[list[AuditLogResponse]]:
     """List clinic-scoped audit logs with filtering and pagination."""
 
     logs = await service.list_logs(
@@ -55,4 +56,7 @@ async def list_audit_logs(
         limit=limit,
     )
     items = [AuditLogResponse.model_validate(log) for log in logs]
-    return AuditLogListResponse(items=items, total=len(items), offset=offset, limit=limit)
+    return ResponseEnvelope(
+        data=items,
+        meta={"total": len(logs) if len(logs) < limit else len(items) + offset, "offset": offset, "limit": limit}
+    )
