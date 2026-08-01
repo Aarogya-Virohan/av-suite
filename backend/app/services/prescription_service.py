@@ -5,14 +5,9 @@ import html
 from datetime import datetime
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import func
-from sqlalchemy.orm import selectinload
-from app.models.prescription import Prescription, PrescriptionItem
-from app.models.exercise import Exercise
-from app.models.patient import Patient
-from app.models.user import User
+from app.models.prescription import Prescription
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
+from app.repositories.prescription import PrescriptionRepository
 from weasyprint import HTML
 
 logger = logging.getLogger(__name__)
@@ -26,36 +21,8 @@ async def create_prescription(
     try:
         logger.info(f"Creating prescription for patient: {prescription_in.patient_id} in clinic: {clinic_id}")
         
-        db_prescription = Prescription(
-            clinic_id=clinic_id,
-            patient_id=prescription_in.patient_id,
-            physio_id=physio_id,
-            physio_notes=prescription_in.physio_notes,
-            status=prescription_in.status
-        )
-        db.add(db_prescription)
-        await db.flush()  # Generate prescription ID
-        
-        db_items = []
-        for item in prescription_in.items:
-            db_items.append(
-                PrescriptionItem(
-                    prescription_id=db_prescription.id,
-                    exercise_id=item.exercise_id,
-                    sets=item.sets,
-                    reps=item.reps,
-                    hold=item.hold,
-                    frequency=item.frequency,
-                    hold_angle=item.hold_angle,
-                    note=item.note
-                )
-            )
-        
-        if db_items:
-            db.add_all(db_items)
-            
-        await db.commit()
-        await db.refresh(db_prescription)
+        repo = PrescriptionRepository(db)
+        db_prescription = await repo.create_prescription(clinic_id, physio_id, prescription_in)
         
         # Return prescription with relationships loaded
         return await get_prescription_by_id(db, clinic_id, db_prescription.id)
@@ -72,18 +39,8 @@ async def get_prescription_by_id(
     """
     try:
         logger.info(f"Fetching prescription: {prescription_id} in clinic: {clinic_id}")
-        query = (
-            select(Prescription)
-            .where(Prescription.id == prescription_id, Prescription.clinic_id == clinic_id)
-            .options(
-                selectinload(Prescription.items).selectinload(PrescriptionItem.exercise),
-                selectinload(Prescription.patient),
-                selectinload(Prescription.physio),
-                selectinload(Prescription.clinic)
-            )
-        )
-        result = await db.execute(query)
-        return result.scalars().first()
+        repo = PrescriptionRepository(db)
+        return await repo.get_prescription_by_id(clinic_id, prescription_id)
     except Exception as e:
         logger.error(f"Error fetching prescription {prescription_id}: {str(e)}")
         raise
@@ -101,28 +58,8 @@ async def get_prescriptions(
     try:
         logger.info(f"Listing prescriptions for clinic: {clinic_id}, page: {page}")
         
-        query = select(Prescription).where(Prescription.clinic_id == clinic_id)
-        if patient_id:
-            query = query.where(Prescription.patient_id == patient_id)
-            
-        # Get total count
-        count_query = select(func.count()).select_from(query.subquery())
-        total_result = await db.execute(count_query)
-        total = total_result.scalar() or 0
-        
-        # Paginate and order by created_at desc
-        query = (
-            query.options(
-                selectinload(Prescription.items).selectinload(PrescriptionItem.exercise),
-                selectinload(Prescription.patient)
-            )
-            .order_by(Prescription.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
-        
-        result = await db.execute(query)
-        return list(result.scalars().all()), total
+        repo = PrescriptionRepository(db)
+        return await repo.get_prescriptions(clinic_id, patient_id, page, page_size)
     except Exception as e:
         logger.error(f"Error listing prescriptions: {str(e)}")
         raise
@@ -145,29 +82,8 @@ async def patch_prescription(
             rx.status = patch.status
             
         if patch.items is not None:
-            # Delete existing items
-            from sqlalchemy import delete
-            await db.execute(
-                delete(PrescriptionItem).where(PrescriptionItem.prescription_id == prescription_id)
-            )
-            
-            # Insert new items
-            db_items = []
-            for item in patch.items:
-                db_items.append(
-                    PrescriptionItem(
-                        prescription_id=prescription_id,
-                        exercise_id=item.exercise_id,
-                        sets=item.sets,
-                        reps=item.reps,
-                        hold=item.hold,
-                        frequency=item.frequency,
-                        hold_angle=item.hold_angle,
-                        note=item.note
-                    )
-                )
-            if db_items:
-                db.add_all(db_items)
+            repo = PrescriptionRepository(db)
+            await repo.update_prescription_items(prescription_id, patch)
             
         await db.commit()
         # Fetch again to ensure all relationships are fresh and loaded
@@ -487,8 +403,8 @@ async def generate_prescription_pdf(
         HTML(string=html_content).write_pdf(pdf_path)
         
         # Save pdf key back to the database
-        rx.pdf_key = pdf_filename
-        await db.commit()
+        repo = PrescriptionRepository(db)
+        await repo.update_pdf_key(rx, pdf_filename)
         
         logger.info(f"PDF successfully generated for prescription: {rx.id} at {pdf_path}")
         return f"/api/v1/prescriptions/{rx.id}/pdf/download"

@@ -17,11 +17,10 @@ Features:
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import func, or_
 from app.models.exercise import Exercise
 from app.schemas.exercise import ExerciseCreate
 from app.schemas.common import PaginationParams
+from app.repositories.exercise import ExerciseRepository
 from typing import Optional, List, Tuple
 import uuid
 import logging
@@ -100,61 +99,8 @@ async def get_exercises(
     try:
         logger.debug(f"Fetching exercises for clinic {clinic_id}")
         
-        # Base query: Clinic-specific aur global exercises
-        # OR condition: clinic_id matches OR clinic_id is NULL (global)
-        # Yeh multi-tenant + global exercises support provide karta hai
-        query = select(Exercise).where(
-            or_(
-                Exercise.clinic_id == uuid.UUID(clinic_id),  # Clinic-specific
-                Exercise.clinic_id.is_(None)  # Global exercises
-            )
-        )
-
-        # Body part filter - optional
-        # Supports comma-separated body parts for multi-select (e.g. "Shoulder,Knee")
-        if body_part:
-            if "," in body_part:
-                parts = [p.strip() for p in body_part.split(",") if p.strip()]
-                query = query.where(Exercise.body_part.in_(parts))
-            else:
-                query = query.where(Exercise.body_part == body_part)
-            logger.debug(f"Filter applied: body_part = {body_part}")
-        
-        # Free/paid filter - optional
-        # Boolean comparison - subscription/pricing logic ke liye
-        # Note: is_free parameter None ho sakta hai (no filter)
-        if is_free is not None:
-            query = query.where(Exercise.is_free == is_free)
-            logger.debug(f"Filter applied: is_free = {is_free}")
-        
-        # Search filter - optional
-        # ILIKE: Case-insensitive substring search
-        # Substring matching: Exercise title mein search term
-        if search:
-            query = query.where(Exercise.title.ilike(f"%{search}%"))
-            logger.debug(f"Filter applied: search = {search}")
-
-        # Total count calculate karte hain pagination metadata ke liye
-        # Subquery use karte hain counting ke liye (all filters included)
-        count_query = select(func.count()).select_from(query.subquery())
-        total_result = await db.execute(count_query)
-        total = total_result.scalar() or 0
-        
-        logger.debug(f"Total exercises matching filters: {total}")
-
-        # Pagination apply karte hain
-        # offset: Skip karte hain (page-1) * page_size records
-        # limit: Take karte hain page_size records
-        query = query.offset(
-            (pagination.page - 1) * pagination.page_size
-        ).limit(pagination.page_size)
-        
-        # Query execute karte hain
-        result = await db.execute(query)
-        exercises = result.scalars().all()
-        
-        logger.info(f"Retrieved {len(exercises)} exercises, total: {total}")
-        return list(exercises), total
+        repo = ExerciseRepository(db)
+        return await repo.list_exercises(clinic_id, pagination, body_part, is_free, search)
         
     except ValueError as e:
         logger.error(f"Invalid clinic_id format: {clinic_id}")
@@ -220,21 +166,8 @@ async def create_exercise(
     try:
         logger.info(f"Creating exercise in clinic {clinic_id}")
         
-        # Exercise object create karte hain
-        # model_dump(): Pydantic schema se dict extract karte hain
-        exercise = Exercise(
-            clinic_id=uuid.UUID(clinic_id),
-            **exercise_in.model_dump()  # Unpacking schema fields
-        )
-        
-        # Database mein add karte hain
-        db.add(exercise)
-        
-        # Transaction commit karte hain
-        await db.commit()
-        
-        # Auto-generated fields load karte hain (id, created_at, updated_at)
-        await db.refresh(exercise)
+        repo = ExerciseRepository(db)
+        exercise = await repo.create_exercise(clinic_id, exercise_in)
         
         logger.info(f"Exercise created successfully: {exercise.id}")
         return exercise
@@ -297,22 +230,8 @@ async def get_exercise_by_id(
     try:
         logger.debug(f"Fetching exercise {exercise_id} for clinic {clinic_id}")
         
-        # Query construct karte hain multiple conditions ke saath
-        # Exercise ID aur (Clinic ID OR NULL) check karte hain
-        query = select(Exercise).where(
-            Exercise.id == uuid.UUID(exercise_id),
-            or_(
-                Exercise.clinic_id == uuid.UUID(clinic_id),  # Clinic-specific
-                Exercise.clinic_id.is_(None)  # Global exercises
-            )
-        )
-        
-        # Query execute karte hain
-        result = await db.execute(query)
-        
-        # first() use karte hain single result ke liye
-        # None return hota hai if not found
-        exercise = result.scalars().first()
+        repo = ExerciseRepository(db)
+        exercise = await repo.get_exercise_by_id(clinic_id, exercise_id)
         
         if exercise:
             logger.info(f"Exercise found: {exercise_id}")
