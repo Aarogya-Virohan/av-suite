@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.exercise import Exercise
 from app.repositories.base import BaseRepository
-from app.schemas.exercise import ExerciseCreate
+from app.schemas.exercise import ExerciseCreate, ExerciseUpdate
 from app.schemas.common import PaginationParams
 
 
@@ -81,3 +81,14 @@ class ExerciseRepository(BaseRepository[Exercise]):
         )
         result = await self.session.execute(query)
         return result.scalars().first()
+
+    async def update_exercise(self, db_obj: Exercise, exercise_in: ExerciseUpdate) -> Exercise:
+        update_data = exercise_in.model_dump(exclude_unset=True)
+        updated = await self.update(db_obj, update_data)
+        await self.session.commit()
+        await self.session.refresh(updated)
+        return updated
+
+    async def delete_exercise(self, db_obj: Exercise) -> None:
+        await self.delete(db_obj)
+        await self.session.commit()

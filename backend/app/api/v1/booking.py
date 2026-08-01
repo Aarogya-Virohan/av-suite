@@ -21,6 +21,7 @@ from app.schemas.booking import (
     AppointmentRequestCreate,
     AppointmentRequestListResponse,
     AppointmentRequestResponse,
+    AppointmentRequestUpdate,
     PublicClinicBrandingResponse,
 )
 from app.services.booking import BookingNotFoundError, BookingService, BookingValidationError
@@ -86,6 +87,39 @@ async def create_public_appointment_request(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BookingValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put("/booking/{id}", response_model=ResponseEnvelope[AppointmentRequestResponse], dependencies=[ProtectedRouterDep])
+async def update_booking_request(
+    id: UUID,
+    payload: AppointmentRequestUpdate,
+    clinic: CurrentClinicDep,
+    service: BookingServiceDep,
+) -> ResponseEnvelope[AppointmentRequestResponse]:
+    """Update an appointment request for the authenticated clinic."""
+
+    try:
+        req = await service.update_request(clinic.id, id, payload)
+        return ResponseEnvelope(data=AppointmentRequestResponse.model_validate(req))
+    except BookingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except BookingValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/booking/{id}", response_model=ResponseEnvelope[dict[str, str]], dependencies=[ProtectedRouterDep])
+async def delete_booking_request(
+    id: UUID,
+    clinic: CurrentClinicDep,
+    service: BookingServiceDep,
+) -> ResponseEnvelope[dict[str, str]]:
+    """Delete an appointment request for the authenticated clinic."""
+
+    try:
+        await service.delete_request(clinic.id, id)
+        return ResponseEnvelope(data={"message": "Appointment request deleted successfully."})
+    except BookingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 # --- Authenticated Staff Appointment Request Queue Endpoints ---

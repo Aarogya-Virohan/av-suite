@@ -15,6 +15,7 @@ from app.repositories.patient import PatientRepository
 from app.schemas.booking import (
     AppointmentRequestApprovePayload,
     AppointmentRequestCreate,
+    AppointmentRequestUpdate,
     PublicClinicBrandingResponse,
 )
 
@@ -181,3 +182,32 @@ class BookingService:
             update_data["notes"] = f"{req.notes or ''}\nRejection notes: {notes}".strip()
 
         return await self.request_repository.update(req, update_data)
+
+    async def update_request(
+        self,
+        clinic_id: UUID,
+        request_id: UUID,
+        payload: AppointmentRequestUpdate,
+    ) -> AppointmentRequest:
+        """Update appointment request fields for a clinic-scoped request."""
+
+        request_obj = await self.get_request(clinic_id, request_id)
+        update_data = payload.model_dump(exclude_unset=True, exclude_none=True)
+        if not update_data:
+            return request_obj
+
+        updated = await self.request_repository.update_request_by_id(
+            clinic_id=clinic_id,
+            request_id=request_id,
+            update_data=update_data,
+        )
+        if updated is None:
+            raise BookingNotFoundError(f"Appointment request '{request_id}' not found for clinic '{clinic_id}'.")
+
+        return updated
+
+    async def delete_request(self, clinic_id: UUID, request_id: UUID) -> None:
+        """Delete appointment request for the clinic."""
+
+        request_obj = await self.get_request(clinic_id, request_id)
+        await self.request_repository.delete_request(request_obj)

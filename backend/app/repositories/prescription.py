@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import Optional, Tuple, List
 from uuid import UUID
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import String, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.exercise import Exercise
+from app.models.patient import Patient
 from app.models.prescription import Prescription, PrescriptionItem
 from app.repositories.base import BaseRepository
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
@@ -70,6 +72,7 @@ class PrescriptionRepository(BaseRepository[Prescription]):
         self,
         clinic_id: UUID,
         patient_id: Optional[UUID] = None,
+        search: Optional[str] = None,
         page: int = 1,
         page_size: int = 10
     ) -> Tuple[List[Prescription], int]:
@@ -77,7 +80,27 @@ class PrescriptionRepository(BaseRepository[Prescription]):
         if patient_id:
             query = query.where(Prescription.patient_id == patient_id)
 
-        count_query = select(func.count()).select_from(query.subquery())
+        if search:
+            search_pattern = f"%{search.strip()}%"
+            query = (
+                query.outerjoin(Prescription.patient)
+                .outerjoin(Prescription.items)
+                .outerjoin(PrescriptionItem.exercise)
+                .where(
+                    or_(
+                        Patient.first_name.ilike(search_pattern),
+                        Patient.last_name.ilike(search_pattern),
+                        func.concat(Patient.first_name, " ", Patient.last_name).ilike(search_pattern),
+                        Exercise.title.ilike(search_pattern),
+                        Prescription.physio_notes.ilike(search_pattern),
+                        Prescription.status.ilike(search_pattern),
+                        Prescription.id.cast(String).ilike(search_pattern),
+                    )
+                )
+            )
+
+        count_subquery = query.with_only_columns(Prescription.id).distinct().subquery()
+        count_query = select(func.count()).select_from(count_subquery)
         total_result = await self.session.execute(count_query)
         total = total_result.scalar() or 0
 
@@ -86,6 +109,7 @@ class PrescriptionRepository(BaseRepository[Prescription]):
                 selectinload(Prescription.items).selectinload(PrescriptionItem.exercise),
                 selectinload(Prescription.patient)
             )
+            .distinct(Prescription.id)
             .order_by(Prescription.created_at.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
@@ -118,4 +142,8 @@ class PrescriptionRepository(BaseRepository[Prescription]):
 
     async def update_pdf_key(self, rx: Prescription, pdf_filename: str) -> None:
         rx.pdf_key = pdf_filename
+        await self.session.commit()
+
+    async def delete_prescription(self, prescription: Prescription) -> None:
+        await self.delete(prescription)
         await self.session.commit()

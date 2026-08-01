@@ -49,6 +49,7 @@ async def get_prescriptions(
     db: AsyncSession,
     clinic_id: uuid.UUID,
     patient_id: Optional[uuid.UUID] = None,
+    search: Optional[str] = None,
     page: int = 1,
     page_size: int = 10
 ) -> Tuple[List[Prescription], int]:
@@ -59,9 +60,30 @@ async def get_prescriptions(
         logger.info(f"Listing prescriptions for clinic: {clinic_id}, page: {page}")
         
         repo = PrescriptionRepository(db)
-        return await repo.get_prescriptions(clinic_id, patient_id, page, page_size)
+        return await repo.get_prescriptions(clinic_id, patient_id, search, page, page_size)
     except Exception as e:
         logger.error(f"Error listing prescriptions: {str(e)}")
+        raise
+
+
+async def delete_prescription(
+    db: AsyncSession,
+    clinic_id: uuid.UUID,
+    prescription_id: uuid.UUID,
+) -> bool:
+    """Delete a prescription scoped to clinic; returns False when not found."""
+
+    try:
+        repo = PrescriptionRepository(db)
+        prescription = await repo.get_prescription_by_id(clinic_id, prescription_id)
+        if not prescription:
+            return False
+
+        await repo.delete_prescription(prescription)
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting prescription {prescription_id}: {str(e)}")
+        await db.rollback()
         raise
 
 async def patch_prescription(

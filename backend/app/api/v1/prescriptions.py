@@ -59,6 +59,7 @@ async def create_prescription(
 async def list_prescriptions(
     request: Request,
     patient_id: Optional[uuid.UUID] = Query(None, description="Filter by patient ID"),
+    search: Optional[str] = Query(None, description="Search by patient name, exercise title, or related fields"),
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db)
 ):
@@ -69,7 +70,7 @@ async def list_prescriptions(
     try:
         clinic_id = request.state.clinic_id
         prescriptions, total = await prescription_service.get_prescriptions(
-            db, uuid.UUID(clinic_id), patient_id, pagination.page, pagination.page_size
+            db, uuid.UUID(clinic_id), patient_id, search, pagination.page, pagination.page_size
         )
         meta = MetaPagination(
             total=total,
@@ -146,6 +147,29 @@ async def update_prescription(
     except Exception as e:
         logger.error(f"Error updating prescription {id}: {str(e)}")
         raise
+
+
+@router.delete(
+    "/{id}",
+    response_model=ResponseEnvelope[dict],
+    tags=["Prescriptions"]
+)
+async def delete_prescription(
+    request: Request,
+    id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST)),
+):
+    """Deletes a prescription by ID in clinic scope."""
+
+    clinic_id = request.state.clinic_id
+    deleted = await prescription_service.delete_prescription(db, uuid.UUID(clinic_id), id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prescription not found or not in user's clinic",
+        )
+    return ResponseEnvelope(data={"message": "Prescription deleted successfully."})
 
 @router.post(
     "/{id}/pdf",

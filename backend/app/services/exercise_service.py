@@ -18,7 +18,7 @@ Features:
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.exercise import Exercise
-from app.schemas.exercise import ExerciseCreate
+from app.schemas.exercise import ExerciseCreate, ExerciseUpdate
 from app.schemas.common import PaginationParams
 from app.repositories.exercise import ExerciseRepository
 from typing import Optional, List, Tuple
@@ -245,5 +245,47 @@ async def get_exercise_by_id(
         raise
     except Exception as e:
         logger.error(f"Get exercise by id error: {str(e)}")
+        raise
+
+
+async def update_exercise(
+    db: AsyncSession,
+    clinic_id: str,
+    exercise_id: str,
+    exercise_in: ExerciseUpdate,
+) -> Optional[Exercise]:
+    """Update an exercise if it exists in clinic scope (or is global)."""
+
+    try:
+        repo = ExerciseRepository(db)
+        exercise = await repo.get_exercise_by_id(clinic_id, exercise_id)
+        if not exercise:
+            return None
+
+        return await repo.update_exercise(exercise, exercise_in)
+    except Exception as e:
+        logger.error(f"Update exercise error: {str(e)}")
+        await db.rollback()
+        raise
+
+
+async def delete_exercise(
+    db: AsyncSession,
+    clinic_id: str,
+    exercise_id: str,
+) -> bool:
+    """Delete an exercise if it exists in clinic scope (or is global)."""
+
+    try:
+        repo = ExerciseRepository(db)
+        exercise = await repo.get_exercise_by_id(clinic_id, exercise_id)
+        if not exercise:
+            return False
+
+        await repo.delete_exercise(exercise)
+        return True
+    except Exception as e:
+        logger.error(f"Delete exercise error: {str(e)}")
+        await db.rollback()
         raise
 
