@@ -174,13 +174,8 @@ async def approve_appointment_request(
     """Authenticated staff endpoint approving an appointment request and scheduling an appointment."""
 
     try:
-        updated_req, appointment = await service.approve_request(clinic.id, id, payload)
-        return ResponseEnvelope(data={
-            "request": AppointmentRequestResponse.model_validate(updated_req).model_dump(mode="json"),
-            "appointment_id": str(appointment.id),
-            "patient_id": str(appointment.patient_id),
-            "message": "Appointment request approved successfully.",
-        })
+        response = await service.approve_request(clinic.id, id, payload)
+        return ResponseEnvelope(data=response)
     except BookingNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BookingValidationError as exc:
