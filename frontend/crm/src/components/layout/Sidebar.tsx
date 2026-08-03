@@ -14,6 +14,8 @@ import {
   X
 } from 'lucide-react';
 import { useCRMStore } from '@/lib/store';
+import { canAccessTab, formatRole } from '@/features/auth/roleAccess';
+import type { UserRole } from '@/features/auth/auth.types';
 
 export type NavTab =
   | 'dashboard'
@@ -31,20 +33,29 @@ interface SidebarProps {
   setActiveTab: (tab: NavTab) => void;
   isOpen: boolean;
   onClose: () => void;
+  role: UserRole;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   isOpen,
-  onClose
+  onClose,
+  role
 }) => {
   const branding = useCRMStore((state) => state.branding);
   const appointmentRequests = useCRMStore((state) => state.appointmentRequests);
 
   const pendingRequestsCount = appointmentRequests.filter((r) => r.status === 'Pending').length;
 
-  const navItems: { id: NavTab; label: string; icon: React.ReactNode; badge?: number }[] = [
+  interface NavItem {
+    id: NavTab;
+    label: string;
+    icon: React.ReactNode;
+    badge?: number;
+  }
+
+  const allNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'patients', label: 'Patients', icon: <Users className="w-5 h-5" /> },
@@ -60,6 +71,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'recycle', label: 'Recycle Bin', icon: <Trash2 className="w-5 h-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> }
   ];
+
+  const navItems = allNavItems.filter((item) => canAccessTab(role, item.id));
 
   return (
     <>
@@ -140,7 +153,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-white/10 text-xs text-white/50 text-center">
-          AV Suite CRM v1.0 • Aarogya Virohan
+          <p className="font-semibold text-white/70">{formatRole(role)}</p>
+          <p className="mt-1">AV Suite CRM v1.0 • Aarogya Virohan</p>
         </div>
       </aside>
     </>

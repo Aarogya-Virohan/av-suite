@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AppProviders } from '@/providers/AppProviders';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 export const metadata: Metadata = {
   title: 'Aarogya CRM | AV Suite Clinical Platform',
@@ -16,10 +17,13 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased selection:bg-[var(--teal)] selection:text-white">
         <AppProviders>
-          {children}
+          <AuthGuard>
+            {children}
+          </AuthGuard>
         </AppProviders>
       </body>
     </html>
   );
 }
+
 
