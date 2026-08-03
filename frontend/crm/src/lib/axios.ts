@@ -1,9 +1,17 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { toast } from 'sonner';
+import { clearAuthSession, getStoredAuthToken } from '@/features/auth/auth.storage';
 
 // Custom request configuration interface to record request timestamp
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipAuthRedirect?: boolean;
+  }
+}
+
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   startTime?: number;
+  skipAuthRedirect?: boolean;
 }
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
@@ -27,7 +35,7 @@ api.interceptors.request.use((config: CustomAxiosRequestConfig) => {
   config.startTime = Date.now();
   
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('token');
+    const token = getStoredAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -65,10 +73,16 @@ api.interceptors.response.use((response) => {
 
     switch (status) {
       case 401:
+        if (config?.skipAuthRedirect) {
+          break;
+        }
+
         toast.error('Session expired. Please log in again.');
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('token');
-          window.location.href = '/login';
+          clearAuthSession();
+          const nextPath = window.location.pathname + window.location.search;
+          const safeNextPath = nextPath.startsWith('/login') ? '/' : nextPath;
+          window.location.href = '/login?next=' + encodeURIComponent(safeNextPath);
         }
         break;
       case 403:

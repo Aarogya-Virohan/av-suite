@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Sidebar, NavTab } from '@/components/layout/Sidebar';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Sidebar, type NavTab } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
 import { DashboardView } from '@/components/dashboard/DashboardView';
 import { AnalyticsView } from '@/components/analytics/AnalyticsView';
@@ -15,11 +16,17 @@ import { SettingsView } from '@/components/settings/SettingsView';
 import { PatientModal } from '@/components/patients/PatientModal';
 import { InvoiceModal } from '@/components/billing/InvoiceModal';
 import { useCRMStore } from '@/lib/store';
-import { X } from 'lucide-react';
+import { Activity, X } from 'lucide-react';
+import { clearAuthSession, getAuthSession } from '@/features/auth/auth.storage';
+import type { AuthSession } from '@/features/auth/auth.types';
+import { canAccessTab, getDefaultTabForRole } from '@/features/auth/roleAccess';
 
 export default function CRMApp() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Global Modal States
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
@@ -34,8 +41,35 @@ export default function CRMApp() {
   const [apptTherapist, setApptTherapist] = useState(therapists[0]?.name || '');
   const [apptNotes, setApptNotes] = useState('');
 
+  useEffect(() => {
+    const session = getAuthSession();
+    if (!session) {
+      router.replace('/login?next=/');
+      return;
+    }
+
+    setAuthSession(session);
+    setActiveTab((currentTab) =>
+      canAccessTab(session.role, currentTab) ? currentTab : getDefaultTabForRole(session.role)
+    );
+    setIsCheckingAuth(false);
+  }, [router]);
+
   const handleRefresh = () => {
     // Re-trigger render
+  };
+
+  const handleSetActiveTab = (tab: NavTab) => {
+    if (!authSession || !canAccessTab(authSession.role, tab)) {
+      return;
+    }
+
+    setActiveTab(tab);
+  };
+
+  const handleLogout = () => {
+    clearAuthSession();
+    router.replace('/login');
   };
 
   const handleBookApptSubmit = (e: React.FormEvent) => {
@@ -61,14 +95,26 @@ export default function CRMApp() {
     setApptNotes('');
   };
 
+  if (isCheckingAuth || !authSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--text)]">
+        <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-5 py-4 text-sm font-semibold shadow-sm">
+          <Activity className="h-5 w-5 animate-pulse text-[var(--teal)]" />
+          Checking secure session...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-[var(--bg)] text-[var(--text)] transition-colors duration-200">
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleSetActiveTab}
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
+        role={authSession.role}
       />
 
       {/* Main Content Area */}
@@ -77,19 +123,21 @@ export default function CRMApp() {
           activeTab={activeTab}
           onOpenMenu={() => setIsMobileMenuOpen(true)}
           onRefresh={handleRefresh}
+          authSession={authSession}
+          onLogout={handleLogout}
         />
 
         <main className="p-4 sm:p-8 flex-1 overflow-y-auto">
           {activeTab === 'dashboard' && (
             <DashboardView
-              onNavigate={setActiveTab}
+              onNavigate={handleSetActiveTab}
               onOpenPatientModal={() => setIsPatientModalOpen(true)}
               onOpenApptModal={() => setIsApptModalOpen(true)}
               onOpenInvoiceModal={() => setIsInvoiceModalOpen(true)}
             />
           )}
 
-          {activeTab === 'analytics' && <AnalyticsView />}
+          {activeTab === 'analytics' && canAccessTab(authSession.role, 'analytics') && <AnalyticsView />}
 
           {activeTab === 'patients' && <PatientsModule />}
 
@@ -103,9 +151,9 @@ export default function CRMApp() {
 
           {activeTab === 'therapists' && <TherapistsView />}
 
-          {activeTab === 'recycle' && <RecycleBinView />}
+          {activeTab === 'recycle' && canAccessTab(authSession.role, 'recycle') && <RecycleBinView />}
 
-          {activeTab === 'settings' && <SettingsView />}
+          {activeTab === 'settings' && canAccessTab(authSession.role, 'settings') && <SettingsView />}
         </main>
       </div>
 

@@ -1,16 +1,26 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Menu, RefreshCw, Sun, Moon } from 'lucide-react';
-import { NavTab } from './Sidebar';
+import { LogOut, Menu, Moon, RefreshCw, ShieldCheck, Sun } from 'lucide-react';
+import type { NavTab } from './Sidebar';
+import { formatRole } from '@/features/auth/roleAccess';
+import type { AuthSession } from '@/features/auth/auth.types';
 
 interface TopbarProps {
   activeTab: NavTab;
   onOpenMenu: () => void;
   onRefresh: () => void;
+  authSession: AuthSession;
+  onLogout: () => void;
 }
 
-export const Topbar: React.FC<TopbarProps> = ({ activeTab, onOpenMenu, onRefresh }) => {
+export const Topbar: React.FC<TopbarProps> = ({
+  activeTab,
+  onOpenMenu,
+  onRefresh,
+  authSession,
+  onLogout
+}) => {
   const [isDark, setIsDark] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [latency, setLatency] = useState<string>('');
@@ -93,6 +103,14 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, onOpenMenu, onRefresh
           </span>
         )}
 
+        <div className="hidden items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--text)] lg:flex">
+          <ShieldCheck className="h-3.5 w-3.5 text-[var(--teal)]" />
+          <span>{formatRole(authSession.role)}</span>
+          <span className="max-w-24 truncate text-[var(--text-light)]">
+            {authSession.clinicId}
+          </span>
+        </div>
+
         <button
           onClick={handleRefreshClick}
           className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg)] transition-colors hover:scale-105"
@@ -109,6 +127,15 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, onOpenMenu, onRefresh
           aria-label="Toggle theme"
         >
           {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+        </button>
+
+        <button
+          onClick={onLogout}
+          className="p-2 rounded-lg border border-[var(--border)] text-[var(--text)] hover:bg-[var(--bg)] transition-colors"
+          title="Sign out"
+          aria-label="Sign out"
+        >
+          <LogOut className="w-4 h-4" />
         </button>
       </div>
     </header>
