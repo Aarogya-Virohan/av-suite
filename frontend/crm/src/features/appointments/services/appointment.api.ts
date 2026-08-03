@@ -5,17 +5,17 @@ import { AppointmentInput } from '../schemas/appointment.schema';
 export const appointmentApi = {
   fetch: async (): Promise<Appointment[]> => {
     const response = await api.get('/appointments');
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   create: async (data: AppointmentInput): Promise<Appointment> => {
     const response = await api.post('/appointments', data);
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   updateStatus: async (id: string, status: string): Promise<Appointment> => {
     const response = await api.patch(`/appointments/${id}`, { status });
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   delete: async (id: string): Promise<void> => {
@@ -24,7 +24,7 @@ export const appointmentApi = {
 
   fetchRequests: async (): Promise<AppointmentRequest[]> => {
     const response = await api.get('/appointment-requests');
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   approveRequest: async (id: string, therapistId?: string, duration?: number): Promise<void> => {

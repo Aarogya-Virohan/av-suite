@@ -5,12 +5,12 @@ import { PatientIntakeInput } from '../schemas/patient.schema';
 export const patientApi = {
   fetch: async (page = 1): Promise<Patient[]> => {
     const response = await api.get(`/patients?page=${page}`);
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   fetchOne: async (id: string): Promise<Patient> => {
     const response = await api.get(`/patients/${id}`);
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   create: async (data: PatientIntakeInput): Promise<Patient> => {
@@ -24,12 +24,12 @@ export const patientApi = {
       referral_source: data.referral_source
     };
     const response = await api.post('/patients', payload);
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   update: async (id: string, data: Partial<PatientIntakeInput>): Promise<Patient> => {
     const response = await api.patch(`/patients/${id}`, data);
-    return response.data.data || response.data;
+    return response.data.items || response.data.data || response.data;
   },
 
   delete: async (id: string): Promise<void> => {
