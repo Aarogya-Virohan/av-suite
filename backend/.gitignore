@@ -46,3 +46,4 @@ plan.md
 # Task-specific files (reference only, not part of production)
 tarun_task_03.txt
 FINAL_SUMMARY.txt
+seed_db.py
