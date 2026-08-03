@@ -12,7 +12,7 @@ __pycache__/
 venv/
 env/
 *.sqlite3
-
+AI_RULES.md
 # Node
 node_modules/
 npm-debug.log*
