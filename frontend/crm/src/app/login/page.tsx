@@ -1,194 +1,130 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, AlertCircle, Loader2, Lock, Mail } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { toast } from 'sonner';
-import { authApi } from '@/features/auth/auth.api';
-import { getAuthSession, saveAuthSession } from '@/features/auth/auth.storage';
+import { useAuthStore } from '../../store';
+import { setStoredToken } from '../../lib/auth';
+import { apiClient } from '../../lib/api-client';
+import { Stethoscope, Lock, Mail, Loader2 } from 'lucide-react';
 
-const getSafeNextPath = (nextPath: string | null): string => {
-  if (!nextPath || !nextPath.startsWith('/') || nextPath.startsWith('//')) {
-    return '/';
-  }
+const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
 
-  if (nextPath.startsWith('/login')) {
-    return '/';
-  }
-
-  return nextPath;
-};
-
-const getRequestedNextPath = (): string => {
-  if (typeof window === 'undefined') {
-    return '/';
-  }
-
-  return getSafeNextPath(new URLSearchParams(window.location.search).get('next'));
-};
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const setToken = useAuthStore((s) => s.setToken);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (getAuthSession()) {
-      router.replace(getRequestedNextPath());
-    }
-  }, [router]);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: 'admin@aarogya.com',
+      password: 'password123',
+    },
+  });
 
-  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmedEmail = email.trim().toLowerCase();
-
-    if (!trimmedEmail || !password) {
-      setError('Enter your clinic email and password.');
-      return;
-    }
-
+  const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
-    setError(null);
-
     try {
-      const response = await authApi.login({
-        email: trimmedEmail,
-        password,
-      });
-      const session = saveAuthSession(response.access_token, trimmedEmail);
-
-      if (!session) {
-        throw new Error('The login token is missing required clinic or role claims.');
+      // Real endpoint call via api-client
+      const res = await apiClient.post('/auth/login', data);
+      const token = res.data?.access_token || res.data?.data?.access_token;
+      if (!token) {
+        throw new Error('Invalid token response from server');
       }
 
-      toast.success('Signed in successfully.');
-      router.replace(getRequestedNextPath());
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to sign in.';
-      setError(message);
+      setStoredToken(token);
+      setToken(token);
+      toast.success('Successfully logged in');
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error('Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      <div className="grid min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(420px,520px)]">
-        <section className="hidden bg-[var(--sidebar-bg)] px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10">
-              <Activity className="h-5 w-5 text-teal-200" />
-            </span>
-            <div>
-              <p className="text-sm font-bold uppercase tracking-widest text-white/60">AV Suite</p>
-              <h1 className="text-2xl font-extrabold">Aarogya CRM</h1>
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-8 border border-slate-700">
+        {/* Header */}
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="w-12 h-12 rounded-xl bg-teal-600 flex items-center justify-center text-white mb-3 shadow-lg shadow-teal-500/30">
+            <Stethoscope className="w-6 h-6" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">AV Suite CRM</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Sign in to access your clinic portal
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              Email Address
+            </label>
+            <div className="relative">
+              <Mail className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                {...register('email')}
+                type="email"
+                placeholder="admin@aarogya.com"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-white"
+              />
             </div>
+            {errors.email && (
+              <p className="text-xs text-rose-500 mt-1">{errors.email.message}</p>
+            )}
           </div>
 
-          <div className="max-w-xl space-y-6">
-            <p className="text-sm font-bold uppercase tracking-widest text-teal-200">Clinic access</p>
-            <h2 className="text-5xl font-black leading-tight">
-              Sign in to your secure clinical workspace.
-            </h2>
-            <p className="max-w-lg text-base leading-7 text-white/70">
-              Your clinic and role are resolved from the signed access token after authentication.
-              Tenant access is enforced by the API on every request.
-            </p>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                {...register('password')}
+                type="password"
+                placeholder="••••••••"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-white"
+              />
+            </div>
+            {errors.password && (
+              <p className="text-xs text-rose-500 mt-1">{errors.password.message}</p>
+            )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-xs text-white/65">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <p className="font-bold text-white">JWT</p>
-              <p className="mt-1">Bearer auth</p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <p className="font-bold text-white">Clinic</p>
-              <p className="mt-1">Claim scoped</p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <p className="font-bold text-white">Role</p>
-              <p className="mt-1">API enforced</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="flex items-center justify-center px-4 py-10 sm:px-6">
-          <div className="w-full max-w-md">
-            <div className="mb-8 lg:hidden">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--navy)] text-white">
-                <Activity className="h-6 w-6" />
-              </div>
-              <h1 className="text-2xl font-extrabold">Aarogya CRM</h1>
-              <p className="mt-2 text-sm text-[var(--text-light)]">Sign in to continue.</p>
-            </div>
-
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--card-bg)] p-6 shadow-sm sm:p-8">
-              <div className="mb-6">
-                <h2 className="text-xl font-extrabold">Welcome back</h2>
-                <p className="mt-1 text-sm text-[var(--text-light)]">
-                  Use your clinic account credentials.
-                </p>
-              </div>
-
-              {error && (
-                <div className="mb-5 flex gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>{error}</p>
-                </div>
-              )}
-
-              <form onSubmit={handleLogin} className="space-y-5">
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-[var(--text-light)]">
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-light)]" />
-                    <input
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] py-3 pl-10 pr-3 text-sm font-medium text-[var(--text)] outline-none transition focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-glow)]"
-                      placeholder="name@clinic.com"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-[var(--text-light)]">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-light)]" />
-                    <input
-                      type="password"
-                      autoComplete="current-password"
-                      required
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] py-3 pl-10 pr-3 text-sm font-medium text-[var(--text)] outline-none transition focus:border-[var(--teal)] focus:ring-2 focus:ring-[var(--teal-glow)]"
-                      placeholder="Enter password"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--teal)] px-4 py-3 text-sm font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isLoading ? 'Signing in...' : 'Sign in'}
-                </button>
-              </form>
-            </div>
-          </div>
-        </section>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 px-4 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold text-sm rounded-xl transition-colors shadow-md shadow-teal-600/30 flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <span>Sign In to Dashboard</span>
+            )}
+          </button>
+        </form>
       </div>
-    </main>
+    </div>
   );
 }

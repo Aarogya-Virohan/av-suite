@@ -1,29 +1,22 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AppProviders } from '@/providers/AppProviders';
-import { AuthGuard } from '@/components/auth/AuthGuard';
+import { AppProviders } from '../providers/AppProviders';
 
 export const metadata: Metadata = {
-  title: 'Aarogya CRM | AV Suite Clinical Platform',
-  description: 'Multi-tenant practice management, patient care, and clinical CRM module for Aarogya Virohan.',
+  title: 'AV Suite CRM',
+  description: 'Healthcare CRM for Aarogya Virohan Suite',
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
-      <body className="antialiased selection:bg-[var(--teal)] selection:text-white">
-        <AppProviders>
-          <AuthGuard>
-            {children}
-          </AuthGuard>
-        </AppProviders>
+      <body className="antialiased">
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
 }
-
-
