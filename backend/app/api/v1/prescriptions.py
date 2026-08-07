@@ -21,7 +21,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
 
 
 @router.post(
@@ -33,8 +33,7 @@ router = APIRouter()
 async def create_prescription(
     request: Request,
     prescription_in: PrescriptionCreate,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST)),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Creates a new exercise prescription for a patient.
@@ -128,8 +127,7 @@ async def update_prescription(
     request: Request,
     id: uuid.UUID,
     patch_in: PrescriptionPatch,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST)),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Patches/updates prescription details.
@@ -158,8 +156,7 @@ async def update_prescription(
 async def delete_prescription(
     request: Request,
     id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _=Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST)),
+    db: AsyncSession = Depends(get_db)
 ):
     """Deletes a prescription by ID in clinic scope."""
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_roles
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,9 @@ from app.schemas.analytics import AnalyticsOverviewResponse
 from app.services.analytics import AnalyticsService
 from app.schemas.envelope import ResponseEnvelope
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+from app.enums.user import UserRole
+
+router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
 
 
 async def get_analytics_service(

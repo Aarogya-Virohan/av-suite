@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from app.core.dependencies import require_roles
+from app.core.dependencies import require_roles, require_admin
 from app.enums.user import UserRole
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,7 @@ from app.core.dependencies import get_async_session, get_current_clinic
 from app.enums.billing import InvoiceStatus
 from app.enums.package import PackageStatus
 from app.models.clinic import Clinic
+from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.billing import (
     InvoiceItemRepository,
@@ -47,7 +48,7 @@ from app.services.billing import (
 )
 
 router = APIRouter(
-    dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))]
+    dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.FRONT_DESK))]
 )
 
 
@@ -69,6 +70,7 @@ async def get_billing_service(
 
 BillingServiceDep = Annotated[BillingService, Depends(get_billing_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
+AdminUserDep = Annotated[User, Depends(require_admin)]
 
 
 # --- Package Catalog Endpoints ---
@@ -80,6 +82,7 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 async def create_package(
     payload: PackageCreate,
     clinic: CurrentClinicDep,
+    user: AdminUserDep,
     service: BillingServiceDep,
 ) -> PackageResponse:
     """Create a new package in the clinic catalogue."""
@@ -134,6 +137,7 @@ async def update_package(
     id: UUID,
     payload: PackageUpdate,
     clinic: CurrentClinicDep,
+    user: AdminUserDep,
     service: BillingServiceDep,
 ) -> PackageResponse:
     """Update a package catalogue item for the authenticated clinic."""

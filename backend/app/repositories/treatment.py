@@ -71,12 +71,13 @@ class SoapAssessmentRepository(BaseRepository[SoapAssessment]):
         clinic_id: UUID | None = None,
         patient_id: UUID | None = None,
         appointment_id: UUID | None = None,
+        therapist_id: UUID | None = None,
         specialty: str | None = None,
         is_reassessment: bool | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[SoapAssessment]:
-        """List SOAP assessments with optional clinic, patient, appointment, specialty, and reassessment filters."""
+        """List SOAP assessments with optional clinic, patient, appointment, therapist, specialty, and reassessment filters."""
 
         effective_limit = min(limit, 500)
         statement = select(SoapAssessment)
@@ -86,6 +87,9 @@ class SoapAssessmentRepository(BaseRepository[SoapAssessment]):
 
         if appointment_id is not None:
             statement = statement.where(SoapAssessment.appointment_id == appointment_id)
+
+        if therapist_id is not None:
+            statement = statement.where(SoapAssessment.therapist_id == therapist_id)
 
         if specialty is not None:
             statement = statement.where(SoapAssessment.specialty == specialty)

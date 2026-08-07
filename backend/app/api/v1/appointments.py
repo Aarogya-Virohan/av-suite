@@ -9,9 +9,10 @@ from app.core.dependencies import require_roles
 from app.enums.user import UserRole
 
 
-from app.core.dependencies import SessionDep, get_current_clinic
+from app.core.dependencies import SessionDep, get_current_clinic, get_current_user
 from app.enums.appointment import AppointmentStatus
 from app.models.clinic import Clinic
+from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.patient import PatientRepository
 from app.repositories.user import UserRepository
@@ -27,7 +28,7 @@ from app.services.appointment import (
     AppointmentValidationError,
 )
 
-router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
+router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK))])
 
 
 async def get_appointment_service(session: SessionDep) -> AppointmentService:
@@ -42,6 +43,7 @@ async def get_appointment_service(session: SessionDep) -> AppointmentService:
 
 AppointmentServiceDep = Annotated[AppointmentService, Depends(get_appointment_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 @router.post("", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
@@ -62,6 +64,7 @@ async def create_appointment(
 @router.get("", response_model=AppointmentListResponse)
 async def list_appointments(
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: AppointmentServiceDep,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
@@ -72,11 +75,16 @@ async def list_appointments(
 ) -> AppointmentListResponse:
     """List appointments for the authenticated clinic with filtering by date, therapist, or patient."""
 
+    # Enforce own-scope filtering for therapists
+    effective_therapist_id = therapist_id
+    if user.role == UserRole.THERAPIST:
+        effective_therapist_id = user.id
+
     appointments = await service.list_appointments(
         clinic.id,
         scheduled_date=scheduled_date,
         patient_id=patient_id,
-        therapist_id=therapist_id,
+        therapist_id=effective_therapist_id,
         status=status_filter,
         offset=offset,
         limit=limit,
@@ -95,12 +103,15 @@ async def list_appointments(
 async def get_appointment(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: AppointmentServiceDep,
 ) -> AppointmentResponse:
     """Retrieve an appointment by ID for the authenticated clinic."""
 
     try:
         appointment = await service.get_appointment(clinic.id, id)
+        if user.role == UserRole.THERAPIST and appointment.therapist_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own appointments.")
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -111,11 +122,15 @@ async def update_appointment(
     id: UUID,
     payload: AppointmentUpdate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: AppointmentServiceDep,
 ) -> AppointmentResponse:
     """Reschedule or update appointment status/details for the authenticated clinic."""
 
     try:
+        appointment = await service.get_appointment(clinic.id, id)
+        if user.role == UserRole.THERAPIST and appointment.therapist_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only update your own appointments.")
         appointment = await service.update_appointment(clinic.id, id, payload)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
@@ -128,11 +143,15 @@ async def update_appointment(
 async def soft_cancel_appointment(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: AppointmentServiceDep,
 ) -> AppointmentResponse:
     """Soft-cancel an appointment for the authenticated clinic."""
 
     try:
+        appointment = await service.get_appointment(clinic.id, id)
+        if user.role == UserRole.THERAPIST and appointment.therapist_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only cancel your own appointments.")
         appointment = await service.soft_cancel(clinic.id, id)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:

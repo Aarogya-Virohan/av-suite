@@ -10,7 +10,7 @@ API Endpoints:
 - GET /api/v1/exercises/{id} - Get specific exercise details
 
 Authorization:
-- GET endpoints: All authenticated users (patients, physios, admins)
+- GET endpoints: All authenticated users (therapists, admins, front desk)
 - POST endpoint: Admin users only
 - Clinic + Global exercises: Clinic-specific aur global exercises visible
 
@@ -28,7 +28,7 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, require_roles
 from app.schemas.exercise import ExerciseCreate, ExerciseRead, ExerciseUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # APIRouter instance jo exercise endpoints organize karta hai
 # Prefix: /api/v1/exercises (main router mein define hota hai)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
 
 
 @router.get(
@@ -218,7 +218,7 @@ async def create_exercise(
     
     Security:
     - JWT token required: All requests authenticated
-    - Admin only: Only admin role create kar sakte hain (no physios, patients)
+    - Admin only: Only admin role create kar sakte hain (no therapists, front desk)
     - Clinic isolation: Exercise automatically current clinic se associated
     - Input validation: Pydantic schema se strict validation
     

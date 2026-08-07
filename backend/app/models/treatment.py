@@ -63,6 +63,7 @@ class TreatmentSession(UUIDMixin, TimestampMixin, Base):
     treatment: Mapped[str] = mapped_column(Text, nullable=False)
     home_advice: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    finalized: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
 
 
 class SoapAssessment(UUIDMixin, TimestampMixin, Base):
@@ -73,6 +74,7 @@ class SoapAssessment(UUIDMixin, TimestampMixin, Base):
         Index("ix_soap_assessments_clinic_id", "clinic_id"),
         Index("ix_soap_assessments_patient_id", "patient_id"),
         Index("ix_soap_assessments_appointment_id", "appointment_id"),
+        Index("ix_soap_assessments_therapist_id", "therapist_id"),
         Index("ix_soap_assessments_specialty", "specialty"),
     )
 
@@ -97,7 +99,15 @@ class SoapAssessment(UUIDMixin, TimestampMixin, Base):
     )
     appointment: Mapped[Appointment | None] = relationship()
 
+    therapist_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    therapist: Mapped[User | None] = relationship()
+
     specialty: Mapped[str] = mapped_column(String(length=100), nullable=False)
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_reassessment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    finalized: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)
     form_data: Mapped[dict[str, Any]] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=dict)

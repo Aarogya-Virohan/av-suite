@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     # Supabase Session Pooler use karta hai IPv4 compatibility ke liye
     # Yeh required field hai - .env mein must set hona chahiye
     DATABASE_URL: str
+    TEST_DATABASE_URL: str | None = None
     
     # JWT (JSON Web Token) Configuration
     # JWT authentication stateless authentication provide karta hai

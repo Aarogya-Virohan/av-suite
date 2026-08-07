@@ -39,6 +39,7 @@ AdminUserDep = Annotated[User, Depends(require_admin)]
 @router.get("/settings/clinic", response_model=ClinicSettingsResponse)
 async def get_clinic_settings(
     clinic: CurrentClinicDep,
+    user: AdminUserDep,
     service: SettingsServiceDep,
 ) -> ClinicSettingsResponse:
     """Retrieve clinic branding and configuration settings."""

@@ -22,7 +22,7 @@ from app.schemas.lead import (
 )
 from app.services.lead import LeadNotFoundError, LeadService, LeadValidationError
 
-router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
+router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.FRONT_DESK))])
 
 
 async def get_lead_service(

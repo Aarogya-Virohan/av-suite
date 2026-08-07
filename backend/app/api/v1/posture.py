@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.core.dependencies import require_roles
 from app.enums.user import UserRole
 
@@ -72,7 +72,11 @@ from app.services.posture.report_builder import (
     measurement,
 )
 
-router = APIRouter(prefix="/posture", tags=["posture"])
+router = APIRouter(
+    prefix="/posture", 
+    tags=["posture"],
+    dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))]
+)
 
 
 def _annotate_or_blank(image_bytes: bytes, pose_results) -> str:
