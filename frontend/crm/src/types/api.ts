@@ -1,14 +1,16 @@
+import { components } from './schema';
+
 export type UserRole = 'admin' | 'therapist' | 'front_desk' | 'patient';
 
 export type PatientStatus = 'active' | 'inactive' | 'discharged';
-export type LeadStage = 'new' | 'contacted' | 'qualified' | 'converted' | 'lost';
-export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show';
-export type AppointmentSource = 'manual' | 'public_booking';
-export type PackageStatus = 'active' | 'inactive' | 'completed' | 'expired' | 'cancelled';
-export type InvoiceStatus = 'unpaid' | 'paid' | 'partial' | 'draft' | 'issued' | 'cancelled';
-export type PaymentMethod = 'cash' | 'upi' | 'card' | 'bank_transfer' | 'insurance' | 'other';
+export type LeadStage = components['schemas']['LeadStage'];
+export type AppointmentStatus = components['schemas']['AppointmentStatus'];
+export type AppointmentSource = components['schemas']['AppointmentSource'];
+export type PackageStatus = components['schemas']['PackageStatus'];
+export type InvoiceStatus = components['schemas']['InvoiceStatus'];
+export type PaymentMethod = components['schemas']['PaymentMethod'];
 export type PaymentStatus = 'completed' | 'voided';
-export type DocumentCategory = 'medical_report' | 'prescription' | 'lab_result' | 'consent' | 'other';
+export type DocumentCategory = components['schemas']['DocumentCategory'];
 
 export interface User {
   id: string;
@@ -17,201 +19,80 @@ export interface User {
   role: UserRole;
   first_name: string;
   last_name: string;
-  phone: string;
+  phone?: string | null;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface Patient {
-  id: string;
-  clinic_id: string;
-  user_id: string | null;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string | null;
-  phone: string;
-  gender: string;
-  chief_complaint: string;
-  referral_source: string;
+export type Patient = components['schemas']['PatientRead'] & {
+  gender?: string | null;
+  chief_complaint?: string | null;
+  referral_source?: string | null;
   status: PatientStatus;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string | null;
-}
+};
 
-export interface Lead {
-  id: string;
-  clinic_id: string;
-  name: string;
-  phone: string;
-  email: string | null;
-  source: string;
-  stage: LeadStage;
-  assigned_to: string | null;
-  notes: string;
-  converted_patient_id: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string | null;
-  deleted_by?: string | null;
-}
+export type Lead = components['schemas']['LeadResponse'];
 
-export interface Appointment {
-  id: string;
-  clinic_id: string;
-  patient_id: string;
-  therapist_id: string;
-  appointment_type: string;
-  scheduled_at: string;
-  duration_minutes: number;
-  status: AppointmentStatus;
-  source: AppointmentSource;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string | null;
-  deleted_by?: string | null;
-}
+export type Appointment = components['schemas']['AppointmentResponse'] & {
+  appointment_type?: string | null;
+  patient_name?: string | null;
+  therapist_name?: string | null;
+};
 
-export interface TreatmentSession {
-  id: string;
-  clinic_id: string;
-  patient_id: string;
-  appointment_id: string | null;
-  therapist_id: string;
-  treatment_date: string;
-  pain_score: number | null;
-  treatment: string;
-  home_advice: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type TreatmentSession = components['schemas']['TreatmentSessionResponse'] & {
+  treatment?: string | null;
+};
 
-export interface SoapAssessment {
-  id: string;
-  clinic_id: string;
-  patient_id: string;
-  appointment_id: string | null;
-  author_id: string;
-  specialty: string;
-  diagnosis: string | null;
-  is_reassessment: boolean;
-  form_data: Record<string, unknown>;
-  finalized_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type SoapAssessment = Omit<components['schemas']['SoapAssessmentResponse'], 'form_data'> & {
+  form_data?: Record<string, any>;
+  finalized_at?: string | null;
+  author_id?: string | null;
+};
 
-export interface Package {
-  id: string;
-  clinic_id: string;
-  name: string;
-  total_sessions: number;
-  price: number;
-  validity_days: number;
-  status: PackageStatus;
-  created_at: string;
-  updated_at: string;
-}
+export type Package = Omit<components['schemas']['PackageResponse'], 'price'> & {
+  price: number | string;
+};
 
-export interface PatientPackage {
-  id: string;
-  clinic_id: string;
-  patient_id: string;
-  package_id: string | null;
-  package_name: string;
-  total_sessions: number;
-  completed_sessions: number;
-  price: number;
-  status: PackageStatus;
-  purchased_at: string;
-  expires_at: string;
-  created_at: string;
-  updated_at: string;
-}
+export type PatientPackage = Omit<components['schemas']['PatientPackageResponse'], 'price' | 'sessions_remaining'> & {
+  price: number | string;
+  sessions_remaining?: number;
+};
 
-export interface Invoice {
-  id: string;
-  clinic_id: string;
-  patient_id: string;
-  appointment_id: string | null;
-  invoice_number: string;
-  issue_date: string;
-  due_date: string | null;
-  subtotal: number;
-  discount_amount: number;
-  tax_amount: number;
-  total_amount: number;
-  paid_amount: number;
-  status: InvoiceStatus;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string | null;
-  deleted_by?: string | null;
-}
+export type Invoice = Omit<components['schemas']['InvoiceResponse'], 'subtotal' | 'discount_amount' | 'tax_amount' | 'total_amount' | 'paid_amount'> & {
+  subtotal: number | string;
+  discount_amount: number | string;
+  tax_amount: number | string;
+  total_amount: number | string;
+  paid_amount: number | string;
+  patient_name?: string | null;
+};
 
-export interface InvoiceItem {
-  id: string;
-  clinic_id: string;
-  invoice_id: string;
-  description: string;
-  quantity: number;
-  unit_price: number;
-  total_price: number;
-  created_at: string;
-  updated_at: string;
-}
+export type InvoiceItem = Omit<components['schemas']['InvoiceItemResponse'], 'unit_price' | 'total_price'> & {
+  unit_price: number | string;
+  total_price: number | string;
+};
 
-export interface Payment {
-  id: string;
-  clinic_id: string;
-  invoice_id: string;
-  patient_id: string;
-  amount: number;
-  payment_method: PaymentMethod;
-  status: PaymentStatus;
-  payment_date: string;
-  transaction_reference: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type Payment = Omit<components['schemas']['PaymentResponse'], 'amount'> & {
+  amount: number | string;
+  status?: PaymentStatus;
+};
 
-export interface PatientDocument {
-  id: string;
-  clinic_id: string;
-  patient_id: string;
-  uploaded_by: string | null;
-  treatment_id: string | null;
-  file_url: string;
-  file_type: string;
-  file_size: number | null;
-  label: string;
-  category: DocumentCategory;
-  notes: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string | null;
-  deleted_by?: string | null;
-}
+export type PatientDocument = components['schemas']['PatientDocumentResponse'];
 
-export interface AuditLog {
-  id: string;
-  clinic_id: string;
-  user_id: string | null;
-  action: string;
-  entity_type: string;
-  entity_id: string | null;
-  details: Record<string, unknown>;
-  created_at: string;
-}
+export type AuditLog = Omit<components['schemas']['AuditLogResponse'], 'details'> & {
+  details?: Record<string, any>;
+  user_name?: string | null;
+};
 
-export interface AnalyticsOverview {
+export type AnalyticsOverview = {
   total_patients: number;
   active_appointments_today: number;
   monthly_revenue: number;
   pending_leads: number;
   revenue_trend: Array<{ date: string; amount: number }>;
-}
+  patients?: components['schemas']['AnalyticsOverviewResponse']['patients'];
+  appointments?: components['schemas']['AnalyticsOverviewResponse']['appointments'];
+  revenue?: components['schemas']['AnalyticsOverviewResponse']['revenue'];
+  leads?: components['schemas']['AnalyticsOverviewResponse']['leads'];
+};

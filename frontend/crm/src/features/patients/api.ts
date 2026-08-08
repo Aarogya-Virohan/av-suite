@@ -5,12 +5,14 @@ import { PatientFormValues } from '../../lib/schemas';
 
 export const PATIENTS_QUERY_KEY = ['patients'];
 
-export function usePatients() {
-  return useQuery<Patient[]>({
-    queryKey: PATIENTS_QUERY_KEY,
+export function usePatients(search?: string, page = 1, page_size = 10) {
+  return useQuery({
+    queryKey: [...PATIENTS_QUERY_KEY, { search, page, page_size }],
     queryFn: async () => {
-      const res = await apiClient.get('/patients');
-      return res.data?.data || res.data || [];
+      const res = await apiClient.get('/patients', {
+        params: { search: search || undefined, page, page_size },
+      });
+      return res.data as { data: Patient[]; meta: { total: number; page: number; page_size: number } };
     },
   });
 }
@@ -65,5 +67,18 @@ export function useDeletePatient() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: PATIENTS_QUERY_KEY });
     },
+  });
+}
+
+export const PATIENT_DOCUMENTS_QUERY_KEY = ['patient-documents'];
+
+export function usePatientDocuments(patientId: string) {
+  return useQuery({
+    queryKey: [...PATIENT_DOCUMENTS_QUERY_KEY, patientId],
+    queryFn: async () => {
+      const res = await apiClient.get(`/patients/${patientId}/documents`);
+      return res.data as { data: any[]; meta: any };
+    },
+    enabled: !!patientId,
   });
 }

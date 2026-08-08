@@ -5,10 +5,11 @@ export const leadStageSchema = z.enum(['new', 'contacted', 'qualified', 'convert
 export const appointmentStatusSchema = z.enum(['scheduled', 'completed', 'cancelled', 'no_show']);
 export const appointmentSourceSchema = z.enum(['manual', 'public_booking']);
 export const packageStatusSchema = z.enum(['active', 'inactive', 'completed', 'expired', 'cancelled']);
-export const invoiceStatusSchema = z.enum(['unpaid', 'paid', 'partial', 'draft', 'issued', 'cancelled']);
+export const invoiceStatusSchema = z.enum(['unpaid', 'paid', 'partial', 'draft', 'issued', 'cancelled', 'overdue']);
 export const paymentMethodSchema = z.enum(['cash', 'upi', 'card', 'bank_transfer', 'insurance', 'other']);
 export const paymentStatusSchema = z.enum(['completed', 'voided']);
 export const documentCategorySchema = z.enum(['medical_report', 'prescription', 'lab_result', 'consent', 'other']);
+export const genderSchema = z.enum(['male', 'female', 'other']);
 
 // Patient Form Schema
 export const patientFormSchema = z.object({
@@ -16,7 +17,7 @@ export const patientFormSchema = z.object({
   last_name: z.string().min(1, 'Last name is required'),
   date_of_birth: z.string().nullable().optional(),
   phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-  gender: z.string().min(1, 'Gender is required'),
+  gender: genderSchema,
   chief_complaint: z.string().min(1, 'Chief complaint is required'),
   referral_source: z.string().min(1, 'Referral source is required'),
   status: patientStatusSchema,

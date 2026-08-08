@@ -10,7 +10,10 @@ export function useInvoices() {
     queryKey: [...BILLING_QUERY_KEY, 'invoices'],
     queryFn: async () => {
       const res = await apiClient.get('/invoices');
-      return res.data?.data || res.data || [];
+      const data = res.data?.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      return [];
     },
   });
 }
@@ -20,7 +23,10 @@ export function usePayments() {
     queryKey: [...BILLING_QUERY_KEY, 'payments'],
     queryFn: async () => {
       const res = await apiClient.get('/payments');
-      return res.data?.data || res.data || [];
+      const data = res.data?.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      return [];
     },
   });
 }
@@ -30,7 +36,10 @@ export function usePackages() {
     queryKey: [...BILLING_QUERY_KEY, 'packages'],
     queryFn: async () => {
       const res = await apiClient.get('/packages');
-      return res.data?.data || res.data || [];
+      const data = res.data?.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      return [];
     },
   });
 }

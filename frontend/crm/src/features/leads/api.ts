@@ -5,12 +5,17 @@ import { LeadFormValues } from '../../lib/schemas';
 
 export const LEADS_QUERY_KEY = ['leads'];
 
-export function useLeads() {
+export function useLeads(stage?: LeadStage) {
   return useQuery<Lead[]>({
-    queryKey: LEADS_QUERY_KEY,
+    queryKey: [...LEADS_QUERY_KEY, { stage }],
     queryFn: async () => {
-      const res = await apiClient.get('/leads');
-      return res.data?.data || res.data || [];
+      const res = await apiClient.get('/leads', {
+        params: stage ? { stage } : undefined,
+      });
+      const data = res.data?.data;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      return [];
     },
   });
 }
