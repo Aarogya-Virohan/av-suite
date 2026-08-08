@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 from app.models.base import TimestampMixin, UUIDMixin
 from app.enums.booking import AppointmentRequestStatus
+from app.enums.shared import Gender
 from app.models.clinic import Clinic
 
 

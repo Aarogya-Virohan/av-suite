@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, Enum, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -16,18 +16,20 @@ from app.models.appointment import Appointment
 from app.models.clinic import Clinic
 from app.models.patient import Patient
 from app.models.user import User
+from app.enums.shared import Specialty
 
 
 class TreatmentSession(UUIDMixin, TimestampMixin, Base):
     """Clinic-scoped treatment session record."""
 
     __tablename__: str = "treatment_sessions"
-    __table_args__: tuple[Index, ...] = (
+    __table_args__: tuple[Index | CheckConstraint, ...] = (
         Index("ix_treatment_sessions_clinic_id", "clinic_id"),
         Index("ix_treatment_sessions_patient_id", "patient_id"),
         Index("ix_treatment_sessions_appointment_id", "appointment_id"),
         Index("ix_treatment_sessions_therapist_id", "therapist_id"),
         Index("ix_treatment_sessions_treatment_date", "treatment_date"),
+        CheckConstraint("pain_score >= 0 AND pain_score <= 10", name="ck_treatment_sessions_pain_score")
     )
 
     clinic_id: Mapped[UUID] = mapped_column(

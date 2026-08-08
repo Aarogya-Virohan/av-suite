@@ -6,6 +6,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from datetime import date, datetime
 from typing import Optional
 from app.models.base import Base, TimestampMixin
+from app.enums.shared import Gender
 
 
 class PatientStatus(str, enum.Enum):

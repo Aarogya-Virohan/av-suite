@@ -30,7 +30,11 @@ def sessionmaker(engine):
 @pytest.fixture(scope="session")
 async def setup_db(engine, sessionmaker):
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(lambda sync_conn: Base.metadata.drop_all(sync_conn, checkfirst=True))
+        if engine.dialect.name == "postgresql":
+            from sqlalchemy import text
+            for enum_name in ["clinicplantier", "patientstatus", "payment_status", "gender_type", "specialty_type", "lead_source_type", "appointment_request_status", "lead_stage"]:
+                await conn.execute(text(f"DROP TYPE IF EXISTS {enum_name} CASCADE;"))
         await conn.run_sync(Base.metadata.create_all)
 
     # Seed initial test clinic and users for test suite

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDMixin
-from app.enums.lead import LeadStage
+from app.enums.lead import LeadStage, LeadSource
 from app.models.clinic import Clinic
 from app.models.patient import Patient
 from app.models.user import User

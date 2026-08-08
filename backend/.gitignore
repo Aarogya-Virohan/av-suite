@@ -33,12 +33,15 @@ htmlcov/
 # Logs
 *.log
 
-# Database
+# Database & Specs
 *.db
 *.sqlite
 *.sqlite3
 *.sql
-
+*.json
+*.yaml
+*.yml
+docs/*.html
 # Temporary & Working Files - These are development artifacts, not part of codebase
 plan.md
 # (Only temporary working notes excluded - all documentation MD files are INCLUDED)
