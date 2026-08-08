@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.core.dependencies import require_roles
+from app.core.dependencies import require_permission
 from app.enums.user import UserRole
 
 from fastapi import File
@@ -75,7 +75,7 @@ from app.services.posture.report_builder import (
 router = APIRouter(
     prefix="/posture", 
     tags=["posture"],
-    dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))]
+    dependencies=[Depends(require_permission("posture"))]
 )
 
 

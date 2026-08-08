@@ -26,7 +26,7 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.core.dependencies import require_roles, require_admin
+from app.core.dependencies import require_permission, require_admin
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # APIRouter instance jo patient endpoints organize karta hai
 # Prefix: /api/v1/patients (main router mein define hota hai)
-router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK))])
+router = APIRouter(dependencies=[Depends(require_permission("patients"))])
 
 
 

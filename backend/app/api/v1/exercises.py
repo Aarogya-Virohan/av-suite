@@ -28,7 +28,7 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.core.dependencies import require_admin, require_roles
+from app.core.dependencies import require_admin, require_permission
 from app.schemas.exercise import ExerciseCreate, ExerciseRead, ExerciseUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # APIRouter instance jo exercise endpoints organize karta hai
 # Prefix: /api/v1/exercises (main router mein define hota hai)
-router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
+router = APIRouter(dependencies=[Depends(require_permission("exercises"))])
 
 
 @router.get(

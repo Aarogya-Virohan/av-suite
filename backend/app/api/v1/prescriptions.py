@@ -6,7 +6,7 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.core.dependencies import require_roles
+from app.core.dependencies import require_permission
 from app.schemas.prescription import (
     PrescriptionCreate,
     PrescriptionRead,
@@ -21,7 +21,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
+router = APIRouter(dependencies=[Depends(require_permission("prescriptions"))])
 
 
 @router.post(

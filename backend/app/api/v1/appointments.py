@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from app.core.dependencies import require_roles
+from app.core.dependencies import require_permission
 from app.enums.user import UserRole
 
 
@@ -28,7 +28,7 @@ from app.services.appointment import (
     AppointmentValidationError,
 )
 
-router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK))])
+router = APIRouter(dependencies=[Depends(require_permission("appointments"))])
 
 
 async def get_appointment_service(session: SessionDep) -> AppointmentService:

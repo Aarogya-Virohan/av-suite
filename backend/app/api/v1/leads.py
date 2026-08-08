@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session, get_current_clinic, require_roles
+from app.core.dependencies import get_async_session, get_current_clinic, require_permission
 from app.enums.lead import LeadStage
 from app.enums.user import UserRole
 from app.models.clinic import Clinic
@@ -22,7 +22,7 @@ from app.schemas.lead import (
 )
 from app.services.lead import LeadNotFoundError, LeadService, LeadValidationError
 
-router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.FRONT_DESK))])
+router = APIRouter(dependencies=[Depends(require_permission("leads"))])
 
 
 async def get_lead_service(

@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from app.core.dependencies import require_roles, require_admin
+from app.core.dependencies import require_permission, require_admin
 from app.enums.user import UserRole
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +48,7 @@ from app.services.billing import (
 )
 
 router = APIRouter(
-    dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.FRONT_DESK))]
+    dependencies=[Depends(require_permission("billing"))]
 )
 
 

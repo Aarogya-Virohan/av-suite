@@ -11,6 +11,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.rbac import PERMISSION_MAP
 from app.core.security import decode_token
 from app.models.clinic import Clinic
 from app.enums.user import UserRole, normalize_user_role
@@ -49,6 +50,36 @@ def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User
         )
 
     return current_user
+
+
+def require_roles(*roles: UserRole) -> Callable[[User], User]:
+    def role_checker(user: User = Depends(get_current_user)) -> User:
+        if normalize_user_role(user.role) not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Operation not permitted. Required roles: {[r.value for r in roles]}",
+            )
+        return user
+
+    return role_checker
+
+
+def require_permission(resource: str) -> Callable[[User], User]:
+    """
+    Checks if the current user has the required role for a given resource.
+    The allowed roles are fetched from the centralized PERMISSION_MAP.
+    """
+    allowed_roles = PERMISSION_MAP.get(resource, [])
+    
+    def permission_checker(user: User = Depends(get_current_user)) -> User:
+        if normalize_user_role(user.role) not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Operation not permitted. '{resource}' requires one of: {[r.value for r in allowed_roles]}",
+            )
+        return user
+
+    return permission_checker
 
 
 async def get_authenticated_context(token: TokenDep, session: SessionDep) -> AuthenticatedContext:
