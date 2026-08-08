@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { paymentFormSchema, PaymentFormValues } from '../../../lib/schemas';
 import { useRecordPayment, useInvoices } from '../api';
-import { mockPatients } from '../../../mocks';
+import { usePatients } from '../../patients/api';
 
 interface RecordPaymentSlideOverProps {
   isOpen: boolean;
@@ -17,6 +17,8 @@ interface RecordPaymentSlideOverProps {
 export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOverProps) {
   const recordPayment = useRecordPayment();
   const { data: invoices = [] } = useInvoices();
+  const { data: patientsResponse } = usePatients(undefined, 1, 100);
+  const patients = patientsResponse?.data || [];
 
   const {
     register,
@@ -27,7 +29,7 @@ export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOv
     resolver: zodResolver(paymentFormSchema),
     defaultValues: {
       invoice_id: invoices[0]?.id || '',
-      patient_id: mockPatients[0]?.id || '',
+      patient_id: patients[0]?.id || '',
       amount: 1000,
       payment_method: 'cash',
       payment_date: new Date().toISOString().slice(0, 10),
@@ -75,7 +77,7 @@ export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOv
             {...register('patient_id')}
             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
           >
-            {mockPatients.map((p) => (
+            {patients.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.first_name} {p.last_name} ({p.phone})
               </option>

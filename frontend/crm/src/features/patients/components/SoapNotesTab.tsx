@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { SoapAssessment } from '../../../types/api';
-import { mockSoapAssessments } from '../../../mocks';
+import { useAssessments } from '../../assessments/api';
 import { useAuthStore } from '../../../store';
 import { CheckCircle2, Lock, Unlock, Save, FileCheck, Stethoscope, Heart, Zap, Baby, Activity } from 'lucide-react';
 
@@ -33,11 +33,18 @@ export function SoapNotesTab({
   const [selectedSpecialty, setSelectedSpecialty] = useState('ortho');
   const [painVas, setPainVas] = useState<number>(6);
 
-  const [assessments, setAssessments] = useState<SoapAssessment[]>(() =>
-    mockSoapAssessments.filter(
-      (a) => a.patient_id === patientId && a.is_reassessment === isReassessmentOnly
-    )
-  );
+  const { data: assessmentsResponse, isLoading } = useAssessments(patientId);
+  const assessmentsData = assessmentsResponse?.data || [];
+  
+  const [assessments, setAssessments] = useState<SoapAssessment[]>([]);
+
+  React.useEffect(() => {
+    setAssessments(
+      assessmentsData.filter(
+        (a: SoapAssessment) => a.is_reassessment === isReassessmentOnly
+      )
+    );
+  }, [assessmentsData, isReassessmentOnly]);
 
   const [activeNote, setActiveNote] = useState<SoapAssessment>(() => {
     const existing = assessments[0];
@@ -241,7 +248,7 @@ export function SoapNotesTab({
             <textarea
               rows={3}
               disabled={isFinalized}
-              value={String(activeNote.form_data.subjective || '')}
+              value={String(activeNote.form_data?.subjective || '')}
               onChange={(e) => updateFormData('subjective', e.target.value)}
               placeholder="Patient reported symptoms, pain history, and limitations..."
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"
@@ -255,7 +262,7 @@ export function SoapNotesTab({
             <textarea
               rows={3}
               disabled={isFinalized}
-              value={String(activeNote.form_data.objective || '')}
+              value={String(activeNote.form_data?.objective || '')}
               onChange={(e) => updateFormData('objective', e.target.value)}
               placeholder="Physical findings, ROM tests, posture analysis..."
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"
@@ -269,7 +276,7 @@ export function SoapNotesTab({
             <textarea
               rows={3}
               disabled={isFinalized}
-              value={String(activeNote.form_data.assessment || '')}
+              value={String(activeNote.form_data?.assessment || '')}
               onChange={(e) => updateFormData('assessment', e.target.value)}
               placeholder="Clinical impression and progress comparison..."
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"
@@ -283,7 +290,7 @@ export function SoapNotesTab({
             <textarea
               rows={3}
               disabled={isFinalized}
-              value={String(activeNote.form_data.plan || '')}
+              value={String(activeNote.form_data?.plan || '')}
               onChange={(e) => updateFormData('plan', e.target.value)}
               placeholder="Treatment goals, frequency of visits, home routine..."
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"

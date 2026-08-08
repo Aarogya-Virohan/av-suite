@@ -3,12 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Command, X, Users, Calendar, Plus, CreditCard } from 'lucide-react';
-import { mockPatients } from '../../mocks';
+import { usePatients } from '../../features/patients/api';
 
 export function CommandBar() {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const router = useRouter();
+  const { data: response } = usePatients(search, 1, 5);
+  const filteredPatients = response?.data || [];
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -25,12 +27,6 @@ export function CommandBar() {
   }, []);
 
   if (!isOpen) return null;
-
-  const filteredPatients = mockPatients.filter(
-    (p) =>
-      `${p.first_name} ${p.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
-      p.phone.includes(search)
-  );
 
   const navigate = (path: string) => {
     router.push(path);

@@ -5,17 +5,17 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { TreatmentSession } from '../../../types/api';
-import { mockTreatmentSessions } from '../../../mocks';
 import { treatmentSessionFormSchema, TreatmentSessionFormValues } from '../../../lib/schemas';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { Plus, Calendar, Activity, FileText } from 'lucide-react';
 import { useAuthStore } from '../../../store';
 
+import { useTreatments } from '../../treatments/api';
+
 export function TreatmentsTab({ patientId }: { patientId: string }) {
   const role = useAuthStore((s) => s.role);
-  const [sessions, setSessions] = useState<TreatmentSession[]>(() =>
-    mockTreatmentSessions.filter((s) => s.patient_id === patientId)
-  );
+  const { data: response, isLoading } = useTreatments(patientId);
+  const sessions = response?.data || [];
   const [isSlideOpen, setIsSlideOpen] = useState(false);
 
   const {
@@ -51,9 +51,7 @@ export function TreatmentsTab({ patientId }: { patientId: string }) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setSessions([newSession, ...sessions]);
-    mockTreatmentSessions.unshift(newSession);
-    toast.success('Treatment session recorded');
+    toast.success('Treatment session recorded (mock mode for save)');
     reset();
     setIsSlideOpen(false);
   };

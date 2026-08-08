@@ -8,9 +8,9 @@ import { CreateInvoiceSlideOver } from '../../../features/billing/components/Cre
 import { RecordPaymentSlideOver } from '../../../features/billing/components/RecordPaymentSlideOver';
 import { InvoicePreviewModal } from '../../../features/billing/components/InvoicePreviewModal';
 import { Invoice, Payment, Package, InvoiceStatus } from '../../../types/api';
-import { mockPatients } from '../../../mocks';
 import { Plus, Download, CreditCard, FileText, Package as PackageIcon, Eye, Printer } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePatients } from '../../../features/patients/api';
 
 type TabKey = 'invoices' | 'payments' | 'packages';
 
@@ -26,9 +26,11 @@ export default function BillingPage() {
   const { data: invoices = [], isLoading: isLoadingInvoices } = useInvoices();
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments();
   const { data: packages = [], isLoading: isLoadingPackages } = usePackages();
+  const { data: patientsResponse, isLoading: isLoadingPatients } = usePatients(undefined, 1, 100);
+  const patients = patientsResponse?.data || [];
 
   const getPatientName = (patientId: string) => {
-    const p = mockPatients.find((patient) => patient.id === patientId);
+    const p = patients.find((patient) => patient.id === patientId);
     return p ? `${p.first_name} ${p.last_name}` : patientId;
   };
 
@@ -53,7 +55,7 @@ export default function BillingPage() {
     {
       key: 'paid_amount',
       header: 'Paid Amount',
-      render: (inv) => `₹${inv.paid_amount.toLocaleString('en-IN')}`,
+      render: (inv) => `₹${Number(inv.paid_amount || 0).toLocaleString('en-IN')}`,
     },
     {
       key: 'status',
@@ -66,6 +68,7 @@ export default function BillingPage() {
           draft: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300',
           issued: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
           cancelled: 'bg-slate-100 text-slate-500 line-through',
+          overdue: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
         };
         return (
           <span

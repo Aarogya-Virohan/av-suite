@@ -5,15 +5,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { PatientDocument, DocumentCategory } from '../../../types/api';
-import { mockPatientDocuments } from '../../../mocks';
 import { patientDocumentFormSchema, PatientDocumentFormValues } from '../../../lib/schemas';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { FileUp, FileText, Download, Trash2, Plus, Paperclip } from 'lucide-react';
 
+import { usePatientDocuments } from '../api';
+
 export function DocumentsTab({ patientId }: { patientId: string }) {
-  const [documents, setDocuments] = useState<PatientDocument[]>(() =>
-    mockPatientDocuments.filter((d) => d.patient_id === patientId)
-  );
+  const { data: response, isLoading } = usePatientDocuments(patientId);
+  const documents = response?.data || [];
   const [isSlideOpen, setIsSlideOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -67,9 +67,7 @@ export function DocumentsTab({ patientId }: { patientId: string }) {
       updated_at: new Date().toISOString(),
     };
 
-    setDocuments([newDoc, ...documents]);
-    mockPatientDocuments.unshift(newDoc);
-    toast.success('Document uploaded successfully');
+    toast.success('Document uploaded successfully (mock mode for upload)');
     reset();
     setSelectedFile(null);
     setIsSlideOpen(false);

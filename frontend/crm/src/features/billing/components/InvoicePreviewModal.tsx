@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Invoice, Payment } from '../../../types/api';
-import { mockPatients } from '../../../mocks';
+import { Invoice } from '../../../types/api';
+import { usePatients } from '../../patients/api';
 import { Printer, X } from 'lucide-react';
 
 interface InvoicePreviewModalProps {
@@ -13,9 +13,12 @@ interface InvoicePreviewModalProps {
 }
 
 export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice' }: InvoicePreviewModalProps) {
+  const { data: patientsResponse } = usePatients(undefined, 1, 100);
+  const patients = patientsResponse?.data || [];
+  
   if (!isOpen || !invoice) return null;
 
-  const patient = mockPatients.find((p) => p.id === invoice.patient_id);
+  const patient = patients.find((p) => p.id === invoice.patient_id);
   const patientName = patient ? `${patient.first_name} ${patient.last_name}` : invoice.patient_id;
 
   const handlePrint = () => {
@@ -93,23 +96,23 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
             <tbody className="divide-y divide-slate-100">
               <tr>
                 <td className="p-2.5 font-medium">{invoice.notes || 'Clinical Consultation & Physical Therapy Sessions'}</td>
-                <td className="p-2.5 text-right font-semibold">₹{invoice.subtotal.toLocaleString('en-IN')}</td>
+                <td className="p-2.5 text-right font-semibold">₹{Number(invoice.subtotal || 0).toLocaleString('en-IN')}</td>
               </tr>
-              {invoice.tax_amount > 0 && (
+              {Number(invoice.tax_amount || 0) > 0 && (
                 <tr>
                   <td className="p-2.5 text-slate-500">GST / Tax</td>
-                  <td className="p-2.5 text-right text-slate-500">₹{invoice.tax_amount.toLocaleString('en-IN')}</td>
+                  <td className="p-2.5 text-right text-slate-500">₹{Number(invoice.tax_amount || 0).toLocaleString('en-IN')}</td>
                 </tr>
               )}
-              {invoice.discount_amount > 0 && (
+              {Number(invoice.discount_amount || 0) > 0 && (
                 <tr>
                   <td className="p-2.5 text-slate-500">Discount</td>
-                  <td className="p-2.5 text-right text-slate-500">- ₹{invoice.discount_amount.toLocaleString('en-IN')}</td>
+                  <td className="p-2.5 text-right text-slate-500">- ₹{Number(invoice.discount_amount || 0).toLocaleString('en-IN')}</td>
                 </tr>
               )}
               <tr className="font-extrabold text-sm bg-slate-50 border-t-2 border-slate-200">
                 <td className="p-3 text-slate-900">Total Payable Amount</td>
-                <td className="p-3 text-right text-teal-700">₹{invoice.total_amount.toLocaleString('en-IN')}</td>
+                <td className="p-3 text-right text-teal-700">₹{Number(invoice.total_amount || 0).toLocaleString('en-IN')}</td>
               </tr>
             </tbody>
           </table>

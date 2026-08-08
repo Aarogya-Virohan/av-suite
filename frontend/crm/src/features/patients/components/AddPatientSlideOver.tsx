@@ -104,9 +104,9 @@ export function AddPatientSlideOver({ isOpen, onClose }: AddPatientSlideOverProp
                 {...register('gender')}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
               >
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
+                <option value="male">MALE</option>
+                <option value="female">FEMALE</option>
+                <option value="other">OTHER</option>
               </select>
             </div>
           </div>

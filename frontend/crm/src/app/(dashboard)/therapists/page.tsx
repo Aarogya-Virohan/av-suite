@@ -4,16 +4,23 @@ import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { SlideOver } from '../../../components/ui/SlideOver';
-import { mockUsers } from '../../../mocks';
-import { User, UserRole } from '../../../types/api';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
+import { useUsers } from '../../../features/users/api';
+import { User, UserRole } from '../../../types/api';
 import { ShieldAlert, AlertCircle, Plus, Edit, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TherapistsPage() {
   const role = useAuthStore((s) => s.role) || ('admin' as UserRole);
-  const [therapists, setTherapists] = useState<User[]>(() => mockUsers.filter((u) => u.role === 'therapist'));
+  const { data: usersResponse, isLoading } = useUsers();
+  const users = usersResponse || [];
+  const initialTherapists = users.filter((u: User) => u.role === 'therapist' || u.role === 'admin');
+  const [therapists, setTherapists] = useState<User[]>([]);
+
+  React.useEffect(() => {
+    setTherapists(initialTherapists);
+  }, [usersResponse]);
   const [isSlideOpen, setIsSlideOpen] = useState(false);
 
   // Form fields

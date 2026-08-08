@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { appointmentFormSchema, AppointmentFormValues } from '../../../lib/schemas';
 import { useCreateAppointment, useAppointments } from '../api';
-import { mockPatients, mockUsers } from '../../../mocks';
+import { usePatients } from '../../patients/api';
+import { useUsers } from '../../users/api';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 
 interface AddAppointmentSlideOverProps {
@@ -17,10 +18,17 @@ interface AddAppointmentSlideOverProps {
 
 export function AddAppointmentSlideOver({ isOpen, onClose }: AddAppointmentSlideOverProps) {
   const createAppointment = useCreateAppointment();
-  const { data: existingAppointments = [] } = useAppointments();
+  const { data: aptResponse } = useAppointments(undefined, undefined, 1, 100);
+  const existingAppointments = aptResponse?.data || [];
   const [hasDoubleBookingWarning, setHasDoubleBookingWarning] = useState(false);
 
-  const therapists = mockUsers.filter((u) => u.role === 'therapist' || u.role === 'admin');
+  const { data: patientsResponse } = usePatients(undefined, 1, 100);
+  const patients = patientsResponse?.data || [];
+  
+  const { data: usersResponse } = useUsers();
+  const users = usersResponse || []; // assuming useUsers returns raw array if not enveloped yet, wait, we created useUsers recently
+
+  const therapists = users.filter((u) => u.role === 'therapist' || u.role === 'admin');
 
   const {
     register,
@@ -31,7 +39,7 @@ export function AddAppointmentSlideOver({ isOpen, onClose }: AddAppointmentSlide
   } = useForm<AppointmentFormValues>({
     resolver: zodResolver(appointmentFormSchema),
     defaultValues: {
-      patient_id: mockPatients[0]?.id || '',
+      patient_id: patients[0]?.id || '',
       therapist_id: therapists[0]?.id || '',
       appointment_type: 'consultation',
       scheduled_at: new Date().toISOString().slice(0, 16),
@@ -89,7 +97,7 @@ export function AddAppointmentSlideOver({ isOpen, onClose }: AddAppointmentSlide
             {...register('patient_id')}
             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
           >
-            {mockPatients.map((p) => (
+            {patients.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.first_name} {p.last_name} ({p.phone})
               </option>

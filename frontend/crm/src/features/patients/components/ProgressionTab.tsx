@@ -2,13 +2,17 @@
 
 import React from 'react';
 import { toast } from 'sonner';
-import { mockTreatmentSessions, mockSoapAssessments } from '../../../mocks';
+import { useTreatments } from '../../treatments/api';
+import { useAssessments } from '../../assessments/api';
 import { TrendingDown, FileText, Download, Activity } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 
 export function ProgressionTab({ patientId }: { patientId: string }) {
-  const sessions = mockTreatmentSessions.filter((s) => s.patient_id === patientId);
-  const assessments = mockSoapAssessments.filter((a) => a.patient_id === patientId);
+  const { data: treatmentsResponse } = useTreatments(patientId);
+  const sessions = treatmentsResponse?.data || [];
+  
+  const { data: assessmentsResponse } = useAssessments(patientId);
+  const assessments = assessmentsResponse?.data || [];
 
   const painScores = sessions
     .filter((s) => s.pain_score != null)

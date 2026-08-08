@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { invoiceFormSchema, InvoiceFormValues } from '../../../lib/schemas';
 import { useCreateInvoice } from '../api';
-import { mockPatients } from '../../../mocks';
+import { usePatients } from '../../patients/api';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
 
 interface CreateInvoiceSlideOverProps {
@@ -17,6 +17,8 @@ interface CreateInvoiceSlideOverProps {
 
 export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOverProps) {
   const createInvoice = useCreateInvoice();
+  const { data: patientsResponse } = usePatients(undefined, 1, 100);
+  const patients = patientsResponse?.data || [];
 
   const {
     register,
@@ -29,7 +31,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
-      patient_id: mockPatients[0]?.id || '',
+      patient_id: patients[0]?.id || '',
       issue_date: new Date().toISOString().slice(0, 10),
       due_date: new Date().toISOString().slice(0, 10),
       subtotal: 0,
@@ -86,7 +88,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
             {...register('patient_id')}
             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
           >
-            {mockPatients.map((p) => (
+            {patients.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.first_name} {p.last_name} ({p.phone})
               </option>

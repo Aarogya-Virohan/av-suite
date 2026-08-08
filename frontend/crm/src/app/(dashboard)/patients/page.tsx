@@ -12,7 +12,10 @@ import { Plus, Phone } from 'lucide-react';
 
 export default function PatientsPage() {
   const router = useRouter();
-  const { data: patients = [], isLoading } = usePatients();
+  const [page, setPage] = useState(1);
+  const { data: response, isLoading } = usePatients(undefined, page, 10);
+  const patients = response?.data || [];
+  const meta = response?.meta;
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -123,6 +126,10 @@ export default function PatientsPage() {
           searchPlaceholder="Search by patient name or phone number..."
           emptyMessage="No patients found."
           onRowClick={(patient) => router.push(`/patients/${patient.id}`)}
+          totalItems={meta?.total}
+          currentPage={meta?.page}
+          pageSize={meta?.page_size}
+          onPageChange={setPage}
         />
 
         <AddPatientSlideOver isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />

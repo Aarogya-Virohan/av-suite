@@ -17,6 +17,11 @@ interface DataTableProps<T> {
   isLoading?: boolean;
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
+  // Server-side pagination support
+  totalItems?: number;
+  currentPage?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export function DataTable<T extends { id: string }>({
@@ -27,18 +32,38 @@ export function DataTable<T extends { id: string }>({
   isLoading = false,
   emptyMessage = 'No records found.',
   onRowClick,
+  totalItems,
+  currentPage: serverPage,
+  pageSize: serverPageSize = 10,
+  onPageChange,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [clientPage, setClientPage] = useState(1);
+  
+  const isServerSide = totalItems !== undefined && onPageChange !== undefined;
+  const currentPage = isServerSide ? (serverPage || 1) : clientPage;
+  const pageSize = isServerSide ? serverPageSize : 10;
 
-  const filteredData = data.filter((item) => {
+  const handlePageChange = (newPage: number) => {
+    if (isServerSide && onPageChange) {
+      onPageChange(newPage);
+    } else {
+      setClientPage(newPage);
+    }
+  };
+
+  const filteredData = isServerSide ? data : data.filter((item) => {
     if (!searchTerm || !searchField) return true;
     return searchField(item).toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
-  const paginatedData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = isServerSide 
+    ? Math.ceil(totalItems / pageSize) || 1
+    : Math.ceil(filteredData.length / pageSize) || 1;
+    
+  const paginatedData = isServerSide 
+    ? data 
+    : filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <div className="space-y-4">
@@ -52,14 +77,14 @@ export function DataTable<T extends { id: string }>({
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                setCurrentPage(1);
+                handlePageChange(1);
               }}
               placeholder={searchPlaceholder}
               className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
           <span className="text-xs text-slate-500 font-medium">
-            Showing {filteredData.length} entries
+            Showing {isServerSide ? totalItems : filteredData.length} entries
           </span>
         </div>
       )}
@@ -128,14 +153,14 @@ export function DataTable<T extends { id: string }>({
           </span>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
               className="p-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
               className="p-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100"
             >

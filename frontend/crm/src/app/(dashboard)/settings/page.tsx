@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
-import { mockAuditLogs, mockUsers } from '../../../mocks';
 import { AuditLog, User } from '../../../types/api';
+import { useUsers } from '../../../features/users/api';
+import { useAuditLogs } from '../../../features/audit/api';
 import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Palette, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -20,6 +21,12 @@ export default function SettingsPage() {
   const [doctorName, setDoctorName] = useState('Dr. Ananya Roy');
   const [regNo, setRegNo] = useState('REG-2026-PT88');
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+
+  const { data: usersResponse, isLoading: isLoadingUsers } = useUsers();
+  const users = usersResponse || [];
+
+  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(1, 50);
+  const auditLogs = auditResponse?.data || [];
 
   const handleBrandColorChange = (color: string) => {
     setBrandColor(color);
@@ -111,7 +118,7 @@ export default function SettingsPage() {
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>Audit Log ({mockAuditLogs.length})</span>
+            <span>Audit Log ({auditLogs.length})</span>
           </button>
         </div>
 
@@ -236,7 +243,7 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <DataTable columns={userColumns} data={mockUsers} />
+            <DataTable columns={userColumns} data={users} isLoading={isLoadingUsers} />
           </div>
         )}
 
@@ -244,7 +251,8 @@ export default function SettingsPage() {
         {activeTab === 'audit' && (
           <DataTable
             columns={auditColumns}
-            data={mockAuditLogs}
+            data={auditLogs}
+            isLoading={isLoadingAudit}
             searchField={(log) => `${log.action} ${log.entity_type}`}
             searchPlaceholder="Search audit logs by action or entity type..."
           />

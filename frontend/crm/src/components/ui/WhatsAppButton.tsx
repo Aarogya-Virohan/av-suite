@@ -4,13 +4,13 @@ import React from 'react';
 import { MessageSquare } from 'lucide-react';
 
 interface WhatsAppButtonProps {
-  phone: string;
+  phone?: string | null;
   name: string;
   message?: string;
   className?: string;
 }
 
-export function openWhatsApp(phone: string, name: string, message?: string) {
+export function openWhatsApp(phone: string | null | undefined, name: string, message?: string) {
   if (!phone) return;
   const cleanPhone = phone.replace(/\D/g, '');
   const formattedPhone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;

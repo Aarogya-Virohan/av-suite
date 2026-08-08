@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
-import { mockAnalyticsOverview, mockPatients } from '../../../mocks';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
 import { UserRole } from '../../../types/api';
+import { usePatients } from '../../../features/patients/api';
+import { useAnalyticsOverview } from '../../../features/analytics/api';
 import { TrendingUp, Users, Calendar, DollarSign, ShieldAlert, Plus, Trash2, Save, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,6 +19,8 @@ interface RunningCostItem {
 export default function AnalyticsPage() {
   const role = useAuthStore((s) => s.role) || ('admin' as UserRole);
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'year'>('month');
+  const { data: patientsResponse } = usePatients(undefined, 1, 5);
+  const patients = patientsResponse?.data || [];
 
   // Running costs state (Rent, Electricity, Supplies)
   const [runningCosts, setRunningCosts] = useState<RunningCostItem[]>([
@@ -32,7 +35,8 @@ export default function AnalyticsPage() {
   const manualCostsTotal = runningCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
   const totalMonthlyExpenses = manualCostsTotal + therapistSalariesTotal;
 
-  const totalCollected = mockAnalyticsOverview.monthly_revenue;
+  const { data: analyticsOverview } = useAnalyticsOverview();
+  const totalCollected = analyticsOverview?.monthly_revenue || 0;
   const estimatedProfit = totalCollected - totalMonthlyExpenses;
 
   const handleAddCost = () => {
@@ -210,7 +214,7 @@ export default function AnalyticsPage() {
           <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Top Patients by Revenue</h3>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {mockPatients.map((patient) => (
+              {patients.slice(0, 5).map((patient) => (
                 <div key={patient.id} className="py-3 flex items-center justify-between text-xs">
                   <div>
                     <p className="font-bold text-slate-900 dark:text-white">

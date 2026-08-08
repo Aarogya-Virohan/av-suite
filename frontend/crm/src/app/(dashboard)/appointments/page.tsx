@@ -5,7 +5,7 @@ import { AppShell } from '../../../components/layout/AppShell';
 import { useAppointments, useUpdateAppointmentStatus } from '../../../features/appointments/api';
 import { AddAppointmentSlideOver } from '../../../features/appointments/components/AddAppointmentSlideOver';
 import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
-import { AppointmentStatus } from '../../../types/api';
+import { AppointmentStatus, Appointment } from '../../../types/api';
 import { Plus, Calendar as CalendarIcon, Clock, User, CheckCircle2, XCircle, Copy, ExternalLink, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '../../../lib/api-client';
@@ -39,12 +39,13 @@ const MOCK_REQUESTS: BookingRequest[] = [
 type SubTabKey = 'list' | 'requests' | 'bookingLink';
 
 export default function AppointmentsPage() {
-  const { data: appointments = [] } = useAppointments();
+  const { data: appointmentsResponse, isLoading } = useAppointments();
+  const appointments: Appointment[] = appointmentsResponse?.data || [];
   const updateStatus = useUpdateAppointmentStatus();
 
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('list');
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
   const [requests, setRequests] = useState<BookingRequest[]>(MOCK_REQUESTS);
 
   // Booking Link State
@@ -178,7 +179,7 @@ export default function AppointmentsPage() {
             <div className="flex items-center justify-between">
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'scheduled' | 'completed' | 'cancelled')}
                 className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-700 dark:text-slate-300"
               >
                 <option value="all">All Statuses</option>
