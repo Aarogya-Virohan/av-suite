@@ -18,5 +18,7 @@ PERMISSION_MAP: Dict[str, List[UserRole]] = {
     "prescriptions": [UserRole.ADMIN, UserRole.THERAPIST],
     "settings": [UserRole.ADMIN],
     "packages": [UserRole.ADMIN],
-    "clinic_admin": [UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK], 
+    "clinic_admin": [UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK],
+    "booking": [UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK],
+    "appointment_requests": [UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK],
 }
