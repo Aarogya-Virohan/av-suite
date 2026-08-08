@@ -5,64 +5,41 @@ import html
 from datetime import datetime
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import func
-from sqlalchemy.orm import selectinload
-from app.models.prescription import Prescription, PrescriptionItem
-from app.models.exercise import Exercise
-from app.models.patient import Patient
-from app.models.user import User
+from app.models.prescription import Prescription
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
+from app.repositories.prescription import PrescriptionRepository
+from app.utils.whatsapp import build_whatsapp_link
 from weasyprint import HTML
 
 logger = logging.getLogger(__name__)
 
+
 async def create_prescription(
-    db: AsyncSession, clinic_id: uuid.UUID, physio_id: uuid.UUID, prescription_in: PrescriptionCreate
+    db: AsyncSession,
+    clinic_id: uuid.UUID,
+    physio_id: uuid.UUID,
+    prescription_in: PrescriptionCreate,
 ) -> Prescription:
     """
     Creates a new exercise prescription for a patient within a clinic context.
     """
     try:
-        logger.info(f"Creating prescription for patient: {prescription_in.patient_id} in clinic: {clinic_id}")
-        
-        db_prescription = Prescription(
-            clinic_id=clinic_id,
-            patient_id=prescription_in.patient_id,
-            physio_id=physio_id,
-            physio_notes=prescription_in.physio_notes,
-            status=prescription_in.status
+        logger.info(
+            f"Creating prescription for patient: {prescription_in.patient_id} in clinic: {clinic_id}"
         )
-        db.add(db_prescription)
-        await db.flush()  # Generate prescription ID
-        
-        db_items = []
-        for item in prescription_in.items:
-            db_items.append(
-                PrescriptionItem(
-                    prescription_id=db_prescription.id,
-                    exercise_id=item.exercise_id,
-                    sets=item.sets,
-                    reps=item.reps,
-                    hold=item.hold,
-                    frequency=item.frequency,
-                    hold_angle=item.hold_angle,
-                    note=item.note
-                )
-            )
-        
-        if db_items:
-            db.add_all(db_items)
-            
-        await db.commit()
-        await db.refresh(db_prescription)
-        
+
+        repo = PrescriptionRepository(db)
+        db_prescription = await repo.create_prescription(
+            clinic_id, physio_id, prescription_in
+        )
+
         # Return prescription with relationships loaded
         return await get_prescription_by_id(db, clinic_id, db_prescription.id)
     except Exception as e:
         logger.error(f"Error creating prescription: {str(e)}")
         await db.rollback()
         raise
+
 
 async def get_prescription_by_id(
     db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID
@@ -72,63 +49,62 @@ async def get_prescription_by_id(
     """
     try:
         logger.info(f"Fetching prescription: {prescription_id} in clinic: {clinic_id}")
-        query = (
-            select(Prescription)
-            .where(Prescription.id == prescription_id, Prescription.clinic_id == clinic_id)
-            .options(
-                selectinload(Prescription.items).selectinload(PrescriptionItem.exercise),
-                selectinload(Prescription.patient),
-                selectinload(Prescription.physio),
-                selectinload(Prescription.clinic)
-            )
-        )
-        result = await db.execute(query)
-        return result.scalars().first()
+        repo = PrescriptionRepository(db)
+        return await repo.get_prescription_by_id(clinic_id, prescription_id)
     except Exception as e:
         logger.error(f"Error fetching prescription {prescription_id}: {str(e)}")
         raise
+
 
 async def get_prescriptions(
     db: AsyncSession,
     clinic_id: uuid.UUID,
     patient_id: Optional[uuid.UUID] = None,
+    search: Optional[str] = None,
     page: int = 1,
-    page_size: int = 10
+    page_size: int = 10,
 ) -> Tuple[List[Prescription], int]:
     """
     Lists paginated prescriptions for a clinic, optionally filtered by patient.
     """
     try:
         logger.info(f"Listing prescriptions for clinic: {clinic_id}, page: {page}")
-        
-        query = select(Prescription).where(Prescription.clinic_id == clinic_id)
-        if patient_id:
-            query = query.where(Prescription.patient_id == patient_id)
-            
-        # Get total count
-        count_query = select(func.count()).select_from(query.subquery())
-        total_result = await db.execute(count_query)
-        total = total_result.scalar() or 0
-        
-        # Paginate and order by created_at desc
-        query = (
-            query.options(
-                selectinload(Prescription.items).selectinload(PrescriptionItem.exercise),
-                selectinload(Prescription.patient)
-            )
-            .order_by(Prescription.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
+
+        repo = PrescriptionRepository(db)
+        return await repo.get_prescriptions(
+            clinic_id, patient_id, search, page, page_size
         )
-        
-        result = await db.execute(query)
-        return list(result.scalars().all()), total
     except Exception as e:
         logger.error(f"Error listing prescriptions: {str(e)}")
         raise
 
+
+async def delete_prescription(
+    db: AsyncSession,
+    clinic_id: uuid.UUID,
+    prescription_id: uuid.UUID,
+) -> bool:
+    """Delete a prescription scoped to clinic; returns False when not found."""
+
+    try:
+        repo = PrescriptionRepository(db)
+        prescription = await repo.get_prescription_by_id(clinic_id, prescription_id)
+        if not prescription:
+            return False
+
+        await repo.delete_prescription(prescription)
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting prescription {prescription_id}: {str(e)}")
+        await db.rollback()
+        raise
+
+
 async def patch_prescription(
-    db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID, patch: PrescriptionPatch
+    db: AsyncSession,
+    clinic_id: uuid.UUID,
+    prescription_id: uuid.UUID,
+    patch: PrescriptionPatch,
 ) -> Optional[Prescription]:
     """
     Updates prescription notes, status, and optionally replaces prescription items.
@@ -138,37 +114,16 @@ async def patch_prescription(
         rx = await get_prescription_by_id(db, clinic_id, prescription_id)
         if not rx:
             return None
-            
+
         if patch.physio_notes is not None:
             rx.physio_notes = patch.physio_notes
         if patch.status is not None:
             rx.status = patch.status
-            
+
         if patch.items is not None:
-            # Delete existing items
-            from sqlalchemy import delete
-            await db.execute(
-                delete(PrescriptionItem).where(PrescriptionItem.prescription_id == prescription_id)
-            )
-            
-            # Insert new items
-            db_items = []
-            for item in patch.items:
-                db_items.append(
-                    PrescriptionItem(
-                        prescription_id=prescription_id,
-                        exercise_id=item.exercise_id,
-                        sets=item.sets,
-                        reps=item.reps,
-                        hold=item.hold,
-                        frequency=item.frequency,
-                        hold_angle=item.hold_angle,
-                        note=item.note
-                    )
-                )
-            if db_items:
-                db.add_all(db_items)
-            
+            repo = PrescriptionRepository(db)
+            await repo.update_prescription_items(prescription_id, patch)
+
         await db.commit()
         # Fetch again to ensure all relationships are fresh and loaded
         return await get_prescription_by_id(db, clinic_id, prescription_id)
@@ -176,6 +131,7 @@ async def patch_prescription(
         logger.error(f"Error updating prescription {prescription_id}: {str(e)}")
         await db.rollback()
         raise
+
 
 async def generate_prescription_pdf(
     db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID
@@ -188,12 +144,12 @@ async def generate_prescription_pdf(
         rx = await get_prescription_by_id(db, clinic_id, prescription_id)
         if not rx:
             raise ValueError("Prescription not found")
-            
+
         # Create output directory
         os.makedirs("static/prescriptions", exist_ok=True)
         pdf_filename = f"prescription_{rx.id}.pdf"
         pdf_path = os.path.join("static/prescriptions", pdf_filename)
-        
+
         # Formulate HTML content
         # Inline SVG fallback (no network dependency — avoids relying on external
         # placeholder services that can be slow, down, or removed in production)
@@ -215,11 +171,21 @@ async def generate_prescription_pdf(
             # since WeasyPrint renders raw HTML — unescaped text could break the
             # layout or inject markup (e.g. via a note field with "<" or ">").
             ex_title = html.escape(ex.title) if ex and ex.title else "Rehab Exercise"
-            ex_body_part = html.escape(ex.body_part) if ex and ex.body_part else "General"
-            ex_description = html.escape(ex.description) if ex and ex.description else "Perform as advised by therapist."
+            ex_body_part = (
+                html.escape(ex.body_part) if ex and ex.body_part else "General"
+            )
+            ex_description = (
+                html.escape(ex.description)
+                if ex and ex.description
+                else "Perform as advised by therapist."
+            )
             item_note_escaped = html.escape(item.note) if item.note else None
 
-            note_text = f"<p class='note'><strong>Special Notes:</strong> {item_note_escaped}</p>" if item_note_escaped else ""
+            note_text = (
+                f"<p class='note'><strong>Special Notes:</strong> {item_note_escaped}</p>"
+                if item_note_escaped
+                else ""
+            )
             items_html += f"""
             <div class="exercise-card">
                 <div class="exercise-header">
@@ -245,18 +211,38 @@ async def generate_prescription_pdf(
             </div>
             """
 
-        date_str = rx.created_at.strftime("%B %d, %Y") if rx.created_at else datetime.now().strftime("%B %d, %Y")
-        patient_name = html.escape(f"{rx.patient.first_name} {rx.patient.last_name}") if rx.patient else "Patient"
-        patient_phone = html.escape(rx.patient.phone) if rx.patient and rx.patient.phone else "N/A"
-        patient_dob = rx.patient.date_of_birth.strftime("%B %d, %Y") if rx.patient and rx.patient.date_of_birth else "N/A"
-        clinic_name = html.escape(rx.clinic.name) if rx.clinic else "Aarogya-Virohan Clinic"
+        date_str = (
+            rx.created_at.strftime("%B %d, %Y")
+            if rx.created_at
+            else datetime.now().strftime("%B %d, %Y")
+        )
+        patient_name = (
+            html.escape(f"{rx.patient.first_name} {rx.patient.last_name}")
+            if rx.patient
+            else "Patient"
+        )
+        patient_phone = (
+            html.escape(rx.patient.phone) if rx.patient and rx.patient.phone else "N/A"
+        )
+        patient_dob = (
+            rx.patient.date_of_birth.strftime("%B %d, %Y")
+            if rx.patient and rx.patient.date_of_birth
+            else "N/A"
+        )
+        clinic_name = (
+            html.escape(rx.clinic.name) if rx.clinic else "Aarogya-Virohan Clinic"
+        )
         physio_name = html.escape(
             f"{rx.physio.first_name} {rx.physio.last_name}".strip()
             if rx.physio and rx.physio.first_name
             else (rx.physio.email if rx.physio else "N/A")
         )
         physio_notes_escaped = html.escape(rx.physio_notes) if rx.physio_notes else None
-        general_notes = f"<div class='general-notes'><h3>Clinical Notes & Guidance</h3><p>{physio_notes_escaped}</p></div>" if physio_notes_escaped else ""
+        general_notes = (
+            f"<div class='general-notes'><h3>Clinical Notes & Guidance</h3><p>{physio_notes_escaped}</p></div>"
+            if physio_notes_escaped
+            else ""
+        )
 
         html_content = f"""
         <!DOCTYPE html>
@@ -485,13 +471,48 @@ async def generate_prescription_pdf(
 
         # Generate PDF using WeasyPrint
         HTML(string=html_content).write_pdf(pdf_path)
-        
+
         # Save pdf key back to the database
-        rx.pdf_key = pdf_filename
-        await db.commit()
-        
-        logger.info(f"PDF successfully generated for prescription: {rx.id} at {pdf_path}")
+        repo = PrescriptionRepository(db)
+        await repo.update_pdf_key(rx, pdf_filename)
+
+        logger.info(
+            f"PDF successfully generated for prescription: {rx.id} at {pdf_path}"
+        )
         return f"/api/v1/prescriptions/{rx.id}/pdf/download"
     except Exception as e:
-        logger.error(f"Error generating PDF for prescription {prescription_id}: {str(e)}")
+        logger.error(
+            f"Error generating PDF for prescription {prescription_id}: {str(e)}"
+        )
         raise
+
+
+def _build_prescription_message(patient_name: str, pdf_url: str) -> str:
+    """Format the WhatsApp message that accompanies a prescription download."""
+
+    return (
+        f"Hello {patient_name},\n\n"
+        "Your prescription is ready.\n\n"
+        "Download:\n\n"
+        f"{pdf_url}"
+    )
+
+
+async def generate_prescription_pdf_response(
+    db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID
+) -> dict[str, object]:
+    """Generate the prescription PDF and return the download URL plus WhatsApp deep link."""
+
+    pdf_url = await generate_prescription_pdf(db, clinic_id, prescription_id)
+    rx = await get_prescription_by_id(db, clinic_id, prescription_id)
+    if not rx or not rx.patient:
+        raise ValueError("Prescription not found")
+
+    patient_name = (
+        f"{rx.patient.first_name} {rx.patient.last_name}".strip() or "Patient"
+    )
+    whatsapp_link = build_whatsapp_link(
+        rx.patient.phone or "", _build_prescription_message(patient_name, pdf_url)
+    )
+
+    return {"pdf_url": pdf_url, "whatsapp_link": whatsapp_link}

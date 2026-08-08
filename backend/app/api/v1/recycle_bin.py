@@ -4,6 +4,8 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.core.dependencies import require_admin
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session, get_current_clinic
@@ -23,7 +25,7 @@ from app.services.recycle_bin import (
     RecycleBinService,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 async def get_recycle_bin_service(

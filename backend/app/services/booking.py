@@ -15,8 +15,11 @@ from app.repositories.patient import PatientRepository
 from app.schemas.booking import (
     AppointmentRequestApprovePayload,
     AppointmentRequestCreate,
+    AppointmentRequestResponse,
+    AppointmentRequestUpdate,
     PublicClinicBrandingResponse,
 )
+from app.utils.whatsapp import build_whatsapp_link
 
 
 class BookingValidationError(Exception):
@@ -49,7 +52,9 @@ class BookingService:
         self.patient_repository = patient_repository
         self.clinic_repository = clinic_repository
 
-    async def get_clinic_branding(self, clinic_slug_or_id: str) -> PublicClinicBrandingResponse:
+    async def get_clinic_branding(
+        self, clinic_slug_or_id: str
+    ) -> PublicClinicBrandingResponse:
         """Retrieve public branding details for a clinic without exposing patient or internal data."""
 
         clinic = await self.clinic_repository.get_by_slug_or_id(clinic_slug_or_id)
@@ -64,7 +69,9 @@ class BookingService:
             brand_color=clinic.branding_color,
         )
 
-    async def create_request(self, clinic_id: UUID, payload: AppointmentRequestCreate) -> AppointmentRequest:
+    async def create_request(
+        self, clinic_id: UUID, payload: AppointmentRequestCreate
+    ) -> AppointmentRequest:
         """Create a new public appointment request for a clinic."""
 
         clinic = await self.clinic_repository.get_by_id(clinic_id)
@@ -80,12 +87,16 @@ class BookingService:
         )
         return await self.request_repository.create(req_data)
 
-    async def get_request(self, clinic_id: UUID, request_id: UUID) -> AppointmentRequest:
+    async def get_request(
+        self, clinic_id: UUID, request_id: UUID
+    ) -> AppointmentRequest:
         """Retrieve an appointment request ensuring clinic scoping."""
 
         req = await self.request_repository.get_by_id(request_id, clinic_id=clinic_id)
         if req is None:
-            raise BookingNotFoundError(f"Appointment request '{request_id}' not found for clinic '{clinic_id}'.")
+            raise BookingNotFoundError(
+                f"Appointment request '{request_id}' not found for clinic '{clinic_id}'."
+            )
         return req
 
     async def list_requests(
@@ -107,20 +118,36 @@ class BookingService:
             limit=limit,
         )
 
+    @staticmethod
+    def _build_approval_message(patient_name: str, scheduled_at: datetime) -> str:
+        """Format the WhatsApp confirmation message for an approved appointment."""
+
+        return (
+            f"Hello {patient_name},\n\n"
+            "Your appointment has been confirmed.\n\n"
+            f"Date: {scheduled_at.strftime('%d %b %Y')}\n"
+            f"Time: {scheduled_at.strftime('%I:%M %p')}\n\n"
+            "Thank you."
+        )
+
     async def approve_request(
         self,
         clinic_id: UUID,
         request_id: UUID,
         payload: AppointmentRequestApprovePayload,
-    ) -> tuple[AppointmentRequest, Appointment]:
+    ) -> dict[str, object]:
         """Approve an appointment request, ensuring or creating a patient, and scheduling an appointment."""
 
         req = await self.get_request(clinic_id, request_id)
         if req.status == AppointmentRequestStatus.APPROVED:
-            raise BookingValidationError(f"Appointment request '{request_id}' has already been approved.")
+            raise BookingValidationError(
+                f"Appointment request '{request_id}' has already been approved."
+            )
 
         # Find or create patient record
-        matching_patients = await self.patient_repository.search_by_phone(req.phone, clinic_id=clinic_id)
+        matching_patients = await self.patient_repository.search_by_phone(
+            req.phone, clinic_id=clinic_id
+        )
         if matching_patients:
             patient = matching_patients[0]
         else:
@@ -141,7 +168,11 @@ class BookingService:
         if payload.start_time:
             try:
                 parts = [int(p) for p in payload.start_time.split(":")]
-                start_t = time(hour=parts[0], minute=parts[1], second=parts[2] if len(parts) > 2 else 0)
+                start_t = time(
+                    hour=parts[0],
+                    minute=parts[1],
+                    second=parts[2] if len(parts) > 2 else 0,
+                )
             except (ValueError, IndexError):
                 start_t = time(hour=9, minute=0)
 
@@ -168,7 +199,21 @@ class BookingService:
             {"status": AppointmentRequestStatus.APPROVED},
         )
 
-        return updated_req, appointment
+        patient_name = getattr(patient, "full_name", req.name)
+        whatsapp_link = build_whatsapp_link(
+            req.phone,
+            self._build_approval_message(patient_name, appointment.scheduled_at),
+        )
+
+        return {
+            "request": AppointmentRequestResponse.model_validate(
+                updated_req
+            ).model_dump(mode="json"),
+            "appointment_id": str(appointment.id),
+            "patient_id": str(appointment.patient_id),
+            "message": "Appointment request approved successfully.",
+            "whatsapp_link": whatsapp_link,
+        }
 
     async def reject_request(
         self, clinic_id: UUID, request_id: UUID, notes: str | None = None
@@ -178,6 +223,39 @@ class BookingService:
         req = await self.get_request(clinic_id, request_id)
         update_data: dict[str, object] = {"status": AppointmentRequestStatus.REJECTED}
         if notes:
-            update_data["notes"] = f"{req.notes or ''}\nRejection notes: {notes}".strip()
+            update_data["notes"] = (
+                f"{req.notes or ''}\nRejection notes: {notes}".strip()
+            )
 
         return await self.request_repository.update(req, update_data)
+
+    async def update_request(
+        self,
+        clinic_id: UUID,
+        request_id: UUID,
+        payload: AppointmentRequestUpdate,
+    ) -> AppointmentRequest:
+        """Update appointment request fields for a clinic-scoped request."""
+
+        request_obj = await self.get_request(clinic_id, request_id)
+        update_data = payload.model_dump(exclude_unset=True, exclude_none=True)
+        if not update_data:
+            return request_obj
+
+        updated = await self.request_repository.update_request_by_id(
+            clinic_id=clinic_id,
+            request_id=request_id,
+            update_data=update_data,
+        )
+        if updated is None:
+            raise BookingNotFoundError(
+                f"Appointment request '{request_id}' not found for clinic '{clinic_id}'."
+            )
+
+        return updated
+
+    async def delete_request(self, clinic_id: UUID, request_id: UUID) -> None:
+        """Delete appointment request for the clinic."""
+
+        request_obj = await self.get_request(clinic_id, request_id)
+        await self.request_repository.delete_request(request_obj)

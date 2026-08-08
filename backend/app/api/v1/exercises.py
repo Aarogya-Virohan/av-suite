@@ -28,7 +28,8 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.schemas.exercise import ExerciseCreate, ExerciseRead
+from app.core.dependencies import require_admin
+from app.schemas.exercise import ExerciseCreate, ExerciseRead, ExerciseUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
@@ -169,7 +170,8 @@ async def list_exercises(
 async def create_exercise(
     request: Request,
     exercise_in: ExerciseCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_admin)
 ):
     """
     Endpoint ka purpose: New exercise create karna clinic mein (admin only)
@@ -252,19 +254,7 @@ async def create_exercise(
     logger.info(f"Create exercise request - {exercise_in.title}")
     
     try:
-        # request.state se role extract karte hain
-        # JWT token decode se role set hota hai middleware mein
-        role = request.state.role
-        
-        # Admin-only check
-        if role != UserRole.ADMIN:
-            logger.warning(f"Unauthorized exercise creation attempt with role: {role}")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admins can create exercises"
-            )
-        
-        logger.debug(f"Admin authorization check passed for role: {role}")
+
         
         # request.state se clinic_id extract karte hain
         clinic_id = request.state.clinic_id
@@ -446,4 +436,51 @@ async def get_exercise(
     except Exception as e:
         logger.error(f"Get exercise error: {str(e)}")
         raise
+
+
+@router.put(
+    "/{id}",
+    response_model=ResponseEnvelope[ExerciseRead],
+    tags=["Exercises"]
+)
+async def update_exercise(
+    request: Request,
+    id: str,
+    exercise_in: ExerciseUpdate,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_admin),
+):
+    """Update an existing exercise."""
+
+    clinic_id = request.state.clinic_id
+    exercise = await exercise_service.update_exercise(db, clinic_id, id, exercise_in)
+    if not exercise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exercise not found or not in caller's clinic",
+        )
+    return ResponseEnvelope(data=exercise)
+
+
+@router.delete(
+    "/{id}",
+    response_model=ResponseEnvelope[dict],
+    tags=["Exercises"]
+)
+async def delete_exercise(
+    request: Request,
+    id: str,
+    db: AsyncSession = Depends(get_db),
+    _ = Depends(require_admin),
+):
+    """Delete an exercise."""
+
+    clinic_id = request.state.clinic_id
+    deleted = await exercise_service.delete_exercise(db, clinic_id, id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exercise not found or not in caller's clinic",
+        )
+    return ResponseEnvelope(data={"message": "Exercise deleted successfully."})
 

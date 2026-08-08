@@ -5,6 +5,9 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from app.core.dependencies import require_roles
+from app.enums.user import UserRole
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session, get_current_clinic
@@ -37,9 +40,15 @@ from app.schemas.billing import (
     PaymentListResponse,
     PaymentResponse,
 )
-from app.services.billing import BillingNotFoundError, BillingService, BillingValidationError
+from app.services.billing import (
+    BillingNotFoundError,
+    BillingService,
+    BillingValidationError,
+)
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))]
+)
 
 
 async def get_billing_service(
@@ -64,7 +73,10 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 
 # --- Package Catalog Endpoints ---
 
-@router.post("/packages", response_model=PackageResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/packages", response_model=PackageResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_package(
     payload: PackageCreate,
     clinic: CurrentClinicDep,
@@ -76,7 +88,9 @@ async def create_package(
         package = await service.create_package(clinic.id, payload)
         return PackageResponse.model_validate(package)
     except BillingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
 @router.get("/packages", response_model=PackageListResponse)
@@ -93,7 +107,9 @@ async def list_packages(
         clinic.id, status=status_filter, offset=offset, limit=limit
     )
     items = [PackageResponse.model_validate(p) for p in packages]
-    return PackageListResponse(items=items, total=len(items), offset=offset, limit=limit)
+    return PackageListResponse(
+        items=items, total=len(items), offset=offset, limit=limit
+    )
 
 
 @router.get("/packages/{id}", response_model=PackageResponse)
@@ -108,7 +124,9 @@ async def get_package(
         package = await service.get_package(clinic.id, id)
         return PackageResponse.model_validate(package)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.patch("/packages/{id}", response_model=PackageResponse)
@@ -124,12 +142,18 @@ async def update_package(
         package = await service.update_package(clinic.id, id, payload)
         return PackageResponse.model_validate(package)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except BillingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.delete("/packages/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/packages/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
+)
 async def delete_package(
     id: UUID,
     clinic: CurrentClinicDep,
@@ -140,12 +164,19 @@ async def delete_package(
     try:
         await service.delete_package(clinic.id, id)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 # --- Patient Package Endpoints ---
 
-@router.post("/patients/{patient_id}/packages", response_model=PatientPackageResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/patients/{patient_id}/packages",
+    response_model=PatientPackageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def sell_patient_package(
     patient_id: UUID,
     payload: PatientPackageCreate,
@@ -164,10 +195,14 @@ async def sell_patient_package(
         patient_package = await service.sell_package(clinic.id, payload)
         return PatientPackageResponse.model_validate(patient_package)
     except BillingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.get("/patients/{patient_id}/packages", response_model=PatientPackageListResponse)
+@router.get(
+    "/patients/{patient_id}/packages", response_model=PatientPackageListResponse
+)
 async def list_patient_packages_by_patient(
     patient_id: UUID,
     clinic: CurrentClinicDep,
@@ -180,10 +215,17 @@ async def list_patient_packages_by_patient(
     """List treatment packages purchased by a specific patient."""
 
     packages = await service.list_patient_packages(
-        clinic.id, patient_id=patient_id, package_id=package_id, status=status_filter, offset=offset, limit=limit
+        clinic.id,
+        patient_id=patient_id,
+        package_id=package_id,
+        status=status_filter,
+        offset=offset,
+        limit=limit,
     )
     items = [PatientPackageResponse.model_validate(p) for p in packages]
-    return PatientPackageListResponse(items=items, total=len(items), offset=offset, limit=limit)
+    return PatientPackageListResponse(
+        items=items, total=len(items), offset=offset, limit=limit
+    )
 
 
 @router.get("/patient-packages/{id}", response_model=PatientPackageResponse)
@@ -198,7 +240,9 @@ async def get_patient_package(
         package = await service.get_patient_package(clinic.id, id)
         return PatientPackageResponse.model_validate(package)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.patch("/patient-packages/{id}", response_model=PatientPackageResponse)
@@ -214,12 +258,20 @@ async def update_patient_package(
         package = await service.update_patient_package(clinic.id, id, payload)
         return PatientPackageResponse.model_validate(package)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except BillingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.delete("/patient-packages/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/patient-packages/{id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 async def delete_patient_package(
     id: UUID,
     clinic: CurrentClinicDep,
@@ -230,12 +282,17 @@ async def delete_patient_package(
     try:
         await service.delete_patient_package(clinic.id, id)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 # --- Invoice Endpoints ---
 
-@router.post("/invoices", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/invoices", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_invoice(
     payload: InvoiceCreate,
     clinic: CurrentClinicDep,
@@ -247,7 +304,9 @@ async def create_invoice(
         invoice = await service.create_invoice(clinic.id, payload)
         return InvoiceResponse.model_validate(invoice)
     except BillingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
 @router.get("/invoices/outstanding-balance")
@@ -285,7 +344,9 @@ async def list_invoices(
         limit=limit,
     )
     items = [InvoiceResponse.model_validate(inv) for inv in invoices]
-    return InvoiceListResponse(items=items, total=len(items), offset=offset, limit=limit)
+    return InvoiceListResponse(
+        items=items, total=len(items), offset=offset, limit=limit
+    )
 
 
 @router.get("/invoices/{id}", response_model=InvoiceResponse)
@@ -300,7 +361,9 @@ async def get_invoice(
         invoice = await service.get_invoice(clinic.id, id)
         return InvoiceResponse.model_validate(invoice)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.patch("/invoices/{id}", response_model=InvoiceResponse)
@@ -316,12 +379,18 @@ async def update_invoice(
         invoice = await service.update_invoice(clinic.id, id, payload)
         return InvoiceResponse.model_validate(invoice)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except BillingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.delete("/invoices/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/invoices/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
+)
 async def delete_invoice(
     id: UUID,
     clinic: CurrentClinicDep,
@@ -332,7 +401,9 @@ async def delete_invoice(
     try:
         await service.delete_invoice(clinic.id, id)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.post("/invoices/{id}/pdf", status_code=status.HTTP_200_OK)
@@ -340,14 +411,15 @@ async def generate_invoice_pdf_endpoint(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
-) -> dict[str, str]:
+) -> dict[str, object]:
     """Trigger PDF generation for an invoice."""
 
     try:
-        _ = await service.generate_invoice_pdf(clinic.id, id)
-        return {"invoice_id": str(id), "status": "generated", "download_url": f"/api/v1/billing/invoices/{id}/pdf/download"}
+        return await service.generate_invoice_pdf_response(clinic.id, id)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get("/invoices/{id}/pdf/download")
@@ -361,14 +433,23 @@ async def download_invoice_pdf_endpoint(
     try:
         pdf_bytes = await service.generate_invoice_pdf(clinic.id, id)
         headers = {"Content-Disposition": f'attachment; filename="invoice_{id}.pdf"'}
-        return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+        return Response(
+            content=pdf_bytes, media_type="application/pdf", headers=headers
+        )
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 # --- Payment Endpoints ---
 
-@router.post("/invoices/{invoice_id}/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/invoices/{invoice_id}/payments",
+    response_model=PaymentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def record_payment_for_invoice(
     invoice_id: UUID,
     payload: PaymentCreate,
@@ -387,12 +468,18 @@ async def record_payment_for_invoice(
         payment = await service.record_payment(clinic.id, payload)
         return PaymentResponse.model_validate(payment)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except BillingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.post("/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED
+)
 async def record_payment(
     payload: PaymentCreate,
     clinic: CurrentClinicDep,
@@ -404,9 +491,13 @@ async def record_payment(
         payment = await service.record_payment(clinic.id, payload)
         return PaymentResponse.model_validate(payment)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except BillingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
 @router.get("/payments", response_model=PaymentListResponse)
@@ -432,7 +523,9 @@ async def list_payments(
         limit=limit,
     )
     items = [PaymentResponse.model_validate(p) for p in payments]
-    return PaymentListResponse(items=items, total=len(items), offset=offset, limit=limit)
+    return PaymentListResponse(
+        items=items, total=len(items), offset=offset, limit=limit
+    )
 
 
 @router.get("/payments/{id}", response_model=PaymentResponse)
@@ -447,10 +540,14 @@ async def get_payment(
         payment = await service.get_payment(clinic.id, id)
         return PaymentResponse.model_validate(payment)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
-@router.delete("/payments/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/payments/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
+)
 async def delete_payment(
     id: UUID,
     clinic: CurrentClinicDep,
@@ -461,4 +558,6 @@ async def delete_payment(
     try:
         await service.delete_payment(clinic.id, id)
     except BillingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
