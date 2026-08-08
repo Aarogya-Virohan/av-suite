@@ -1,5 +1,5 @@
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { getStoredToken, getStoredRefreshToken, setStoredToken, clearStoredTokens } from './auth';
+import axios, { AxiosError } from 'axios';
+import { getStoredToken, clearStoredTokens } from './auth';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 export const API_BASE_URL = `${BASE_URL}/api/v1`;
@@ -20,88 +20,43 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (value?: unknown) => void;
-  reject: (reason?: unknown) => void;
-}> = [];
-
-const processQueue = (error: Error | null, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
-
-// Interceptor for 401/403 response handling
+// Interceptor to extract backend's actual error message and handle 401 unauthenticated
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+  (error: AxiosError) => {
+    // Surface backend's actual error detail (FastAPI detail string or array)
+    const responseData = error.response?.data as
+      | { detail?: string | Array<{ msg?: string }>; message?: string }
+      | undefined;
 
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-            }
-            return apiClient(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
+    let detailMessage: string | undefined;
+
+    if (responseData) {
+      if (typeof responseData.detail === 'string') {
+        detailMessage = responseData.detail;
+      } else if (Array.isArray(responseData.detail)) {
+        detailMessage = responseData.detail
+          .map((item) => (typeof item === 'object' && item && item.msg ? item.msg : JSON.stringify(item)))
+          .join(', ');
+      } else if (typeof responseData.message === 'string') {
+        detailMessage = responseData.message;
       }
+    }
 
-      originalRequest._retry = true;
-      isRefreshing = true;
+    if (detailMessage) {
+      error.message = detailMessage;
+    }
 
-      const refreshToken = getStoredRefreshToken();
-      if (!refreshToken) {
-        clearStoredTokens();
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
-        return Promise.reject(error);
-      }
-
-      try {
-        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-          refresh_token: refreshToken,
-        });
-
-        const newToken = data.access_token || data.data?.access_token;
-        const newRefreshToken = data.refresh_token || data.data?.refresh_token;
-
-        if (newToken) {
-          setStoredToken(newToken, newRefreshToken);
-          processQueue(null, newToken);
-
-          if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-          }
-          return apiClient(originalRequest);
-        } else {
-          throw new Error('Refresh response missing token');
-        }
-      } catch (refreshError) {
-        processQueue(refreshError as Error, null);
-        clearStoredTokens();
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+    // On 401 Unauthorized: clear tokens and redirect to login
+    if (error.response?.status === 401) {
+      clearStoredTokens();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login';
       }
     }
 
     if (error.response?.status === 403) {
-      console.error('Permission denied (403):', error.response.data);
+      console.error('Permission denied (403):', detailMessage || error.response.data);
     }
 
     return Promise.reject(error);

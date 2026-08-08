@@ -13,7 +13,7 @@ import { Stethoscope, Lock, Mail, Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -30,19 +30,23 @@ export default function LoginPage() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'admin@aarogya.com',
-      password: 'password123',
+      email: 'admin@avtest.com',
+      password: 'Password123!',
     },
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      // Real endpoint call via api-client
-      const res = await apiClient.post('/auth/login', data);
+      // Direct POST to /auth/login sending plaintext credentials matching backend verification
+      const res = await apiClient.post('/auth/login', {
+        email: data.email.trim(),
+        password: data.password,
+      });
+
       const token = res.data?.access_token || res.data?.data?.access_token;
       if (!token) {
-        throw new Error('Invalid token response from server');
+        throw new Error('Invalid authentication response from server.');
       }
 
       setStoredToken(token);
@@ -50,8 +54,10 @@ export default function LoginPage() {
       toast.success('Successfully logged in');
       router.push('/dashboard');
     } catch (err: unknown) {
-      console.error(err);
-      toast.error('Login failed. Please check your credentials.');
+      console.error('Login error:', err);
+      const errorMessage =
+        err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +88,7 @@ export default function LoginPage() {
               <input
                 {...register('email')}
                 type="email"
-                placeholder="admin@aarogya.com"
+                placeholder="admin@avtest.com"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-white"
               />
             </div>

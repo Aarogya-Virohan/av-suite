@@ -49,3 +49,10 @@ coverage/
 .codex
 AGENTS.md
 CLAUDE.md
+
+# Data and Specs
+*.sql
+*.json
+*.yaml
+*.yml
+

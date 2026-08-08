@@ -108,7 +108,7 @@ class SoapAssessment(UUIDMixin, TimestampMixin, Base):
     )
     therapist: Mapped[User | None] = relationship()
 
-    specialty: Mapped[str] = mapped_column(String(length=100), nullable=False)
+    specialty: Mapped[Specialty] = mapped_column(Enum(Specialty, name="specialty_type", create_type=False), nullable=False)
     diagnosis: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_reassessment: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     finalized: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false", default=False)

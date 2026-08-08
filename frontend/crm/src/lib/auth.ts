@@ -1,7 +1,6 @@
 import { UserRole } from '../types/api';
 
 const TOKEN_KEY = 'av_crm_access_token';
-const REFRESH_TOKEN_KEY = 'av_crm_refresh_token';
 
 export interface JwtPayload {
   sub: string;        // user_id
@@ -15,23 +14,14 @@ export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-export function setStoredToken(token: string, refreshToken?: string): void {
+export function setStoredToken(token: string): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(TOKEN_KEY, token);
-  if (refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  }
 }
 
 export function clearStoredTokens(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
-
-export function getStoredRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 export function parseJwt(token: string): JwtPayload | null {
@@ -55,7 +45,7 @@ export function parseJwt(token: string): JwtPayload | null {
 
     return decoded;
   } catch (e) {
-    console.error('Failed to parse JWT', e);
+    console.error('Failed to parse JWT token', e);
     return null;
   }
 }
