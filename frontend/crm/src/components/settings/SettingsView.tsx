@@ -76,7 +76,25 @@ export const SettingsView: React.FC = () => {
           />
           <button
             type="button"
-            onClick={() => alert('FastAPI Connection test: Healthy ✓')}
+            onClick={async () => {
+              try {
+                const base = apiUrl || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                const origin = new URL(base).origin;
+                const response = await fetch(`${origin}/health`);
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.status === 'healthy') {
+                    alert('FastAPI Connection test: Healthy ✓');
+                  } else {
+                    alert('FastAPI Connection test: Unhealthy ⚠️');
+                  }
+                } else {
+                  alert('FastAPI Connection test: Failed ❌');
+                }
+              } catch (error) {
+                alert('FastAPI Connection test: Failed ❌');
+              }
+            }}
             className="px-4 py-2 bg-[var(--teal)] text-white font-bold rounded-lg hover:opacity-90 inline-flex items-center gap-1.5"
           >
             <RefreshCw className="w-3.5 h-3.5" />

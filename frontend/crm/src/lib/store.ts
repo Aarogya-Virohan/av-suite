@@ -111,28 +111,7 @@ const INITIAL_BRANDING: ClinicBranding = {
   bookingUrl: 'https://aarogyavirohan.com/book'
 };
 
-const INITIAL_THERAPISTS: Therapist[] = [
-  {
-    id: 'th_1',
-    name: 'Dr. Ramesh Sharma',
-    specialization: 'Senior Physiotherapist (Ortho & Neuro)',
-    mobile: '9876543210',
-    email: 'ramesh@aarogyavirohan.com',
-    regNo: 'PT-2024-8891',
-    salary: 45000,
-    qualification: 'MPT (Musculoskeletal), BPT'
-  },
-  {
-    id: 'th_2',
-    name: 'Dr. Priya Ananth',
-    specialization: 'Neuro & Paediatric PT',
-    mobile: '9876543211',
-    email: 'priya@aarogyavirohan.com',
-    regNo: 'PT-2025-4412',
-    salary: 40000,
-    qualification: 'MPT (Neurology)'
-  }
-];
+const INITIAL_THERAPISTS: Therapist[] = [];
 
 const INITIAL_PATIENTS: Patient[] = [
   {
@@ -223,7 +202,7 @@ const INITIAL_APPOINTMENTS: Appointment[] = [
     patientName: 'Rajesh Malhotra',
     patientMobile: '9820112233',
     therapist: 'Dr. Ramesh Sharma',
-    date: new Date().toISOString().slice(0, 10),
+    date: '2026-07-28',
     time: '10:30',
     durationMinutes: 45,
     status: 'Confirmed',
@@ -238,7 +217,7 @@ const INITIAL_APPOINTMENTS: Appointment[] = [
     patientName: 'Sunita Deshmukh',
     patientMobile: '9833445566',
     therapist: 'Dr. Priya Ananth',
-    date: new Date().toISOString().slice(0, 10),
+    date: '2026-07-28',
     time: '14:00',
     durationMinutes: 30,
     status: 'Scheduled',
@@ -256,7 +235,7 @@ const INITIAL_REQUESTS: AppointmentRequest[] = [
     mobile: '9845012345',
     age: 42,
     gender: 'Female',
-    preferredDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    preferredDate: '2026-07-29',
     preferredTime: '11:00',
     chiefComplaint: 'Severe neck stiffness and upper back spasm',
     source: 'Website Booking Form',
@@ -266,41 +245,7 @@ const INITIAL_REQUESTS: AppointmentRequest[] = [
   }
 ];
 
-const INITIAL_TREATMENTS: TreatmentSession[] = [
-  {
-    id: 'tx_1',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    date: '2026-07-02',
-    therapist: 'Dr. Ramesh Sharma',
-    painScore: 8,
-    treatment: 'Initial assessment, IFT 15 mins, moist heat, McKenzie extension exercises',
-    homeAdvice: 'Perform 10 extension reps every 2 hours, avoid slouching.',
-    createdAt: '2026-07-02T11:00:00Z'
-  },
-  {
-    id: 'tx_2',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    date: '2026-07-08',
-    therapist: 'Dr. Ramesh Sharma',
-    painScore: 6,
-    treatment: 'Ultrasound therapy 1.5 W/cm², spinal mobilization grade II, pelvic bridging',
-    homeAdvice: 'Continue extensions and added abdominal draw-in maneuver.',
-    createdAt: '2026-07-08T11:00:00Z'
-  },
-  {
-    id: 'tx_3',
-    clinicId: DEFAULT_CLINIC_ID,
-    patientId: 'p_101',
-    date: '2026-07-15',
-    therapist: 'Dr. Ramesh Sharma',
-    painScore: 3,
-    treatment: 'Advanced core stability, resistance band exercises, gait correction',
-    homeAdvice: 'Ergonomic lumbar support at work office chair.',
-    createdAt: '2026-07-15T11:00:00Z'
-  }
-];
+const INITIAL_TREATMENTS: TreatmentSession[] = [];
 
 const INITIAL_PACKAGES: PatientPackage[] = [
   {
@@ -737,7 +682,7 @@ export const useCRMStore = create<CRMStore>()(
           entityType: 'patient',
           entityId: 'p_101',
           description: 'Aarogya CRM initialized with demo datasets',
-          createdAt: new Date().toISOString()
+          createdAt: '2026-07-28T10:00:00Z'
         }
       ],
       logAudit: (action, entityType, entityId, description) =>

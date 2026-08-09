@@ -313,7 +313,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="text-[var(--text-light)] shrink-0 ml-2">
                   {new Date(log.createdAt).toLocaleTimeString('en-US', {
                     hour: '2-digit',
-                    minute: '2-digit'
+                    minute: '2-digit',
+                    hour12: true,
                   })}
                 </span>
               </div>
