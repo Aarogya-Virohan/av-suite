@@ -26,6 +26,7 @@ from app.repositories.patient import PatientRepository
 from app.schemas.billing import (
     InvoiceCreate,
     InvoiceListResponse,
+    InvoicePdfResponse,
     InvoiceResponse,
     InvoiceUpdate,
     PackageCreate,
@@ -406,16 +407,17 @@ async def delete_invoice(
         ) from exc
 
 
-@router.post("/invoices/{id}/pdf", status_code=status.HTTP_200_OK)
+@router.post("/invoices/{id}/pdf", response_model=InvoicePdfResponse, status_code=status.HTTP_200_OK)
 async def generate_invoice_pdf_endpoint(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
-) -> dict[str, object]:
+) -> InvoicePdfResponse:
     """Trigger PDF generation for an invoice."""
 
     try:
-        return await service.generate_invoice_pdf_response(clinic.id, id)
+        response = await service.generate_invoice_pdf_response(clinic.id, id)
+        return InvoicePdfResponse.model_validate(response)
     except BillingNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)

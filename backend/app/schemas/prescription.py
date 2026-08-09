@@ -51,6 +51,10 @@ class PrescriptionRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class PrescriptionPdfResponse(BaseModel):
+    pdf_url: str
+    whatsapp_link: str
+
 class PrescriptionItemPatch(BaseModel):
     sets: Optional[int] = None
     reps: Optional[int] = None

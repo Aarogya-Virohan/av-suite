@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from app.main import app
 from app.enums.booking import AppointmentRequestStatus
 from app.enums.billing import InvoiceStatus
 from app.services.booking import BookingService
@@ -13,13 +14,17 @@ from app.services.billing import BillingService
 from app.services import prescription_service
 from app.utils.whatsapp import build_whatsapp_link
 
-pytestmark = pytest.mark.asyncio
-
 
 def test_build_whatsapp_link_normalizes_and_encodes_phone_and_message() -> None:
     link = build_whatsapp_link("+91 98765-43210", "Hello & welcome, doctor.")
 
     assert link == "https://wa.me/919876543210?text=Hello%20%26%20welcome%2C%20doctor."
+
+
+def test_build_whatsapp_link_adds_default_country_code_and_encodes_newlines() -> None:
+    link = build_whatsapp_link("98765 43210", "Hello Jane,\nYour invoice is ready.")
+
+    assert link == "https://wa.me/919876543210?text=Hello%20Jane%2C%0AYour%20invoice%20is%20ready."
 
 
 class _BookingRequestRepo:
@@ -67,6 +72,7 @@ class _BookingClinicRepo:
         return SimpleNamespace(id=clinic_id)
 
 
+@pytest.mark.asyncio
 async def test_booking_approval_includes_whatsapp_link() -> None:
     clinic_id = uuid4()
     request = SimpleNamespace(
@@ -127,6 +133,7 @@ class _NoopRepo:
     pass
 
 
+@pytest.mark.asyncio
 async def test_invoice_pdf_response_includes_whatsapp_link() -> None:
     clinic_id = uuid4()
     patient_id = uuid4()
@@ -173,6 +180,7 @@ async def test_invoice_pdf_response_includes_whatsapp_link() -> None:
     )
 
 
+@pytest.mark.asyncio
 async def test_prescription_pdf_response_includes_whatsapp_link(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -205,3 +213,19 @@ async def test_prescription_pdf_response_includes_whatsapp_link(
     )
     assert response["whatsapp_link"].startswith("https://wa.me/919876543210?text=")
     assert "Your%20prescription%20is%20ready." in response["whatsapp_link"]
+
+
+def test_openapi_contracts_expose_whatsapp_links() -> None:
+    app.openapi_schema = None
+    openapi = app.openapi()
+    schemas = openapi["components"]["schemas"]
+
+    assert "whatsapp_link" in schemas["AppointmentRequestApprovalResponse"]["properties"]
+    assert "whatsapp_link" in schemas["InvoicePdfResponse"]["properties"]
+    assert "whatsapp_link" in schemas["PrescriptionPdfResponse"]["properties"]
+
+    billing_schema = openapi["paths"]["/api/v1/invoices/{id}/pdf"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]
+    prescription_schema = openapi["paths"]["/api/v1/prescriptions/{id}/pdf"]["post"]["responses"]["200"]["content"]["application/json"]["schema"]
+
+    assert billing_schema["$ref"] == "#/components/schemas/InvoicePdfResponse"
+    assert prescription_schema["$ref"].startswith("#/components/schemas/ResponseEnvelope_")

@@ -62,6 +62,16 @@ class AppointmentRequestListResponse(BaseModel):
     limit: int
 
 
+class AppointmentRequestApprovalResponse(BaseModel):
+    """Schema representing an approved booking response with WhatsApp deep link."""
+
+    request: AppointmentRequestResponse
+    appointment_id: str
+    patient_id: str
+    message: str
+    whatsapp_link: str
+
+
 class PublicClinicBrandingResponse(BaseModel):
     """Schema for public unauthenticated clinic branding endpoint."""
 

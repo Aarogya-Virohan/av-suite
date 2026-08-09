@@ -17,9 +17,9 @@ from app.repositories.booking import AppointmentRequestRepository
 from app.repositories.clinic import ClinicRepository
 from app.repositories.patient import PatientRepository
 from app.schemas.booking import (
+    AppointmentRequestApprovalResponse,
     AppointmentRequestApprovePayload,
     AppointmentRequestCreate,
-    AppointmentRequestListResponse,
     AppointmentRequestResponse,
     AppointmentRequestUpdate,
     PublicClinicBrandingResponse,
@@ -164,18 +164,18 @@ async def get_appointment_request(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
-@router.post("/appointment-requests/{id}/approve", response_model=ResponseEnvelope[dict[str, object]], status_code=status.HTTP_200_OK, dependencies=[ProtectedRouterDep])
+@router.post("/appointment-requests/{id}/approve", response_model=ResponseEnvelope[AppointmentRequestApprovalResponse], status_code=status.HTTP_200_OK, dependencies=[ProtectedRouterDep])
 async def approve_appointment_request(
     id: UUID,
     payload: AppointmentRequestApprovePayload,
     clinic: CurrentClinicDep,
     service: BookingServiceDep,
-) -> ResponseEnvelope[dict[str, object]]:
+) -> ResponseEnvelope[AppointmentRequestApprovalResponse]:
     """Authenticated staff endpoint approving an appointment request and scheduling an appointment."""
 
     try:
         response = await service.approve_request(clinic.id, id, payload)
-        return ResponseEnvelope(data=response)
+        return ResponseEnvelope(data=AppointmentRequestApprovalResponse.model_validate(response))
     except BookingNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except BookingValidationError as exc:
