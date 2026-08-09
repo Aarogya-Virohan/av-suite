@@ -198,6 +198,15 @@ class InvoiceListResponse(BaseModel):
     limit: int
 
 
+class InvoicePdfResponse(BaseModel):
+    """Response payload for a generated invoice PDF and WhatsApp deep link."""
+
+    invoice_id: str
+    status: str
+    download_url: str
+    whatsapp_link: str
+
+
 # --- Payment Schemas ---
 
 class PaymentBase(BaseModel):

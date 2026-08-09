@@ -9,6 +9,7 @@ from app.core.database import get_db
 from app.core.dependencies import require_roles
 from app.schemas.prescription import (
     PrescriptionCreate,
+    PrescriptionPdfResponse,
     PrescriptionRead,
     PrescriptionPatch,
 )
@@ -175,7 +176,7 @@ async def delete_prescription(
     return ResponseEnvelope(data={"message": "Prescription deleted successfully."})
 
 
-@router.post("/{id}/pdf", response_model=ResponseEnvelope[dict], tags=["Prescriptions"])
+@router.post("/{id}/pdf", response_model=ResponseEnvelope[PrescriptionPdfResponse], tags=["Prescriptions"])
 async def generate_pdf(
     request: Request, id: uuid.UUID, db: AsyncSession = Depends(get_db)
 ):
