@@ -35,6 +35,15 @@
 - Backend always reads `clinic_id` from the signed JWT, never from request params/body.
 - **Why**: A malicious user could pass any `clinic_id` and access another clinic's data.
 
+### ❌ NEVER fallback to 'admin' on a null role
+- e.g. `role || 'admin'` is strictly prohibited. Default `role` MUST be `null`, and `null` MUST deny access to all protected resources.
+
+### ❌ NEVER ship pre-filled default login credentials
+- Do not use `defaultValues` in `useForm` for login pages to prevent exposing test credentials in production builds.
+
+### ❌ NEVER rely solely on hiding sidebar navigation for RBAC
+- Every routed page in Next.js MUST enforce RBAC at the route boundary using `canAccessModule(role, module)` and render `<AccessRestricted>` if unauthorized.
+
 ### 🔒 ONLY IF: Adding a new public (unauthenticated) backend route
 - Document the decision in Decisions.md with a full justification.
 - Confirm the route returns zero patient/clinic-specific data.
@@ -80,6 +89,23 @@
 - Extend existing interfaces in `types/api.ts`.
 - Before adding a new type, search for an existing one.
 
+### ❌ NEVER show silent success toasts for unwired endpoints
+- If a UI action is not wired to a live backend endpoint, explicitly notify the user using `toast.warning()` stating the operation was not saved.
+
+### ❌ NEVER swallow API failures with fake success
+- No `.catch(() => ({ success: true }))` for mock fallbacks. Let errors bubble up to display real toast errors.
+
+### ❌ NEVER use hardcoded mock items as initial state
+- Always initialize with empty arrays `[]` and fetch live data from backend APIs on mount. Handle loading and empty states cleanly.
+
+### ❌ NEVER use inconsistent environment variable names for the API URL
+- All frontend applications across the monorepo MUST read the backend base URL using `NEXT_PUBLIC_API_URL`.
+- Base URLs MUST come strictly from environment configurations (`.env.local` / `.env`). Never allow `localStorage` overrides for API base URLs.
+- Every frontend app MUST maintain a populated `.env.example` file.
+
+### ❌ NEVER use different token storage keys across the suite
+- All monorepo frontend applications MUST use `'token'` as the standard `localStorage` key for authentication access tokens.
+
 ### ⚠️ ONLY IF: Creating a new Zustand store slice
 - Only for UI state with no server-sourced data.
 - Document the decision in Decisions.md.
@@ -99,6 +125,9 @@
 
 ### ❌ NEVER delete branches without confirming they are fully merged
 - Assume any existing branch is under review.
+
+### ❌ NEVER declare a task complete without zero TypeScript errors
+- Always run `npx tsc --noEmit` and verify it passes cleanly before finishing a task.
 
 ---
 
