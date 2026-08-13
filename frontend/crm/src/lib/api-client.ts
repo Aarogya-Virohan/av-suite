@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { getStoredToken, clearStoredTokens } from './auth';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export const API_BASE_URL = `${BASE_URL}/api/v1`;
 
 export const apiClient = axios.create({

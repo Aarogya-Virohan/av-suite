@@ -11,10 +11,14 @@ import { Invoice, Payment, Package, InvoiceStatus } from '../../../types/api';
 import { Plus, Download, CreditCard, FileText, Package as PackageIcon, Eye, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePatients } from '../../../features/patients/api';
+import { useAuthStore } from '../../../store';
+import { canAccessModule } from '../../../config/permissions';
+import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 type TabKey = 'invoices' | 'payments' | 'packages';
 
 export default function BillingPage() {
+  const role = useAuthStore((s) => s.role);
   const [activeTab, setActiveTab] = useState<TabKey>('invoices');
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -33,6 +37,10 @@ export default function BillingPage() {
     const p = patients.find((patient) => patient.id === patientId);
     return p ? `${p.first_name} ${p.last_name}` : patientId;
   };
+
+  if (!canAccessModule(role, 'billing')) {
+    return <AccessRestricted message="Billing & invoices are restricted to Administrators and Front Desk staff only." />;
+  }
 
   const invoiceColumns: Column<Invoice>[] = [
     {

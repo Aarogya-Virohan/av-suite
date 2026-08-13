@@ -5,7 +5,6 @@ import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
-import { UserRole } from '../../../types/api';
 import { Trash2, RotateCcw, ShieldAlert } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { toast } from 'sonner';
@@ -36,8 +35,23 @@ const MOCK_DELETED_ITEMS: DeletedItem[] = [
 ];
 
 export default function RecycleBinPage() {
-  const role = useAuthStore((s) => s.role) || ('admin' as UserRole);
-  const [items, setItems] = useState<DeletedItem[]>(MOCK_DELETED_ITEMS);
+  const role = useAuthStore((s) => s.role);
+  const [items, setItems] = useState<DeletedItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  React.useEffect(() => {
+    const fetchDeletedItems = async () => {
+      try {
+        const res = await apiClient.get('/recycle-bin');
+        setItems(res.data?.data || res.data || []);
+      } catch {
+        setItems([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchDeletedItems();
+  }, []);
 
   const handleRestore = async (resource: string, id: string) => {
     try {
@@ -94,6 +108,7 @@ export default function RecycleBinPage() {
         <DataTable
           columns={columns}
           data={items}
+          isLoading={isLoading}
           searchField={(i) => `${i.name} ${i.resource}`}
           searchPlaceholder="Search soft-deleted records..."
           emptyMessage="Recycle bin is empty."

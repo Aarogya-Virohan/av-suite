@@ -7,12 +7,12 @@ import { SlideOver } from '../../../components/ui/SlideOver';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
 import { useUsers } from '../../../features/users/api';
-import { User, UserRole } from '../../../types/api';
+import { User } from '../../../types/api';
 import { ShieldAlert, AlertCircle, Plus, Edit, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function TherapistsPage() {
-  const role = useAuthStore((s) => s.role) || ('admin' as UserRole);
+  const role = useAuthStore((s) => s.role);
   const { data: usersResponse, isLoading } = useUsers();
   const users = usersResponse || [];
   const initialTherapists = users.filter((u: User) => u.role === 'therapist' || u.role === 'admin');

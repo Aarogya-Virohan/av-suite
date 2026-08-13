@@ -7,6 +7,9 @@ import { AddLeadSlideOver } from '../../../features/leads/components/AddLeadSlid
 import { Lead, LeadStage } from '../../../types/api';
 import { Plus, UserCheck, ArrowRight, Phone, Mail } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuthStore } from '../../../store';
+import { canAccessModule } from '../../../config/permissions';
+import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 const STAGES: { key: LeadStage; label: string; color: string }[] = [
   { key: 'new', label: 'New', color: 'bg-blue-500' },
@@ -17,6 +20,7 @@ const STAGES: { key: LeadStage; label: string; color: string }[] = [
 ];
 
 export default function LeadsPage() {
+  const role = useAuthStore((s) => s.role);
   const { data: leads = [], isLoading } = useLeads();
   const updateStage = useUpdateLeadStage();
   const convertLead = useConvertLead();
@@ -40,6 +44,10 @@ export default function LeadsPage() {
       console.error(err);
     }
   };
+
+  if (!canAccessModule(role, 'leads')) {
+    return <AccessRestricted message="Leads management is restricted to Administrators and Front Desk staff only." />;
+  }
 
   return (
     <AppShell>

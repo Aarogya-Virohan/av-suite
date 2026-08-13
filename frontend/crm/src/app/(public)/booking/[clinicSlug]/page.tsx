@@ -39,9 +39,6 @@ export default function PublicBookingPage() {
         patient_name: name,
         phone,
         chief_complaint: chiefComplaint,
-      }).catch(() => {
-        // Fallback demo mock response
-        return { data: { success: true } };
       });
 
       setIsSuccess(true);

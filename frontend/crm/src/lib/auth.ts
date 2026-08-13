@@ -1,6 +1,6 @@
 import { UserRole } from '../types/api';
 
-const TOKEN_KEY = 'av_crm_access_token';
+const TOKEN_KEY = 'token';
 
 export interface JwtPayload {
   sub: string;        // user_id

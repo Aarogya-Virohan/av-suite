@@ -206,14 +206,17 @@ export const PERMISSIONS_MATRIX: Record<UserRole, RolePermissions> = {
   },
 };
 
-export function getPermissionsForRole(role: UserRole): RolePermissions {
+export function getPermissionsForRole(role: UserRole | null): RolePermissions {
+  if (!role) return PERMISSIONS_MATRIX.front_desk; // safest non-null fallback, but callers check null first
   return PERMISSIONS_MATRIX[role] || PERMISSIONS_MATRIX.front_desk;
 }
 
-export function canAccessModule(role: UserRole, module: keyof ModuleVisibility): boolean {
+export function canAccessModule(role: UserRole | null, module: keyof ModuleVisibility): boolean {
+  if (!role) return false;
   return getPermissionsForRole(role).sidebar[module];
 }
 
-export function canPerformAction(role: UserRole, action: keyof ActionPermissions): boolean {
+export function canPerformAction(role: UserRole | null, action: keyof ActionPermissions): boolean {
+  if (!role) return false;
   return getPermissionsForRole(role).actions[action];
 }

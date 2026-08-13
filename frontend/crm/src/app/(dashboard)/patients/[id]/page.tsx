@@ -6,7 +6,6 @@ import { AppShell } from '../../../../components/layout/AppShell';
 import { usePatient } from '../../../../features/patients/api';
 import { useAuthStore } from '../../../../store';
 import { getPermissionsForRole } from '../../../../config/permissions';
-import { UserRole } from '../../../../types/api';
 import { TreatmentsTab } from '../../../../features/patients/components/TreatmentsTab';
 import { SoapNotesTab } from '../../../../features/patients/components/SoapNotesTab';
 import { DocumentsTab } from '../../../../features/patients/components/DocumentsTab';
@@ -21,7 +20,7 @@ export default function PatientWorkspacePage() {
   const params = useParams();
   const router = useRouter();
   const patientId = params?.id as string;
-  const role = useAuthStore((s) => s.role) || ('admin' as UserRole);
+  const role = useAuthStore((s) => s.role);
 
   const { data: patient, isLoading } = usePatient(patientId);
   const [activeTab, setActiveTab] = useState<TabKey>('timeline');

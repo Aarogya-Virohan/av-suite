@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { useAuthStore, useUiStore } from '../../store';
 import { canAccessModule, ModuleVisibility } from '../../config/permissions';
-import { UserRole } from '../../types/api';
 
 interface NavItem {
   label: string;
@@ -42,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function SidebarNavigation() {
   const pathname = usePathname();
-  const role = useAuthStore((s) => s.role) || ('admin' as UserRole);
+  const role = useAuthStore((s) => s.role);
   const logout = useAuthStore((s) => s.logout);
   const { isSidebarOpen, toggleSidebar } = useUiStore();
 
@@ -74,7 +73,7 @@ export function SidebarNavigation() {
       {isSidebarOpen && (
         <div className="px-4 py-2 border-b border-white/5 bg-white/5">
           <p className="text-[10px] uppercase font-bold tracking-wider text-slate-300">
-            Role: <span className="text-teal-300">{role.replace('_', ' ')}</span>
+            Role: <span className="text-teal-300">{role ? role.replace('_', ' ') : 'Unknown'}</span>
           </p>
         </div>
       )}

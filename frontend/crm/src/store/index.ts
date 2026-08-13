@@ -33,7 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       token,
       userId: claims?.sub || null,
       clinicId: claims?.clinic_id || null,
-      role: claims?.role || 'admin',
+      role: claims?.role ?? null,
       isAuthenticated: true,
     });
   },

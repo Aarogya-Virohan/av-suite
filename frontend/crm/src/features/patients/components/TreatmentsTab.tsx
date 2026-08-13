@@ -51,7 +51,7 @@ export function TreatmentsTab({ patientId }: { patientId: string }) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    toast.success('Treatment session recorded (mock mode for save)');
+    toast.warning('Treatment session not saved — backend endpoint not yet wired. Your entry has not been persisted.');
     reset();
     setIsSlideOpen(false);
   };

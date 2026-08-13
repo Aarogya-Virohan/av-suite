@@ -67,7 +67,7 @@ export function DocumentsTab({ patientId }: { patientId: string }) {
       updated_at: new Date().toISOString(),
     };
 
-    toast.success('Document uploaded successfully (mock mode for upload)');
+    toast.warning('Document not uploaded — backend endpoint not yet wired. File has not been saved.');
     reset();
     setSelectedFile(null);
     setIsSlideOpen(false);

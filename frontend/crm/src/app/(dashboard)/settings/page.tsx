@@ -3,15 +3,20 @@
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
+import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { AuditLog, User } from '../../../types/api';
 import { useUsers } from '../../../features/users/api';
 import { useAuditLogs } from '../../../features/audit/api';
+import { useAuthStore } from '../../../store';
+import { canAccessModule } from '../../../config/permissions';
 import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Palette, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 type TabKey = 'clinic' | 'users' | 'audit';
 
 export default function SettingsPage() {
+  const role = useAuthStore((s) => s.role);
+
   const [activeTab, setActiveTab] = useState<TabKey>('clinic');
   const [clinicName, setClinicName] = useState('Aarogya Virohan Health Center');
   const [phone, setPhone] = useState('+919876543210');
@@ -76,6 +81,10 @@ export default function SettingsPage() {
     { key: 'role', header: 'Role', render: (u) => <span className="uppercase text-xs font-bold text-teal-600">{u.role}</span> },
     { key: 'is_active', header: 'Status', render: (u) => (u.is_active ? 'Active' : 'Inactive') },
   ];
+
+  if (!canAccessModule(role, 'settings')) {
+    return <AccessRestricted message="Clinic settings are restricted to Administrators only." />;
+  }
 
   return (
     <AppShell>

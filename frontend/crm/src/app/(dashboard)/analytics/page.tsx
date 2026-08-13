@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
-import { UserRole } from '../../../types/api';
 import { usePatients } from '../../../features/patients/api';
 import { useAnalyticsOverview } from '../../../features/analytics/api';
 import { TrendingUp, Users, Calendar, DollarSign, ShieldAlert, Plus, Trash2, Save, ArrowDownRight, ArrowUpRight } from 'lucide-react';
@@ -17,7 +16,7 @@ interface RunningCostItem {
 }
 
 export default function AnalyticsPage() {
-  const role = useAuthStore((s) => s.role) || ('admin' as UserRole);
+  const role = useAuthStore((s) => s.role);
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'year'>('month');
   const { data: patientsResponse } = usePatients(undefined, 1, 5);
   const patients = patientsResponse?.data || [];
@@ -48,7 +47,7 @@ export default function AnalyticsPage() {
   };
 
   const handleSaveCosts = () => {
-    toast.success('Running costs saved successfully');
+    toast.warning('Running costs not saved — backend endpoint not yet wired. Changes have not been persisted.');
   };
 
   if (!canAccessModule(role, 'analytics')) {

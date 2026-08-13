@@ -46,7 +46,21 @@ export default function AppointmentsPage() {
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('list');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
-  const [requests, setRequests] = useState<BookingRequest[]>(MOCK_REQUESTS);
+  const [requests, setRequests] = useState<BookingRequest[]>([]);
+
+  // Fetch pending appointment requests from backend on mount
+  React.useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const res = await apiClient.get('/appointment-requests');
+        setRequests(res.data?.data || res.data || []);
+      } catch {
+        // If endpoint isn't live yet, stay empty rather than showing mock data
+        setRequests([]);
+      }
+    };
+    fetchRequests();
+  }, []);
 
   // Booking Link State
   const [bookingUrl, setBookingUrl] = useState(
