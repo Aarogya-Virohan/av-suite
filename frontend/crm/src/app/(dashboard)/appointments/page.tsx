@@ -25,19 +25,6 @@ interface BookingRequest {
   created_at: string;
 }
 
-const MOCK_REQUESTS: BookingRequest[] = [
-  {
-    id: 'req_1',
-    patient_name: 'Vikas Sharma',
-    phone: '+919812345678',
-    service: 'Physiotherapy Consultation',
-    preferred_date: '2026-08-06',
-    preferred_slot: '10:00 AM',
-    chief_complaint: 'Severe neck pain after working on laptop',
-    status: 'pending',
-    created_at: '2026-08-05T09:30:00Z',
-  },
-];
 
 type SubTabKey = 'list' | 'requests' | 'bookingLink';
 

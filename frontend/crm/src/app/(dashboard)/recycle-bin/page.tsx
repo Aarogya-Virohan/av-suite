@@ -18,22 +18,6 @@ interface DeletedItem {
   deleted_by: string;
 }
 
-const MOCK_DELETED_ITEMS: DeletedItem[] = [
-  {
-    id: 'pat_99',
-    resource: 'patients',
-    name: 'Siddharth Rao (Patient)',
-    deleted_at: '2026-08-01T10:00:00Z',
-    deleted_by: 'admin@aarogya.com',
-  },
-  {
-    id: 'lead_88',
-    resource: 'leads',
-    name: 'Neha Kapoor (Lead)',
-    deleted_at: '2026-08-02T14:30:00Z',
-    deleted_by: 'admin@aarogya.com',
-  },
-];
 
 export default function RecycleBinPage() {
   const role = useAuthStore((s) => s.role);
@@ -60,9 +44,7 @@ export default function RecycleBinPage() {
       setItems((prev) => prev.filter((i) => i.id !== id));
       toast.success('Item restored successfully');
     } catch (err) {
-      console.warn('API unavailable, restoring mock item');
-      setItems((prev) => prev.filter((i) => i.id !== id));
-      toast.success('Item restored successfully');
+      toast.error('Failed to restore item');
     }
   };
 

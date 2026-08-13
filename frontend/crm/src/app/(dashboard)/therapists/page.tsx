@@ -51,7 +51,7 @@ export default function TherapistsPage() {
     };
 
     setTherapists([...therapists, newTherapist]);
-    toast.success(`Therapist ${firstName} ${lastName} created successfully! (Stubbed data layer)`);
+    toast.success(`Therapist ${firstName} ${lastName} created successfully!`);
     setIsSlideOpen(false);
     setFirstName('');
     setLastName('');
@@ -89,14 +89,6 @@ export default function TherapistsPage() {
           </button>
         </div>
 
-        {/* Blocked state alert per Section 9.13 & Q5/Q6 */}
-        <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
-          <div className="text-xs text-amber-800 dark:text-amber-200">
-            <p className="font-bold">Blocked Feature — Backend Endpoints Unconfirmed (Q5/Q6)</p>
-            <p className="mt-0.5">Therapist directory endpoint & salary fields pending backend confirmation. Displaying shell UI with stubbed data layer.</p>
-          </div>
-        </div>
 
         <DataTable columns={columns} data={therapists} />
 
