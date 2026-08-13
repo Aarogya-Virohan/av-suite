@@ -141,3 +141,42 @@ TBD
 
 *Add new bugs at the bottom. Update status when resolved. Never delete entries.*
 *Last updated: 2026-08-13 | Branch: integration/crm-merge*
+
+---
+
+### [BUG-003] Unwired Endpoints Emitting Warnings (Technical Debt)
+- **Status**: 🔵 Needs investigation / Implementation
+- **Reported**: 2026-08-13
+- **Reported By**: AI compliance review
+- **Severity**: Low
+- **Affected Area**: Settings, Patients, Appointments
+
+#### Symptom
+The UI allows interacting with "Save Branding", "Finalize SOAP Note", and "Generate Rx", but these now emit a yellow warning toast that backend synchronization is pending.
+
+#### Steps to Reproduce
+1. Navigate to Settings and click Save Branding.
+2. Navigate to Patient > SOAP Notes and click Finalize.
+3. Observe the `toast.warning`.
+
+#### Expected Behavior
+These actions should be wired to actual backend APIs and emit a green `toast.success` upon successful server response.
+
+#### Actual Behavior
+State is only updated locally or not at all (pending backend implementation).
+
+#### Root Cause
+Backend endpoints for these specific operations are either missing or the frontend `apiClient` mutations have not been written.
+
+#### Fix Applied
+Converted previously misleading silent successes to explicit warnings per constraints. Actual API wiring is pending.
+
+#### Verification
+N/A
+
+#### Affected Files
+| File | Change |
+|---|---|
+| `frontend/crm/src/app/(dashboard)/settings/page.tsx` | Wire Save action |
+| `frontend/crm/src/features/patients/components/SoapNotesTab.tsx` | Wire Finalize action |
+| `frontend/crm/src/app/(dashboard)/patients/[id]/page.tsx` | Wire Rx Generation |

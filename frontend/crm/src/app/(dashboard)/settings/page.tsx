@@ -63,7 +63,7 @@ export default function SettingsPage() {
       localStorage.setItem('av_crm_brand_color', brandColor);
       if (logoBase64) localStorage.setItem('av_crm_logo', logoBase64);
     }
-    toast.success('Clinic branding & settings saved successfully!');
+    toast.warning('Clinic branding & settings saved locally only — backend endpoint pending.');
   };
 
   const auditColumns: Column<AuditLog>[] = [
@@ -238,19 +238,6 @@ export default function SettingsPage() {
         {/* User Management Tab (Blocked Stub State) */}
         {activeTab === 'users' && (
           <div className="space-y-4">
-            <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-amber-800 dark:text-amber-200 font-semibold">
-                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-                <span>Blocked Feature — `/users` CRUD endpoints unconfirmed on backend (Q4). Submitting will no-op.</span>
-              </div>
-              <button
-                onClick={() => toast.error('User management endpoint not yet available')}
-                className="px-3 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-lg flex items-center gap-1 opacity-75 cursor-not-allowed"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add User (Stub)</span>
-              </button>
-            </div>
 
             <DataTable columns={userColumns} data={users} isLoading={isLoadingUsers} />
           </div>

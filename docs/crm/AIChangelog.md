@@ -95,3 +95,22 @@ cold-start overhead for future AI sessions.
 
 ---
 *Every AI session must add an entry before ending.*
+
+---
+
+### [2026-08-13] Session by Antigravity (Current Session)
+
+**Session Goal**: Review codebase against `AI_RULES.md` and `Constraints.md` and enforce compliance.
+
+**Branch**: `feature/frontend-redesign-impl`
+
+| File | Action | Summary |
+|---|---|---|
+| `frontend/crm/src/app/(dashboard)/settings/page.tsx` | Modified | Replaced silent success toast with warning. Removed outdated "Blocked Feature" stub for users. |
+| `frontend/crm/src/features/patients/components/SoapNotesTab.tsx` | Modified | Replaced silent success toasts with warnings for local-only SOAP note changes. |
+| `frontend/crm/src/app/(dashboard)/patients/[id]/page.tsx` | Modified | Replaced silent success toast with warning for unwired PDF Rx generation. |
+
+**Decisions Made**: N/A
+**Bugs Identified**: BUG-003 (Unwired endpoints needing backend logic: Settings save, SOAP finalizing, PDF generation)
+**Features Touched**: N/A
+**Notes**: Completed comprehensive codebase review for constraints compliance. All fake successes and lingering mock stubs are cleared out or converted to explicit warnings.

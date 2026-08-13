@@ -57,7 +57,7 @@ export default function PatientWorkspacePage() {
   };
 
   const handleGenerateRx = () => {
-    toast.success(`PDF Prescription generated for ${patient.first_name} ${patient.last_name}`);
+    toast.warning('PDF generation is not yet wired to the backend API.');
   };
 
   const allTabs: { key: TabKey; label: string; icon: React.ElementType }[] = [

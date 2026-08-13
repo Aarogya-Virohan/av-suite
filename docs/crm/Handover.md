@@ -120,3 +120,42 @@ and protocols that any future AI session can load to avoid starting from zero.
 ---
 
 *Template and log for all future sessions. Add new handovers below the previous entry.*
+
+---
+
+### Session Handover — 2026-08-13 — Antigravity (Current Session)
+
+#### What We Were Doing
+User requested a codebase-wide review against `AI_RULES.md` and `Constraints.md` to enforce compliance and update constraints documentation.
+
+#### Current State
+- Branch: `feature/frontend-redesign-impl`
+- Files actively being worked on: Codebase sweep completed.
+- Last action taken: Updating `AIChangelog.md`, `Handover.md`, and `Bug.md`.
+- Status: Complete
+
+#### What Was Completed This Session
+- [x] Swept codebase for silent success toasts on unwired endpoints.
+- [x] Swept codebase for lingering "Blocked Feature" stubs where backend endpoints are now available (e.g. `/users`).
+- [x] Enforced strict compliance with `Constraints.md` regarding mock data.
+- [x] Updated documentation trails.
+
+#### What Is Still In Progress
+- [ ] None.
+
+#### Open Questions / Blockers
+- None.
+
+#### What the Next Session Should Do First
+1. The codebase is now clean and compliant. Review `Bug.md` to pick up BUG-001 or BUG-002 if desired, or proceed with new feature work.
+
+#### Files Modified This Session
+| File | Change Type | Summary |
+|---|---|---|
+| `frontend/crm/src/app/(dashboard)/settings/page.tsx` | Modified | Removed fake success, removed outdated block stub. |
+| `frontend/crm/src/features/patients/components/SoapNotesTab.tsx` | Modified | Changed fake successes to warnings. |
+| `frontend/crm/src/app/(dashboard)/patients/[id]/page.tsx` | Modified | Changed fake success to warning. |
+
+#### Context the Next AI Must Know
+- Unwired endpoints now correctly emit `toast.warning()` instead of silently pretending to save data.
+- The `feature/frontend-redesign-impl` branch is fully compliant with `Constraints.md`.

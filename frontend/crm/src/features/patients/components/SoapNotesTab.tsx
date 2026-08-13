@@ -90,7 +90,7 @@ export function SoapNotesTab({
     };
     setActiveNote(updated);
     setAssessments((prev) => [updated, ...prev.filter((a) => a.id !== updated.id)]);
-    toast.success('SOAP note finalized & locked');
+    toast.warning('SOAP note locked locally — backend sync pending.');
   };
 
   const handleReopen = () => {
@@ -104,7 +104,7 @@ export function SoapNotesTab({
       updated_at: new Date().toISOString(),
     };
     setActiveNote(updated);
-    toast.success('Note re-opened for editing (Audit log recorded)');
+    toast.warning('Note re-opened locally — audit log sync pending.');
   };
 
   const updateFormData = (key: string, value: unknown) => {
