@@ -9,6 +9,9 @@ import { AppointmentStatus, Appointment } from '../../../types/api';
 import { Plus, Calendar as CalendarIcon, Clock, User, CheckCircle2, XCircle, Copy, ExternalLink, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '../../../lib/api-client';
+import { useAuthStore } from '../../../store';
+import { canAccessModule } from '../../../config/permissions';
+import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 interface BookingRequest {
   id: string;
@@ -39,6 +42,7 @@ const MOCK_REQUESTS: BookingRequest[] = [
 type SubTabKey = 'list' | 'requests' | 'bookingLink';
 
 export default function AppointmentsPage() {
+  const role = useAuthStore((s) => s.role);
   const { data: appointmentsResponse, isLoading } = useAppointments();
   const appointments: Appointment[] = appointmentsResponse?.data || [];
   const updateStatus = useUpdateAppointmentStatus();
@@ -74,6 +78,10 @@ export default function AppointmentsPage() {
     if (statusFilter !== 'all' && apt.status !== statusFilter) return false;
     return true;
   });
+
+  if (!canAccessModule(role, 'appointments')) {
+    return <AccessRestricted message="Appointments access is restricted for your role." />;
+  }
 
   const handleStatusChange = async (id: string, newStatus: AppointmentStatus) => {
     try {

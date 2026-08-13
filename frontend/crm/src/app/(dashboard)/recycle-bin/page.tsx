@@ -5,9 +5,10 @@ import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
-import { Trash2, RotateCcw, ShieldAlert } from 'lucide-react';
+import { Trash2, RotateCcw } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { toast } from 'sonner';
+import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 interface DeletedItem {
   id: string;
@@ -66,15 +67,7 @@ export default function RecycleBinPage() {
   };
 
   if (!canAccessModule(role, 'recycleBin')) {
-    return (
-      <AppShell>
-        <div className="p-8 max-w-md mx-auto text-center space-y-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-          <ShieldAlert className="w-12 h-12 text-rose-500 mx-auto" />
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Access Restricted</h2>
-          <p className="text-xs text-slate-500">Recycle bin access is restricted to Administrators only.</p>
-        </div>
-      </AppShell>
-    );
+    return <AccessRestricted message="Recycle bin access is restricted to Administrators only." />;
   }
 
   const columns: Column<DeletedItem>[] = [

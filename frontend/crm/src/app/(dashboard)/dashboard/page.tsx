@@ -4,9 +4,17 @@ import React from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { Users, Calendar, DollarSign, UserCheck, Loader2 } from 'lucide-react';
 import { useAnalyticsOverview } from '../../../features/analytics/api';
+import { useAuthStore } from '../../../store';
+import { canAccessModule } from '../../../config/permissions';
+import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 export default function DashboardPage() {
+  const role = useAuthStore((s) => s.role);
   const { data: overview, isLoading, isError, error } = useAnalyticsOverview();
+
+  if (!canAccessModule(role, 'dashboard')) {
+    return <AccessRestricted message="Dashboard access is restricted." />;
+  }
 
   return (
     <AppShell>

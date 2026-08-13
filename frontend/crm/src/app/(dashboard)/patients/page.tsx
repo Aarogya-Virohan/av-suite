@@ -9,8 +9,12 @@ import { AddPatientSlideOver } from '../../../features/patients/components/AddPa
 import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
 import { Patient, PatientStatus } from '../../../types/api';
 import { Plus, Phone } from 'lucide-react';
+import { useAuthStore } from '../../../store';
+import { canAccessModule } from '../../../config/permissions';
+import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 export default function PatientsPage() {
+  const role = useAuthStore((s) => s.role);
   const router = useRouter();
   const [page, setPage] = useState(1);
   const { data: response, isLoading } = usePatients(undefined, page, 10);
@@ -23,6 +27,10 @@ export default function PatientsPage() {
     if (statusFilter === 'all') return true;
     return p.status === statusFilter;
   });
+
+  if (!canAccessModule(role, 'patients')) {
+    return <AccessRestricted message="Patients directory access is restricted for your role." />;
+  }
 
   const columns: Column<Patient>[] = [
     {

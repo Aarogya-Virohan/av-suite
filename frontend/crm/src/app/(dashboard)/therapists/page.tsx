@@ -8,8 +8,9 @@ import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
 import { useUsers } from '../../../features/users/api';
 import { User } from '../../../types/api';
-import { ShieldAlert, AlertCircle, Plus, Edit, DollarSign } from 'lucide-react';
+import { AlertCircle, Plus, Edit, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
+import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 export default function TherapistsPage() {
   const role = useAuthStore((s) => s.role);
@@ -59,15 +60,7 @@ export default function TherapistsPage() {
   };
 
   if (!canAccessModule(role, 'therapists')) {
-    return (
-      <AppShell>
-        <div className="p-8 max-w-md mx-auto text-center space-y-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-          <ShieldAlert className="w-12 h-12 text-rose-500 mx-auto" />
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Access Restricted</h2>
-          <p className="text-xs text-slate-500">Therapists directory and payroll is restricted to Administrators only.</p>
-        </div>
-      </AppShell>
-    );
+    return <AccessRestricted message="Therapists directory and payroll is restricted to Administrators only." />;
   }
 
   const columns: Column<User>[] = [
