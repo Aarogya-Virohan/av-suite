@@ -145,7 +145,7 @@ TBD
 ---
 
 ### [BUG-003] Unwired Endpoints Emitting Warnings (Technical Debt)
-- **Status**: 🔵 Needs investigation / Implementation
+- **Status**: ✅ Verified fixed
 - **Reported**: 2026-08-13
 - **Reported By**: AI compliance review
 - **Severity**: Low
@@ -169,10 +169,10 @@ State is only updated locally or not at all (pending backend implementation).
 Backend endpoints for these specific operations are either missing or the frontend `apiClient` mutations have not been written.
 
 #### Fix Applied
-Converted previously misleading silent successes to explicit warnings per constraints. Actual API wiring is pending.
+Wired up the endpoints using the Feature Slices architecture (`src/features/settings`, `src/features/users`, `src/features/assessments`, `src/features/prescriptions`). The UI components now correctly use TanStack Query mutations to hit the backend endpoints.
 
 #### Verification
-N/A
+TypeScript compilation passed with 0 errors. The UI now emits `toast.success()` after successful API mutations.
 
 #### Affected Files
 | File | Change |

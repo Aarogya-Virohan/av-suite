@@ -114,3 +114,27 @@ cold-start overhead for future AI sessions.
 **Bugs Identified**: BUG-003 (Unwired endpoints needing backend logic: Settings save, SOAP finalizing, PDF generation)
 **Features Touched**: N/A
 **Notes**: Completed comprehensive codebase review for constraints compliance. All fake successes and lingering mock stubs are cleared out or converted to explicit warnings.
+
+---
+
+### [2026-08-13] Session by Antigravity (Phase 2: API Wiring)
+
+**Session Goal**: Wire up the 4 unwired endpoints identified as BUG-003 while maintaining Feature Slices modularity.
+
+**Branch**: `feature/frontend-redesign-impl`
+
+| File | Action | Summary |
+|---|---|---|
+| `frontend/crm/src/features/settings/api.ts` | Created | Added `useClinicSettings` and `useUpdateClinicSettings`. |
+| `frontend/crm/src/features/prescriptions/api.ts` | Created | Added `useGeneratePrescriptionPdf` and `useCreatePrescription`. |
+| `frontend/crm/src/features/users/components/AddUserSlideOver.tsx` | Created | Added UI for `useCreateUser` mutation. |
+| `frontend/crm/src/features/users/api.ts` | Modified | Added `useCreateUser`. |
+| `frontend/crm/src/features/assessments/api.ts` | Modified | Added `useCreateAssessment` and `useUpdateAssessment`. |
+| `frontend/crm/src/app/(dashboard)/settings/page.tsx` | Modified | Replaced `localStorage` usage with backend API calls. Included AddUserSlideOver. |
+| `frontend/crm/src/features/patients/components/SoapNotesTab.tsx` | Modified | Replaced local state mutation with real `POST/PATCH /assessments` calls. |
+| `frontend/crm/src/app/(dashboard)/patients/[id]/page.tsx` | Modified | Replaced warning toast with real `POST /prescriptions/{id}/pdf` call and file download. |
+
+**Decisions Made**: N/A
+**Bugs Identified**: BUG-003 Fixed
+**Features Touched**: N/A
+**Notes**: Maintained strict architectural compliance by isolating all API queries/mutations in their respective `src/features/<feature>/api.ts` files. Modularity allows for easy feature teardown.

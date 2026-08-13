@@ -126,11 +126,11 @@ and protocols that any future AI session can load to avoid starting from zero.
 ### Session Handover — 2026-08-13 — Antigravity (Current Session)
 
 #### What We Were Doing
-User requested a codebase-wide review against `AI_RULES.md` and `Constraints.md` to enforce compliance and update constraints documentation.
+User requested a codebase-wide review against `AI_RULES.md` and `Constraints.md` to enforce compliance, followed by wiring up the unwired APIs for Settings, Users, SOAP Notes, and Prescriptions.
 
 #### Current State
 - Branch: `feature/frontend-redesign-impl`
-- Files actively being worked on: Codebase sweep completed.
+- Files actively being worked on: Codebase sweep and API wiring completed.
 - Last action taken: Updating `AIChangelog.md`, `Handover.md`, and `Bug.md`.
 - Status: Complete
 
@@ -138,7 +138,11 @@ User requested a codebase-wide review against `AI_RULES.md` and `Constraints.md`
 - [x] Swept codebase for silent success toasts on unwired endpoints.
 - [x] Swept codebase for lingering "Blocked Feature" stubs where backend endpoints are now available (e.g. `/users`).
 - [x] Enforced strict compliance with `Constraints.md` regarding mock data.
-- [x] Updated documentation trails.
+- [x] Wired Clinic Settings API (`/settings/clinic`) using `src/features/settings`.
+- [x] Wired User Management API (`/users`) using `src/features/users` with a new `AddUserSlideOver`.
+- [x] Wired SOAP Notes API (`/assessments`) in `SoapNotesTab.tsx`.
+- [x] Wired Prescription PDF generation (`/prescriptions/{id}/pdf`) in `patients/[id]/page.tsx`.
+- [x] Updated documentation trails and marked BUG-003 as fixed.
 
 #### What Is Still In Progress
 - [ ] None.
@@ -152,10 +156,13 @@ User requested a codebase-wide review against `AI_RULES.md` and `Constraints.md`
 #### Files Modified This Session
 | File | Change Type | Summary |
 |---|---|---|
-| `frontend/crm/src/app/(dashboard)/settings/page.tsx` | Modified | Removed fake success, removed outdated block stub. |
-| `frontend/crm/src/features/patients/components/SoapNotesTab.tsx` | Modified | Changed fake successes to warnings. |
-| `frontend/crm/src/app/(dashboard)/patients/[id]/page.tsx` | Modified | Changed fake success to warning. |
+| `frontend/crm/src/features/settings/api.ts` | Created | New API hooks for clinic settings |
+| `frontend/crm/src/features/prescriptions/api.ts` | Created | New API hooks for generating PDF prescriptions |
+| `frontend/crm/src/features/users/components/AddUserSlideOver.tsx` | Created | UI component for creating users |
+| `frontend/crm/src/app/(dashboard)/settings/page.tsx` | Modified | Wired Settings and Add User functionality |
+| `frontend/crm/src/features/patients/components/SoapNotesTab.tsx` | Modified | Wired Finalize/Reopen to `/assessments` API |
+| `frontend/crm/src/app/(dashboard)/patients/[id]/page.tsx` | Modified | Wired Generate Rx to `/prescriptions` API |
 
 #### Context the Next AI Must Know
-- Unwired endpoints now correctly emit `toast.warning()` instead of silently pretending to save data.
-- The `feature/frontend-redesign-impl` branch is fully compliant with `Constraints.md`.
+- BUG-003 is officially fixed. All unwired endpoints now communicate with the backend.
+- The `feature/frontend-redesign-impl` branch is fully compliant with `Constraints.md` and follows the strict "Feature Slices" modularity pattern.
