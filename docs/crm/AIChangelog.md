@@ -71,5 +71,27 @@ cold-start overhead for future AI sessions.
 
 ---
 
-*New entries go at the BOTTOM. Oldest entries at top.*
+### [2026-08-13] Session by Gemini 3.1 Pro (High)
+
+**Session Goal**: Address Lead Developer review comments (PR #8 & #9 replacement): fix RBAC role fallback, add route guards, unify token key, standardize env vars, remove mock data, and rebase onto integration/crm-merge.
+
+**Branch**: `feature/frontend-redesign-impl`
+
+| File | Action | Summary |
+|---|---|---|
+| `frontend/crm/src/config/permissions.ts` | Modified | Explicitly deny access on `null` role instead of fallback to 'admin' |
+| `frontend/crm/src/store/index.ts` | Modified | Prevent setting 'admin' when token parse fails |
+| `frontend/crm/src/components/ui/AccessRestricted.tsx` | Created | Route-level RBAC guard component |
+| `frontend/crm/src/app/(dashboard)/*/page.tsx` | Modified | Added route guards to settings, billing, leads |
+| `frontend/crm/src/lib/api-client.ts` | Modified | Updated env var to `NEXT_PUBLIC_API_URL` across suite |
+| `frontend/crm/src/features/patients/components/*.tsx` | Modified | Replaced silent success toasts with warnings |
+| `frontend/crm/src/app/(dashboard)/appointments/page.tsx` | Modified | Replaced `MOCK_REQUESTS` with live API fetch |
+| `docs/crm/Constraints.md` | Modified | Added new explicit rules for AI based on this session's fixes |
+
+**Decisions Made**: D-009 (Formalize RBAC, Toast, and Mock constraints in docs)
+**Bugs Identified**: None
+**Features Touched**: FEAT-004, FEAT-005
+**Notes**: Branch successfully rebased onto `integration/crm-merge` (commit `b8894b9`). TypeScript build is fully clean.
+
+---
 *Every AI session must add an entry before ending.*
