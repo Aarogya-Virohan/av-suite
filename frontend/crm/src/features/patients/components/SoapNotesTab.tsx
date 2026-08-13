@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { SoapAssessment } from '../../../types/api';
-import { useAssessments } from '../../assessments/api';
+import { useAssessments, useCreateAssessment, useUpdateAssessment } from '../../assessments/api';
 import { useAuthStore } from '../../../store';
 import { CheckCircle2, Lock, Unlock, Save, FileCheck, Stethoscope, Heart, Zap, Baby, Activity } from 'lucide-react';
 
@@ -46,6 +46,9 @@ export function SoapNotesTab({
     );
   }, [assessmentsData, isReassessmentOnly]);
 
+  const createAssessment = useCreateAssessment();
+  const updateAssessment = useUpdateAssessment();
+
   const [activeNote, setActiveNote] = useState<SoapAssessment>(() => {
     const existing = assessments[0];
     if (existing) return existing;
@@ -82,29 +85,42 @@ export function SoapNotesTab({
     return () => clearTimeout(timer);
   }, [activeNote, isFinalized]);
 
-  const handleFinalize = () => {
-    const updated = {
-      ...activeNote,
-      finalized_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setActiveNote(updated);
-    setAssessments((prev) => [updated, ...prev.filter((a) => a.id !== updated.id)]);
-    toast.warning('SOAP note locked locally — backend sync pending.');
+  const handleFinalize = async () => {
+    try {
+      const payload = {
+        patient_id: patientId,
+        specialty: activeNote.specialty,
+        diagnosis: activeNote.diagnosis,
+        is_reassessment: isReassessmentOnly,
+        form_data: activeNote.form_data,
+        finalized: true,
+      };
+
+      if (activeNote.id.startsWith('soap_')) {
+        // Create new
+        await createAssessment.mutateAsync(payload);
+      } else {
+        // Update existing
+        await updateAssessment.mutateAsync({ id: activeNote.id, values: payload });
+      }
+
+      toast.success('SOAP note finalized & locked');
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to finalize note');
+    }
   };
 
-  const handleReopen = () => {
+  const handleReopen = async () => {
     if (role !== 'admin') {
       toast.error('Only Admins can re-open finalized clinical notes');
       return;
     }
-    const updated = {
-      ...activeNote,
-      finalized_at: null,
-      updated_at: new Date().toISOString(),
-    };
-    setActiveNote(updated);
-    toast.warning('Note re-opened locally — audit log sync pending.');
+    try {
+      await updateAssessment.mutateAsync({ id: activeNote.id, values: { finalized: false } });
+      toast.success('Note re-opened for editing (Audit log recorded)');
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to re-open note');
+    }
   };
 
   const updateFormData = (key: string, value: unknown) => {

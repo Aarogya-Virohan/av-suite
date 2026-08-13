@@ -15,3 +15,31 @@ export function useAssessments(patientId: string) {
     enabled: !!patientId,
   });
 }
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+export function useCreateAssessment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (values: any) => {
+      const res = await apiClient.post('/assessments', values);
+      return res.data?.data || res.data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ASSESSMENTS_QUERY_KEY });
+    },
+  });
+}
+
+export function useUpdateAssessment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, values }: { id: string; values: any }) => {
+      const res = await apiClient.patch(`/assessments/${id}`, values);
+      return res.data?.data || res.data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ASSESSMENTS_QUERY_KEY });
+    },
+  });
+}

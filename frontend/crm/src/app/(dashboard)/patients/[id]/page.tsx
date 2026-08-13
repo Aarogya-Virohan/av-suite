@@ -13,6 +13,7 @@ import { ProgressionTab } from '../../../../features/patients/components/Progres
 import { WhatsAppButton, openWhatsApp } from '../../../../components/ui/WhatsAppButton';
 import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, TrendingDown, Activity, FileCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } from '../../../../features/prescriptions/api';
 
 type TabKey = 'timeline' | 'documents' | 'treatments' | 'soapNotes' | 'assessments' | 'progression' | 'rx' | 'billing';
 
@@ -56,8 +57,50 @@ export default function PatientWorkspacePage() {
     openWhatsApp(patient.phone, `${patient.first_name} ${patient.last_name}`, message);
   };
 
-  const handleGenerateRx = () => {
-    toast.warning('PDF generation is not yet wired to the backend API.');
+  const { data: prescriptions, isLoading: isRxLoading } = usePrescriptions(patientId);
+  const createRx = useCreatePrescription();
+  const generatePdf = useGeneratePrescriptionPdf();
+
+  const handleGenerateRx = async () => {
+    try {
+      let rxId: string;
+      if (prescriptions && prescriptions.length > 0) {
+        rxId = prescriptions[0].id;
+      } else {
+        const newRx = await createRx.mutateAsync({
+          patient_id: patientId,
+          physio_notes: "Auto-generated prescription.",
+          items: [],
+        });
+        rxId = newRx.id;
+      }
+
+      await generatePdf.mutateAsync(rxId);
+      toast.success('Prescription generated successfully! Downloading...');
+
+      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/prescriptions/${rxId}/pdf/download`;
+      
+      const token = localStorage.getItem('av_crm_token');
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Prescription-${patient.first_name}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (err) {
+      toast.error('Failed to generate or download Prescription PDF');
+    }
   };
 
   const allTabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
@@ -197,10 +240,11 @@ export default function PatientWorkspacePage() {
               </p>
               <button
                 onClick={handleGenerateRx}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-lg inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                disabled={generatePdf.isPending || createRx.isPending || isRxLoading}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <FileCheck className="w-4 h-4" />
-                <span>Generate Prescription PDF</span>
+                <span>{generatePdf.isPending ? 'Generating...' : 'Generate Prescription PDF'}</span>
               </button>
             </div>
           )}

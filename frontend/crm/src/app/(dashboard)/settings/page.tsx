@@ -9,8 +9,10 @@ import { useUsers } from '../../../features/users/api';
 import { useAuditLogs } from '../../../features/audit/api';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
-import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Palette, Upload } from 'lucide-react';
+import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Palette, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useClinicSettings, useUpdateClinicSettings } from '../../../features/settings/api';
+import { AddUserSlideOver } from '../../../features/users/components/AddUserSlideOver';
 
 type TabKey = 'clinic' | 'users' | 'audit';
 
@@ -26,6 +28,23 @@ export default function SettingsPage() {
   const [doctorName, setDoctorName] = useState('Dr. Ananya Roy');
   const [regNo, setRegNo] = useState('REG-2026-PT88');
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+
+  const { data: clinicSettings, isLoading: isLoadingSettings } = useClinicSettings();
+  const updateSettings = useUpdateClinicSettings();
+
+  React.useEffect(() => {
+    if (clinicSettings) {
+      setClinicName(clinicSettings.name || 'Aarogya Virohan Health Center');
+      if (clinicSettings.branding_color) {
+        setBrandColor(clinicSettings.branding_color);
+        document.documentElement.style.setProperty('--brand-navy', clinicSettings.branding_color);
+      }
+      if (clinicSettings.branding_logo_url) {
+        setLogoBase64(clinicSettings.branding_logo_url);
+      }
+    }
+  }, [clinicSettings]);
 
   const { data: usersResponse, isLoading: isLoadingUsers } = useUsers();
   const users = usersResponse || [];
@@ -57,13 +76,18 @@ export default function SettingsPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleSaveClinic = (e: React.FormEvent) => {
+  const handleSaveClinic = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('av_crm_brand_color', brandColor);
-      if (logoBase64) localStorage.setItem('av_crm_logo', logoBase64);
+    try {
+      await updateSettings.mutateAsync({
+        name: clinicName,
+        branding_color: brandColor,
+        branding_logo_url: logoBase64,
+      });
+      toast.success('Clinic branding & settings saved successfully!');
+    } catch (err) {
+      toast.error('Failed to save clinic settings');
     }
-    toast.warning('Clinic branding & settings saved locally only — backend endpoint pending.');
   };
 
   const auditColumns: Column<AuditLog>[] = [
@@ -129,6 +153,18 @@ export default function SettingsPage() {
             <FileText className="w-4 h-4" />
             <span>Audit Log ({auditLogs.length})</span>
           </button>
+
+          {activeTab === 'users' && (
+            <div className="ml-auto">
+              <button
+                onClick={() => setIsAddUserOpen(true)}
+                className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium text-xs rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add User</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Clinic Branding Settings Tab */}
@@ -227,18 +263,18 @@ export default function SettingsPage() {
 
             <button
               type="submit"
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm"
+              disabled={updateSettings.isPending}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
-              <Save className="w-4 h-4" />
+              {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               <span>Save Branding Settings</span>
             </button>
           </form>
         )}
 
-        {/* User Management Tab (Blocked Stub State) */}
+        {/* User Management Tab */}
         {activeTab === 'users' && (
           <div className="space-y-4">
-
             <DataTable columns={userColumns} data={users} isLoading={isLoadingUsers} />
           </div>
         )}
@@ -254,6 +290,8 @@ export default function SettingsPage() {
           />
         )}
       </div>
+
+      <AddUserSlideOver isOpen={isAddUserOpen} onClose={() => setIsAddUserOpen(false)} />
     </AppShell>
   );
 }
