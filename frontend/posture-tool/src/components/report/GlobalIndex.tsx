@@ -8,7 +8,7 @@ export default function GlobalIndex({
   descriptor
 }: Props) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="print-section print-tight rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
 
       <p className="text-sm uppercase tracking-wide text-slate-500">
         Global Stability Index

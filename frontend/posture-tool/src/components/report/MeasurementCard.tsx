@@ -9,7 +9,7 @@ export default function MeasurementCard({ measurement }: Props) {
   const colors = getSeverityColor(measurement.severity)
 
   return (
-    <div className="bg-white border rounded-xl p-4 shadow-sm">
+    <div className="print-card bg-white border rounded-xl p-4 shadow-sm">
       <p className="text-sm text-gray-500">
         {measurement.label}
       </p>

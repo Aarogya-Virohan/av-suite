@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException
+from fastapi import Body
 from fastapi import File
 from fastapi import Form
 from fastapi import UploadFile
+from fastapi.responses import Response
 
 import base64
 import json
@@ -14,6 +16,7 @@ from app.services.posture.detector import (
     get_image_dimensions,
 )
 from app.services.posture.exceptions import InsufficientVisibilityError
+from app.services.posture.pdf_service import generate_posture_pdf
 
 from app.services.posture.calculator import (
     calc_cva,
@@ -571,3 +574,49 @@ async def analyze_posture(
         )
 
     return report
+
+
+# =============================================================================
+# PDF EXPORT
+# =============================================================================
+# The frontend previously "exported" the report with window.print(), which
+# printed the on-screen dashboard: browser URL and timestamp on every page,
+# interactive buttons in the patient's copy, and measurements landing on a
+# different page from the image they came from. This endpoint renders the same
+# report data as a document designed for paper instead.
+
+
+@router.post("/report/pdf")
+async def export_posture_pdf(report: dict = Body(...)):
+    """
+    Render an already-computed posture report to a clinical PDF.
+
+    Takes the report payload the frontend already holds, so the MediaPipe
+    analysis is not re-run just to produce a document.
+    """
+
+    try:
+        pdf_bytes = generate_posture_pdf(report)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"PDF generation failed: {str(e)}",
+        )
+
+    patient_name = ""
+    if isinstance(report.get("patient"), dict):
+        patient_name = str(report["patient"].get("name") or "")
+
+    safe_name = "".join(
+        c for c in patient_name if c.isalnum() or c in ("-", "_")
+    ) or "report"
+
+    filename = f"posture-assessment-{safe_name}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )

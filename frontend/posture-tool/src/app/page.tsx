@@ -7,7 +7,7 @@ import ImagePreview from "@/components/posture/ImagePreview"
 
 import ReportCard from "@/components/report/ReportCard"
 
-import { analyzePosture } from "@/lib/api"
+import { analyzePosture, downloadPostureReportPdf } from "@/lib/api"
 
 import type { PostureReport } from "@/types/posture"
 
@@ -332,13 +332,21 @@ return ( <div className="min-h-screen bg-slate-100">
             data={report}
           />
 
-          <div className="flex flex-wrap gap-4">
+          <div className="no-print flex flex-wrap gap-4">
 
             <button
               type="button"
-              onClick={() =>
-                window.print()
-              }
+              onClick={async () => {
+                try {
+                  await downloadPostureReportPdf(
+                    report
+                  )
+                } catch (err) {
+                  alert(
+                    "Could not generate the report PDF. Please try again."
+                  )
+                }
+              }}
               className="
                 rounded-full
                 bg-slate-900

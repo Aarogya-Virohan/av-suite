@@ -12,7 +12,7 @@ export default function ViewSection({
   data
 }: Props) {
   return (
-    <section className="bg-slate-50 rounded-2xl p-6 mt-6">
+    <section className="print-section print-page-break print-tight bg-slate-50 rounded-2xl p-6 mt-6">
 
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">
@@ -27,10 +27,12 @@ export default function ViewSection({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
 
         {data.photoUrl ? (
-          <AnnotatedImage
-            src={data.photoUrl}
-            alt={viewName}
-          />
+          <div className="print-image">
+            <AnnotatedImage
+              src={data.photoUrl}
+              alt={viewName}
+            />
+          </div>
         ) : (
           <div className="flex h-full min-h-[240px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white text-sm text-slate-400">
             No annotated image available

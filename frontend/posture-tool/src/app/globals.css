@@ -18,3 +18,103 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ==========================================================================
+   PRINT / PDF EXPORT
+   The report is exported via window.print(), so the printed page is whatever
+   these rules produce. The screen layout stacks the annotated image above a
+   long single-column list of measurement cards, which pushes each plane
+   across two or three pages -- a clinician then reads a severity value on a
+   page that does not show the image it came from.
+
+   The fix is to re-lay-out for paper rather than to ask the browser to avoid
+   breaking an oversized block: break-inside: avoid is silently ignored when
+   the block is taller than one page.
+   ========================================================================== */
+
+@media print {
+
+  /* Interactive controls are not part of the patient document. */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Severity badges carry clinical meaning through colour (NONE / MILD /
+     MODERATE / SEVERE). Browsers strip background colour when printing
+     unless this is set. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    margin: 10mm;
+  }
+
+  body {
+    background: #ffffff;
+    font-size: 10pt;
+  }
+
+  /* Start each plane on a fresh page. */
+  .print-page-break {
+    break-before: page;
+    page-break-before: page;
+  }
+
+  /* Tighten the generous on-screen spacing. */
+  .print-section {
+    padding: 0.5rem !important;
+    margin-top: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Keep the image beside its measurements on paper. Tailwind's lg: grid
+     columns do not apply at print width, so the two-column split is forced
+     here. */
+  .print-section > .grid {
+    display: grid !important;
+    grid-template-columns: 38% 62% !important;
+    gap: 0.5rem !important;
+    margin-top: 0.5rem !important;
+  }
+
+  /* The measurement grid itself: three across so nine cards occupy three
+     compact rows rather than a full page. */
+  .print-section > .grid > .grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0.35rem !important;
+  }
+
+  /* Individual measurement cards should never split across a page edge. */
+  .print-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    padding: 0.4rem !important;
+    box-shadow: none !important;
+  }
+
+  .print-card h2 {
+    font-size: 1.1rem !important;
+    margin-top: 0.15rem !important;
+  }
+
+  .print-card > div {
+    margin-top: 0.25rem !important;
+    padding: 0.1rem 0.5rem !important;
+    font-size: 0.7rem !important;
+  }
+
+  /* Annotated images are the clinical evidence, but at screen size a single
+     portrait photo consumes most of a page on its own. */
+  .print-image img {
+    max-height: 105mm;
+    width: auto;
+    object-fit: contain;
+  }
+
+  .print-image > div {
+    border: none !important;
+  }
+}

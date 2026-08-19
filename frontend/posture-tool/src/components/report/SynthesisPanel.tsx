@@ -8,7 +8,7 @@ export default function SynthesisPanel({
   data
 }: Props) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+    <section className="print-section print-page-break print-tight rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
 
       <h2 className="text-3xl font-bold text-slate-900">
         Clinical Master Synthesis
