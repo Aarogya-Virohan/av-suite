@@ -1,8 +1,8 @@
 import cv2
 import mediapipe as mp
 from mediapipe import solutions as mp_solutions
-import numpy as np
 
+from .decoder import decode_image_bytes
 from .schemas import Landmark
 from .exceptions import InsufficientVisibilityError
 
@@ -17,12 +17,7 @@ VISIBILITY_THRESHOLD = 0.65
 def get_image_dimensions(image_bytes: bytes) -> tuple[int, int]:
     """Returns (width_px, height_px) for an encoded image."""
 
-    np_arr = np.frombuffer(image_bytes, np.uint8)
-
-    image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-    if image is None:
-        raise ValueError("Failed to decode image")
+    image = decode_image_bytes(image_bytes)
 
     height, width = image.shape[:2]
 
@@ -41,12 +36,7 @@ def detect_pose_full(image_bytes: bytes):
         (parsed landmarks, raw mediapipe pose results)
     """
 
-    np_arr = np.frombuffer(image_bytes, np.uint8)
-
-    image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-    if image is None:
-        raise ValueError("Failed to decode image")
+    image = decode_image_bytes(image_bytes)
 
     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 

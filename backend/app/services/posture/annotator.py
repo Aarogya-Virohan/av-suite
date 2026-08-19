@@ -1,7 +1,7 @@
 import cv2
-import mediapipe as mp
 from mediapipe.python.solutions import drawing_utils, pose
-import numpy as np
+
+from .decoder import decode_image_bytes
 
 mp_drawing = drawing_utils
 mp_pose = pose
@@ -9,12 +9,7 @@ mp_pose = pose
 
 def annotate_pose(image_bytes: bytes, results) -> bytes:
 
-    np_arr = np.frombuffer(image_bytes, np.uint8)
-
-    image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-    if image is None:
-        raise ValueError("Image decoding failed")
+    image = decode_image_bytes(image_bytes)
 
     annotated = image.copy()
 
