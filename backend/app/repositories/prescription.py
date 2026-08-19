@@ -109,8 +109,8 @@ class PrescriptionRepository(BaseRepository[Prescription]):
                 selectinload(Prescription.items).selectinload(PrescriptionItem.exercise),
                 selectinload(Prescription.patient)
             )
-            .distinct(Prescription.id)
-            .order_by(Prescription.created_at.desc())
+            .distinct(Prescription.created_at, Prescription.id)
+            .order_by(Prescription.created_at.desc(), Prescription.id)
             .offset((page - 1) * page_size)
             .limit(page_size)
         )

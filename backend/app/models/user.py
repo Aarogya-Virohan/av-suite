@@ -15,9 +15,9 @@ class User(Base, TimestampMixin):
     role: Mapped[UserRole] = mapped_column(
         Enum(
             UserRole,
-            native_enum=False,
+            native_enum=True,
             values_callable=lambda e: [m.value for m in e],
-            name="userrole",
+            name="user_role",
         ),
         nullable=False,
     )

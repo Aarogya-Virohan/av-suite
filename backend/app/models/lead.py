@@ -43,7 +43,7 @@ class Lead(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     phone: Mapped[str] = mapped_column(String(length=50), nullable=False)
     email: Mapped[str | None] = mapped_column(String(length=255), nullable=True)
     source: Mapped[LeadSource | None] = mapped_column(
-        Enum(LeadSource, name="lead_source_type", create_type=False), nullable=True
+        Enum(LeadSource, name="lead_source_type", values_callable=lambda x: [e.value for e in x], create_type=False), nullable=True
     )
 
     stage: Mapped[LeadStage] = mapped_column(

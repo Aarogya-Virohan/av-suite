@@ -30,7 +30,7 @@ class Patient(Base, TimestampMixin):
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     age: Mapped[Optional[int]] = mapped_column(nullable=True)
-    gender: Mapped[Gender | None] = mapped_column(Enum(Gender, name="gender_type", create_type=False), nullable=True)
+    gender: Mapped[Gender | None] = mapped_column(Enum(Gender, name="gender_type", values_callable=lambda x: [e.value for e in x], create_type=False), nullable=True)
     chief_complaint: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     referral_source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[PatientStatus] = mapped_column(Enum(PatientStatus), nullable=False, default=PatientStatus.active)

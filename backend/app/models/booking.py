@@ -42,7 +42,7 @@ class AppointmentRequest(UUIDMixin, TimestampMixin, Base):
     phone: Mapped[str] = mapped_column(String(length=50), nullable=False)
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
     gender: Mapped[Gender | None] = mapped_column(
-        Enum(Gender, name="gender_type", create_type=False), nullable=True
+        Enum(Gender, name="gender_type", values_callable=lambda x: [e.value for e in x], create_type=False), nullable=True
     )
 
     chief_complaint: Mapped[str | None] = mapped_column(Text, nullable=True)
