@@ -84,6 +84,36 @@ CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
                 }
             ),
         ),
+        "appointments.view": CapabilityDefinition(
+            key="appointments.view",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.OWN,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
+        "appointments.create": CapabilityDefinition(
+            key="appointments.create",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.OWN,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
+        "appointments.edit": CapabilityDefinition(
+            key="appointments.edit",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.OWN,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
     }
 )
 
@@ -99,6 +129,9 @@ ROLE_TEMPLATES: Mapping[UserRole, Mapping[str, CapabilityScope]] = MappingProxyT
                 "treatments.view": CapabilityScope.ALL,
                 "treatments.create": CapabilityScope.ALL,
                 "treatments.edit": CapabilityScope.ALL,
+                "appointments.view": CapabilityScope.ALL,
+                "appointments.create": CapabilityScope.ALL,
+                "appointments.edit": CapabilityScope.ALL,
             }
         ),
         UserRole.THERAPIST: MappingProxyType(
@@ -107,9 +140,17 @@ ROLE_TEMPLATES: Mapping[UserRole, Mapping[str, CapabilityScope]] = MappingProxyT
                 "treatments.view": CapabilityScope.OWN,
                 "treatments.create": CapabilityScope.OWN,
                 "treatments.edit": CapabilityScope.OWN,
+                "appointments.view": CapabilityScope.OWN,
+                "appointments.create": CapabilityScope.OWN,
+                "appointments.edit": CapabilityScope.OWN,
             }
         ),
-        UserRole.FRONT_DESK: MappingProxyType({}),
+        UserRole.FRONT_DESK: MappingProxyType(
+            {
+                "appointments.view": CapabilityScope.ALL,
+                "appointments.create": CapabilityScope.ALL,
+            }
+        ),
         UserRole.PATIENT: MappingProxyType({}),
     }
 )
