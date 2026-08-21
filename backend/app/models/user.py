@@ -29,3 +29,9 @@ class User(Base, TimestampMixin):
     clinic = relationship("Clinic", back_populates="users")
     patient_profile = relationship("Patient", back_populates="user", uselist=False)
     prescriptions_given = relationship("Prescription", back_populates="physio")
+    permission_overrides = relationship(
+        "UserPermission",
+        foreign_keys="UserPermission.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
