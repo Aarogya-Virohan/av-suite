@@ -54,6 +54,36 @@ CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
                 }
             ),
         ),
+        "treatments.view": CapabilityDefinition(
+            key="treatments.view",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.OWN,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
+        "treatments.create": CapabilityDefinition(
+            key="treatments.create",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.OWN,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
+        "treatments.edit": CapabilityDefinition(
+            key="treatments.edit",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.OWN,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
     }
 )
 
@@ -66,11 +96,17 @@ ROLE_TEMPLATES: Mapping[UserRole, Mapping[str, CapabilityScope]] = MappingProxyT
                 "analytics.clinic_financials": CapabilityScope.ALL,
                 "permissions.manage": CapabilityScope.ALL,
                 "users.manage": CapabilityScope.ALL,
+                "treatments.view": CapabilityScope.ALL,
+                "treatments.create": CapabilityScope.ALL,
+                "treatments.edit": CapabilityScope.ALL,
             }
         ),
         UserRole.THERAPIST: MappingProxyType(
             {
                 "analytics.my_performance": CapabilityScope.OWN,
+                "treatments.view": CapabilityScope.OWN,
+                "treatments.create": CapabilityScope.OWN,
+                "treatments.edit": CapabilityScope.OWN,
             }
         ),
         UserRole.FRONT_DESK: MappingProxyType({}),
@@ -125,7 +161,6 @@ def resolve_capability_scope(
 # Adding a new role (e.g., Manager) is as simple as adding it to the appropriate lists here.
 PERMISSION_MAP: Dict[str, List[UserRole]] = {
     "patients": [UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK],
-    "treatments": [UserRole.ADMIN, UserRole.THERAPIST],
     "assessments": [UserRole.ADMIN, UserRole.THERAPIST],
     "billing": [UserRole.ADMIN, UserRole.FRONT_DESK],
     "analytics": [UserRole.ADMIN, UserRole.THERAPIST],  # RBAC Spec §4: Front Desk has NO analytics access
