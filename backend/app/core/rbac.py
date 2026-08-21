@@ -1,19 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from types import MappingProxyType
 from typing import Dict, List, Mapping
 
+from app.enums.permission import CapabilityScope
 from app.enums.user import UserRole
-
-
-class CapabilityScope(StrEnum):
-    """Allowed Rev3 capability scopes."""
-
-    NONE = "none"
-    OWN = "own"
-    ALL = "all"
 
 
 @dataclass(frozen=True, slots=True)
