@@ -28,7 +28,7 @@ async def test_public_booking_request_and_approval_flow(client: AsyncClient, aut
         "name": "Vikas Verma",
         "phone": "9899887766",
         "age": 32,
-        "gender": "Male",
+        "gender": "male",
         "chief_complaint": "Acute neck spasm",
         "preferred_date": "2026-08-10",
         "preferred_slot": "10:00 AM",

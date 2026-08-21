@@ -5,18 +5,16 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from app.core.dependencies import require_permission
-from app.enums.user import UserRole
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session, get_current_clinic, get_current_user
+from app.enums.permission import CapabilityScope
 from app.models.clinic import Clinic
 from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.patient import PatientRepository
 from app.repositories.treatment import TreatmentSessionRepository
 from app.repositories.user import UserRepository
+from app.core.dependencies import get_async_session, get_current_clinic, get_current_user, require_capability
 from app.schemas.treatment import (
     TreatmentSessionCreate,
     TreatmentSessionListResponse,
@@ -29,7 +27,7 @@ from app.services.treatment import (
     TreatmentValidationError,
 )
 
-router = APIRouter(dependencies=[Depends(require_permission("treatments"))])
+router = APIRouter()
 
 
 async def get_treatment_service(
@@ -54,9 +52,17 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 async def create_treatment_session(
     payload: TreatmentSessionCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: TreatmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("treatments.create")),
 ) -> TreatmentSessionResponse:
     """Create a new treatment session for the authenticated clinic."""
+
+    if scope == CapabilityScope.OWN and payload.therapist_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only create treatments assigned to yourself."
+        )
 
     try:
         session = await service.create_session(clinic.id, payload)
@@ -77,12 +83,13 @@ async def list_treatment_sessions(
     therapist_id: Annotated[UUID | None, Query(alias="therapist_id")] = None,
     start_date: Annotated[date | None, Query(alias="start_date")] = None,
     end_date: Annotated[date | None, Query(alias="end_date")] = None,
+    scope: CapabilityScope = Depends(require_capability("treatments.view")),
 ) -> TreatmentSessionListResponse:
     """List treatment sessions for the authenticated clinic with optional filtering."""
 
     # Enforce own-scope filtering for therapists
     effective_therapist_id = therapist_id
-    if user.role == UserRole.THERAPIST:
+    if scope == CapabilityScope.OWN:
         effective_therapist_id = user.id
 
     sessions = await service.list_sessions(
@@ -111,12 +118,13 @@ async def get_treatment_session(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: TreatmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("treatments.view")),
 ) -> TreatmentSessionResponse:
     """Retrieve a treatment session by ID for the authenticated clinic."""
 
     try:
         session = await service.get_session(clinic.id, id)
-        if user.role == UserRole.THERAPIST and session.therapist_id != user.id:
+        if scope == CapabilityScope.OWN and session.therapist_id != user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own treatments.")
         return TreatmentSessionResponse.model_validate(session)
     except TreatmentNotFoundError as exc:
@@ -130,13 +138,19 @@ async def update_treatment_session(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: TreatmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("treatments.edit")),
 ) -> TreatmentSessionResponse:
     """Update a treatment session for the authenticated clinic."""
 
     try:
         session = await service.get_session(clinic.id, id)
-        if user.role == UserRole.THERAPIST and session.therapist_id != user.id:
+        if scope == CapabilityScope.OWN and session.therapist_id != user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own treatments.")
+        
+        # Also prevent reassignment to another therapist if scope is OWN
+        if scope == CapabilityScope.OWN and payload.therapist_id is not None and payload.therapist_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot reassign your treatment to another therapist.")
+            
         session = await service.update_session(clinic.id, id, payload)
         return TreatmentSessionResponse.model_validate(session)
     except TreatmentNotFoundError as exc:
@@ -149,11 +163,16 @@ async def update_treatment_session(
 async def delete_treatment_session(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: TreatmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("treatments.edit")),
 ) -> None:
     """Delete a treatment session for the authenticated clinic."""
 
     try:
+        session = await service.get_session(clinic.id, id)
+        if scope == CapabilityScope.OWN and session.therapist_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own treatments.")
         await service.delete_session(clinic.id, id)
     except TreatmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
