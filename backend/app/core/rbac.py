@@ -1,5 +1,132 @@
-from typing import Dict, List
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+from types import MappingProxyType
+from typing import Dict, List, Mapping
+
 from app.enums.user import UserRole
+
+
+class CapabilityScope(StrEnum):
+    """Allowed Rev3 capability scopes."""
+
+    NONE = "none"
+    OWN = "own"
+    ALL = "all"
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilityDefinition:
+    """Definition for one Rev3 capability key."""
+
+    key: str
+    allowed_scopes: frozenset[CapabilityScope]
+
+
+CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
+    {
+        "analytics.my_performance": CapabilityDefinition(
+            key="analytics.my_performance",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.OWN,
+                }
+            ),
+        ),
+        "analytics.clinic_financials": CapabilityDefinition(
+            key="analytics.clinic_financials",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
+        "permissions.manage": CapabilityDefinition(
+            key="permissions.manage",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
+        "users.manage": CapabilityDefinition(
+            key="users.manage",
+            allowed_scopes=frozenset(
+                {
+                    CapabilityScope.NONE,
+                    CapabilityScope.ALL,
+                }
+            ),
+        ),
+    }
+)
+
+
+ROLE_TEMPLATES: Mapping[UserRole, Mapping[str, CapabilityScope]] = MappingProxyType(
+    {
+        UserRole.ADMIN: MappingProxyType(
+            {
+                "analytics.my_performance": CapabilityScope.OWN,
+                "analytics.clinic_financials": CapabilityScope.ALL,
+                "permissions.manage": CapabilityScope.ALL,
+                "users.manage": CapabilityScope.ALL,
+            }
+        ),
+        UserRole.THERAPIST: MappingProxyType(
+            {
+                "analytics.my_performance": CapabilityScope.OWN,
+            }
+        ),
+        UserRole.FRONT_DESK: MappingProxyType({}),
+        UserRole.PATIENT: MappingProxyType({}),
+    }
+)
+
+
+def get_capability_definition(capability_key: str) -> CapabilityDefinition | None:
+    """Return the registered capability definition, if known."""
+
+    return CAPABILITY_REGISTRY.get(capability_key)
+
+
+def get_role_template(role: UserRole) -> Mapping[str, CapabilityScope]:
+    """Return the default capability template for a role."""
+
+    return ROLE_TEMPLATES.get(role, MappingProxyType({}))
+
+
+def validate_capability_scope(capability_key: str, scope: CapabilityScope | str) -> CapabilityScope:
+    """Validate that a scope is allowed for a known capability."""
+
+    capability = get_capability_definition(capability_key)
+    if capability is None:
+        raise ValueError(f"Unknown capability: {capability_key}")
+
+    normalized_scope = CapabilityScope(scope)
+    if normalized_scope not in capability.allowed_scopes:
+        raise ValueError(f"Scope '{normalized_scope.value}' is not allowed for '{capability_key}'")
+
+    return normalized_scope
+
+
+def resolve_capability_scope(
+    role: UserRole,
+    capability_key: str,
+    user_permissions: Mapping[str, CapabilityScope | str] | None = None,
+) -> CapabilityScope:
+    """Resolve effective scope using explicit override, then role template, then none."""
+
+    if capability_key not in CAPABILITY_REGISTRY:
+        return CapabilityScope.NONE
+
+    if user_permissions is not None and capability_key in user_permissions:
+        return validate_capability_scope(capability_key, user_permissions[capability_key])
+
+    return get_role_template(role).get(capability_key, CapabilityScope.NONE)
 
 # Centralized Permission Map
 # Maps a resource/feature area to the list of roles that are allowed to access it.
