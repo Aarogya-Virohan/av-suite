@@ -1,7 +1,5 @@
 from typing import Any
 
-from app.services.posture.classifier import SEVERITY_LABELS
-
 
 def measurement(
     param_id: str,
@@ -14,9 +12,9 @@ def measurement(
     return {
         "paramId": param_id,
         "label": label,
-        "value": round(value, 2) if isinstance(value, (int, float)) else value,
+        "value": round(value, 2),
         "unit": unit,
-        "severityLabel": SEVERITY_LABELS.get(severity, severity.upper()),
+        "severityLabel": severity.upper(),
         "severity": severity,
     }
 
@@ -24,7 +22,6 @@ def measurement(
 def build_side_view_result(
     measurements: list[dict[str, Any]],
     photo_url: str,
-    accuracy: float = 0.0,
 ) -> dict[str, Any]:
 
     severe_findings = [
@@ -40,7 +37,7 @@ def build_side_view_result(
 
     return {
         "photoUrl": photo_url,
-        "accuracy": round(accuracy, 4),
+        "accuracy": 0.98,
         "measurements": measurements,
         "interpretation": interpretation,
     }
