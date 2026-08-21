@@ -82,3 +82,33 @@ export function usePatientDocuments(patientId: string) {
     enabled: !!patientId,
   });
 }
+
+export function useUploadPatientDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      patientId,
+      payload,
+    }: {
+      patientId: string;
+      payload: {
+        patient_id: string;
+        label: string;
+        category: string;
+        file_url: string;
+        file_type: string;
+        file_size: number;
+        notes?: string;
+        treatment_id?: string | null;
+      };
+    }) => {
+      const res = await apiClient.post(`/patients/${patientId}/documents`, payload);
+      return res.data?.data || res.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [...PATIENT_DOCUMENTS_QUERY_KEY, variables.patientId],
+      });
+    },
+  });
+}

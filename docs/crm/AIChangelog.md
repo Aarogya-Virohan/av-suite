@@ -138,3 +138,28 @@ cold-start overhead for future AI sessions.
 **Bugs Identified**: BUG-003 Fixed
 **Features Touched**: N/A
 **Notes**: Maintained strict architectural compliance by isolating all API queries/mutations in their respective `src/features/<feature>/api.ts` files. Modularity allows for easy feature teardown.
+
+---
+
+### [2026-08-21] Session by Antigravity (Cross-Verification & Execution)
+
+**Session Goal**: Cross-verify session walkthrough, all 15 docs, Rev3 PDF, and RBAC Spec PDF against live codebase. Fix all immediate-priority issues.
+
+**Branch**: `feature/frontend-redesign-impl`
+
+| File | Action | Summary |
+|---|---|---|
+| `backend/app/core/dependencies.py` | Modified | Removed duplicate synchronous `require_roles` (lines 55–64). Async version at line 153 is the correct canonical one. |
+| `frontend/crm/src/features/treatments/api.ts` | Modified | Added `useCreateTreatmentSession` TanStack mutation for `POST /treatments`. |
+| `frontend/crm/src/features/patients/components/TreatmentsTab.tsx` | Modified | Wired real mutation. Removed fake local TreatmentSession object, hardcoded clinic_id, and hardcoded therapist_id. Real therapist_id sourced from `useAuthStore.getState().userId`. |
+| `frontend/crm/src/features/patients/api.ts` | Modified | Added `useUploadPatientDocument` mutation for `POST /patients/{id}/documents`. |
+| `frontend/crm/src/features/patients/components/DocumentsTab.tsx` | Modified | Wired real document mutation. Removed fake PatientDocument object with hardcoded clinic_id and uploaded_by. |
+| `frontend/crm/src/lib/api-client.ts` | Modified | Fixed BUG-002: added `useAuthStore.getState().logout()` in 401 interceptor to clear Zustand in-memory state alongside localStorage. |
+| `frontend/crm/src/app/(dashboard)/analytics/page.tsx` | Modified | Consolidated hardcoded therapistSalariesTotal into editable runningCosts array. Removed hardcoded ₹7,500 per-patient revenue mock. |
+| `schema.sql` | Modified | Added REFERENCE ONLY disclaimer per Step 013 / Onkar review point #7. |
+
+**Decisions Made**: N/A (existing decisions cover all actions)
+**Bugs Identified**: BUG-004 (see Bug.md)
+**Bugs Fixed**: BUG-002, BUG-003 (Treatments & Documents finally wired)
+**Features Touched**: FEAT-004 (Patient Management — TreatmentsTab + DocumentsTab now live)
+**Notes**: Migration linearization (Steps 1–9) deferred — Sparsh's `d8a9f0c1b2e3` file does not exist on disk. Only apply after `git merge fix/backend-analytics-whatsapp`. Rev3 capability system (Phase 6) deferred pending Onkar sign-off.

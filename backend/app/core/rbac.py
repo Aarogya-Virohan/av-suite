@@ -9,7 +9,7 @@ PERMISSION_MAP: Dict[str, List[UserRole]] = {
     "treatments": [UserRole.ADMIN, UserRole.THERAPIST],
     "assessments": [UserRole.ADMIN, UserRole.THERAPIST],
     "billing": [UserRole.ADMIN, UserRole.FRONT_DESK],
-    "analytics": [UserRole.ADMIN, UserRole.THERAPIST],
+    "analytics": [UserRole.ADMIN, UserRole.THERAPIST],  # RBAC Spec §4: Front Desk has NO analytics access
     "leads": [UserRole.ADMIN, UserRole.FRONT_DESK],
     "documents": [UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK],
     "appointments": [UserRole.ADMIN, UserRole.THERAPIST, UserRole.FRONT_DESK],

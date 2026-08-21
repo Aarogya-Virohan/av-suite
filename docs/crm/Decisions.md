@@ -150,5 +150,33 @@ Each entry follows this structure:
 
 ---
 
-*Last updated: 2026-08-13 | Branch: integration/crm-merge*
+*Last updated: 2026-08-21 | Branch: feature/frontend-redesign-impl*
 *Add new entries at the bottom with incremented D-NNN index.*
+
+---
+
+## [D-009] Rev3 Capability System Deferred to Phase 2
+- **Date**: 2026-08-21
+- **Session / Model**: Antigravity (Claude Sonnet 4.6 Thinking)
+- **Context**: Rev3 spec requires a `user_permissions` table, capability keys, scope values (`none`/`own`/`all`), and split analytics endpoints. This is substantial backend work.
+- **Options Considered**:
+  1. Implement `user_permissions` table + capability resolver in this PR
+  2. Defer to Phase 2 — merge current PR as Phase 1, then implement Rev3 in a dedicated branch
+- **Decision**: Defer to Phase 2 (option 2)
+- **Reasoning**: Phase 1 PR is already substantial (migration, auth hardening, API wiring). Adding a new DB table, resolver engine, and two new analytics endpoints would make the PR too large to review safely. The current RBAC system (`PERMISSION_MAP` in `rbac.py`) is functional for all existing routes.
+- **Trade-offs**: Analytics page shows same view for admin and therapist in the interim.
+- **Affected Files**: Will affect `backend/alembic/versions/`, `backend/app/core/rbac.py`, `backend/app/api/v1/analytics.py`, `frontend/crm/src/features/analytics/api.ts`, `frontend/crm/src/app/(dashboard)/analytics/page.tsx`
+
+---
+
+## [D-010] Zustand `.getState()` Used Outside React in `api-client.ts`
+- **Date**: 2026-08-21
+- **Session / Model**: Antigravity (Claude Sonnet 4.6 Thinking)
+- **Context**: BUG-002 fix requires calling `useAuthStore.logout()` from within the Axios response interceptor, which is outside any React component tree.
+- **Options Considered**:
+  1. Subscribe to a global event bus and handle logout in a React component
+  2. Use Zustand's vanilla `.getState()` API directly in the interceptor
+- **Decision**: Use `useAuthStore.getState().logout()` (option 2)
+- **Reasoning**: Zustand explicitly supports and documents calling `.getState()` on the store object outside React. This is simpler, has no side effects, and does not require any new infrastructure. No hooks are invoked — `.getState()` is a plain synchronous call on the store module export.
+- **Trade-offs**: Slight coupling between `api-client.ts` (lib layer) and `store/index.ts`. Acceptable because auth state management is already centralized in the store by design.
+- **Affected Files**: `frontend/crm/src/lib/api-client.ts`, `frontend/crm/src/store/index.ts`

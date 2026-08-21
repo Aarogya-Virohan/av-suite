@@ -22,6 +22,7 @@ from app.api.v1 import (
     settings,
     analytics,
     users,
+    # memory,
 )
 import logging
 
@@ -51,5 +52,6 @@ api_router.include_router(audit.router, tags=["Audit"])
 api_router.include_router(recycle_bin.router, tags=["Recycle Bin"])
 api_router.include_router(settings.router, tags=["Settings"])
 api_router.include_router(analytics.router, tags=["Analytics"])
+# api_router.include_router(memory.router, prefix="/memory", tags=["Memory"])
 
 logger.info("All API v1 routers registered (existing + CRM)")

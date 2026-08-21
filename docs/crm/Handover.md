@@ -166,3 +166,59 @@ User requested a codebase-wide review against `AI_RULES.md` and `Constraints.md`
 #### Context the Next AI Must Know
 - BUG-003 is officially fixed. All unwired endpoints now communicate with the backend.
 - The `feature/frontend-redesign-impl` branch is fully compliant with `Constraints.md` and follows the strict "Feature Slices" modularity pattern.
+
+---
+
+### Session Handover — 2026-08-21 — Antigravity (Cross-Verification & Execution)
+
+#### What We Were Doing
+Tarun provided the full session walkthrough from the previous session and asked for a cross-verification of all 15 docs, Rev3 PDF, RBAC Spec PDF, and live codebase — then execute all confirmed immediate-priority fixes.
+
+#### Current State
+- Branch: `feature/frontend-redesign-impl`
+- Status: **Phase 1 complete**. Phases 2 & 3 pending (migration + Rev3 capability system).
+
+#### What Was Completed This Session
+- [x] Removed duplicate synchronous `require_roles` from `dependencies.py` (lines 55–64)
+- [x] Added `useCreateTreatmentSession` mutation — `features/treatments/api.ts`
+- [x] Wired `TreatmentsTab.tsx` to real `POST /treatments` — removed hardcoded clinic_id, therapist_id mock
+- [x] Added `useUploadPatientDocument` mutation — `features/patients/api.ts`
+- [x] Wired `DocumentsTab.tsx` to real `POST /patients/{id}/documents` — removed hardcoded mock
+- [x] Fixed BUG-002: `api-client.ts` 401 handler now clears Zustand state via `.getState().logout()`
+- [x] Removed hardcoded `₹7,500 Paid` per-patient mock from analytics page
+- [x] Consolidated `therapistSalariesTotal = 65000` into editable `runningCosts` array
+- [x] Added REFERENCE ONLY disclaimer to `schema.sql` (Onkar review point #7 ✅)
+- [x] Updated all 5 documentation files (AIChangelog, Handover, Bug, Decisions, Feature)
+
+#### What Is Still In Progress
+- [ ] Migration `down_revision` fix — **deferred** (Sparsh's migration file not on disk; apply after `git merge fix/backend-analytics-whatsapp`)
+- [ ] Remove `patients.date_of_birth` from migration — same as above
+- [ ] Rev3 capability system (`user_permissions` table, `/analytics/my-performance`, `/analytics/clinic-financials`) — **deferred** pending Onkar sign-off
+- [ ] DocumentsTab: Phase 2 — replace `createObjectURL` with actual Supabase Storage upload
+
+#### Open Questions / Blockers
+- Has Sparsh's PR #16 (`fix/backend-analytics-whatsapp`) been merged to `integration/crm-merge`? The migration conflict only becomes real after merge.
+- Is the Rev3 `user_permissions` table required for this PR or Phase 2?
+
+#### What the Next Session Should Do First
+1. Run `git fetch origin && git log --oneline origin/integration/crm-merge` — check if Sparsh's migration landed
+2. If yes: apply migration `down_revision` fix + strip `patients.date_of_birth`
+3. Run `python -m alembic heads` to verify single head
+4. Run `npm install && node node_modules/typescript/bin/tsc --noEmit` in `frontend/crm` to verify 0 TS errors
+
+#### Files Modified This Session
+| File | Change Type | Summary |
+|---|---|---|
+| `backend/app/core/dependencies.py` | Modified | Removed duplicate sync `require_roles` |
+| `frontend/crm/src/features/treatments/api.ts` | Modified | Added `useCreateTreatmentSession` |
+| `frontend/crm/src/features/patients/components/TreatmentsTab.tsx` | Modified | Real mutation wiring |
+| `frontend/crm/src/features/patients/api.ts` | Modified | Added `useUploadPatientDocument` |
+| `frontend/crm/src/features/patients/components/DocumentsTab.tsx` | Modified | Real mutation wiring |
+| `frontend/crm/src/lib/api-client.ts` | Modified | BUG-002 fix — Zustand logout on 401 |
+| `frontend/crm/src/app/(dashboard)/analytics/page.tsx` | Modified | Mock cost/revenue cleanup |
+| `schema.sql` | Modified | REFERENCE ONLY disclaimer added |
+
+#### Context the Next AI Must Know
+- Sparsh's `d8a9f0c1b2e3_seed_demo_login_data.py` migration does NOT exist on disk. The two-headed conflict in the walkthrough only materializes after Sparsh's branch is merged. Do NOT change `down_revision` until then.
+- `api-client.ts` now imports `useAuthStore` — this is intentional (Zustand `.getState()` is valid outside React).
+- `DocumentsTab` stores `createObjectURL` as `file_url` as a temporary placeholder. Phase 2 must add Supabase Storage upload and replace this with a permanent URL.

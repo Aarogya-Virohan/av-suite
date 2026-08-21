@@ -97,7 +97,7 @@ TBD
 ---
 
 ### [BUG-002] 401 Redirect Does Not Clear Zustand State
-- **Status**: 🔵 Needs investigation
+- **Status**: ✅ Verified fixed
 - **Reported**: 2026-08-13
 - **Reported By**: AI code review
 - **Severity**: Medium
@@ -105,42 +105,69 @@ TBD
 
 #### Symptom
 When `api-client.ts` responseInterceptor handles a 401, it calls `clearStoredTokens()`
-(clears localStorage) and redirects to `/login`. However, it does NOT call
+(clears localStorage) and redirects to `/login`. However, it did NOT call
 `useAuthStore().logout()`, which means Zustand's in-memory state
 (`isAuthenticated`, `token`, `role`) remains set until the page reloads.
 
-#### Steps to Reproduce
-1. Log in as a user
-2. Manually expire or invalidate the JWT server-side
-3. Trigger any API call
-4. Observe: redirect happens, but Zustand state in memory still shows isAuthenticated = true
-   until hard reload
-
-#### Expected Behavior
-On 401, both localStorage AND Zustand state should be cleared before redirect.
-
 #### Root Cause
-`api-client.ts` doesn't have direct access to the Zustand store (Zustand is a React hook context).
-Calling hooks outside of React components is not allowed.
+`api-client.ts` doesn't have direct access to the Zustand store via React hooks (hooks
+are only valid inside React components). The fix uses Zustand's `.getState()` vanilla API
+which is explicitly designed for use outside React component trees.
 
 #### Fix Applied
-TBD. Potential solutions:
-1. Use Zustand's `getState()` outside React: `useAuthStore.getState().logout()`
-   (Zustand supports this)
-2. Subscribe to a global event from the store and clear there
+Added `useAuthStore.getState().logout()` call in `api-client.ts` 401 handler, alongside
+`clearStoredTokens()`. Zustand's `.getState()` is the officially supported pattern for
+accessing store state outside React (documented in D-004).
 
 #### Verification
-TBD
+401 response now: (1) clears localStorage via `clearStoredTokens()`, (2) resets Zustand
+in-memory auth state via `.getState().logout()`, (3) redirects to `/login`.
 
 #### Affected Files
 | File | Change |
 |---|---|
-| `frontend/crm/src/lib/api-client.ts` | Add `useAuthStore.getState().logout()` call on 401 |
+| `frontend/crm/src/lib/api-client.ts` | Added `useAuthStore.getState().logout()` on 401 |
 
 ---
 
 *Add new bugs at the bottom. Update status when resolved. Never delete entries.*
-*Last updated: 2026-08-13 | Branch: integration/crm-merge*
+*Last updated: 2026-08-21 | Branch: feature/frontend-redesign-impl*
+
+---
+
+### [BUG-004] Hardcoded `therapist_id` & `clinic_id` in TreatmentsTab Default Values
+- **Status**: ✅ Verified fixed
+- **Reported**: 2026-08-21
+- **Reported By**: Antigravity cross-verification audit
+- **Severity**: High (security + constraint violation)
+- **Affected Area**: TreatmentsTab / Patient Management
+
+#### Symptom
+`TreatmentsTab.tsx` constructed a fake `TreatmentSession` object with hardcoded
+`clinic_id: 'cln_aarogya_1'` and `therapist_id: 'usr_therapist_1'`. Even though this
+object was never persisted (the form was mocked), these values would have been sent to
+the backend if wired naively.
+
+#### Root Cause
+Mock-first implementation from early development stage. `clinic_id` was never meant to
+be sent from the frontend (backend derives it from JWT). `therapist_id` defaulted to a
+hardcoded string instead of the authenticated user's ID.
+
+#### Fix Applied
+- Removed the entire fake `TreatmentSession` object construction
+- `therapist_id` default now reads from `useAuthStore.getState().userId`
+- `clinic_id` is never sent — the backend injects it from the JWT via `get_current_clinic()`
+- The `onSubmit` now calls `useCreateTreatmentSession().mutate(values, ...)`
+
+#### Verification
+- Mock toast removed. Form submission now calls `POST /api/v1/treatments` with bearer token.
+- On success: `toast.success` + cache invalidation. On error: `toast.error` with backend detail.
+
+#### Affected Files
+| File | Change |
+|---|---|
+| `frontend/crm/src/features/patients/components/TreatmentsTab.tsx` | Replaced mock with real mutation |
+| `frontend/crm/src/features/treatments/api.ts` | Added `useCreateTreatmentSession` |
 
 ---
 

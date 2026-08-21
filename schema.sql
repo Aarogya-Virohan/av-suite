@@ -3,6 +3,14 @@
 -- Target Database: PostgreSQL 14+
 -- Last Updated: August 2026
 -- =============================================================================
+--
+-- ⚠️  REFERENCE ONLY — ARCHITECTURAL DESIGN SPECIFICATION
+-- This file is NOT the source of truth for the live database schema.
+-- Alembic migrations in backend/alembic/versions/ are the SINGLE SOURCE OF TRUTH.
+-- This file exists for human reference and design review purposes only.
+-- DO NOT run this file against any database directly — it will conflict with
+-- existing Alembic migration history.
+-- =============================================================================
 
 -- Enable UUID extension if not already enabled
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

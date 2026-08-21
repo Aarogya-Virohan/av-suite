@@ -4,12 +4,11 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { PatientDocument, DocumentCategory } from '../../../types/api';
 import { patientDocumentFormSchema, PatientDocumentFormValues } from '../../../lib/schemas';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { FileUp, FileText, Download, Trash2, Plus, Paperclip } from 'lucide-react';
 
-import { usePatientDocuments } from '../api';
+import { usePatientDocuments, useUploadPatientDocument } from '../api';
 
 export function DocumentsTab({ patientId }: { patientId: string }) {
   const { data: response, isLoading } = usePatientDocuments(patientId);
@@ -45,32 +44,44 @@ export function DocumentsTab({ patientId }: { patientId: string }) {
     setSelectedFile(file);
   };
 
+  const uploadDocument = useUploadPatientDocument();
+
   const onSubmit = (values: PatientDocumentFormValues) => {
     if (!selectedFile) {
       toast.error('Please select a file to upload');
       return;
     }
 
-    const newDoc: PatientDocument = {
-      id: `doc_${Date.now()}`,
-      clinic_id: 'cln_aarogya_1',
-      patient_id: patientId,
-      uploaded_by: 'usr_therapist_1',
-      treatment_id: values.treatment_id || null,
-      file_url: URL.createObjectURL(selectedFile),
-      file_type: selectedFile.type || 'application/pdf',
-      file_size: selectedFile.size,
-      label: values.label,
-      category: values.category as DocumentCategory,
-      notes: values.notes || '',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    // Note: file_url uses a temporary object URL.
+    // Phase 2 will replace this with a Supabase Storage upload that returns a permanent URL.
+    const tempFileUrl = URL.createObjectURL(selectedFile);
 
-    toast.warning('Document not uploaded — backend endpoint not yet wired. File has not been saved.');
-    reset();
-    setSelectedFile(null);
-    setIsSlideOpen(false);
+    uploadDocument.mutate(
+      {
+        patientId,
+        payload: {
+          patient_id: patientId,
+          label: values.label,
+          category: values.category,
+          file_url: tempFileUrl,
+          file_type: selectedFile.type || 'application/octet-stream',
+          file_size: selectedFile.size,
+          notes: values.notes || undefined,
+          treatment_id: values.treatment_id || null,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Document record saved successfully.');
+          reset();
+          setSelectedFile(null);
+          setIsSlideOpen(false);
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || 'Failed to save document.');
+        },
+      }
+    );
   };
 
   const formatFileSize = (bytes: number | null) => {

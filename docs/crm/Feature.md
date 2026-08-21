@@ -225,5 +225,37 @@ Billing records per patient per appointment. Invoice generation. Payment status 
 
 ---
 
+### [FEAT-007] Rev3 Capability System (Per-User Permission Overrides)
+- **Status**: 📋 Planned
+- **Priority**: P1
+- **Owner**: Tarun Sisodia (Phase 2)
+
+#### What It Does
+Replaces rigid role-based access with per-user capability overrides. Each user has a row
+in `user_permissions` (`clinic_id`, `user_id`, `capability_key`, `scope`) where scope
+can be `none`, `own`, or `all`. The effective access level is resolved via
+`effective_scope(user, capability_key)`.
+
+#### Acceptance Criteria
+- [ ] New migration: `user_permissions` table
+- [ ] Backend `effective_scope()` resolver
+- [ ] `GET /api/v1/analytics/my-performance` — therapist-scoped stats
+- [ ] `GET /api/v1/analytics/clinic-financials` — admin-scoped financial view
+- [ ] Frontend analytics page conditionally renders based on capability
+- [ ] Permission management UI for admins
+- [ ] Lockout guard: cannot revoke last `permissions.manage` or `users.manage` grant
+
+#### Backend Contract
+- `GET /api/v1/permissions` → list user capabilities
+- `PUT /api/v1/permissions/{user_id}/{capability_key}` → set scope
+- `GET /api/v1/analytics/my-performance` → own-scoped therapist view
+- `GET /api/v1/analytics/clinic-financials` → admin financial view
+- Auth required: Yes (admin for grant/revoke; any role for reading own analytics)
+
+#### Decisions Made During Implementation
+- Reference D-009 (Phase 2 deferral decision)
+
+---
+
 *Add new features above the closing line. Never delete completed feature entries.*
-*Last updated: 2026-08-13 | Branch: integration/crm-merge*
+*Last updated: 2026-08-21 | Branch: feature/frontend-redesign-impl*

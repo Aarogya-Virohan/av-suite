@@ -4,13 +4,12 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { TreatmentSession } from '../../../types/api';
 import { treatmentSessionFormSchema, TreatmentSessionFormValues } from '../../../lib/schemas';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { Plus, Calendar, Activity, FileText } from 'lucide-react';
 import { useAuthStore } from '../../../store';
 
-import { useTreatments } from '../../treatments/api';
+import { useTreatments, useCreateTreatmentSession } from '../../treatments/api';
 
 export function TreatmentsTab({ patientId }: { patientId: string }) {
   const role = useAuthStore((s) => s.role);
@@ -27,7 +26,7 @@ export function TreatmentsTab({ patientId }: { patientId: string }) {
     resolver: zodResolver(treatmentSessionFormSchema),
     defaultValues: {
       patient_id: patientId,
-      therapist_id: 'usr_therapist_1',
+      therapist_id: useAuthStore.getState().userId ?? '',
       treatment_date: new Date().toISOString().slice(0, 16),
       pain_score: 5,
       treatment: '',
@@ -36,24 +35,19 @@ export function TreatmentsTab({ patientId }: { patientId: string }) {
     },
   });
 
+  const createSession = useCreateTreatmentSession();
+
   const onSubmit = (values: TreatmentSessionFormValues) => {
-    const newSession: TreatmentSession = {
-      id: `trt_${Date.now()}`,
-      clinic_id: 'cln_aarogya_1',
-      patient_id: patientId,
-      appointment_id: values.appointment_id || null,
-      therapist_id: values.therapist_id,
-      treatment_date: values.treatment_date,
-      pain_score: values.pain_score ?? null,
-      treatment: values.treatment,
-      home_advice: values.home_advice || null,
-      notes: values.notes || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    toast.warning('Treatment session not saved — backend endpoint not yet wired. Your entry has not been persisted.');
-    reset();
-    setIsSlideOpen(false);
+    createSession.mutate(values, {
+      onSuccess: () => {
+        toast.success('Treatment session saved successfully.');
+        reset();
+        setIsSlideOpen(false);
+      },
+      onError: (err: any) => {
+        toast.error(err?.message || 'Failed to save treatment session.');
+      },
+    });
   };
 
   return (

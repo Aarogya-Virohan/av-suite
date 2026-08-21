@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { getStoredToken, clearStoredTokens } from './auth';
+import { useAuthStore } from '../store';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export const API_BASE_URL = `${BASE_URL}/api/v1`;
@@ -47,9 +48,11 @@ apiClient.interceptors.response.use(
       error.message = detailMessage;
     }
 
-    // On 401 Unauthorized: clear tokens and redirect to login
+    // On 401 Unauthorized: clear tokens, reset auth state, and redirect to login
     if (error.response?.status === 401) {
       clearStoredTokens();
+      // Clear Zustand in-memory auth state — .getState() is valid outside React per Zustand docs
+      useAuthStore.getState().logout();
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login';
       }

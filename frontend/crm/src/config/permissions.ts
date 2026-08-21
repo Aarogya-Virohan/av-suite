@@ -9,7 +9,7 @@ export const BACKEND_PERMISSION_MAP: Record<string, UserRole[]> = {
   treatments: ['admin', 'therapist'],
   assessments: ['admin', 'therapist'],
   billing: ['admin', 'front_desk'],
-  analytics: ['admin', 'therapist'],
+  analytics: ['admin', 'therapist'],  // RBAC Spec §4: Front Desk has NO analytics access
   leads: ['admin', 'front_desk'],
   documents: ['admin', 'therapist', 'front_desk'],
   appointments: ['admin', 'therapist', 'front_desk'],
@@ -143,7 +143,7 @@ export const PERMISSIONS_MATRIX: Record<UserRole, RolePermissions> = {
       dashboard: true,
       patients: hasBackendPermission('front_desk', 'patients'),
       appointments: hasBackendPermission('front_desk', 'appointments'),
-      analytics: hasBackendPermission('front_desk', 'analytics'),
+      analytics: false,  // RBAC Spec §4: Front Desk has NO analytics access
       billing: hasBackendPermission('front_desk', 'billing'),
       leads: hasBackendPermission('front_desk', 'leads'),
       therapists: false,

@@ -5,7 +5,8 @@ import { AppShell } from '../../../components/layout/AppShell';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
 import { usePatients } from '../../../features/patients/api';
-import { useAnalyticsOverview } from '../../../features/analytics/api';
+import { useAnalyticsOverview, useMyPerformance } from '../../../features/analytics/api';
+import { ActivitySquare, Stethoscope, ClipboardList } from 'lucide-react';
 import { TrendingUp, Users, Calendar, DollarSign, Plus, Trash2, Save, ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
@@ -22,18 +23,19 @@ export default function AnalyticsPage() {
   const { data: patientsResponse } = usePatients(undefined, 1, 5);
   const patients = patientsResponse?.data || [];
 
-  // Running costs state (Rent, Electricity, Supplies)
+  // Therapist-scoped performance (RBAC Spec §4: therapist analytics = 'Own only')
+  const { data: myPerformance, isLoading: myPerfLoading } = useMyPerformance();
+  // Running costs state — editable by admin (Rent, Electricity, Supplies, Salaries)
+  // Note: Therapist Salaries is included as an editable line item.
+  // Phase 2: persist to backend via /api/v1/settings/running-costs
   const [runningCosts, setRunningCosts] = useState<RunningCostItem[]>([
     { id: '1', label: 'Rent', amount: 35000 },
     { id: '2', label: 'Electricity & Utilities', amount: 8000 },
     { id: '3', label: 'Clinic Supplies', amount: 12000 },
+    { id: '4', label: 'Therapist Salaries', amount: 65000 },
   ]);
 
-  // Therapist salaries total
-  const therapistSalariesTotal = 65000;
-
-  const manualCostsTotal = runningCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
-  const totalMonthlyExpenses = manualCostsTotal + therapistSalariesTotal;
+  const totalMonthlyExpenses = runningCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
 
   const { data: analyticsOverview } = useAnalyticsOverview();
   const totalCollected = analyticsOverview?.monthly_revenue || 0;
@@ -52,7 +54,50 @@ export default function AnalyticsPage() {
   };
 
   if (!canAccessModule(role, 'analytics')) {
-    return <AccessRestricted message="Analytics & financial P&L access is restricted for your role." />;
+    return <AccessRestricted message="Analytics access is restricted for your role." />;
+  }
+
+  // RBAC Spec §4: Therapist sees own-only performance, not clinic financials
+  if (role === 'therapist') {
+    const perf = myPerformance;
+    return (
+      <AppShell>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/40">
+              <ActivitySquare className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white">My Performance</h1>
+              <p className="text-xs text-slate-400">Your own sessions, patients & appointments this month</p>
+            </div>
+          </div>
+
+          {myPerfLoading ? (
+            <div className="text-slate-400 text-sm">Loading your performance data...</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                { label: "Today's Appointments", value: perf?.today_appointments ?? 0, icon: Calendar },
+                { label: 'Completed This Month', value: perf?.completed_appointments_this_month ?? 0, icon: TrendingUp },
+                { label: 'Cancelled This Month', value: perf?.cancelled_appointments_this_month ?? 0, icon: ArrowDownRight },
+                { label: 'Treatment Sessions', value: perf?.treatment_sessions_this_month ?? 0, icon: Stethoscope },
+                { label: 'SOAP Notes', value: perf?.soap_notes_this_month ?? 0, icon: ClipboardList },
+                { label: 'Patients Seen', value: perf?.patients_seen_this_month ?? 0, icon: Users },
+              ].map(({ label, value, icon: Icon }) => (
+                <div key={label} className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Icon className="w-4 h-4 text-indigo-500" />
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </AppShell>
+    );
   }
 
   return (
@@ -215,8 +260,9 @@ export default function AnalyticsPage() {
                     <p className="text-[10px] text-slate-400">{patient.phone}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-emerald-600">₹7,500 Paid</p>
-                    <p className="text-[10px] text-slate-400">1 Invoice</p>
+                    {/* Phase 2: fetch real per-patient revenue from /api/v1/billing */}
+                    <p className="font-bold text-slate-400">— Revenue pending</p>
+                    <p className="text-[10px] text-slate-400">API wiring Phase 2</p>
                   </div>
                 </div>
               ))}
