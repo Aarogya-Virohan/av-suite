@@ -85,7 +85,9 @@ class BookingService:
                 "status": AppointmentRequestStatus.PENDING,
             }
         )
-        return await self.request_repository.create(req_data)
+        req = await self.request_repository.create(req_data)
+        await self.request_repository.session.commit()
+        return req
 
     async def get_request(
         self, clinic_id: UUID, request_id: UUID
@@ -198,6 +200,7 @@ class BookingService:
             req,
             {"status": AppointmentRequestStatus.APPROVED},
         )
+        await self.request_repository.session.commit()
 
         patient_name = getattr(patient, "full_name", req.name)
         whatsapp_link = build_whatsapp_link(
@@ -227,7 +230,9 @@ class BookingService:
                 f"{req.notes or ''}\nRejection notes: {notes}".strip()
             )
 
-        return await self.request_repository.update(req, update_data)
+        updated = await self.request_repository.update(req, update_data)
+        await self.request_repository.session.commit()
+        return updated
 
     async def update_request(
         self,
@@ -252,6 +257,7 @@ class BookingService:
                 f"Appointment request '{request_id}' not found for clinic '{clinic_id}'."
             )
 
+        await self.request_repository.session.commit()
         return updated
 
     async def delete_request(self, clinic_id: UUID, request_id: UUID) -> None:
@@ -259,3 +265,4 @@ class BookingService:
 
         request_obj = await self.get_request(clinic_id, request_id)
         await self.request_repository.delete_request(request_obj)
+        await self.request_repository.session.commit()

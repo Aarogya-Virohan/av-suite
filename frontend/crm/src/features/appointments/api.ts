@@ -13,11 +13,13 @@ export function useAppointments(startDate?: string, endDate?: string, page = 1, 
         params: { 
           start_date: startDate || undefined, 
           end_date: endDate || undefined,
-          page, 
-          page_size 
+          offset: (page - 1) * page_size,
+          limit: page_size 
         },
       });
-      return res.data as { data: Appointment[]; meta: { total: number; page: number; page_size: number } };
+      // Backend returns { items: Appointment[], total: number, offset: number, limit: number }
+      const data = res.data?.items || res.data?.data || [];
+      return { data, meta: { total: res.data?.total || 0, page, page_size } };
     },
   });
 }

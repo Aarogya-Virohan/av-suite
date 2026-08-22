@@ -38,8 +38,10 @@ export default function AnalyticsPage() {
   const totalMonthlyExpenses = runningCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
 
   const { data: analyticsOverview } = useAnalyticsOverview();
-  const totalCollected = analyticsOverview?.monthly_revenue || 0;
+  const totalCollected = Number(analyticsOverview?.revenue?.revenue_this_month) || 0;
   const estimatedProfit = totalCollected - totalMonthlyExpenses;
+
+  const therapistSalariesTotal = runningCosts.find((c) => c.label === 'Therapist Salaries')?.amount || 0;
 
   const handleAddCost = () => {
     setRunningCosts([...runningCosts, { id: Date.now().toString(), label: 'New Expense', amount: 5000 }]);

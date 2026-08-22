@@ -207,8 +207,8 @@ export const PERMISSIONS_MATRIX: Record<UserRole, RolePermissions> = {
 };
 
 export function getPermissionsForRole(role: UserRole | null): RolePermissions {
-  if (!role) return PERMISSIONS_MATRIX.front_desk; // safest non-null fallback, but callers check null first
-  return PERMISSIONS_MATRIX[role] || PERMISSIONS_MATRIX.front_desk;
+  if (!role) return PERMISSIONS_MATRIX.patient; // fail-closed (deny all)
+  return PERMISSIONS_MATRIX[role] || PERMISSIONS_MATRIX.patient;
 }
 
 export function canAccessModule(role: UserRole | null, module: keyof ModuleVisibility): boolean {

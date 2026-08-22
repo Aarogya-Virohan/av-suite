@@ -156,10 +156,35 @@ cold-start overhead for future AI sessions.
 | `frontend/crm/src/features/patients/components/DocumentsTab.tsx` | Modified | Wired real document mutation. Removed fake PatientDocument object with hardcoded clinic_id and uploaded_by. |
 | `frontend/crm/src/lib/api-client.ts` | Modified | Fixed BUG-002: added `useAuthStore.getState().logout()` in 401 interceptor to clear Zustand in-memory state alongside localStorage. |
 | `frontend/crm/src/app/(dashboard)/analytics/page.tsx` | Modified | Consolidated hardcoded therapistSalariesTotal into editable runningCosts array. Removed hardcoded ₹7,500 per-patient revenue mock. |
-| `schema.sql` | Modified | Added REFERENCE ONLY disclaimer per Step 013 / Onkar review point #7. |
+| `schema.sql` | Modified | REFERENCE ONLY disclaimer added |
 
 **Decisions Made**: N/A (existing decisions cover all actions)
 **Bugs Identified**: BUG-004 (see Bug.md)
 **Bugs Fixed**: BUG-002, BUG-003 (Treatments & Documents finally wired)
 **Features Touched**: FEAT-004 (Patient Management — TreatmentsTab + DocumentsTab now live)
 **Notes**: Migration linearization (Steps 1–9) deferred — Sparsh's `d8a9f0c1b2e3` file does not exist on disk. Only apply after `git merge fix/backend-analytics-whatsapp`. Rev3 capability system (Phase 6) deferred pending Onkar sign-off.
+
+---
+
+### [2026-08-22] Session by Antigravity (Current Session)
+
+**Session Goal**: Expand granular RBAC capabilities, fix missing database commits in backend services, resolve frontend appointments bug, and add more mock users.
+
+**Branch**: `feature/frontend-redesign-impl`
+
+| File | Action | Summary |
+|---|---|---|
+| `backend/app/services/lead.py` | Modified | Added missing `session.commit()` calls. |
+| `backend/app/services/billing.py` | Modified | Added missing `session.commit()` calls. |
+| `backend/app/services/document.py` | Modified | Added missing `session.commit()` calls. |
+| `backend/app/services/booking.py` | Modified | Added missing `session.commit()` calls. |
+| `backend/app/core/rbac.py` | Modified | Expanded `CAPABILITY_REGISTRY` with granular permissions (`leads.manage`, etc.) |
+| `frontend/crm/src/features/users/components/UserPermissionsSlideOver.tsx` | Modified | Synced UI to display the newly expanded capabilities from `rbac.py`. |
+| `frontend/crm/src/features/appointments/api.ts` | Modified | Fixed `useAppointments` mapping to correctly map `items` to `data`. |
+| `backend/seed.py` | Modified | Increased test user count (2 Admins, 3 Therapists, 2 Front Desk per clinic). |
+
+**Decisions Made**: Addressed missing backend `commit()` bug and granular RBAC capabilities implementation.
+**Bugs Identified**: BUG-005 (Missing commits), BUG-006 (Appointments response mapping)
+**Bugs Fixed**: BUG-005, BUG-006
+**Features Touched**: RBAC Capabilities (Phase 6), Lead Pipeline, Billing, Documents, Booking, Appointments.
+**Notes**: Database was successfully wiped and re-seeded with `asyncpg` to test the newly generated mock users and the new roles.

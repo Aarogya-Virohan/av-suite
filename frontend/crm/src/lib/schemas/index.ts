@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const patientStatusSchema = z.enum(['active', 'inactive', 'discharged']);
 export const leadStageSchema = z.enum(['new', 'contacted', 'qualified', 'converted', 'lost']);
+export const leadSourceSchema = z.enum(['website', 'referral', 'social_media', 'walk_in', 'advertisement', 'other']);
 export const appointmentStatusSchema = z.enum(['scheduled', 'completed', 'cancelled', 'no_show']);
 export const appointmentSourceSchema = z.enum(['manual', 'public_booking']);
 export const packageStatusSchema = z.enum(['active', 'inactive', 'completed', 'expired', 'cancelled']);
@@ -29,7 +30,7 @@ export const leadFormSchema = z.object({
   name: z.string().min(1, 'Lead name is required'),
   phone: z.string().min(10, 'Phone number must be at least 10 digits'),
   email: z.string().email('Invalid email address').nullable().optional().or(z.literal('')),
-  source: z.string().min(1, 'Source is required'),
+  source: leadSourceSchema,
   stage: leadStageSchema,
   assigned_to: z.string().nullable().optional(),
   notes: z.string(),

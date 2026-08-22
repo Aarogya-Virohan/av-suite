@@ -167,14 +167,14 @@ Below is the manually verified architecture map of the backend layers:
 - [ ] **Step 070**: Commit Phase 5 API wiring and mock alert cleanup.
 
 ### Phase 6: Scope Update (Rev 3) & Multi-Tenant Capabilities (Steps 71–85)
-- [ ] **Step 071**: Review Backend Scope Update Rev 3 capability registry keys in `backend/app/core/rbac.py`.
+- [x] **Step 071**: Review Backend Scope Update Rev 3 capability registry keys in `backend/app/core/rbac.py`.
 - [ ] **Step 072**: Review `user_permissions` table design specification (`id`, `clinic_id`, `user_id`, `capability_key`, `scope`).
 - [ ] **Step 073**: Prepare capability resolution engine logic (`effective_scope(user, capability_key)`).
 - [ ] **Step 074**: Prepare `/analytics/my-performance` endpoint schema (patients seen, appointments, treatments, own-scoped).
 - [ ] **Step 075**: Prepare `/analytics/clinic-financials` endpoint schema (revenue, clinic-wide totals).
 - [ ] **Step 076**: Update frontend `features/analytics/api.ts` to support both split analytics endpoints.
 - [ ] **Step 077**: Update `analytics/page.tsx` to conditionally render My Performance for therapists vs Clinic Financials for Admins.
-- [ ] **Step 078**: Ensure multi-tenant isolation (`clinic_id`) is strictly enforced on all queries.
+- [x] **Step 078**: Ensure multi-tenant isolation (`clinic_id`) is strictly enforced on all queries.
 - [ ] **Step 079**: Confirm WhatsApp click-to-chat links are rendered in appointments and prescription components.
 - [ ] **Step 080**: Verify prescription PDF authenticated generation flow (`POST /prescriptions/{id}/pdf`).
 - [ ] **Step 081**: Confirm posture report viewing links in patient records.

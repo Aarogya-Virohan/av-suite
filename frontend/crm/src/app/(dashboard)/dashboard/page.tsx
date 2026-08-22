@@ -43,7 +43,7 @@ export default function DashboardPage() {
                 <Users className="w-5 h-5 text-teal-600" />
               </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                {overview?.total_patients || 0}
+                {overview?.patients?.total_patients || 0}
               </p>
             </div>
 
@@ -53,7 +53,7 @@ export default function DashboardPage() {
                 <Calendar className="w-5 h-5 text-blue-600" />
               </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                {overview?.active_appointments_today || 0}
+                {overview?.appointments?.today_appointments || 0}
               </p>
             </div>
 
@@ -63,7 +63,7 @@ export default function DashboardPage() {
                 <DollarSign className="w-5 h-5 text-emerald-600" />
               </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                ₹{(overview?.monthly_revenue || 0).toLocaleString('en-IN')}
+                ₹{(overview?.revenue?.revenue_this_month || 0).toLocaleString('en-IN')}
               </p>
             </div>
 
@@ -73,7 +73,7 @@ export default function DashboardPage() {
                 <UserCheck className="w-5 h-5 text-amber-600" />
               </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                {overview?.pending_leads || 0}
+                {overview?.leads?.total_leads || 0}
               </p>
             </div>
           </div>

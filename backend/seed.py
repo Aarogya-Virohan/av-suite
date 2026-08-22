@@ -29,7 +29,46 @@ async def seed():
         
         # Create Users, Patients, Exercises, and Treatments for each clinic
         for idx, clinic in enumerate(clinics, start=1):
-            # 1. Users (Admin, Therapist, Front Desk)
+            # 1. Users (2 Admins, 3 Therapists, 2 Front Desk)
+            users_to_add = []
+            
+            for a in range(1, 3):
+                users_to_add.append(User(
+                    id=uuid.uuid4(),
+                    clinic_id=clinic.id,
+                    email=f"admin{idx}_{a}@clinic.com",
+                    password_hash=get_password_hash("password123"),
+                    first_name=f"Admin{a}",
+                    last_name="User",
+                    role=UserRole.ADMIN,
+                    is_active=True,
+                ))
+
+            for t in range(1, 4):
+                users_to_add.append(User(
+                    id=uuid.uuid4(),
+                    clinic_id=clinic.id,
+                    email=f"therapist{idx}_{t}@clinic.com",
+                    password_hash=get_password_hash("password123"),
+                    first_name=f"Therapist{t}",
+                    last_name="User",
+                    role=UserRole.THERAPIST,
+                    is_active=True,
+                ))
+
+            for f in range(1, 3):
+                users_to_add.append(User(
+                    id=uuid.uuid4(),
+                    clinic_id=clinic.id,
+                    email=f"frontdesk{idx}_{f}@clinic.com",
+                    password_hash=get_password_hash("password123"),
+                    first_name=f"FrontDesk{f}",
+                    last_name="User",
+                    role=UserRole.FRONT_DESK,
+                    is_active=True,
+                ))
+            
+            # Keep original accounts for backward compatibility
             admin = User(
                 id=uuid.uuid4(),
                 clinic_id=clinic.id,
@@ -60,8 +99,9 @@ async def seed():
                 role=UserRole.FRONT_DESK,
                 is_active=True,
             )
+            users_to_add.extend([admin, therapist, front_desk])
             
-            session.add_all([admin, therapist, front_desk])
+            session.add_all(users_to_add)
             
             # 2. Patients (3 patients)
             # Patient 1 - Assigned to therapist (via treatment)

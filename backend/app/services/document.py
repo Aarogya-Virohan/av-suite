@@ -55,7 +55,9 @@ class DocumentService:
 
         doc_data = payload.model_dump()
         doc_data["clinic_id"] = clinic_id
-        return await self.document_repository.create(doc_data)
+        document = await self.document_repository.create(doc_data)
+        await self.document_repository.session.commit()
+        return document
 
     async def get_document(self, clinic_id: UUID, document_id: UUID) -> PatientDocument:
         """Retrieve a patient document ensuring clinic scoping."""
@@ -95,10 +97,13 @@ class DocumentService:
         update_data = payload.model_dump(exclude_unset=True)
         if not update_data:
             return document
-        return await self.document_repository.update(document, update_data)
+        updated = await self.document_repository.update(document, update_data)
+        await self.document_repository.session.commit()
+        return updated
 
     async def delete_document(self, clinic_id: UUID, document_id: UUID) -> None:
         """Delete a document metadata record for the clinic."""
 
         document = await self.get_document(clinic_id, document_id)
         await self.document_repository.delete(document)
+        await self.document_repository.session.commit()

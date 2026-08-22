@@ -75,7 +75,9 @@ class BillingService:
         package_data = payload.model_dump()
         package_data["clinic_id"] = clinic_id
         package_data["status"] = PackageStatus.ACTIVE
-        return await self.package_repository.create(package_data)
+        package = await self.package_repository.create(package_data)
+        await self.package_repository.session.commit()
+        return package
 
     async def get_package(self, clinic_id: UUID, package_id: UUID) -> Package:
         """Retrieve a package from the catalogue ensuring clinic isolation."""
@@ -109,13 +111,16 @@ class BillingService:
         update_data = payload.model_dump(exclude_unset=True)
         if not update_data:
             return package
-        return await self.package_repository.update(package, update_data)
+        updated = await self.package_repository.update(package, update_data)
+        await self.package_repository.session.commit()
+        return updated
 
     async def delete_package(self, clinic_id: UUID, package_id: UUID) -> None:
         """Delete a package from the catalogue for the clinic."""
 
         package = await self.get_package(clinic_id, package_id)
         await self.package_repository.delete(package)
+        await self.package_repository.session.commit()
 
     # --- Patient Package Methods ---
 
@@ -144,7 +149,9 @@ class BillingService:
             }
         )
 
-        return await self.patient_package_repository.create(package_data)
+        sold = await self.patient_package_repository.create(package_data)
+        await self.patient_package_repository.session.commit()
+        return sold
 
     async def get_patient_package(self, clinic_id: UUID, patient_package_id: UUID) -> PatientPackage:
         """Retrieve a patient package ensuring clinic scoping."""
@@ -194,13 +201,16 @@ class BillingService:
         if not update_data:
             return package
 
-        return await self.patient_package_repository.update(package, update_data)
+        updated = await self.patient_package_repository.update(package, update_data)
+        await self.patient_package_repository.session.commit()
+        return updated
 
     async def delete_patient_package(self, clinic_id: UUID, patient_package_id: UUID) -> None:
         """Delete a patient package record for the clinic."""
 
         package = await self.get_patient_package(clinic_id, patient_package_id)
         await self.patient_package_repository.delete(package)
+        await self.patient_package_repository.session.commit()
 
     # --- Invoice Methods ---
 
@@ -287,6 +297,7 @@ class BillingService:
         loaded_invoice = await self.invoice_repository.get_by_id_with_items(invoice.id, clinic_id=clinic_id)
         if loaded_invoice is None:
             raise BillingNotFoundError(f"Created invoice '{invoice.id}' could not be reloaded.")
+        await self.invoice_repository.session.commit()
         return loaded_invoice
 
     async def get_invoice(self, clinic_id: UUID, invoice_id: UUID) -> Invoice:
@@ -336,13 +347,16 @@ class BillingService:
         if not update_data:
             return invoice
 
-        return await self.invoice_repository.update(invoice, update_data)
+        updated = await self.invoice_repository.update(invoice, update_data)
+        await self.invoice_repository.session.commit()
+        return updated
 
     async def delete_invoice(self, clinic_id: UUID, invoice_id: UUID) -> None:
         """Delete or cancel an invoice for the clinic."""
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
         await self.invoice_repository.delete(invoice)
+        await self.invoice_repository.session.commit()
 
     # --- Payment Methods ---
 
@@ -378,6 +392,7 @@ class BillingService:
             invoice,
             {"paid_amount": new_paid_amount, "status": new_status},
         )
+        await self.payment_repository.session.commit()
 
         return payment
 
@@ -417,6 +432,7 @@ class BillingService:
 
         payment = await self.get_payment(clinic_id, payment_id)
         await self.payment_repository.delete(payment)
+        await self.payment_repository.session.commit()
 
     async def generate_invoice_pdf(self, clinic_id: UUID, invoice_id: UUID) -> bytes:
         """Generate PDF representation of a clinic invoice."""

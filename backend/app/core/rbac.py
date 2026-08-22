@@ -20,138 +20,129 @@ CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
     {
         "analytics.my_performance": CapabilityDefinition(
             key="analytics.my_performance",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN}),
         ),
         "analytics.clinic_financials": CapabilityDefinition(
             key="analytics.clinic_financials",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
         ),
         "patients.view": CapabilityDefinition(
             key="patients.view",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
         ),
         "patients.create": CapabilityDefinition(
             key="patients.create",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
         ),
         "patients.edit": CapabilityDefinition(
             key="patients.edit",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
         ),
         "patients.delete": CapabilityDefinition(
             key="patients.delete",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
         ),
         "permissions.manage": CapabilityDefinition(
             key="permissions.manage",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
         ),
         "users.manage": CapabilityDefinition(
             key="users.manage",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
         ),
         "treatments.view": CapabilityDefinition(
             key="treatments.view",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
         ),
         "treatments.create": CapabilityDefinition(
             key="treatments.create",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
         ),
         "treatments.edit": CapabilityDefinition(
             key="treatments.edit",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
         ),
         "appointments.view": CapabilityDefinition(
             key="appointments.view",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
         ),
         "appointments.create": CapabilityDefinition(
             key="appointments.create",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
         ),
         "appointments.edit": CapabilityDefinition(
             key="appointments.edit",
-            allowed_scopes=frozenset(
-                {
-                    CapabilityScope.NONE,
-                    CapabilityScope.OWN,
-                    CapabilityScope.ALL,
-                }
-            ),
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
         ),
+        "leads.view": CapabilityDefinition(
+            key="leads.view",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
+        ),
+        "leads.create": CapabilityDefinition(
+            key="leads.create",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
+        ),
+        "leads.edit": CapabilityDefinition(
+            key="leads.edit",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
+        ),
+        "leads.delete": CapabilityDefinition(
+            key="leads.delete",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "billing.view": CapabilityDefinition(
+            key="billing.view",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "billing.create": CapabilityDefinition(
+            key="billing.create",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "billing.edit": CapabilityDefinition(
+            key="billing.edit",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "billing.delete": CapabilityDefinition(
+            key="billing.delete",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "documents.view": CapabilityDefinition(
+            key="documents.view",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
+        ),
+        "documents.upload": CapabilityDefinition(
+            key="documents.upload",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}),
+        ),
+        "documents.delete": CapabilityDefinition(
+            key="documents.delete",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "settings.manage": CapabilityDefinition(
+            key="settings.manage",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "booking.manage": CapabilityDefinition(
+            key="booking.manage",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "packages.manage": CapabilityDefinition(
+            key="packages.manage",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "exercises.manage": CapabilityDefinition(
+            key="exercises.manage",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "posture.manage": CapabilityDefinition(
+            key="posture.manage",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        ),
+        "prescriptions.manage": CapabilityDefinition(
+            key="prescriptions.manage",
+            allowed_scopes=frozenset({CapabilityScope.NONE, CapabilityScope.ALL}),
+        )
+
     }
 )
 
@@ -174,6 +165,23 @@ ROLE_TEMPLATES: Mapping[UserRole, Mapping[str, CapabilityScope]] = MappingProxyT
                 "appointments.view": CapabilityScope.ALL,
                 "appointments.create": CapabilityScope.ALL,
                 "appointments.edit": CapabilityScope.ALL,
+                "leads.view": CapabilityScope.ALL,
+                "leads.create": CapabilityScope.ALL,
+                "leads.edit": CapabilityScope.ALL,
+                "leads.delete": CapabilityScope.ALL,
+                "billing.view": CapabilityScope.ALL,
+                "billing.create": CapabilityScope.ALL,
+                "billing.edit": CapabilityScope.ALL,
+                "billing.delete": CapabilityScope.ALL,
+                "documents.view": CapabilityScope.ALL,
+                "documents.upload": CapabilityScope.ALL,
+                "documents.delete": CapabilityScope.ALL,
+                "settings.manage": CapabilityScope.ALL,
+                "booking.manage": CapabilityScope.ALL,
+                "packages.manage": CapabilityScope.ALL,
+                "exercises.manage": CapabilityScope.ALL,
+                "posture.manage": CapabilityScope.ALL,
+                "prescriptions.manage": CapabilityScope.ALL,
             }
         ),
         UserRole.THERAPIST: MappingProxyType(
@@ -188,6 +196,11 @@ ROLE_TEMPLATES: Mapping[UserRole, Mapping[str, CapabilityScope]] = MappingProxyT
                 "appointments.view": CapabilityScope.OWN,
                 "appointments.create": CapabilityScope.OWN,
                 "appointments.edit": CapabilityScope.OWN,
+                "documents.view": CapabilityScope.OWN,
+                "documents.upload": CapabilityScope.OWN,
+                "exercises.manage": CapabilityScope.ALL,
+                "posture.manage": CapabilityScope.ALL,
+                "prescriptions.manage": CapabilityScope.ALL,
             }
         ),
         UserRole.FRONT_DESK: MappingProxyType(
@@ -197,9 +210,16 @@ ROLE_TEMPLATES: Mapping[UserRole, Mapping[str, CapabilityScope]] = MappingProxyT
                 "patients.edit": CapabilityScope.ALL,
                 "appointments.view": CapabilityScope.ALL,
                 "appointments.create": CapabilityScope.ALL,
+                "leads.view": CapabilityScope.ALL,
+                "leads.create": CapabilityScope.ALL,
+                "leads.edit": CapabilityScope.ALL,
+                "billing.view": CapabilityScope.ALL,
+                "billing.create": CapabilityScope.ALL,
+                "booking.manage": CapabilityScope.ALL,
             }
         ),
-        UserRole.PATIENT: MappingProxyType({}),
+        UserRole.PATIENT: MappingProxyType({})
+
     }
 )
 

@@ -29,3 +29,28 @@ export function useCreateUser() {
     },
   });
 }
+
+export function useUserPermissions(userId: string) {
+  return useQuery({
+    queryKey: [...USERS_QUERY_KEY, userId, 'permissions'],
+    queryFn: async () => {
+      if (!userId) return [];
+      const res = await apiClient.get(`/users/${userId}/permissions`);
+      return res.data?.data || [];
+    },
+    enabled: !!userId,
+  });
+}
+
+export function useUpdateUserPermissions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, permissions }: { userId: string; permissions: any[] }) => {
+      const res = await apiClient.put(`/users/${userId}/permissions`, permissions);
+      return res.data?.data || res.data;
+    },
+    onSuccess: (_, { userId }) => {
+      queryClient.invalidateQueries({ queryKey: [...USERS_QUERY_KEY, userId, 'permissions'] });
+    },
+  });
+}

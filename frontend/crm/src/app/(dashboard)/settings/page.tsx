@@ -13,6 +13,7 @@ import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Pal
 import { toast } from 'sonner';
 import { useClinicSettings, useUpdateClinicSettings } from '../../../features/settings/api';
 import { AddUserSlideOver } from '../../../features/users/components/AddUserSlideOver';
+import { UserPermissionsSlideOver } from '../../../features/users/components/UserPermissionsSlideOver';
 
 type TabKey = 'clinic' | 'users' | 'audit';
 
@@ -29,6 +30,8 @@ export default function SettingsPage() {
   const [regNo, setRegNo] = useState('REG-2026-PT88');
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const { data: clinicSettings, isLoading: isLoadingSettings } = useClinicSettings();
   const updateSettings = useUpdateClinicSettings();
@@ -104,6 +107,21 @@ export default function SettingsPage() {
     { key: 'email', header: 'Email' },
     { key: 'role', header: 'Role', render: (u) => <span className="uppercase text-xs font-bold text-teal-600">{u.role}</span> },
     { key: 'is_active', header: 'Status', render: (u) => (u.is_active ? 'Active' : 'Inactive') },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (u) => (
+        <button
+          onClick={() => {
+            setSelectedUser(u);
+            setIsPermissionsOpen(true);
+          }}
+          className="text-xs px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 dark:text-indigo-300 font-semibold rounded-md transition-colors"
+        >
+          Edit Permissions
+        </button>
+      ),
+    },
   ];
 
   if (!canAccessModule(role, 'settings')) {
@@ -292,6 +310,11 @@ export default function SettingsPage() {
       </div>
 
       <AddUserSlideOver isOpen={isAddUserOpen} onClose={() => setIsAddUserOpen(false)} />
+      <UserPermissionsSlideOver
+        isOpen={isPermissionsOpen}
+        onClose={() => setIsPermissionsOpen(false)}
+        user={selectedUser}
+      />
     </AppShell>
   );
 }

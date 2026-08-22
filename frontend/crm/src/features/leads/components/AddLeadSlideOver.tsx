@@ -28,7 +28,7 @@ export function AddLeadSlideOver({ isOpen, onClose }: AddLeadSlideOverProps) {
       name: '',
       phone: '',
       email: '',
-      source: 'Website Form',
+      source: 'website',
       stage: 'new',
       notes: '',
     },
@@ -93,12 +93,17 @@ export function AddLeadSlideOver({ isOpen, onClose }: AddLeadSlideOverProps) {
             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
               Source *
             </label>
-            <input
+            <select
               {...register('source')}
-              type="text"
-              placeholder="Website / Google"
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
-            />
+            >
+              <option value="website">Website</option>
+              <option value="referral">Referral</option>
+              <option value="social_media">Social Media</option>
+              <option value="walk_in">Walk-in</option>
+              <option value="advertisement">Advertisement</option>
+              <option value="other">Other</option>
+            </select>
           </div>
 
           <div>

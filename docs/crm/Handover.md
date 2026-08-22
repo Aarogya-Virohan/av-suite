@@ -222,3 +222,47 @@ Tarun provided the full session walkthrough from the previous session and asked 
 - Sparsh's `d8a9f0c1b2e3_seed_demo_login_data.py` migration does NOT exist on disk. The two-headed conflict in the walkthrough only materializes after Sparsh's branch is merged. Do NOT change `down_revision` until then.
 - `api-client.ts` now imports `useAuthStore` — this is intentional (Zustand `.getState()` is valid outside React).
 - `DocumentsTab` stores `createObjectURL` as `file_url` as a temporary placeholder. Phase 2 must add Supabase Storage upload and replace this with a permanent URL.
+
+---
+
+### Session Handover — 2026-08-22 — Antigravity (Current Session)
+
+#### What We Were Doing
+User requested fixes for missing data in the lead pipeline and appointment list. We expanded the granular RBAC capabilities system per Phase 6 requirements, and added multiple test users to the seed script for extensive local testing. Finally, we updated all documentation to reflect the current state.
+
+#### Current State
+- Branch: `feature/frontend-redesign-impl`
+- Status: **Phase 6 Capabilities Foundation Complete**. Backend missing commits resolved. Frontend appointments bug resolved.
+
+#### What Was Completed This Session
+- [x] Fixed `session.commit()` bug across `LeadService`, `BillingService`, `DocumentService`, and `BookingService`.
+- [x] Expanded `backend/app/core/rbac.py` with granular capabilities (`leads.manage`, etc.) per Phase 6.
+- [x] Synced `frontend/crm/src/features/users/components/UserPermissionsSlideOver.tsx` to display all new capabilities.
+- [x] Fixed `useAppointments` response mapping (mapping `items` to `data`).
+- [x] Updated `backend/seed.py` to create multiple test accounts per role per clinic.
+- [x] Wiped and re-seeded the local database.
+- [x] Updated documentation (`Bug.md`, `AIChangelog.md`, `Handover.md`, `MIGRATION_CONFLICT_AND_ACTION_PLAN.md`).
+
+#### What Is Still In Progress
+- [ ] Incorporating granular `require_capability` checks directly into the API endpoints (currently rely on coarse-grained `require_permission` from the router).
+- [ ] Remaining tasks in Phase 6 regarding exact multi-tenant analytic schema separation.
+
+#### Open Questions / Blockers
+- None at this time.
+
+#### What the Next Session Should Do First
+1. The app is in a stable, highly-functional state. Any new feature requests can proceed immediately.
+2. If working on specific backend endpoints, consider adding `scope: CapabilityScope = Depends(require_capability("module.action"))` to explicitly enforce the new RBAC capabilities.
+
+#### Files Modified This Session
+| File | Change Type | Summary |
+|---|---|---|
+| `backend/app/services/*.py` | Modified | Added missing commits to DB mutations |
+| `backend/app/core/rbac.py` | Modified | Expanded `CAPABILITY_REGISTRY` |
+| `frontend/crm/src/features/users/components/UserPermissionsSlideOver.tsx` | Modified | Added new capability keys to UI |
+| `frontend/crm/src/features/appointments/api.ts` | Modified | Fixed data extraction mapping |
+| `backend/seed.py` | Modified | Scaled up mock user generation |
+| `docs/crm/*.md` | Modified | Updated project documentation |
+
+#### Context the Next AI Must Know
+- Granular capability definitions exist in the backend (`rbac.py`) and can be assigned to users via the frontend (`UserPermissionsSlideOver.tsx`), but the backend API endpoints currently primarily enforce coarse-grained checks (`require_permission`) via their respective routers. The frontend uses the same coarse-grained checks for hiding/showing modules. Granular checks should be added to specific endpoints as development continues.

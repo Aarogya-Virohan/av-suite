@@ -207,3 +207,58 @@ TypeScript compilation passed with 0 errors. The UI now emits `toast.success()` 
 | `frontend/crm/src/app/(dashboard)/settings/page.tsx` | Wire Save action |
 | `frontend/crm/src/features/patients/components/SoapNotesTab.tsx` | Wire Finalize action |
 | `frontend/crm/src/app/(dashboard)/patients/[id]/page.tsx` | Wire Rx Generation |
+
+---
+
+### [BUG-005] Missing Database Commits in Backend Services
+- **Status**: ✅ Verified fixed
+- **Reported**: 2026-08-22
+- **Reported By**: User via CRM Lead Pipeline missing records
+- **Severity**: Critical
+- **Affected Area**: Leads, Billing, Booking, Documents
+
+#### Symptom
+When creating a lead or approving an appointment request, the backend returned a 201 Created or 200 OK success response, but the record was missing from the database on subsequent fetches.
+
+#### Root Cause
+Backend service methods (e.g., `create_lead` in `LeadService`) performed database repository operations which called `flush()`, but explicitly forgot to call `await session.commit()` before returning the result to the FastAPI router. As a result, the transaction was silently rolled back when the request finished.
+
+#### Fix Applied
+Injected `await self.*_repository.session.commit()` directly after the mutation operations in `lead.py`, `billing.py`, `booking.py`, and `document.py`.
+
+#### Verification
+Created a new lead and verified the record is visible in the frontend list and exists in PostgreSQL.
+
+#### Affected Files
+| File | Change |
+|---|---|
+| `backend/app/services/lead.py` | Added commit |
+| `backend/app/services/billing.py` | Added commit |
+| `backend/app/services/booking.py` | Added commit |
+| `backend/app/services/document.py` | Added commit |
+
+---
+
+### [BUG-006] Appointments Table Empty on Frontend
+- **Status**: ✅ Verified fixed
+- **Reported**: 2026-08-22
+- **Reported By**: User 
+- **Severity**: High
+- **Affected Area**: Appointments Dashboard
+
+#### Symptom
+The appointments view in the frontend displayed an empty list despite appointments existing in the backend. 
+
+#### Root Cause
+The frontend API client (`useAppointments`) assumed the backend returned `{ data: [...] }`. However, the backend pagination schema (`AppointmentListResponse`) returns `{ items: [...] }`. This resulted in `undefined` being assigned to the list, cascading to an empty array fallback.
+
+#### Fix Applied
+Updated the response mapping in `useAppointments` to correctly extract the array from `res.data?.items` before passing it to the UI components.
+
+#### Verification
+Navigated to `/appointments` and confirmed the appointment data correctly populates the UI table.
+
+#### Affected Files
+| File | Change |
+|---|---|
+| `frontend/crm/src/features/appointments/api.ts` | Fixed response mapping |

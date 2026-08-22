@@ -8,10 +8,14 @@ import logging
 from app.core.database import get_db
 from app.core.dependencies import require_permission
 from app.models.user import User
-from app.schemas.user import UserRead
+from app.schemas.user import UserRead, UserCreate
+from app.core.security import get_password_hash
 from app.schemas.envelope import ResponseEnvelope
 from app.repositories.user_permission import UserPermissionRepository
 from app.schemas.user_permission import UserPermissionRead, UserPermissionCreate
+from app.enums.user import UserRole
+from app.repositories.audit import AuditLogRepository
+from app.services.audit import AuditLogService
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +51,66 @@ async def list_users(request: Request, db: AsyncSession = Depends(get_db)):
         users_data.append(u_dict)
         
     return ResponseEnvelope(data=users_data)
+
+
+@router.post("", response_model=ResponseEnvelope[UserRead], status_code=201, tags=["Users"])
+async def create_user(
+    payload: UserCreate, 
+    request: Request, 
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a new user in the clinic.
+    """
+    clinic_id = request.state.clinic_id
+    
+    # Check if email already exists globally
+    existing = await db.execute(select(User).where(User.email == payload.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Email already registered")
+        
+    hashed_password = get_password_hash(payload.password)
+    
+    # Extract first/last name if only name is provided
+    fname = payload.first_name
+    lname = payload.last_name
+    
+    if not fname and not lname and payload.name:
+        parts = payload.name.split(" ", 1)
+        fname = parts[0]
+        lname = parts[1] if len(parts) > 1 else ""
+        
+    new_user = User(
+        clinic_id=clinic_id,
+        email=payload.email,
+        hashed_password=hashed_password,
+        first_name=fname or "",
+        last_name=lname or "",
+        phone=payload.phone,
+        role=payload.role.value,
+        is_active=payload.is_active
+    )
+    
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    
+    # Add name field for UserRead compatibility
+    u_dict = {
+        "id": new_user.id,
+        "clinic_id": new_user.clinic_id,
+        "name": f"{new_user.first_name} {new_user.last_name}".strip(),
+        "first_name": new_user.first_name,
+        "last_name": new_user.last_name,
+        "email": new_user.email,
+        "phone": new_user.phone,
+        "role": new_user.role,
+        "is_active": new_user.is_active,
+        "created_at": new_user.created_at,
+        "updated_at": new_user.updated_at
+    }
+    
+    return ResponseEnvelope(data=u_dict)
 
 
 @router.get("/{user_id}/permissions", response_model=ResponseEnvelope[List[UserPermissionRead]], tags=["Users"])
@@ -89,6 +153,33 @@ async def update_user_permissions(
         
     granted_by = request.state.user.id if hasattr(request.state, "user") and request.state.user else None
     
+    # Lockout Guard: Prevent removing the last 'permissions.manage' or 'users.manage' capability
+    new_perms_manage_override = next((p.scope for p in permissions if p.capability_key == 'permissions.manage'), None)
+    new_users_manage_override = next((p.scope for p in permissions if p.capability_key == 'users.manage'), None)
+    
+    # We only care if they are explicitly being set to 'none' and they are currently an Admin
+    if user.role == UserRole.ADMIN.value and (new_perms_manage_override == 'none' or new_users_manage_override == 'none'):
+        # Check if any OTHER active admin exists without a 'none' override
+        all_admins_stmt = select(User).where(User.clinic_id == clinic_id, User.role == UserRole.ADMIN.value, User.is_active == True, User.id != user_id)
+        other_admins = (await db.execute(all_admins_stmt)).scalars().all()
+        
+        has_other_admin_with_perms = False
+        for admin in other_admins:
+            admin_overrides = await repo.list_for_user_in_clinic(clinic_id, admin.id)
+            perms_override = next((p.scope for p in admin_overrides if p.capability_key == 'permissions.manage'), None)
+            users_override = next((p.scope for p in admin_overrides if p.capability_key == 'users.manage'), None)
+            
+            # If the other admin does not have a 'none' override for either, they are safe
+            if perms_override != 'none' and users_override != 'none':
+                has_other_admin_with_perms = True
+                break
+                
+        if not has_other_admin_with_perms:
+            raise HTTPException(status_code=400, detail="Lockout Guard: Cannot revoke permissions/users management capability from the last clinic administrator.")
+    
+    # Setup audit service
+    audit_service = AuditLogService(AuditLogRepository(db))
+    
     # Get existing overrides
     existing = await repo.list_for_user_in_clinic(clinic_id, user_id)
     existing_keys = {e.capability_key for e in existing}
@@ -101,18 +192,39 @@ async def update_user_permissions(
             user_id=user_id,
             capability_key=key_to_delete
         )
+        await audit_service.log_event(
+            clinic_id=clinic_id,
+            user_id=granted_by,
+            action="revoke_permission",
+            entity_type="user_permissions",
+            entity_id=user_id,
+            details={"capability_key": key_to_delete, "target_user_id": str(user_id)}
+        )
         
     # Upsert the provided overrides
     updated_perms = []
     for p in permissions:
-        perm = await repo.set_override(
-            clinic_id=clinic_id,
-            user_id=user_id,
-            capability_key=p.capability_key,
-            scope=p.scope,
-            granted_by=granted_by
-        )
-        updated_perms.append(perm)
+        # Check if it changed or is new
+        existing_perm = next((e for e in existing if e.capability_key == p.capability_key), None)
+        if not existing_perm or existing_perm.scope != p.scope:
+            perm = await repo.set_override(
+                clinic_id=clinic_id,
+                user_id=user_id,
+                capability_key=p.capability_key,
+                scope=p.scope,
+                granted_by=granted_by
+            )
+            updated_perms.append(perm)
+            await audit_service.log_event(
+                clinic_id=clinic_id,
+                user_id=granted_by,
+                action="grant_permission",
+                entity_type="user_permissions",
+                entity_id=user_id,
+                details={"capability_key": p.capability_key, "scope": p.scope, "target_user_id": str(user_id)}
+            )
+        else:
+            updated_perms.append(existing_perm)
         
     await db.commit()
     
