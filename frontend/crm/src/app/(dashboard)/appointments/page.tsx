@@ -7,6 +7,7 @@ import { AddAppointmentSlideOver } from '../../../features/appointments/componen
 import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
 import { AppointmentStatus, Appointment } from '../../../types/api';
 import { Plus, Calendar as CalendarIcon, Clock, User, CheckCircle2, XCircle, Copy, ExternalLink, QrCode } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { apiClient } from '../../../lib/api-client';
 import { useAuthStore } from '../../../store';
@@ -15,9 +16,9 @@ import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 interface BookingRequest {
   id: string;
-  patient_name: string;
+  name: string;
   phone: string;
-  service: string;
+  notes: string;
   preferred_date: string;
   preferred_slot: string;
   chief_complaint: string;
@@ -90,7 +91,7 @@ export default function AppointmentsPage() {
       setRequests((prev) =>
         prev.map((r) => (r.id === req.id ? { ...r, status: 'approved' } : r))
       );
-      toast.success(`Request approved! Appointment created for ${req.patient_name}`);
+      toast.success(`Request approved! Appointment created for ${req.name}`);
     } catch (err) {
       console.error(err);
       toast.error('Failed to approve request');
@@ -269,7 +270,7 @@ export default function AppointmentsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
                         <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                          {req.patient_name}
+                          {req.name}
                         </h3>
                         <span
                           className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
@@ -286,9 +287,9 @@ export default function AppointmentsPage() {
 
                       <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
                         <span>Phone: <strong>{req.phone}</strong></span>
-                        <WhatsAppButton phone={req.phone} name={req.patient_name} />
+                        <WhatsAppButton phone={req.phone} name={req.name} />
                         <span>•</span>
-                        <span>Service: <strong>{req.service}</strong></span>
+                        <span>Service: <strong>{req.notes ? req.notes.replace('Service Requested: ', '') : 'Consultation'}</strong></span>
                         <span>•</span>
                         <span>Slot: <strong>{req.preferred_date} at {req.preferred_slot}</strong></span>
                       </div>
@@ -374,7 +375,7 @@ export default function AppointmentsPage() {
               {showQr && (
                 <div className="p-6 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-6">
                   <div className="w-32 h-32 bg-white p-2 rounded-lg border border-slate-300 flex items-center justify-center font-bold text-xs text-slate-800 text-center shadow-xs">
-                    [QR Code Canvas]
+                    <QRCodeCanvas value={bookingUrl} size={110} />
                   </div>
                   <div className="text-xs text-slate-500 space-y-1">
                     <p className="font-bold text-slate-800 dark:text-slate-200">Scan to Book</p>

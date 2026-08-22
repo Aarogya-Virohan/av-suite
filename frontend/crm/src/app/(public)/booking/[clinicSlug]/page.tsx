@@ -31,14 +31,24 @@ export default function PublicBookingPage() {
 
     setIsSubmitting(true);
     try {
-      await apiClient.post('/booking/request', {
-        clinic_slug: clinicSlug,
-        service,
+      // 1. Fetch clinic ID from branding endpoint using the slug
+      const brandingRes = await apiClient.get(`/booking/branding/${clinicSlug}`);
+      const clinicId = brandingRes.data?.data?.clinic_id || brandingRes.data?.clinic_id;
+
+      if (!clinicId) {
+        toast.error('Could not verify clinic. Please check the URL.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Submit the booking request
+      await apiClient.post(`/booking/request?clinic_id=${clinicId}`, {
+        name: name,
+        phone: phone,
+        chief_complaint: chiefComplaint,
         preferred_date: preferredDate,
         preferred_slot: preferredSlot,
-        patient_name: name,
-        phone,
-        chief_complaint: chiefComplaint,
+        notes: `Service Requested: ${service}`,
       });
 
       setIsSuccess(true);
