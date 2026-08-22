@@ -12,6 +12,7 @@ import { DocumentsTab } from '../../../../features/patients/components/Documents
 import { ProgressionTab } from '../../../../features/patients/components/ProgressionTab';
 import { WhatsAppButton, openWhatsApp } from '../../../../components/ui/WhatsAppButton';
 import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, TrendingDown, Activity, FileCheck, Camera, Dumbbell } from 'lucide-react';
+import { API_BASE_URL } from '../../../../lib/api-client';
 import { toast } from 'sonner';
 import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } from '../../../../features/prescriptions/api';
 
@@ -78,7 +79,7 @@ export default function PatientWorkspacePage() {
       await generatePdf.mutateAsync(rxId);
       toast.success('Prescription generated successfully! Downloading...');
 
-      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/prescriptions/${rxId}/pdf/download`;
+      const downloadUrl = `${API_BASE_URL}/prescriptions/${rxId}/pdf/download`;
       
       const token = localStorage.getItem('av_crm_token');
       const response = await fetch(downloadUrl, {

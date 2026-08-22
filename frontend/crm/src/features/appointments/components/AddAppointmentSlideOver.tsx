@@ -56,8 +56,8 @@ export function AddAppointmentSlideOver({ isOpen, onClose }: AddAppointmentSlide
   const checkOverlap = () => {
     if (!selectedTherapist || !selectedTime) return false;
     const targetTime = new Date(selectedTime).getTime();
-    return existingAppointments.some((apt) => {
-      if (apt.therapist_id !== selectedTherapist || apt.status === 'cancelled') return false;
+    return existingAppointments.some((apt: any) => {
+      if (apt.therapist_id !== selectedTherapist || apt.status === 'cancelled' || apt.status === 'no_show') return false;
       const aptTime = new Date(apt.scheduled_at).getTime();
       const diffMinutes = Math.abs(targetTime - aptTime) / (1000 * 60);
       return diffMinutes < (apt.duration_minutes || 30);

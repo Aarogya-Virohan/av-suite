@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useClinicSettings, useUpdateClinicSettings } from '../../../features/settings/api';
 import { AddUserSlideOver } from '../../../features/users/components/AddUserSlideOver';
 import { UserPermissionsSlideOver } from '../../../features/users/components/UserPermissionsSlideOver';
+import { JsonViewerSlideOver } from '../../../components/ui/JsonViewerSlideOver';
 
 type TabKey = 'clinic' | 'users' | 'audit';
 
@@ -32,6 +33,8 @@ export default function SettingsPage() {
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [auditPage, setAuditPage] = useState(1);
+  const [selectedLogForDetails, setSelectedLogForDetails] = useState<AuditLog | null>(null);
 
   const { data: clinicSettings, isLoading: isLoadingSettings } = useClinicSettings();
   const updateSettings = useUpdateClinicSettings();
@@ -52,8 +55,9 @@ export default function SettingsPage() {
   const { data: usersResponse, isLoading: isLoadingUsers } = useUsers();
   const users = usersResponse || [];
 
-  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(1, 50);
+  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(auditPage, 50);
   const auditLogs = auditResponse?.data || [];
+  const auditTotal = auditResponse?.meta?.total || auditLogs.length;
 
   const handleBrandColorChange = (color: string) => {
     setBrandColor(color);
@@ -94,12 +98,33 @@ export default function SettingsPage() {
   };
 
   const auditColumns: Column<AuditLog>[] = [
-    { key: 'action', header: 'Action', render: (log) => <span className="font-mono text-xs text-teal-600 font-bold">{log.action}</span> },
-    { key: 'entity_type', header: 'Entity Type' },
-    { key: 'entity_id', header: 'Entity ID', render: (log) => log.entity_id || '-' },
-    { key: 'user_id', header: 'User ID', render: (log) => log.user_id || 'System' },
-    { key: 'details', header: 'Details', render: (log) => JSON.stringify(log.details) },
-    { key: 'created_at', header: 'Timestamp', render: (log) => new Date(log.created_at).toLocaleString() },
+    { 
+      key: 'action', 
+      header: 'Action', 
+      render: (log) => {
+        let colorClass = 'text-teal-600 bg-teal-50 dark:bg-teal-900/30';
+        if (log.action.includes('delete')) colorClass = 'text-red-600 bg-red-50 dark:bg-red-900/30';
+        else if (log.action.includes('update')) colorClass = 'text-amber-600 bg-amber-50 dark:bg-amber-900/30';
+        return <span className={`font-mono text-[10px] uppercase font-bold px-2 py-1 rounded-md ${colorClass}`}>{log.action}</span>;
+      }
+    },
+    { key: 'entity_type', header: 'Entity Type', render: (log) => <span className="font-semibold text-slate-700 dark:text-slate-300">{log.entity_type}</span> },
+    { key: 'entity_id', header: 'Entity ID', render: (log) => <span className="font-mono text-xs text-slate-500">{log.entity_id || '-'}</span> },
+    { key: 'user_id', header: 'User ID', render: (log) => <span className="font-mono text-xs text-slate-500">{log.user_id || 'System'}</span> },
+    { 
+      key: 'details', 
+      header: 'Details', 
+      render: (log) => (
+        <button
+          onClick={() => setSelectedLogForDetails(log)}
+          className="text-xs font-semibold px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          View Payload
+        </button>
+      )
+    },
+    { key: 'created_at', header: 'Timestamp', render: (log) => <span className="text-xs text-slate-500 font-medium whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</span> },
   ];
 
   const userColumns: Column<User>[] = [
@@ -169,7 +194,7 @@ export default function SettingsPage() {
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>Audit Log ({auditLogs.length})</span>
+            <span>Audit Log ({auditTotal})</span>
           </button>
 
           {activeTab === 'users' && (
@@ -299,13 +324,19 @@ export default function SettingsPage() {
 
         {/* Audit Log Tab */}
         {activeTab === 'audit' && (
-          <DataTable
-            columns={auditColumns}
-            data={auditLogs}
-            isLoading={isLoadingAudit}
-            searchField={(log) => `${log.action} ${log.entity_type}`}
-            searchPlaceholder="Search audit logs by action or entity type..."
-          />
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <DataTable
+              columns={auditColumns}
+              data={auditLogs}
+              isLoading={isLoadingAudit}
+              searchField={(log) => `${log.action} ${log.entity_type}`}
+              searchPlaceholder="Search audit logs by action or entity type..."
+              totalItems={auditTotal}
+              currentPage={auditPage}
+              pageSize={50}
+              onPageChange={(page) => setAuditPage(page)}
+            />
+          </div>
         )}
       </div>
 
@@ -314,6 +345,12 @@ export default function SettingsPage() {
         isOpen={isPermissionsOpen}
         onClose={() => setIsPermissionsOpen(false)}
         user={selectedUser}
+      />
+      <JsonViewerSlideOver
+        isOpen={!!selectedLogForDetails}
+        onClose={() => setSelectedLogForDetails(null)}
+        title={`Log Details: ${selectedLogForDetails?.action || ''}`}
+        data={selectedLogForDetails?.details || {}}
       />
     </AppShell>
   );

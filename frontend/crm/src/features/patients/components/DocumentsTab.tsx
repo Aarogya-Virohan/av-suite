@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { patientDocumentFormSchema, PatientDocumentFormValues } from '../../../lib/schemas';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { FileUp, FileText, Download, Trash2, Plus, Paperclip } from 'lucide-react';
+import { API_BASE_URL } from '../../../lib/api-client';
 
 import { usePatientDocuments, useUploadPatientDocument } from '../api';
 
@@ -137,7 +138,7 @@ export function DocumentsTab({ patientId }: { patientId: string }) {
                 <button
                   onClick={async () => {
                     try {
-                      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/documents/${doc.id}/download`;
+                      const downloadUrl = `${API_BASE_URL}/documents/${doc.id}/download`;
                       const token = localStorage.getItem('av_crm_token');
                       const res = await fetch(downloadUrl, {
                         headers: {
