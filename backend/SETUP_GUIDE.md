@@ -287,6 +287,7 @@ Alembic manages database schema changes.
 
 5. Stop server:
    Press Ctrl+C (or Cmd+C on macOS)
+   pkill if uvicorn || true
 */
 
 

@@ -4,15 +4,22 @@ import uuid
 from typing import Optional
 from datetime import date, datetime
 
-NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z .'-]{0,99}$")
+NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 .'-]{0,99}$")
 PHONE_PATTERN = re.compile(r"^[0-9]{10}$")
 
+
+from app.enums.shared import Gender
 
 class PatientBase(BaseModel):
     first_name: str
     last_name: str
     date_of_birth: Optional[date] = None
     phone: Optional[str] = None
+    gender: Optional[Gender] = None
+    chief_complaint: Optional[str] = None
+    referral_source: Optional[str] = None
+    status: Optional[str] = "active"
+    age: Optional[int] = None
 
     @field_validator("first_name", "last_name")
     @classmethod
@@ -56,6 +63,11 @@ class PatientUpdate(BaseModel):
     date_of_birth: Optional[date] = None
     phone: Optional[str] = None
     user_id: Optional[uuid.UUID] = None
+    gender: Optional[Gender] = None
+    chief_complaint: Optional[str] = None
+    referral_source: Optional[str] = None
+    status: Optional[str] = None
+    age: Optional[int] = None
 
     @field_validator("first_name", "last_name")
     @classmethod

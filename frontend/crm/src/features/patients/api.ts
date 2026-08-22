@@ -77,7 +77,7 @@ export function usePatientDocuments(patientId: string) {
     queryKey: [...PATIENT_DOCUMENTS_QUERY_KEY, patientId],
     queryFn: async () => {
       const res = await apiClient.get(`/patients/${patientId}/documents`);
-      return res.data as { data: any[]; meta: any };
+      return res.data as { items: any[]; total: number; offset: number; limit: number };
     },
     enabled: !!patientId,
   });
@@ -91,18 +91,13 @@ export function useUploadPatientDocument() {
       payload,
     }: {
       patientId: string;
-      payload: {
-        patient_id: string;
-        label: string;
-        category: string;
-        file_url: string;
-        file_type: string;
-        file_size: number;
-        notes?: string;
-        treatment_id?: string | null;
-      };
+      payload: FormData;
     }) => {
-      const res = await apiClient.post(`/patients/${patientId}/documents`, payload);
+      const res = await apiClient.post(`/patients/${patientId}/documents`, payload, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       return res.data?.data || res.data;
     },
     onSuccess: (_data, variables) => {

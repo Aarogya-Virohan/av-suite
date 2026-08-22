@@ -14,12 +14,12 @@ interface SpecialtyOption {
 }
 
 const SPECIALTIES: SpecialtyOption[] = [
-  { key: 'ortho', label: 'Ortho', icon: Activity },
-  { key: 'neuro', label: 'Neuro', icon: Stethoscope },
-  { key: 'cardiopulm', label: 'Cardio', icon: Heart },
-  { key: 'sports', label: 'Sports', icon: Zap },
-  { key: 'paeds', label: 'Paeds', icon: Baby },
-  { key: 'general', label: 'General', icon: FileCheck },
+  { key: 'physiotherapy', label: 'Ortho', icon: Activity },
+  { key: 'chiropractic', label: 'Neuro', icon: Stethoscope },
+  { key: 'osteopathy', label: 'Cardio', icon: Heart },
+  { key: 'massage', label: 'Sports', icon: Zap },
+  { key: 'acupuncture', label: 'Paeds', icon: Baby },
+  { key: 'other', label: 'General', icon: FileCheck },
 ];
 
 export function SoapNotesTab({
@@ -30,11 +30,11 @@ export function SoapNotesTab({
   isReassessmentOnly?: boolean;
 }) {
   const role = useAuthStore((s) => s.role);
-  const [selectedSpecialty, setSelectedSpecialty] = useState('ortho');
+  const [selectedSpecialty, setSelectedSpecialty] = useState('physiotherapy');
   const [painVas, setPainVas] = useState<number>(6);
 
   const { data: assessmentsResponse, isLoading } = useAssessments(patientId);
-  const assessmentsData = assessmentsResponse?.data || [];
+  const assessmentsData = React.useMemo(() => assessmentsResponse?.data || [], [assessmentsResponse?.data]);
   
   const [assessments, setAssessments] = useState<SoapAssessment[]>([]);
 
@@ -58,7 +58,7 @@ export function SoapNotesTab({
       patient_id: patientId,
       appointment_id: null,
       author_id: 'usr_therapist_1',
-      specialty: 'ortho',
+      specialty: 'physiotherapy',
       diagnosis: '',
       is_reassessment: isReassessmentOnly,
       form_data: {
@@ -73,6 +73,12 @@ export function SoapNotesTab({
       updated_at: new Date().toISOString(),
     };
   });
+
+  useEffect(() => {
+    if (assessments.length > 0 && activeNote.id.startsWith('soap_')) {
+      setActiveNote(assessments[0]);
+    }
+  }, [assessments, activeNote.id]);
 
   const isFinalized = !!activeNote.finalized_at;
 

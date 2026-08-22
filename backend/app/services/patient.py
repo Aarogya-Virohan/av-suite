@@ -28,12 +28,10 @@ class PatientService:
     async def create_patient(self, clinic_id: UUID, payload: PatientCreate) -> Patient:
         """Validate payload and create a clinic-scoped patient."""
 
-        full_name = payload.full_name.strip()
-        if not full_name:
-            raise PatientValidationError("Patient full name cannot be empty.")
+        if not payload.first_name.strip() or not payload.last_name.strip():
+            raise PatientValidationError("Patient first name and last name cannot be empty.")
 
-        obj_in = payload.model_dump()
-        obj_in["full_name"] = full_name
+        obj_in = payload.model_dump(exclude_unset=True)
         obj_in["clinic_id"] = clinic_id
         return await self.patient_repository.create(obj_in)
 
@@ -66,12 +64,6 @@ class PatientService:
 
         patient = await self.get_patient(clinic_id, patient_id)
         update_data = payload.model_dump(exclude_unset=True)
-
-        if "full_name" in update_data and update_data["full_name"] is not None:
-            cleaned_name = update_data["full_name"].strip()
-            if not cleaned_name:
-                raise PatientValidationError("Patient full name cannot be empty.")
-            update_data["full_name"] = cleaned_name
 
         if not update_data:
             return patient

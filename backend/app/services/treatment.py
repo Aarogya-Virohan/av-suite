@@ -73,7 +73,9 @@ class TreatmentSessionService:
 
         obj_in = payload.model_dump()
         obj_in["clinic_id"] = clinic_id
-        return await self.repository.create(obj_in)
+        result = await self.repository.create(obj_in)
+        await self.repository.session.commit()
+        return result
 
     async def get_session(self, clinic_id: UUID, session_id: UUID) -> TreatmentSession:
         """Retrieve a treatment session ensuring clinic scoping."""
@@ -142,13 +144,16 @@ class TreatmentSessionService:
         if not update_data:
             return session
 
-        return await self.repository.update(session, update_data)
+        result = await self.repository.update(session, update_data)
+        await self.repository.session.commit()
+        return result
 
     async def delete_session(self, clinic_id: UUID, session_id: UUID) -> None:
         """Delete a treatment session ensuring clinic scoping."""
 
         session = await self.get_session(clinic_id, session_id)
         await self.repository.delete(session)
+        await self.repository.session.commit()
 
 
 class SoapAssessmentService:
@@ -198,7 +203,9 @@ class SoapAssessmentService:
 
         obj_in = payload.model_dump()
         obj_in["clinic_id"] = clinic_id
-        return await self.repository.create(obj_in)
+        result = await self.repository.create(obj_in)
+        await self.repository.session.commit()
+        return result
 
     async def get_assessment(self, clinic_id: UUID, assessment_id: UUID) -> SoapAssessment:
         """Retrieve a SOAP assessment ensuring clinic scoping."""
@@ -264,4 +271,6 @@ class SoapAssessmentService:
         if not update_data:
             return assessment
 
-        return await self.repository.update(assessment, update_data)
+        result = await self.repository.update(assessment, update_data)
+        await self.repository.session.commit()
+        return result

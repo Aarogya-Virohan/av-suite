@@ -12,7 +12,7 @@ import { usePatientDocuments, useUploadPatientDocument } from '../api';
 
 export function DocumentsTab({ patientId }: { patientId: string }) {
   const { data: response, isLoading } = usePatientDocuments(patientId);
-  const documents = response?.data || [];
+  const documents = response?.items || [];
   const [isSlideOpen, setIsSlideOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -52,23 +52,17 @@ export function DocumentsTab({ patientId }: { patientId: string }) {
       return;
     }
 
-    // Note: file_url uses a temporary object URL.
-    // Phase 2 will replace this with a Supabase Storage upload that returns a permanent URL.
-    const tempFileUrl = URL.createObjectURL(selectedFile);
+    const formData = new FormData();
+    formData.append('label', values.label);
+    formData.append('category', values.category);
+    if (values.notes) formData.append('notes', values.notes);
+    if (values.treatment_id) formData.append('treatment_id', values.treatment_id);
+    formData.append('file', selectedFile);
 
     uploadDocument.mutate(
       {
         patientId,
-        payload: {
-          patient_id: patientId,
-          label: values.label,
-          category: values.category,
-          file_url: tempFileUrl,
-          file_type: selectedFile.type || 'application/octet-stream',
-          file_size: selectedFile.size,
-          notes: values.notes || undefined,
-          treatment_id: values.treatment_id || null,
-        },
+        payload: formData,
       },
       {
         onSuccess: () => {
@@ -140,16 +134,35 @@ export function DocumentsTab({ patientId }: { patientId: string }) {
                   </div>
                 </div>
 
-                <a
-                  href={doc.file_url}
-                  download={doc.label}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2 rounded-lg text-slate-500 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-slate-800 transition-colors"
+                <button
+                  onClick={async () => {
+                    try {
+                      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/documents/${doc.id}/download`;
+                      const token = localStorage.getItem('av_crm_token');
+                      const res = await fetch(downloadUrl, {
+                        headers: {
+                          'Authorization': `Bearer ${token}`
+                        }
+                      });
+                      if (!res.ok) throw new Error('Download failed');
+                      const blob = await res.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = doc.label;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      a.remove();
+                    } catch (err) {
+                      toast.error('Failed to download document');
+                    }
+                  }}
                   title="Download File"
+                  className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/30 rounded-lg transition-colors cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                </a>
+                </button>
               </div>
             ))}
           </div>

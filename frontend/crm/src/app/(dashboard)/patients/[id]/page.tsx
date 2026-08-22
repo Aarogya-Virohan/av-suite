@@ -11,7 +11,7 @@ import { SoapNotesTab } from '../../../../features/patients/components/SoapNotes
 import { DocumentsTab } from '../../../../features/patients/components/DocumentsTab';
 import { ProgressionTab } from '../../../../features/patients/components/ProgressionTab';
 import { WhatsAppButton, openWhatsApp } from '../../../../components/ui/WhatsAppButton';
-import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, TrendingDown, Activity, FileCheck } from 'lucide-react';
+import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, TrendingDown, Activity, FileCheck, Camera, Dumbbell } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } from '../../../../features/prescriptions/api';
 
@@ -25,6 +25,10 @@ export default function PatientWorkspacePage() {
 
   const { data: patient, isLoading } = usePatient(patientId);
   const [activeTab, setActiveTab] = useState<TabKey>('timeline');
+
+  const { data: prescriptions, isLoading: isRxLoading } = usePrescriptions(patientId);
+  const createRx = useCreatePrescription();
+  const generatePdf = useGeneratePrescriptionPdf();
 
   const permissions = getPermissionsForRole(role).patientTabs;
 
@@ -56,10 +60,6 @@ export default function PatientWorkspacePage() {
     const message = `🏥 *Aarogya Virohan — Session Report*\n\nHi ${patient.first_name},\n\nSession completed successfully.\nInitial Pain: 8/10\nCurrent Pain: 3/10 (▼ 5 pts improved)\nTreatment: IFT therapy & core stabilization\nHome Advice: Cat-camel stretches twice daily\n\nThank you for visiting!`;
     openWhatsApp(patient.phone, `${patient.first_name} ${patient.last_name}`, message);
   };
-
-  const { data: prescriptions, isLoading: isRxLoading } = usePrescriptions(patientId);
-  const createRx = useCreatePrescription();
-  const generatePdf = useGeneratePrescriptionPdf();
 
   const handleGenerateRx = async () => {
     try {
@@ -179,6 +179,26 @@ export default function PatientWorkspacePage() {
                 <MessageSquare className="w-3.5 h-3.5" />
                 <span>WA Session Report</span>
               </button>
+
+              <a
+                href={`http://localhost:3002/analyze?patient_id=${patient.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span>AI Posture Analysis</span>
+              </a>
+
+              <a
+                href={`http://localhost:3001/prescribe?patient_id=${patient.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Dumbbell className="w-3.5 h-3.5" />
+                <span>Exercise Library</span>
+              </a>
             </div>
           </div>
 

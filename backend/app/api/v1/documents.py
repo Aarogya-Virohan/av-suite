@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, UploadFile, File, Form
 from app.core.dependencies import require_permission
 from app.enums.user import UserRole
 
@@ -23,7 +23,11 @@ from app.schemas.document import (
 )
 from app.services.document import DocumentNotFoundError, DocumentService, DocumentValidationError
 
-router = APIRouter(dependencies=[Depends(require_permission("documents"))])
+def check_documents_enabled(clinic: Clinic = Depends(get_current_clinic)) -> None:
+    if not clinic.is_documents_enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Documents bucket is disabled for this clinic.")
+
+router = APIRouter(dependencies=[Depends(require_permission("documents")), Depends(check_documents_enabled)])
 
 
 async def get_document_service(
@@ -47,23 +51,43 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 @router.post("/patients/{patient_id}/documents", response_model=PatientDocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_patient_document(
     patient_id: UUID,
-    payload: PatientDocumentCreate,
     clinic: CurrentClinicDep,
     service: DocumentServiceDep,
+    label: Annotated[str, Form(min_length=1, max_length=255)],
+    category: Annotated[DocumentCategory, Form()],
+    notes: Annotated[str | None, Form(max_length=2000)] = None,
+    treatment_id: Annotated[UUID | None, Form()] = None,
+    file: UploadFile = File(...),
 ) -> PatientDocumentResponse:
-    """Register document metadata for a specific patient."""
-
-    if payload.patient_id != patient_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="patient_id in path does not match payload patient_id.",
-        )
+    """Upload and register a document for a specific patient."""
 
     try:
+        from app.core.storage import storage_client
+        import uuid
+        
+        file_bytes = await file.read()
+        file_ext = file.filename.split('.')[-1] if file.filename and '.' in file.filename else 'bin'
+        path = f"{clinic.id}/{patient_id}/{uuid.uuid4()}.{file_ext}"
+        
+        storage_client.upload_file(path, file_bytes, file.content_type or 'application/octet-stream')
+        
+        payload = PatientDocumentCreate(
+            patient_id=patient_id,
+            label=label,
+            category=category,
+            notes=notes,
+            treatment_id=treatment_id,
+            file_url=path,
+            file_type=file.content_type or 'application/octet-stream',
+            file_size=len(file_bytes),
+        )
+        
         document = await service.create_document(clinic.id, payload)
         return PatientDocumentResponse.model_validate(document)
     except DocumentValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
 @router.post("/documents", response_model=PatientDocumentResponse, status_code=status.HTTP_201_CREATED)
@@ -154,10 +178,20 @@ async def download_document(
 
     try:
         document = await service.get_document(clinic.id, id)
-        headers = {"Location": document.file_url}
+        
+        # Determine URL
+        if document.file_url.startswith("http"):
+            url = document.file_url
+        else:
+            from app.core.storage import storage_client
+            url = storage_client.create_signed_download_url(document.file_url, expires_in=60)
+            
+        headers = {"Location": url}
         return Response(status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers=headers)
     except DocumentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
 @router.patch("/documents/{id}", response_model=PatientDocumentResponse)

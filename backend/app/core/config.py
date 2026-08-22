@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     # Default: localhost:6379 (local development ke liye)
     # Production mein proper Redis instance use karo
     REDIS_URL: str = "redis://localhost:6379"
+    
+    # Supabase Configuration
+    SUPABASE_URL: str
+    SUPABASE_SECRET_KEY: str
+    SUPABASE_BUCKET_NAME: str = "documents"
 
     # Pydantic Model Configuration
     # Configuration dikhaata hai Pydantic ko kaise settings load karne hain
