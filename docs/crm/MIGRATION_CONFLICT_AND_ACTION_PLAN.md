@@ -177,8 +177,8 @@ Below is the manually verified architecture map of the backend layers:
 - [x] **Step 078**: Ensure multi-tenant isolation (`clinic_id`) is strictly enforced on all queries.
 - [ ] **Step 079**: Confirm WhatsApp click-to-chat links are rendered in appointments and prescription components.
 - [ ] **Step 080**: Verify prescription PDF authenticated generation flow (`POST /prescriptions/{id}/pdf`).
-- [ ] **Step 081**: Confirm posture report viewing links in patient records.
-- [ ] **Step 082**: Verify exercise prescription library integration links in patient records.
+- [x] **Step 081**: Confirm posture report viewing links in patient records.
+- [x] **Step 082**: Verify exercise prescription library integration links in patient records.
 - [ ] **Step 083**: Review lockout guard logic (prevent removing last `permissions.manage` or `users.manage` grant).
 - [ ] **Step 084**: Ensure audit logging records every permission grant and revocation.
 - [ ] **Step 085**: Commit Phase 6 capability and scope alignment.
@@ -241,4 +241,29 @@ Below is the manually verified architecture map of the backend layers:
 
 ---
 
-*Last updated: 2026-08-21 | Cross-verification session complete*
+## 10. Capability Scopes Reference (`none`, `own`, `all`)
+
+As part of Rev 3, access to resources is governed by fine-grained **capabilities** (e.g., `patients.view`, `leads.view`) rather than just static roles. Each capability resolves to a **Scope**:
+
+### 1. `none`
+- **Behavior**: The user is completely blocked from performing the action.
+- **Condition**: API returns `403 Forbidden` immediately via the `require_capability(...)` dependency check.
+- **Use Case**: Hiding billing tabs from therapists.
+
+### 2. `all`
+- **Behavior**: The user has unrestricted access to the module within their clinic.
+- **Condition**: The backend applies no additional filters beyond `clinic_id`. They see every record in the clinic.
+- **Use Case**: An admin viewing the full patient directory.
+
+### 3. `own`
+- **Behavior**: The user only sees records they are directly associated with.
+- **Condition**: The backend injects an ownership filter (e.g., `apply_patient_scope`, `apply_lead_scope`) directly into the SQL `WHERE` clause.
+- **Specific Implementations**:
+  - **Patients (`apply_patient_scope`)**: A user only sees a patient if they are the assigned therapist on an **Appointment** for that patient, OR they are the assigned therapist on a **Treatment Session** for that patient. (If an admin has no appointments assigned to them, they will see 0 patients under `own`).
+  - **Leads (`apply_lead_scope`)**: A user only sees leads where they are set as the `assigned_to` user.
+
+*Note: If an admin logs in but has `own` scope for patients, and no one has assigned them any treatments, their patient list will be completely empty. This is expected behavior.*
+
+---
+
+*Last updated: 2026-08-22 | Cross-verification session complete*

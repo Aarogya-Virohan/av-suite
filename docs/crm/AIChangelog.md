@@ -188,3 +188,8 @@ cold-start overhead for future AI sessions.
 **Bugs Fixed**: BUG-005, BUG-006
 **Features Touched**: RBAC Capabilities (Phase 6), Lead Pipeline, Billing, Documents, Booking, Appointments.
 **Notes**: Database was successfully wiped and re-seeded with `asyncpg` to test the newly generated mock users and the new roles.
+
+## 2026-08-22
+- Fixed `user_id` tracking in audit logs for permission updates.
+- Fixed image upload failing by updating database `branding_logo_url` column from `VARCHAR(2048)` to `TEXT` to accommodate Base64 image payloads.
+- Removed hardcoded UI mock data for clinic settings and integrated dynamic `clinicSettings` fetching into the `AppShell` and `SidebarNavigation` components to support custom logos, names, and accent colors across the UI.

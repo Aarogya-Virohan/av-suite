@@ -259,3 +259,29 @@ can be `none`, `own`, or `all`. The effective access level is resolved via
 
 *Add new features above the closing line. Never delete completed feature entries.*
 *Last updated: 2026-08-21 | Branch: feature/frontend-redesign-impl*
+
+
+### [FEAT-008] Supabase Bucket Document Storage & Settings
+- **Status**: ✅ Complete
+- **Priority**: P0
+- **Started**: 2026-08-22
+- **Completed**: 2026-08-22
+
+#### What It Does
+Integrates Supabase Storage buckets for storing patient documents securely. Adds a clinic-level settings toggle (`is_documents_enabled`) to enable/disable access to documents per clinic. Fully integrated into the seeding and testing infrastructure.
+
+#### Backend Contract
+- `PATCH /api/v1/settings/clinic` -> toggle documents bucket
+- `GET /api/v1/documents` -> list patient documents (403 if disabled)
+- `GET /api/v1/documents/{id}/download` -> generate secure download URL
+
+#### Implementation Plan (Completed)
+1. Updated Clinic model to include `is_documents_enabled`.
+2. Created `documents.py` router with RBAC and feature flag checks.
+3. Updated `seed.py` and `wipe_db.py` to directly push and remove dummy PDFs from the Supabase `documents` bucket.
+
+---
+
+## 2026-08-22
+- **Feature:** Dynamic UI Branding.
+  **Description:** The dashboard layout (Sidebar and Top Navigation) now fully reflects the clinic's custom branding settings, including the brand color (accent), clinic name, and logo.

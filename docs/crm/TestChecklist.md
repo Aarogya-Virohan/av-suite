@@ -155,7 +155,7 @@ curl http://localhost:8000/api/v1/patients \
 curl -X POST http://localhost:8000/api/v1/patients \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Test Patient", "phone": "9000000001", "date_of_birth": "1990-01-01"}'
+  -d '{"first_name": "Test", "last_name": "Patient", "phone": "9000000001", "date_of_birth": "1990-01-01"}'
 ```
 
 **Checklist**:
