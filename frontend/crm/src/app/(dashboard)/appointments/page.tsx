@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { useAppointments, useUpdateAppointmentStatus } from '../../../features/appointments/api';
 import { AddAppointmentSlideOver } from '../../../features/appointments/components/AddAppointmentSlideOver';
+import { RescheduleSlideOver } from '../../../features/appointments/components/RescheduleSlideOver';
 import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
 import { AppointmentStatus, Appointment } from '../../../types/api';
 import { Plus, Calendar as CalendarIcon, Clock, User, CheckCircle2, XCircle, Copy, ExternalLink, QrCode } from 'lucide-react';
@@ -37,6 +38,7 @@ export default function AppointmentsPage() {
 
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('list');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
   const [requests, setRequests] = useState<BookingRequest[]>([]);
 
@@ -217,7 +219,7 @@ export default function AppointmentsPage() {
                       </div>
                       <div>
                         <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                          Patient ID: {apt.patient_id}
+                          {apt.patient_name || `Patient ID: ${apt.patient_id}`}
                         </h3>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
                           <span className="flex items-center gap-1">
@@ -231,6 +233,13 @@ export default function AppointmentsPage() {
                     </div>
 
                     <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                      <button
+                        onClick={() => setRescheduleAppointment(apt)}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Reschedule</span>
+                      </button>
                       <select
                         value={apt.status}
                         onChange={(e) => handleStatusChange(apt.id, e.target.value as AppointmentStatus)}
@@ -389,6 +398,13 @@ export default function AppointmentsPage() {
 
         {/* Add Appointment Drawer */}
         <AddAppointmentSlideOver isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
+        
+        {/* Reschedule Appointment Drawer */}
+        <RescheduleSlideOver
+          isOpen={!!rescheduleAppointment}
+          onClose={() => setRescheduleAppointment(null)}
+          appointment={rescheduleAppointment}
+        />
       </div>
     </AppShell>
   );

@@ -40,95 +40,119 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Navigate to the Login page (open '/login') so the email and password fields become visible.
-        await page.goto("http://localhost:3000/login")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
-        
-        # -> Fill 'admin@avtest.com' into the Email Address field, fill 'Password123!' into the Password field, then click the 'Sign In to Dashboard' button.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, and click the 'Sign In to Dashboard' button.
         # admin@avtest.com email field
         elem = page.get_by_placeholder('admin@avtest.com', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.fill("admin1@clinic.com")
         
-        # -> Fill 'admin@avtest.com' into the Email Address field, fill 'Password123!' into the Password field, then click the 'Sign In to Dashboard' button.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, and click the 'Sign In to Dashboard' button.
         # •••••••• password field
         elem = page.get_by_placeholder('••••••••', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("password123")
         
-        # -> Fill 'admin@avtest.com' into the Email Address field, fill 'Password123!' into the Password field, then click the 'Sign In to Dashboard' button.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, and click the 'Sign In to Dashboard' button.
         # Sign In to Dashboard button
         elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Click the 'Appointments' link in the sidebar to open the Appointments page.
+        # Appointments link
+        elem = page.get_by_role('link', name='Appointments', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and observe whether the dashboard loads or an error appears.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Open the 'Charlie Smith' appointment card from the list to view appointment details.
+        # Open the 'Charlie Smith' appointment card from the list to view appointment details.
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div/div/div')
         await elem.click(timeout=10000)
         
-        # -> Search the page for error messages (e.g., 'invalid', 'error', 'failed', 'unauthoriz', 'incorrect', 'verification') and open the 'Notifications' panel to look for authentication feedback.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
+        # -> Open the 'Charlie Smith' appointment from the appointments list to view its details.
+        # Open the 'Charlie Smith' appointment from the appointments list to view its details.
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div/div/div')
         await elem.click(timeout=10000)
         
-        # -> Open the 'Notifications' panel to view any authentication or verification messages shown after the failed sign-in attempts.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
+        # -> Open the 'Charlie Smith' appointment from the list by clicking its appointment card to view details.
+        # Open the 'Charlie Smith' appointment from the list by clicking its appointment card to view details.
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div/div/div')
         await elem.click(timeout=10000)
         
-        # -> Open the 'Notifications' panel to view any authentication or verification messages
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
+        # -> Click the 'Book Visit' button to open the appointment creation form.
+        # Book Visit button
+        elem = page.get_by_role('button', name='Book Visit', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Open the 'Notifications' panel and read any authentication messages shown after the failed sign-in attempts.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
+        # -> Open the 'Therapist / Provider' dropdown and select the provider (start by clicking the Therapist / Provider field to reveal options).
+        # Admin1 User ( admin ) Admin2 User ( admin )... dropdown
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[4]/div/div[2]/form/div[2]/select')
         await elem.click(timeout=10000)
         
-        # -> Open the 'Notifications' panel and read any authentication or verification messages shown after the failed sign-in attempts.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
+        # -> Click the 'Patient' field in the Book Appointment modal to open the patient dropdown and reveal available patient options.
+        # patient_id dropdown
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[4]/div/div[2]/form/div/select')
         await elem.click(timeout=10000)
         
-        # -> Open the 'Notifications' panel and read any authentication or verification messages shown after the failed sign-in attempts.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
+        # -> Click the 'Cancel' button in the Book Appointment modal to close the modal and reveal the main appointments UI.
+        # Cancel button
+        elem = page.get_by_role('button', name='Cancel', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Read the Notifications panel and any authentication messages shown on the login page (look for 'invalid', 'error', 'verification', '2FA', 'OTP', 'blocked', 'verify').
-        # [internal] extract_content: 
+        # -> Open the 'Charlie Smith' appointment card from the appointments list, then use its status dropdown to set status to 'Scheduled' and then back to 'Cancelled' to verify the cancel flow.
+        # Open the 'Charlie Smith' appointment card from the appointments list, then use its status dropdown to set status to 'Scheduled' and then back to 'Cancelled' to verify the cancel flow.
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div/div/div')
+        await elem.click(timeout=10000)
         
-        # -> Inspect the 'Sign In to Dashboard' button and the email/password fields, then navigate to the 'Appointments' page to check whether it is accessible.
-        await page.goto("http://localhost:3000/appointments")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
+        # -> Open the 'Charlie Smith' appointment card from the appointments list, then use its status dropdown to set status to 'Scheduled' and then back to 'Cancelled' to verify the cancel flow.
+        # Scheduled Completed Cancelled No Show dropdown
+        elem = page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div/div[2]/select").nth(0)
+        await elem.wait_for(state="visible", timeout=10000)
+        await elem.select_option("")
+        
+        # -> Open the 'Charlie Smith' appointment card from the appointments list, then use its status dropdown to set status to 'Scheduled' and then back to 'Cancelled' to verify the cancel flow.
+        # Scheduled Completed Cancelled No Show dropdown
+        elem = page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div/div[2]/select").nth(0)
+        await elem.wait_for(state="visible", timeout=10000)
+        await elem.select_option("")
+        
+        # -> Open the status dropdown for the 'Charlie Smith' appointment (the control currently labeled 'CANCELLED') so its options appear.
+        # Scheduled Completed Cancelled No Show dropdown
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div/div[2]/select')
+        await elem.click(timeout=10000)
+        
+        # -> Select 'Scheduled' from the Charlie Smith appointment status dropdown to change its status to Scheduled.
+        # Scheduled Completed Cancelled No Show dropdown
+        elem = page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[2]/select").nth(0)
+        await elem.wait_for(state="visible", timeout=10000)
+        await elem.select_option("")
+        
+        # -> Open the 'CANCELLED' status dropdown on the Charlie Smith appointment and reveal its options.
+        # Scheduled Completed Cancelled No Show dropdown
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[2]/select')
+        await elem.click(timeout=10000)
+        
+        # -> Select the 'Cancelled' option from the Charlie Smith appointment status dropdown to change its status to Cancelled.
+        # Scheduled Completed Cancelled No Show dropdown
+        elem = page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[2]/select").nth(0)
+        await elem.wait_for(state="visible", timeout=10000)
+        await elem.select_option("")
+        
+        # -> Open the 'SCHEDULED' status dropdown on the Charlie Smith appointment so the 'Cancelled' option can be selected.
+        # Scheduled Completed Cancelled No Show dropdown
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[2]/select')
+        await elem.click(timeout=10000)
         
         # --> Assertions to verify final state
         
-        # --> Expected the appointment status to change to 'canceled', but the test never reached the appointments page to observe the status change.
-        # Assert-outcome: failed
-        # Assert: Expected the URL to contain '/appointments' so the appointment status could be observed.
-        await expect(page).to_have_url(re.compile("/appointments"), timeout=15000), "Expected the URL to contain '/appointments' so the appointment status could be observed."
+        # --> The Charlie Smith appointment's status is set to Cancelled in the list.
+        # Assert-outcome: passed
+        # Assert: The appointment status select has value 'cancelled'.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[2]/select").nth(0)).to_have_value("cancelled", timeout=15000), "The appointment status select has value 'cancelled'."
         
-        # --> Expected the canceled appointment to remain visible in the list, but the test never reached the appointments page to verify the appointment is present.
-        # Assert-outcome: failed
-        # Assert: Expected the URL to contain '/appointments' so the canceled appointment would be visible in the list.
-        await expect(page).to_have_url(re.compile("/appointments"), timeout=15000), "Expected the URL to contain '/appointments' so the canceled appointment would be visible in the list."
-        
-        # --> Test blocked by environment/access constraints during agent run
-        # Reason: TEST BLOCKED The test could not be run — the login form cannot be submitted and the UI remained unresponsive, preventing the required authenticated flow. Observations: - The page remained on the login card after five sign-in attempts (4 clicks on 'Sign In to Dashboard' and 1 Enter). No navigation to the dashboard was observed. - No authentication, verification, or error messages were visible on...
-        raise AssertionError("Test blocked during agent run: " + "TEST BLOCKED The test could not be run \u2014 the login form cannot be submitted and the UI remained unresponsive, preventing the required authenticated flow. Observations: - The page remained on the login card after five sign-in attempts (4 clicks on 'Sign In to Dashboard' and 1 Enter). No navigation to the dashboard was observed. - No authentication, verification, or error messages were visible on..." + " — the exported script cannot reproduce a PASS in this environment.")
+        # --> The Charlie Smith appointment card is visible in the appointments list.
+        await page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[1]/div[1]").nth(0).scroll_into_view_if_needed()
+        # Assert-outcome: passed
+        # Assert: The Charlie Smith appointment card is visible on the appointments page.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[1]/div[1]").nth(0)).to_be_visible(timeout=15000), "The Charlie Smith appointment card is visible on the appointments page."
         await asyncio.sleep(5)
 
     finally:

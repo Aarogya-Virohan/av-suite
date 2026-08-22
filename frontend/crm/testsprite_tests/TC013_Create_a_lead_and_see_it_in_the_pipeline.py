@@ -40,127 +40,78 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Open the Login page by navigating to '/login' (the app's Login page).
-        await page.goto("http://localhost:3000/login")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
-        
-        # -> Fill the 'Email Address' field with admin@avtest.com.
+        # -> Fill the Email Address field with admin1@clinic.com, fill the Password field with password123, and click the 'Sign In to Dashboard' button.
         # admin@avtest.com email field
         elem = page.get_by_placeholder('admin@avtest.com', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.fill("admin1@clinic.com")
         
-        # -> Fill the 'Email Address' field with admin@avtest.com.
+        # -> Fill the Email Address field with admin1@clinic.com, fill the Password field with password123, and click the 'Sign In to Dashboard' button.
         # •••••••• password field
         elem = page.get_by_placeholder('••••••••', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("password123")
         
-        # -> Fill the 'Email Address' field with admin@avtest.com.
+        # -> Fill the Email Address field with admin1@clinic.com, fill the Password field with password123, and click the 'Sign In to Dashboard' button.
         # Sign In to Dashboard button
         elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and access the dashboard.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Click the 'Leads' link in the left sidebar to open the Leads / Pipeline view.
+        # Leads link
+        elem = page.get_by_role('link', name='Leads', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and open the dashboard.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Click the 'Add Lead' button to open the lead creation form or modal.
+        # Add Lead button
+        elem = page.get_by_role('button', name='Add Lead', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and verify navigation or visible error feedback.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Check the page and Notifications area for visible login error messages (look for words like 'error' or 'invalid') to understand why sign-in did not succeed.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Open the 'Notifications' panel and read any visible error or status messages.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Open the 'Notifications' panel and read any visible error or status messages shown there.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Open the 'Notifications' panel and read any visible messages shown there.
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Open the 'Notifications' panel and read any visible messages (look for 'error', 'Invalid', or authentication-related feedback).
-        # Notifications alt+T
-        elem = page.get_by_text('Notifications alt+T', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Read all messages in the Notifications panel and on the page to find any authentication error or alert text.
-        # [internal] extract_content: 
-        
-        # -> Clear and re-fill the 'Email Address' and 'Password' fields and click the 'Sign In to Dashboard' button.
-        # admin@avtest.com email field
-        elem = page.get_by_placeholder('admin@avtest.com', exact=True)
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email, Notes) and click the 'Save Lead' button.
+        # Amit Patel text field
+        elem = page.get_by_placeholder('Amit Patel', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.fill("E2E Lead 9900")
         
-        # -> Clear and re-fill the 'Email Address' and 'Password' fields and click the 'Sign In to Dashboard' button.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email, Notes) and click the 'Save Lead' button.
+        # +919988776655 tel field
+        elem = page.get_by_placeholder('+919988776655', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("9900112233")
         
-        # -> Clear and re-fill the 'Email Address' and 'Password' fields and click the 'Sign In to Dashboard' button.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email, Notes) and click the 'Save Lead' button.
+        # amit.patel@example.com email field
+        elem = page.get_by_placeholder('amit.patel@example.com', exact=True)
+        await elem.wait_for(state="visible", timeout=10000)
+        await elem.fill("e2e.lead.9900@example.com")
+        
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email, Notes) and click the 'Save Lead' button.
+        # Details about patient inquiry... text area
+        elem = page.get_by_placeholder('Details about patient inquiry...', exact=True)
+        await elem.wait_for(state="visible", timeout=10000)
+        await elem.fill("Created by automated test")
+        
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email, Notes) and click the 'Save Lead' button.
+        # Save Lead button
+        elem = page.get_by_role('button', name='Save Lead', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Open the 'Leads' page and observe whether the pipeline loads or the app redirects back to the login page.
-        await page.goto("http://localhost:3000/leads")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
-        
-        # -> Open the 'Leads' page (navigate to /leads) and check whether the pipeline loads or the app redirects back to the login page.
-        await page.goto("http://localhost:3000/leads")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
-        
-        # -> Navigate to the 'Leads' page and observe whether the leads pipeline loads or the app redirects back to the login page.
-        await page.goto("http://localhost:3000/leads")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
+        # -> Open the stage dropdown for the 'E2E Lead 9900' row to confirm the lead's current stage label.
+        # New Contacted Qualified Converted Lost dropdown
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[3]/div/table/tbody/tr[9]/td[4]/select')
+        await elem.click(timeout=10000)
         
         # --> Assertions to verify final state
         
-        # --> Expected the Leads pipeline page to load, but the app remained on the login page.
-        # Assert-outcome: failed
-        # Assert: Expected the URL to contain '/leads' indicating the Leads pipeline page had loaded.
-        await expect(page).to_have_url(re.compile("/leads"), timeout=15000), "Expected the URL to contain '/leads' indicating the Leads pipeline page had loaded."
+        # --> The new lead 'E2E Lead 9900' appears in the Leads Pipeline list.
+        # Assert-outcome: passed
+        # Assert: Verifies the lead row shows the name 'E2E Lead 9900'.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div/table/tbody/tr[9]/td[1]").nth(0)).to_contain_text("E2E Lead 9900", timeout=15000), "Verifies the lead row shows the name 'E2E Lead 9900'."
         
-        # --> Expected the new lead to be visible in the initial stage, but the login form remained on-screen.
-        await page.locator("xpath=/html/body/div[2]/div/form/button").nth(0).scroll_into_view_if_needed()
-        # Assert-outcome: failed
-        # Assert: Expected the Sign In to Dashboard button to not be visible after signing in so the Leads page and lead list could be reached.
-        await expect(page.locator("xpath=/html/body/div[2]/div/form/button").nth(0)).to_be_visible(timeout=15000), "Expected the Sign In to Dashboard button to not be visible after signing in so the Leads page and lead list could be reached."
-        
-        # --> Test blocked by environment/access constraints during agent run
-        # Reason: TEST BLOCKED The test could not be run — signing in with the provided credentials did not produce an authenticated session, so the Leads pipeline and lead-creation flow could not be reached. Observations: - The login page (Sign in to Dashboard) remained on-screen after multiple sign-in attempts using the provided credentials. - No authentication error message or notification text appeared on th...
-        raise AssertionError("Test blocked during agent run: " + "TEST BLOCKED The test could not be run \u2014 signing in with the provided credentials did not produce an authenticated session, so the Leads pipeline and lead-creation flow could not be reached. Observations: - The login page (Sign in to Dashboard) remained on-screen after multiple sign-in attempts using the provided credentials. - No authentication error message or notification text appeared on th..." + " — the exported script cannot reproduce a PASS in this environment.")
+        # --> The new lead is shown in the initial stage 'New'.
+        # Assert-outcome: passed
+        # Assert: Verifies the lead's stage control shows 'New' as the initial stage.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div/table/tbody/tr[9]/td[4]/select").nth(0)).to_contain_text("New", timeout=15000), "Verifies the lead's stage control shows 'New' as the initial stage."
         await asyncio.sleep(5)
 
     finally:

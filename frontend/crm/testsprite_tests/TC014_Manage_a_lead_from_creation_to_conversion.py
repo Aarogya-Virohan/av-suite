@@ -40,104 +40,78 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Fill 'admin@avtest.com' into the Email Address field, 'Password123!' into the Password field, and click the 'Sign In to Dashboard' button.
+        # -> Fill the Email Address with 'admin1@clinic.com', fill the Password with 'password123', and click the 'Sign In to Dashboard' button.
         # admin@avtest.com email field
         elem = page.get_by_placeholder('admin@avtest.com', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.fill("admin1@clinic.com")
         
-        # -> Fill 'admin@avtest.com' into the Email Address field, 'Password123!' into the Password field, and click the 'Sign In to Dashboard' button.
+        # -> Fill the Email Address with 'admin1@clinic.com', fill the Password with 'password123', and click the 'Sign In to Dashboard' button.
         # •••••••• password field
         elem = page.get_by_placeholder('••••••••', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("password123")
         
-        # -> Fill 'admin@avtest.com' into the Email Address field, 'Password123!' into the Password field, and click the 'Sign In to Dashboard' button.
+        # -> Fill the Email Address with 'admin1@clinic.com', fill the Password with 'password123', and click the 'Sign In to Dashboard' button.
         # Sign In to Dashboard button
         elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and load the dashboard.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Click the 'Leads' link in the left sidebar to open the Leads page.
+        # Leads link
+        elem = page.get_by_role('link', name='Leads', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Click the 'Add Lead' button to open the lead creation form.
+        # Add Lead button
+        elem = page.get_by_role('button', name='Add Lead', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and load the dashboard.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Focus the 'PASSWORD' field and press Enter to submit the 'Sign In to Dashboard' form.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and load the dashboard.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form after re-entering credentials.
-        # admin@avtest.com email field
-        elem = page.get_by_placeholder('admin@avtest.com', exact=True)
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email Address) and click the 'Save Lead' button to create the lead.
+        # Amit Patel text field
+        elem = page.get_by_placeholder('Amit Patel', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.fill("QA Lead 0822")
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form after re-entering credentials.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email Address) and click the 'Save Lead' button to create the lead.
+        # +919988776655 tel field
+        elem = page.get_by_placeholder('+919988776655', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("9900223344")
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form after re-entering credentials.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email Address) and click the 'Save Lead' button to create the lead.
+        # amit.patel@example.com email field
+        elem = page.get_by_placeholder('amit.patel@example.com', exact=True)
+        await elem.wait_for(state="visible", timeout=10000)
+        await elem.fill("qa.lead.0822@example.com")
+        
+        # -> Fill the 'Add New Lead' form (Lead Name, Phone Number, Email Address) and click the 'Save Lead' button to create the lead.
+        # Save Lead button
+        elem = page.get_by_role('button', name='Save Lead', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Re-enter email and password, then click the 'Sign In to Dashboard' button to submit the login form and load the dashboard.
-        # admin@avtest.com email field
-        elem = page.get_by_placeholder('admin@avtest.com', exact=True)
+        # -> Select 'Contacted' from the 'Stage' dropdown for the 'QA Lead 0822' row, then click the 'Convert' button for that row.
+        # New Contacted Qualified Converted Lost dropdown
+        elem = page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div/table/tbody/tr[8]/td[4]/select").nth(0)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.select_option("")
         
-        # -> Re-enter email and password, then click the 'Sign In to Dashboard' button to submit the login form and load the dashboard.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
-        
-        # -> Re-enter email and password, then click the 'Sign In to Dashboard' button to submit the login form and load the dashboard.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Select 'Contacted' from the 'Stage' dropdown for the 'QA Lead 0822' row, then click the 'Convert' button for that row.
+        # Convert button
+        elem = page.get_by_text('QQA Lead 08228/22/2026', exact=True).locator("xpath=ancestor-or-self::*[.//button][1]").get_by_role('button', name='Convert', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Fill the 'Email Address' field with admin@avtest.com, fill the 'PASSWORD' field with Password123!, then press Enter to submit the 'Sign In to Dashboard' form.
-        # admin@avtest.com email field
-        elem = page.get_by_placeholder('admin@avtest.com', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
-        
-        # -> Fill the 'Email Address' field with admin@avtest.com, fill the 'PASSWORD' field with Password123!, then press Enter to submit the 'Sign In to Dashboard' form.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        # -> Click the 'Patients' link in the left sidebar to open the Patients page and verify that 'QA Lead 0822' (or qa.lead.0822@example.com) appears as a patient.
+        # Patients link
+        elem = page.get_by_role('link', name='Patients', exact=True)
+        await elem.click(timeout=10000)
         
         # --> Assertions to verify final state
         
-        # --> Could not verify the converted patient because the app remained on the login page (/login) after sign-in attempts.
+        # --> Converted lead 'QA Lead 0822' does not appear in the Patients directory.
         # Assert-outcome: failed
-        # Assert: Expected the page to navigate away from /login after signing in.
-        await expect(page).to_have_url(re.compile("/login"), timeout=15000), "Expected the page to navigate away from /login after signing in."
-        
-        # --> Test blocked by environment/access constraints during agent run
-        # Reason: TEST BLOCKED The test could not be run — the front-desk user could not be authenticated through the UI in this session, preventing the Lead→Patient workflow from being exercised. Observations: - After 4+ submit attempts (clicking 'Sign In to Dashboard' and pressing Enter) with the provided credentials, the page remained on /login and the sign-in form stayed visible. - No clear visible error mes...
-        raise AssertionError("Test blocked during agent run: " + "TEST BLOCKED The test could not be run \u2014 the front-desk user could not be authenticated through the UI in this session, preventing the Lead\u2192Patient workflow from being exercised. Observations: - After 4+ submit attempts (clicking 'Sign In to Dashboard' and pressing Enter) with the provided credentials, the page remained on /login and the sign-in form stayed visible. - No clear visible error mes..." + " — the exported script cannot reproduce a PASS in this environment.")
+        # Assert: Expected the Patients table row to contain the converted patient name 'QA Lead 0822'.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[2]/div[1]/table/tbody/tr").nth(0)).to_contain_text("QA Lead 0822", timeout=15000), "Expected the Patients table row to contain the converted patient name 'QA Lead 0822'."
         await asyncio.sleep(5)
 
     finally:

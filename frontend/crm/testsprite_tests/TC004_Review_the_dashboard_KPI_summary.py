@@ -40,60 +40,48 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Open the 'Login' page (navigate to /login) so the email and password fields can be filled and the login form submitted.
-        await page.goto("http://localhost:3000/login")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
-        
-        # -> Fill the Email Address field with 'admin@avtest.com' and the Password field with 'Password123!', then click the 'Sign In to Dashboard' button.
+        # -> Click the 'Sign In to Dashboard' button after entering the admin1@clinic.com credentials
         # admin@avtest.com email field
         elem = page.get_by_placeholder('admin@avtest.com', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.fill("admin1@clinic.com")
         
-        # -> Fill the Email Address field with 'admin@avtest.com' and the Password field with 'Password123!', then click the 'Sign In to Dashboard' button.
+        # -> Click the 'Sign In to Dashboard' button after entering the admin1@clinic.com credentials
         # •••••••• password field
         elem = page.get_by_placeholder('••••••••', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("password123")
         
-        # -> Fill the Email Address field with 'admin@avtest.com' and the Password field with 'Password123!', then click the 'Sign In to Dashboard' button.
+        # -> Click the 'Sign In to Dashboard' button after entering the admin1@clinic.com credentials
         # Sign In to Dashboard button
         elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Press Enter in the password field to submit the 'Sign In to Dashboard' form and trigger login.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
         await elem.click(timeout=10000)
         
         # --> Assertions to verify final state
         
-        # --> Expected the dashboard to display the clinic summary metrics (total patients, today appointments, monthly revenue, pending leads), but the dashboard was not reached.
-        # Assert-outcome: failed
-        # Assert: Expected the URL to contain '/dashboard' so the dashboard metrics would be visible.
-        await expect(page).to_have_url(re.compile("/dashboard"), timeout=15000), "Expected the URL to contain '/dashboard' so the dashboard metrics would be visible."
+        # --> The Total Patients metric is visible on the dashboard.
+        await page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[1]/div/svg").nth(0).scroll_into_view_if_needed()
+        # Assert-outcome: passed
+        # Assert: Total Patients metric card is visible on the dashboard.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[1]/div/svg").nth(0)).to_be_visible(timeout=15000), "Total Patients metric card is visible on the dashboard."
         
-        # --> Test blocked by environment/access constraints during agent run
-        # Reason: TEST BLOCKED The test could not be run — the dashboard could not be reached because authentication failed with the provided credentials. Observations: - The login page displayed a notification: "Incorrect email or password". - The login form remained visible after multiple submit attempts with credentials admin@avtest.com / Password123!.
-        raise AssertionError("Test blocked during agent run: " + "TEST BLOCKED The test could not be run \u2014 the dashboard could not be reached because authentication failed with the provided credentials. Observations: - The login page displayed a notification: \"Incorrect email or password\". - The login form remained visible after multiple submit attempts with credentials admin@avtest.com / Password123!." + " — the exported script cannot reproduce a PASS in this environment.")
+        # --> The Today's Appointments metric is visible on the dashboard.
+        await page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[2]/div/svg").nth(0).scroll_into_view_if_needed()
+        # Assert-outcome: passed
+        # Assert: Today's Appointments metric card is visible on the dashboard.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[2]/div/svg").nth(0)).to_be_visible(timeout=15000), "Today's Appointments metric card is visible on the dashboard."
+        
+        # --> The Monthly Revenue metric is visible on the dashboard.
+        await page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[3]/div/svg").nth(0).scroll_into_view_if_needed()
+        # Assert-outcome: passed
+        # Assert: Monthly Revenue metric card is visible on the dashboard.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[3]/div/svg").nth(0)).to_be_visible(timeout=15000), "Monthly Revenue metric card is visible on the dashboard."
+        
+        # --> The Pending Leads metric is visible on the dashboard.
+        await page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[4]/div/svg").nth(0).scroll_into_view_if_needed()
+        # Assert-outcome: passed
+        # Assert: Pending Leads metric card is visible on the dashboard.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[4]/div/svg").nth(0)).to_be_visible(timeout=15000), "Pending Leads metric card is visible on the dashboard."
         await asyncio.sleep(5)
 
     finally:

@@ -40,57 +40,35 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Open the Login page by navigating to '/login' so the email and password fields can be filled.
-        await page.goto("http://localhost:3000/login")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
-        
-        # -> Submit the login form by clicking the 'Sign In to Dashboard' button after filling email and password fields.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, then click the 'Sign In to Dashboard' button.
         # admin@avtest.com email field
         elem = page.get_by_placeholder('admin@avtest.com', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.fill("admin1@clinic.com")
         
-        # -> Submit the login form by clicking the 'Sign In to Dashboard' button after filling email and password fields.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, then click the 'Sign In to Dashboard' button.
         # •••••••• password field
         elem = page.get_by_placeholder('••••••••', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("password123")
         
-        # -> Submit the login form by clicking the 'Sign In to Dashboard' button after filling email and password fields.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Submit the login form by pressing Enter while focused in the password field to attempt sign-in.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and observe whether the dashboard loads.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, then click the 'Sign In to Dashboard' button.
         # Sign In to Dashboard button
         elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
         await elem.click(timeout=10000)
         
         # --> Assertions to verify final state
         
-        # --> The dashboard did not load after signing in.
-        # Assert-outcome: failed
-        # Assert: Expected URL to contain '/dashboard' after signing in.
-        await expect(page).to_have_url(re.compile("/dashboard"), timeout=15000), "Expected URL to contain '/dashboard' after signing in."
+        # --> User landed on the dashboard page (/dashboard).
+        # Assert-outcome: passed
+        # Assert: URL contains '/dashboard', indicating the dashboard page loaded.
+        await expect(page).to_have_url(re.compile("/dashboard"), timeout=15000), "URL contains '/dashboard', indicating the dashboard page loaded."
         
-        # --> The main KPI summary is not visible after signing in.
-        await page.locator("xpath=/html/body/div[2]/div/form/button").nth(0).scroll_into_view_if_needed()
-        # Assert-outcome: failed
-        # Assert: Expected the main KPI summary to be visible after signing in.
-        await expect(page.locator("xpath=/html/body/div[2]/div/form/button").nth(0)).to_be_visible(timeout=15000), "Expected the main KPI summary to be visible after signing in."
+        # --> Main KPI summary is visible on the dashboard (Total Patients, Today's Appointments, Monthly Revenue, Pending Leads).
+        await page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[1]/div/svg").nth(0).scroll_into_view_if_needed()
+        # Assert-outcome: passed
+        # Assert: A KPI card icon is visible, indicating the KPI summary is displayed.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[2]/div[1]/div/svg").nth(0)).to_be_visible(timeout=15000), "A KPI card icon is visible, indicating the KPI summary is displayed."
         await asyncio.sleep(5)
 
     finally:

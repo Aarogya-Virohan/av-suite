@@ -40,26 +40,19 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Open the Login page by navigating to http://localhost:3000/login so the login form can be filled.
-        await page.goto("http://localhost:3000/login")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
-        
-        # -> Fill 'invalid@example.com' into the Email Address field, fill 'invalid-password' into the Password field, then click the 'Sign In to Dashboard' button.
+        # -> Fill the 'EMAIL ADDRESS' field with invalid@example.com and the 'PASSWORD' field with invalid-password, then click the 'Sign In to Dashboard' button.
         # admin@avtest.com email field
         elem = page.get_by_placeholder('admin@avtest.com', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
         await elem.fill("invalid@example.com")
         
-        # -> Fill 'invalid@example.com' into the Email Address field, fill 'invalid-password' into the Password field, then click the 'Sign In to Dashboard' button.
+        # -> Fill the 'EMAIL ADDRESS' field with invalid@example.com and the 'PASSWORD' field with invalid-password, then click the 'Sign In to Dashboard' button.
         # •••••••• password field
         elem = page.get_by_placeholder('••••••••', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
         await elem.fill("invalid-password")
         
-        # -> Fill 'invalid@example.com' into the Email Address field, fill 'invalid-password' into the Password field, then click the 'Sign In to Dashboard' button.
+        # -> Fill the 'EMAIL ADDRESS' field with invalid@example.com and the 'PASSWORD' field with invalid-password, then click the 'Sign In to Dashboard' button.
         # Sign In to Dashboard button
         elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
         await elem.click(timeout=10000)

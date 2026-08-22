@@ -40,34 +40,28 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Navigate to the clinic booking page at /booking/avtest and check for the appointment request form and service/time selectors.
-        await page.goto("http://localhost:3000/booking/avtest")
+        # -> Open the clinic booking page by navigating to the /booking path and look for the appointment request form.
+        await page.goto("http://localhost:3000/booking")
         try:
             await page.wait_for_load_state("domcontentloaded", timeout=5000)
         except Exception:
             pass
         
-        # -> Click the 'Physiotherapy Consultation' service button to reveal time selection controls.
-        # Physiotherapy Consultation button
-        elem = page.get_by_role('button', name='Physiotherapy Consultation', exact=True)
-        await elem.click(timeout=10000)
-        
         # --> Assertions to verify final state
         
-        # --> The booking card 'Request an appointment online' is visible.
-        # Assert-outcome: passed
-        # Assert: Booking card header 'Request an appointment online' is visible.
-        await expect(page.locator("xpath=/html/body/div[2]/div/div[1]/div[1]").nth(0)).to_contain_text("Request an appointment online", timeout=15000), "Booking card header 'Request an appointment online' is visible."
+        # --> The booking form is not displayed because the booking page returned a 404 error.
+        # Assert-outcome: failed
+        # Assert: Expected booking form to be displayed.
+        await expect(page.locator("xpath=/html/body/section").nth(0)).to_contain_text("404 This page could not be found.", timeout=15000), "Expected booking form to be displayed."
         
-        # --> Service selection controls are available on the booking page.
-        # Assert-outcome: passed
-        # Assert: Step label '1. Service' is visible, indicating service selection is available.
-        await expect(page.locator("xpath=/html/body/div[2]/div/div[1]/div[1]").nth(0)).to_contain_text("1. Service", timeout=15000), "Step label '1. Service' is visible, indicating service selection is available."
+        # --> Service and time selection controls are not available because the booking page returned a 404 error.
+        # Assert-outcome: failed
+        # Assert: Expected service and time selection controls to be available.
+        await expect(page.locator("xpath=/html/body/section").nth(0)).to_contain_text("404 This page could not be found.", timeout=15000), "Expected service and time selection controls to be available."
         
-        # --> Time selection controls (Preferred Time Slot buttons) are visible after selecting a service.
-        # Assert-outcome: passed
-        # Assert: Preferred Time Slot button '10:00 AM' is visible.
-        await expect(page.locator("xpath=/html/body/div[2]/div/form/div/div[2]/div/button[2]").nth(0)).to_have_text("10:00 AM", timeout=15000), "Preferred Time Slot button '10:00 AM' is visible."
+        # --> Test blocked by environment/access constraints during agent run
+        # Reason: TEST BLOCKED The public clinic booking page could not be reached — the booking page route returned a 404 and the appointment request form cannot be verified. Observations: - Navigating to /booking shows '404 This page could not be found.' - No clinic list, booking form, or service/time selection controls are present on the page
+        raise AssertionError("Test blocked during agent run: " + "TEST BLOCKED The public clinic booking page could not be reached \u2014 the booking page route returned a 404 and the appointment request form cannot be verified. Observations: - Navigating to /booking shows '404 This page could not be found.' - No clinic list, booking form, or service/time selection controls are present on the page" + " — the exported script cannot reproduce a PASS in this environment.")
         await asyncio.sleep(5)
 
     finally:

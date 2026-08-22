@@ -49,3 +49,16 @@ export function useUpdateAppointmentStatus() {
     },
   });
 }
+
+export function useUpdateAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<AppointmentFormValues> }) => {
+      const res = await apiClient.patch(`/appointments/${id}`, data);
+      return res.data?.data || res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
+    },
+  });
+}

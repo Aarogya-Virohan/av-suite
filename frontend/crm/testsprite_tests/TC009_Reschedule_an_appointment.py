@@ -40,127 +40,55 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Fill the email and password fields and click the 'Sign In to Dashboard' button to sign in.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, and click the 'Sign In to Dashboard' button.
         # admin@avtest.com email field
         elem = page.get_by_placeholder('admin@avtest.com', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
+        await elem.fill("admin1@clinic.com")
         
-        # -> Fill the email and password fields and click the 'Sign In to Dashboard' button to sign in.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, and click the 'Sign In to Dashboard' button.
         # •••••••• password field
         elem = page.get_by_placeholder('••••••••', exact=True)
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("password123")
         
-        # -> Fill the email and password fields and click the 'Sign In to Dashboard' button to sign in.
+        # -> Fill the 'Email Address' field with admin1@clinic.com, fill the 'Password' field with password123, and click the 'Sign In to Dashboard' button.
         # Sign In to Dashboard button
         elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and sign in as admin@avtest.com.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Click the 'Appointments' link in the left sidebar to open the Appointments page.
+        # Appointments link
+        elem = page.get_by_role('link', name='Appointments', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and sign in as admin@avtest.com.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Click the 'Reschedule' button on the Charlie Smith appointment card to open the rescheduling UI.
+        # Reschedule button
+        elem = page.get_by_text('Charlie Smith', exact=True).locator("xpath=ancestor-or-self::*[.//button][1]").get_by_role('button', name='Reschedule', exact=True)
         await elem.click(timeout=10000)
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Retype the password in the 'PASSWORD' field and press Enter to submit the 'Sign In to Dashboard' form.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
+        # -> Change 'New Date & Time' to 08/22/2026, 03:30 PM and click the 'Confirm Reschedule' button
+        # scheduled_at datetime-local field
+        elem = page.locator('xpath=/html/body/div[2]/div/main/div/div[4]/div/div[2]/form/div/div/input')
         await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
+        await elem.fill("2026-08-22T15:30")
         
-        # -> Click the 'Sign In to Dashboard' button to submit the login form (after retyping credentials).
-        # admin@avtest.com email field
-        elem = page.get_by_placeholder('admin@avtest.com', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form (after retyping credentials).
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form (after retyping credentials).
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Open the 'Appointments' page (navigate to the Appointments view) to check whether appointments can be reached and whether authentication is required.
-        await page.goto("http://localhost:3000/appointments")
-        try:
-            await page.wait_for_load_state("domcontentloaded", timeout=5000)
-        except Exception:
-            pass
-        
-        # -> Fill the email and password fields with admin@avtest.com / Password123! and click the 'Sign In to Dashboard' button to submit the login form.
-        # admin@avtest.com email field
-        elem = page.get_by_placeholder('admin@avtest.com', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
-        
-        # -> Fill the email and password fields with admin@avtest.com / Password123! and click the 'Sign In to Dashboard' button to submit the login form.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
-        
-        # -> Fill the email and password fields with admin@avtest.com / Password123! and click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button on the login card to submit credentials and wait for the app to respond.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form and attempt to sign in.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button to submit the login form.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Sign In to Dashboard' button after retyping the email and password fields.
-        # admin@avtest.com email field
-        elem = page.get_by_placeholder('admin@avtest.com', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("admin@avtest.com")
-        
-        # -> Click the 'Sign In to Dashboard' button after retyping the email and password fields.
-        # •••••••• password field
-        elem = page.get_by_placeholder('••••••••', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Password123!")
-        
-        # -> Click the 'Sign In to Dashboard' button after retyping the email and password fields.
-        # Sign In to Dashboard button
-        elem = page.get_by_role('button', name='Sign In to Dashboard', exact=True)
+        # -> Change 'New Date & Time' to 08/22/2026, 03:30 PM and click the 'Confirm Reschedule' button
+        # Confirm Reschedule button
+        elem = page.get_by_role('button', name='Confirm Reschedule', exact=True)
         await elem.click(timeout=10000)
         
         # --> Assertions to verify final state
-        current_url = await page.evaluate("() => window.location.href")
+        
+        # --> Charlie Smith's appointment shows the updated time 8/22/2026, 3:30:00 PM in the appointments list.
         # Assert-outcome: passed
-        # Assert: page loaded with a URL (final outcome verified by the AI judge during the run)
-        assert current_url, 'Page should have loaded with a URL'
+        # Assert: Verify the appointment entry contains 'Charlie Smith 8/22/2026, 3:30:00 PM'.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[1]/div[1]").nth(0)).to_contain_text("Charlie Smith 8/22/2026, 3:30:00 PM", timeout=15000), "Verify the appointment entry contains 'Charlie Smith 8/22/2026, 3:30:00 PM'."
+        
+        # --> The rescheduled appointment for Charlie Smith remains visible in the appointments list.
+        # Assert-outcome: passed
+        # Assert: Verify the appointment list contains 'Charlie Smith'.
+        await expect(page.locator("xpath=/html/body/div[2]/div/main/div/div[3]/div[2]/div[2]/div[1]/div[1]").nth(0)).to_contain_text("Charlie Smith", timeout=15000), "Verify the appointment list contains 'Charlie Smith'."
         await asyncio.sleep(5)
 
     finally:

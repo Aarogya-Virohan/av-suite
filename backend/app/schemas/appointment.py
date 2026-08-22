@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import ClassVar
+from typing import ClassVar, Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.enums.appointment import AppointmentSource, AppointmentStatus
 
@@ -47,8 +47,19 @@ class AppointmentResponse(AppointmentBase):
 
     id: UUID
     clinic_id: UUID
+    patient_name: str | None = None
+    therapist_name: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_names(cls, data: Any) -> Any:
+        if hasattr(data, "patient") and data.patient:
+            data.patient_name = f"{data.patient.first_name} {data.patient.last_name}"
+        if hasattr(data, "therapist") and data.therapist:
+            data.therapist_name = f"{data.therapist.first_name} {data.therapist.last_name}"
+        return data
 
 
 class AppointmentListResponse(BaseModel):

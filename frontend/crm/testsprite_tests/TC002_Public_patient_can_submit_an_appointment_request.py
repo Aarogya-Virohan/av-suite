@@ -40,104 +40,28 @@ async def run_test():
         except Exception:
             pass
         
-        # -> Verify the 'Avtest Clinic' branding is visible on the booking card and then click the 'Physiotherapy Consultation' service.
-        # Physiotherapy Consultation button
-        elem = page.get_by_role('button', name='Physiotherapy Consultation', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Select the '10:00 AM' preferred time slot and proceed by clicking the 'Next: Enter Details' button.
-        # 10:00 AM button
-        elem = page.get_by_role('button', name='10:00 AM', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Select the '10:00 AM' preferred time slot and proceed by clicking the 'Next: Enter Details' button.
-        # Next: Enter Details button
-        elem = page.get_by_role('button', name='Next: Enter Details', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Fill the 'Your Full Name', 'Phone Number', and 'Chief Complaint' fields and click the 'Submit Appointment Request' button.
-        # e.g. Ramesh Shah text field
-        elem = page.get_by_placeholder('e.g. Ramesh Shah', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Test Patient")
-        
-        # -> Fill the 'Your Full Name', 'Phone Number', and 'Chief Complaint' fields and click the 'Submit Appointment Request' button.
-        # +919876543210 tel field
-        elem = page.get_by_placeholder('+919876543210', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("+15551234567")
-        
-        # -> Fill the 'Your Full Name', 'Phone Number', and 'Chief Complaint' fields and click the 'Submit Appointment Request' button.
-        # Describe your pain or reason for visit... text area
-        elem = page.get_by_placeholder('Describe your pain or reason for visit...', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Lower back pain for 3 days")
-        
-        # -> Fill the 'Your Full Name', 'Phone Number', and 'Chief Complaint' fields and click the 'Submit Appointment Request' button.
-        # Submit Appointment Request button
-        elem = page.get_by_role('button', name='Submit Appointment Request', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Physiotherapy Consultation' service button to advance to the Time selection step and reveal available times.
-        # Physiotherapy Consultation button
-        elem = page.get_by_role('button', name='Physiotherapy Consultation', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Next: Enter Details' button to open the Details form.
-        # Next: Enter Details button
-        elem = page.get_by_role('button', name='Next: Enter Details', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Fill the 'Your Full Name', 'Phone Number', and 'Chief Complaint' fields, then click the 'Submit Appointment Request' button to submit the booking and check for confirmation.
-        # e.g. Ramesh Shah text field
-        elem = page.get_by_placeholder('e.g. Ramesh Shah', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Test Patient")
-        
-        # -> Fill the 'Your Full Name', 'Phone Number', and 'Chief Complaint' fields, then click the 'Submit Appointment Request' button to submit the booking and check for confirmation.
-        # +919876543210 tel field
-        elem = page.get_by_placeholder('+919876543210', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("+15551234567")
-        
-        # -> Fill the 'Your Full Name', 'Phone Number', and 'Chief Complaint' fields, then click the 'Submit Appointment Request' button to submit the booking and check for confirmation.
-        # Describe your pain or reason for visit... text area
-        elem = page.get_by_placeholder('Describe your pain or reason for visit...', exact=True)
-        await elem.wait_for(state="visible", timeout=10000)
-        await elem.fill("Lower back pain for 3 days")
-        
-        # -> Fill the 'Your Full Name', 'Phone Number', and 'Chief Complaint' fields, then click the 'Submit Appointment Request' button to submit the booking and check for confirmation.
-        # Submit Appointment Request button
-        elem = page.get_by_role('button', name='Submit Appointment Request', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Submit Appointment Request' button and verify a booking confirmation or success message appears.
-        # Submit Appointment Request button
-        elem = page.get_by_role('button', name='Submit Appointment Request', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Submit Appointment Request' button and verify that a booking confirmation or success message appears.
-        # Submit Appointment Request button
-        elem = page.get_by_role('button', name='Submit Appointment Request', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Click the 'Submit Appointment Request' button and verify a booking confirmation or success message appears.
-        # Submit Appointment Request button
-        elem = page.get_by_role('button', name='Submit Appointment Request', exact=True)
-        await elem.click(timeout=10000)
-        
-        # -> Check the 'Notifications' area for a booking confirmation message, then click the 'Submit Appointment Request' button once to trigger submission.
-        # Submit Appointment Request button
-        elem = page.get_by_role('button', name='Submit Appointment Request', exact=True)
-        await elem.click(timeout=10000)
+        # -> Open the public booking page by navigating to the booking page ('/booking') so clinic branding and booking flow can be verified.
+        await page.goto("http://localhost:3000/booking")
+        try:
+            await page.wait_for_load_state("domcontentloaded", timeout=5000)
+        except Exception:
+            pass
         
         # --> Assertions to verify final state
         
-        # --> Clinic branding is visible on the booking page.
-        await page.locator("xpath=/html/body/div[2]/div/div[1]/div[1]").nth(0).scroll_into_view_if_needed()
-        # Assert-outcome: passed
-        # Assert: The clinic branding container is visible on the page.
-        await expect(page.locator("xpath=/html/body/div[2]/div/div[1]/div[1]").nth(0)).to_be_visible(timeout=15000), "The clinic branding container is visible on the page."
+        # --> Clinic branding is not visible because the booking page returned a 404.
+        # Assert-outcome: failed
+        # Assert: Expected clinic branding to be visible on the booking page.
+        await expect(page.locator("xpath=/html/body/section").nth(0)).to_contain_text("404 This page could not be found.", timeout=15000), "Expected clinic branding to be visible on the booking page."
+        
+        # --> A booking confirmation is not visible because the booking page returned a 404.
+        # Assert-outcome: failed
+        # Assert: Expected a booking confirmation to be visible after submitting a request.
+        await expect(page.locator("xpath=/html/body/section").nth(0)).to_contain_text("404 This page could not be found.", timeout=15000), "Expected a booking confirmation to be visible after submitting a request."
+        
+        # --> Test blocked by environment/access constraints during agent run
+        # Reason: TEST BLOCKED The booking page could not be reached — navigating to /booking returned a 404 page, so the public booking flow cannot be tested. Observations: - The /booking URL shows '404 This page could not be found.' - Only a Notifications section element is present; no clinic list, service selection, time slots, patient form fields, or booking confirmation UI are visible.
+        raise AssertionError("Test blocked during agent run: " + "TEST BLOCKED The booking page could not be reached \u2014 navigating to /booking returned a 404 page, so the public booking flow cannot be tested. Observations: - The /booking URL shows '404 This page could not be found.' - Only a Notifications section element is present; no clinic list, service selection, time slots, patient form fields, or booking confirmation UI are visible." + " — the exported script cannot reproduce a PASS in this environment.")
         await asyncio.sleep(5)
 
     finally:
