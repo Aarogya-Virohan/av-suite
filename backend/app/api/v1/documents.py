@@ -182,12 +182,21 @@ async def download_document(
         # Determine URL
         if document.file_url.startswith("http"):
             url = document.file_url
+            headers = {"Location": url}
+            return Response(status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers=headers)
         else:
             from app.core.storage import storage_client
-            url = storage_client.create_signed_download_url(document.file_url, expires_in=60)
+            file_bytes = storage_client.download_file(document.file_url)
             
-        headers = {"Location": url}
-        return Response(status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers=headers)
+            headers = {
+                "Content-Disposition": f'attachment; filename="{document.label}"',
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+            return Response(
+                content=file_bytes, 
+                media_type=document.file_type or "application/octet-stream", 
+                headers=headers
+            )
     except DocumentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except Exception as exc:

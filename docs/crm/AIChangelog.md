@@ -193,3 +193,27 @@ cold-start overhead for future AI sessions.
 - Fixed `user_id` tracking in audit logs for permission updates.
 - Fixed image upload failing by updating database `branding_logo_url` column from `VARCHAR(2048)` to `TEXT` to accommodate Base64 image payloads.
 - Removed hardcoded UI mock data for clinic settings and integrated dynamic `clinicSettings` fetching into the `AppShell` and `SidebarNavigation` components to support custom logos, names, and accent colors across the UI.
+
+---
+
+### [2026-08-22] Session by Antigravity (TestSprite Integration & Bug Fixes)
+
+**Session Goal**: Resolve UI and backend integration bugs discovered during TestSprite testing.
+**Branch**: `feature/frontend-redesign-impl`
+
+| File | Action | Summary |
+|---|---|---|
+| `frontend/crm/src/app/(public)/booking/[clinicSlug]/page.tsx` | Modified | Redesigned public booking form for dark/light mode contrast and added missing `age` & `gender` fields required by the backend. Also decoded clinic URL string for proper display. |
+| `backend/app/schemas/appointment.py` | Modified | Prevented `MissingGreenlet` async SQLAlchemy errors in `AppointmentResponse` validators by inspecting `__dict__` instead of triggering lazy loads. |
+| `frontend/crm/src/features/appointments/components/RescheduleSlideOver.tsx` | Created/Modified | Finished wiring up the frontend logic to submit PATCH requests for rescheduling. |
+| `frontend/crm/src/components/ui/DataTable.tsx` | Modified | Added a 400ms debounce and exposed `onSearchChange` to support robust server-side API searching (previously search was client-side only for the current 10-item page). |
+| `frontend/crm/src/app/(dashboard)/patients/page.tsx` | Modified | Wired `onSearchChange` to `usePatients` to fix the Patient Directory search feature. |
+| `backend/app/schemas/patient.py` | Modified | Relaxed `PatientRead` and `PatientUpdate` schemas to allow empty `last_name` (using Pydantic `ValidationInfo`). This fixes a 500 crash when public bookings are made with single-word names (like "Tarun"). |
+| `backend/app/core/storage.py` | Modified | Added `download_file` using the Supabase Python SDK to read private bucket files directly into backend memory. |
+| `backend/app/api/v1/documents.py` | Modified | Refactored `GET /documents/{id}/download` to bypass `307 Redirect` to Supabase (which failed frontend `fetch` due to `Bearer` token propagation) and instead stream the downloaded raw bytes directly to the client as an attachment. |
+
+**Decisions Made**: Serve document downloads directly through the FastAPI backend proxy rather than redirecting to Supabase signed URLs to avoid cross-origin `fetch` Authorization header collisions.
+**Bugs Identified**: BUG-007 (Server-side Table Search broken), BUG-008 (Single-word name crashes patient API), BUG-009 (Fetch redirect CORS/Auth crash on Supabase S3).
+**Bugs Fixed**: BUG-007, BUG-008, BUG-009.
+**Features Touched**: Public Booking, Patient Directory, Document Management, Rescheduling.
+**Notes**: TestSprite testing highlighted several real-world edge cases. Server-side table searches and file downloading from private S3 buckets via frontend `fetch` require careful architectural handling.

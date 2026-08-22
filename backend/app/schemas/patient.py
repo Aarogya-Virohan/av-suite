@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, ValidationInfo
 import re
 import uuid
 from typing import Optional
@@ -23,10 +23,12 @@ class PatientBase(BaseModel):
 
     @field_validator("first_name", "last_name")
     @classmethod
-    def validate_name(cls, v: str) -> str:
+    def validate_name(cls, v: str, info: ValidationInfo) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("Name cannot be empty")
+            if info.field_name == "last_name":
+                return v
+            raise ValueError("First name cannot be empty")
         if not NAME_PATTERN.match(v):
             raise ValueError(
                 "Name may only contain letters, spaces, hyphens, apostrophes, and periods"
@@ -71,12 +73,14 @@ class PatientUpdate(BaseModel):
 
     @field_validator("first_name", "last_name")
     @classmethod
-    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+    def validate_name(cls, v: Optional[str], info: ValidationInfo) -> Optional[str]:
         if v is None:
             return v
         v = v.strip()
         if not v:
-            raise ValueError("Name cannot be empty")
+            if info.field_name == "last_name":
+                return v
+            raise ValueError("First name cannot be empty")
         if not NAME_PATTERN.match(v):
             raise ValueError(
                 "Name may only contain letters, spaces, hyphens, apostrophes, and periods"

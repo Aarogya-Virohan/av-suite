@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 export interface Column<T> {
@@ -22,6 +22,8 @@ interface DataTableProps<T> {
   currentPage?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
+  // Server-side search support
+  onSearchChange?: (term: string) => void;
 }
 
 export function DataTable<T extends { id: string }>({
@@ -36,9 +38,20 @@ export function DataTable<T extends { id: string }>({
   currentPage: serverPage,
   pageSize: serverPageSize = 10,
   onPageChange,
+  onSearchChange,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [clientPage, setClientPage] = useState(1);
+
+  // Debounce logic for server-side search
+  useEffect(() => {
+    if (onSearchChange) {
+      const handler = setTimeout(() => {
+        onSearchChange(searchTerm);
+      }, 400); // 400ms debounce
+      return () => clearTimeout(handler);
+    }
+  }, [searchTerm, onSearchChange]);
   
   const isServerSide = totalItems !== undefined && onPageChange !== undefined;
   const currentPage = isServerSide ? (serverPage || 1) : clientPage;
@@ -68,7 +81,7 @@ export function DataTable<T extends { id: string }>({
   return (
     <div className="space-y-4">
       {/* Search Header */}
-      {searchField && (
+      {(searchField || onSearchChange) && (
         <div className="flex items-center justify-between gap-4">
           <div className="relative max-w-xs w-full">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />

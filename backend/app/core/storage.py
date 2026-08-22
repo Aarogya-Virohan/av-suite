@@ -34,6 +34,18 @@ class SupabaseStorageClient:
             logger.error(f"Failed to upload file to Supabase: {e}")
             raise e
 
+    def download_file(self, path: str) -> bytes:
+        """
+        Downloads a file directly from the private Supabase bucket.
+        Returns the raw bytes of the file.
+        """
+        try:
+            res = self.client.storage.from_(self.bucket_name).download(path)
+            return res
+        except Exception as e:
+            logger.error(f"Failed to download file from Supabase: {e}")
+            raise e
+
     def create_signed_download_url(self, path: str, expires_in: int = 60) -> str:
         """
         Generates a signed URL for a file in the private bucket.

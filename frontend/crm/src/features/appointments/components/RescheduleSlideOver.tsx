@@ -94,7 +94,6 @@ export function RescheduleSlideOver({ isOpen, onClose, appointment }: Reschedule
             <input
               {...register('duration_minutes', { valueAsNumber: true, required: 'Duration is required', min: 15 })}
               type="number"
-              step="15"
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
             />
             {errors.duration_minutes && <p className="text-xs text-rose-500 mt-1">{errors.duration_minutes.message}</p>}

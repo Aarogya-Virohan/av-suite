@@ -9,6 +9,7 @@ import { apiClient } from '../../../../lib/api-client';
 export default function PublicBookingPage() {
   const params = useParams();
   const clinicSlug = (params?.clinicSlug as string) || 'aarogya';
+  const decodedClinicName = decodeURIComponent(clinicSlug).replace(/-/g, ' ');
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [service, setService] = useState('Physiotherapy Consultation');
@@ -16,6 +17,8 @@ export default function PublicBookingPage() {
   const [preferredSlot, setPreferredSlot] = useState('10:00 AM');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('male');
   const [chiefComplaint, setChiefComplaint] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -31,7 +34,6 @@ export default function PublicBookingPage() {
 
     setIsSubmitting(true);
     try {
-      // 1. Fetch clinic ID from branding endpoint using the slug
       const brandingRes = await apiClient.get(`/booking/branding/${clinicSlug}`);
       const clinicId = brandingRes.data?.data?.clinic_id || brandingRes.data?.clinic_id;
 
@@ -41,10 +43,11 @@ export default function PublicBookingPage() {
         return;
       }
 
-      // 2. Submit the booking request
       await apiClient.post(`/booking/request?clinic_id=${clinicId}`, {
         name: name,
         phone: phone,
+        age: age ? parseInt(age) : null,
+        gender: gender,
         chief_complaint: chiefComplaint,
         preferred_date: preferredDate,
         preferred_slot: preferredSlot,
@@ -70,7 +73,7 @@ export default function PublicBookingPage() {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Booking Requested!</h2>
           <p className="text-sm text-slate-500">
             Thank you, <strong className="text-slate-800 dark:text-slate-200">{name}</strong>. The clinic staff at{' '}
-            <span className="capitalize font-semibold text-teal-600">{clinicSlug}</span> will contact you at{' '}
+            <span className="capitalize font-semibold text-teal-600">{decodedClinicName}</span> will contact you at{' '}
             <strong>{phone}</strong> to confirm your slot for {preferredDate} at {preferredSlot}.
           </p>
         </div>
@@ -78,30 +81,29 @@ export default function PublicBookingPage() {
     );
   }
 
+  const inputClasses = "w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500";
+
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8 flex items-center justify-center">
-      <div className="max-w-lg w-full bg-white dark:bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+      <div className="max-w-lg w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
+        <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-700 pb-4">
           <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center">
             <Stethoscope className="w-5 h-5" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-slate-900 dark:text-white capitalize">
-              {clinicSlug.replace('-', ' ')} Clinic
+              {decodedClinicName}
             </h1>
-            <p className="text-xs text-slate-400">Request an appointment online</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Request an appointment online</p>
           </div>
         </div>
 
-        {/* Step Indicator */}
-        <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div className="flex items-center justify-between text-xs font-bold text-slate-400 border-b border-slate-100 dark:border-slate-700 pb-3">
           <span className={step >= 1 ? 'text-teal-600' : ''}>1. Service</span>
           <span className={step >= 2 ? 'text-teal-600' : ''}>2. Time</span>
           <span className={step >= 3 ? 'text-teal-600' : ''}>3. Details</span>
         </div>
 
-        {/* Form Steps */}
         <form onSubmit={handleSubmit} className="space-y-5">
           {step === 1 && (
             <div className="space-y-3">
@@ -117,7 +119,7 @@ export default function PublicBookingPage() {
                   className={`w-full p-3.5 rounded-xl border text-left text-sm font-semibold transition-all flex items-center justify-between ${
                     service === s
                       ? 'border-teal-600 bg-teal-50 dark:bg-teal-950 text-teal-600'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
                   }`}
                 >
                   <span>{s}</span>
@@ -135,7 +137,7 @@ export default function PublicBookingPage() {
                   type="date"
                   value={preferredDate}
                   onChange={(e) => setPreferredDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                  className={inputClasses}
                 />
               </div>
 
@@ -150,7 +152,7 @@ export default function PublicBookingPage() {
                       className={`p-2 rounded-lg text-xs font-bold border transition-colors ${
                         preferredSlot === slot
                           ? 'border-teal-600 bg-teal-600 text-white'
-                          : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                       }`}
                     >
                       {slot}
@@ -160,13 +162,13 @@ export default function PublicBookingPage() {
               </div>
 
               <div className="flex items-center justify-between pt-3">
-                <button type="button" onClick={() => setStep(1)} className="text-xs text-slate-400 hover:text-white">
+                <button type="button" onClick={() => setStep(1)} className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-medium">
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(3)}
-                  className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-lg"
+                  className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-lg hover:bg-teal-700 transition-colors"
                 >
                   Next: Enter Details
                 </button>
@@ -183,19 +185,44 @@ export default function PublicBookingPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Ramesh Shah"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                  className={inputClasses}
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+919876543210"
+                    className={inputClasses}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Age</label>
+                  <input
+                    type="number"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder="e.g. 35"
+                    className={inputClasses}
+                  />
+                </div>
+              </div>
+
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number *</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+919876543210"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
-                />
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Gender</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className={inputClasses}
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
 
               <div>
@@ -205,18 +232,18 @@ export default function PublicBookingPage() {
                   value={chiefComplaint}
                   onChange={(e) => setChiefComplaint(e.target.value)}
                   placeholder="Describe your pain or reason for visit..."
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                  className={inputClasses}
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-3">
-                <button type="button" onClick={() => setStep(2)} className="text-xs text-slate-400 hover:text-white">
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700 mt-4">
+                <button type="button" onClick={() => setStep(2)} className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-medium">
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer shadow-md shadow-teal-600/30"
+                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer shadow-md transition-colors"
                 >
                   {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Submit Appointment Request</span>

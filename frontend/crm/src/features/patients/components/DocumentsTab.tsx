@@ -8,6 +8,7 @@ import { patientDocumentFormSchema, PatientDocumentFormValues } from '../../../l
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { FileUp, FileText, Download, Trash2, Plus, Paperclip } from 'lucide-react';
 import { API_BASE_URL } from '../../../lib/api-client';
+import { getStoredToken } from '../../../lib/auth';
 
 import { usePatientDocuments, useUploadPatientDocument } from '../api';
 
@@ -139,7 +140,7 @@ export function DocumentsTab({ patientId }: { patientId: string }) {
                   onClick={async () => {
                     try {
                       const downloadUrl = `${API_BASE_URL}/documents/${doc.id}/download`;
-                      const token = localStorage.getItem('av_crm_token');
+                      const token = getStoredToken();
                       const res = await fetch(downloadUrl, {
                         headers: {
                           'Authorization': `Bearer ${token}`

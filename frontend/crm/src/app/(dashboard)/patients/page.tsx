@@ -17,7 +17,8 @@ export default function PatientsPage() {
   const role = useAuthStore((s) => s.role);
   const router = useRouter();
   const [page, setPage] = useState(1);
-  const { data: response, isLoading } = usePatients(undefined, page, 10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const { data: response, isLoading } = usePatients(searchTerm, page, 10);
   const patients = response?.data || [];
   const meta = response?.meta;
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -130,7 +131,10 @@ export default function PatientsPage() {
           columns={columns}
           data={filteredPatients}
           isLoading={isLoading}
-          searchField={(p) => `${p.first_name} ${p.last_name} ${p.phone}`}
+          onSearchChange={(term) => {
+            setSearchTerm(term);
+            setPage(1); // Reset to page 1 on new search
+          }}
           searchPlaceholder="Search by patient name or phone number..."
           emptyMessage="No patients found."
           onRowClick={(patient) => router.push(`/patients/${patient.id}`)}

@@ -55,10 +55,19 @@ class AppointmentResponse(AppointmentBase):
     @model_validator(mode="before")
     @classmethod
     def populate_names(cls, data: Any) -> Any:
-        if hasattr(data, "patient") and data.patient:
-            data.patient_name = f"{data.patient.first_name} {data.patient.last_name}"
-        if hasattr(data, "therapist") and data.therapist:
-            data.therapist_name = f"{data.therapist.first_name} {data.therapist.last_name}"
+        if isinstance(data, dict):
+            if data.get("patient"):
+                data["patient_name"] = f"{data['patient']['first_name']} {data['patient']['last_name']}"
+            if data.get("therapist"):
+                data["therapist_name"] = f"{data['therapist']['first_name']} {data['therapist']['last_name']}"
+            return data
+
+        # Check __dict__ to avoid triggering async lazy loads on SQLAlchemy models
+        state = getattr(data, "__dict__", {})
+        if "patient" in state and state["patient"]:
+            data.patient_name = f"{state['patient'].first_name} {state['patient'].last_name}"
+        if "therapist" in state and state["therapist"]:
+            data.therapist_name = f"{state['therapist'].first_name} {state['therapist'].last_name}"
         return data
 
 
