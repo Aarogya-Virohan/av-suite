@@ -59,3 +59,5 @@ FINAL_SUMMARY.txt
 seed_db.py
 openapi.json
 openapi.yaml
+testsprite_tests/tmp/
+testsprite_tests/tmp/config.json
