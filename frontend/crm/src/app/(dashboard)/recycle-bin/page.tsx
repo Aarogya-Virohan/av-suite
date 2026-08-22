@@ -28,7 +28,7 @@ export default function RecycleBinPage() {
     const fetchDeletedItems = async () => {
       try {
         const res = await apiClient.get('/recycle-bin');
-        setItems(res.data?.data || res.data || []);
+        setItems(res.data?.items || res.data?.data || (Array.isArray(res.data) ? res.data : []));
       } catch {
         setItems([]);
       } finally {

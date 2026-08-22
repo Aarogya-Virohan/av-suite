@@ -12,9 +12,12 @@ export function useLeads(stage?: LeadStage) {
       const res = await apiClient.get('/leads', {
         params: stage ? { stage } : undefined,
       });
-      const data = res.data?.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.items)) return data.items;
+      if (Array.isArray(res.data)) return res.data;
+      if (res.data?.items && Array.isArray(res.data.items)) return res.data.items;
+      if (res.data?.data) {
+        if (Array.isArray(res.data.data)) return res.data.data;
+        if (Array.isArray(res.data.data.items)) return res.data.data.items;
+      }
       return [];
     },
   });

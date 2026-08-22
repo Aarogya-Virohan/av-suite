@@ -36,12 +36,12 @@ class AnalyticsRepository:
         self.session = session
 
     async def get_patient_stats(self, clinic_id: UUID, month_start: datetime) -> PatientAnalytics:
-        total_patients_stmt = select(func.count(Patient.id)).where(Patient.clinic_id == clinic_id)
+        total_patients_stmt = select(func.count(Patient.id)).where(Patient.clinic_id == clinic_id, Patient.deleted_at.is_(None))
         active_patients_stmt = select(func.count(Patient.id)).where(
-            Patient.clinic_id == clinic_id, Patient.status == PatientStatus.ACTIVE
+            Patient.clinic_id == clinic_id, Patient.status == PatientStatus.ACTIVE, Patient.deleted_at.is_(None)
         )
         new_patients_stmt = select(func.count(Patient.id)).where(
-            Patient.clinic_id == clinic_id, Patient.created_at >= month_start
+            Patient.clinic_id == clinic_id, Patient.created_at >= month_start, Patient.deleted_at.is_(None)
         )
 
         total_patients = (await self.session.scalar(total_patients_stmt)) or 0
@@ -61,15 +61,16 @@ class AnalyticsRepository:
             Appointment.clinic_id == clinic_id,
             Appointment.scheduled_at >= today_start,
             Appointment.scheduled_at <= today_end,
+            Appointment.deleted_at.is_(None),
         )
         completed_stmt = select(func.count(Appointment.id)).where(
-            Appointment.clinic_id == clinic_id, Appointment.status == AppointmentStatus.COMPLETED
+            Appointment.clinic_id == clinic_id, Appointment.status == AppointmentStatus.COMPLETED, Appointment.deleted_at.is_(None)
         )
         cancelled_stmt = select(func.count(Appointment.id)).where(
-            Appointment.clinic_id == clinic_id, Appointment.status == AppointmentStatus.CANCELLED
+            Appointment.clinic_id == clinic_id, Appointment.status == AppointmentStatus.CANCELLED, Appointment.deleted_at.is_(None)
         )
         no_show_stmt = select(func.count(Appointment.id)).where(
-            Appointment.clinic_id == clinic_id, Appointment.status == AppointmentStatus.NO_SHOW
+            Appointment.clinic_id == clinic_id, Appointment.status == AppointmentStatus.NO_SHOW, Appointment.deleted_at.is_(None)
         )
 
         today_appts = (await self.session.scalar(today_appt_stmt)) or 0
@@ -87,22 +88,23 @@ class AnalyticsRepository:
 
     async def get_revenue_stats(self, clinic_id: UUID, month_start: datetime) -> RevenueAnalytics:
         month_revenue_stmt = select(func.coalesce(func.sum(Invoice.paid_amount), Decimal("0.00"))).where(
-            Invoice.clinic_id == clinic_id, Invoice.issue_date >= month_start
+            Invoice.clinic_id == clinic_id, Invoice.issue_date >= month_start, Invoice.deleted_at.is_(None)
         )
         paid_invoices_stmt = select(func.count(Invoice.id)).where(
-            Invoice.clinic_id == clinic_id, Invoice.status == InvoiceStatus.PAID
+            Invoice.clinic_id == clinic_id, Invoice.status == InvoiceStatus.PAID, Invoice.deleted_at.is_(None)
         )
         unpaid_invoices_stmt = select(func.count(Invoice.id)).where(
-            Invoice.clinic_id == clinic_id, Invoice.status == InvoiceStatus.UNPAID
+            Invoice.clinic_id == clinic_id, Invoice.status == InvoiceStatus.UNPAID, Invoice.deleted_at.is_(None)
         )
         partial_invoices_stmt = select(func.count(Invoice.id)).where(
-            Invoice.clinic_id == clinic_id, Invoice.status == InvoiceStatus.PARTIAL
+            Invoice.clinic_id == clinic_id, Invoice.status == InvoiceStatus.PARTIAL, Invoice.deleted_at.is_(None)
         )
         outstanding_stmt = select(
             func.coalesce(func.sum(Invoice.total_amount - Invoice.paid_amount), Decimal("0.00"))
         ).where(
             Invoice.clinic_id == clinic_id,
             Invoice.status.in_([InvoiceStatus.UNPAID, InvoiceStatus.PARTIAL, InvoiceStatus.ISSUED, InvoiceStatus.OVERDUE]),
+            Invoice.deleted_at.is_(None),
         )
 
         month_revenue = (await self.session.scalar(month_revenue_stmt)) or Decimal("0.00")
@@ -120,12 +122,12 @@ class AnalyticsRepository:
         )
 
     async def get_lead_stats(self, clinic_id: UUID) -> LeadAnalytics:
-        total_leads_stmt = select(func.count(Lead.id)).where(Lead.clinic_id == clinic_id)
+        total_leads_stmt = select(func.count(Lead.id)).where(Lead.clinic_id == clinic_id, Lead.deleted_at.is_(None))
         total_leads = (await self.session.scalar(total_leads_stmt)) or 0
 
         lead_stage_stmt = (
             select(Lead.stage, func.count(Lead.id))
-            .where(Lead.clinic_id == clinic_id)
+            .where(Lead.clinic_id == clinic_id, Lead.deleted_at.is_(None))
             .group_by(Lead.stage)
         )
         stage_counts_result: Sequence[Row[tuple[LeadStage, int]]] = (await self.session.execute(lead_stage_stmt)).all()
@@ -181,6 +183,7 @@ class AnalyticsRepository:
             Appointment.therapist_id == therapist_id,
             Appointment.scheduled_at >= today_start,
             Appointment.scheduled_at <= today_end,
+            Appointment.deleted_at.is_(None),
         )
 
         # Completed this month for this therapist
@@ -189,6 +192,7 @@ class AnalyticsRepository:
             Appointment.therapist_id == therapist_id,
             Appointment.status == AppointmentStatus.COMPLETED,
             Appointment.scheduled_at >= month_start,
+            Appointment.deleted_at.is_(None),
         )
 
         # Cancelled this month for this therapist
@@ -197,6 +201,7 @@ class AnalyticsRepository:
             Appointment.therapist_id == therapist_id,
             Appointment.status == AppointmentStatus.CANCELLED,
             Appointment.scheduled_at >= month_start,
+            Appointment.deleted_at.is_(None),
         )
 
         # Treatment sessions logged this month by this therapist
@@ -204,6 +209,7 @@ class AnalyticsRepository:
             TreatmentSession.clinic_id == clinic_id,
             TreatmentSession.therapist_id == therapist_id,
             TreatmentSession.treatment_date >= month_start,
+            TreatmentSession.deleted_at.is_(None),
         )
 
         # SOAP notes authored by this therapist this month
