@@ -21,13 +21,13 @@ export default function SettingsPage() {
   const role = useAuthStore((s) => s.role);
 
   const [activeTab, setActiveTab] = useState<TabKey>('clinic');
-  const [clinicName, setClinicName] = useState('Aarogya Virohan Health Center');
-  const [phone, setPhone] = useState('+919876543210');
-  const [email, setEmail] = useState('contact@aarogya.com');
-  const [address, setAddress] = useState('Sector 14, Main Road, New Delhi');
+  const [clinicName, setClinicName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [address, setAddress] = useState('');
   const [brandColor, setBrandColor] = useState('#0b2c5f');
-  const [doctorName, setDoctorName] = useState('Dr. Ananya Roy');
-  const [regNo, setRegNo] = useState('REG-2026-PT88');
+  const [doctorName, setDoctorName] = useState('');
+  const [regNo, setRegNo] = useState('');
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
@@ -38,7 +38,7 @@ export default function SettingsPage() {
 
   React.useEffect(() => {
     if (clinicSettings) {
-      setClinicName(clinicSettings.name || 'Aarogya Virohan Health Center');
+      setClinicName(clinicSettings.name || '');
       if (clinicSettings.branding_color) {
         setBrandColor(clinicSettings.branding_color);
         document.documentElement.style.setProperty('--brand-navy', clinicSettings.branding_color);

@@ -6,9 +6,17 @@ import { CommandBar } from './CommandBar';
 import { AuthGuard } from '../auth/AuthGuard';
 import { useUiStore } from '../../store';
 import { Search } from 'lucide-react';
+import { useClinicSettings } from '../../features/settings/api';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const isSidebarOpen = useUiStore((s) => s.isSidebarOpen);
+  const { data: clinicSettings } = useClinicSettings();
+
+  React.useEffect(() => {
+    if (clinicSettings?.branding_color) {
+      document.documentElement.style.setProperty('--brand-navy', clinicSettings.branding_color);
+    }
+  }, [clinicSettings?.branding_color]);
 
   return (
     <AuthGuard>
@@ -42,7 +50,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
-                Aarogya Clinic Main
+                {clinicSettings?.name || 'Aarogya Clinic Main'}
               </span>
             </div>
           </header>
