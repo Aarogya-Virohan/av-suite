@@ -17,6 +17,7 @@ class ClinicSettingsResponse(BaseModel):
     branding_color: str | None = Field(default=None, description="Primary branding color hex code (e.g. #008080).")
     plan_tier: ClinicPlanTier = Field(..., description="Read-only subscription plan tier.")
     is_partner_clinic: bool = Field(..., description="Read-only partner clinic designation flag.")
+    is_documents_enabled: bool = Field(..., description="Whether document storage is enabled for the clinic.")
     created_at: datetime
     updated_at: datetime
 
@@ -27,5 +28,6 @@ class ClinicSettingsUpdate(BaseModel):
     """Schema for updating clinic settings and branding."""
 
     name: str | None = Field(default=None, min_length=1, max_length=255, description="Updated clinic name.")
-    branding_logo_url: str | None = Field(default=None, max_length=2048, description="Updated branding logo URL.")
+    branding_logo_url: str | None = Field(default=None, description="Updated branding logo URL.")
     branding_color: str | None = Field(default=None, max_length=32, description="Updated branding color hex string.")
+    is_documents_enabled: bool | None = Field(default=None, description="Toggle document storage bucket on/off.")
