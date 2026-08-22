@@ -9,7 +9,7 @@ async def test_leads_crud_and_conversion_flow(client: AsyncClient, auth_headers:
         "name": "Neha Kapoor",
         "phone": "9811122233",
         "email": "neha@example.com",
-        "source": "Instagram",
+        "source": "social_media",
         "stage": "new",
         "notes": "Inquired for shoulder rehab"
     }

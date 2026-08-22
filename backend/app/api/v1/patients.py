@@ -26,18 +26,20 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.core.dependencies import require_permission, require_admin
+from app.core.dependencies import require_capability
+from app.enums.permission import CapabilityScope
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
 from app.services import patient_service
+from app.api.v1.audit import AuditLogServiceDep
 
 logger = logging.getLogger(__name__)
 
 # APIRouter instance jo patient endpoints organize karta hai
 # Prefix: /api/v1/patients (main router mein define hota hai)
-router = APIRouter(dependencies=[Depends(require_permission("patients"))])
+router = APIRouter()
 
 
 
@@ -51,7 +53,8 @@ async def list_patients(
     request: Request,
     search: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("patients.view"))
 ):
     """
     Endpoint ka purpose: Clinic ke sare patients ko list karna pagination ke saath
@@ -128,10 +131,12 @@ async def list_patients(
         
         # Service layer ko call karte hain
         # Patients list aur total count return hota hai
+        user_id = request.state.user_id if hasattr(request.state, "user_id") else None
+        
         if search:
-            patients, total = await patient_service.search_patients(db, clinic_id, search, pagination)
+            patients, total = await patient_service.search_patients(db, clinic_id, search, pagination, scope=scope, user_id=user_id)
         else:
-            patients, total = await patient_service.get_patients(db, clinic_id, pagination)
+            patients, total = await patient_service.get_patients(db, clinic_id, pagination, scope=scope, user_id=user_id)
         
         # Pagination metadata prepare karte hain
         # Frontend pagination UI ke liye total aur current page info
@@ -158,7 +163,9 @@ async def list_patients(
 async def create_patient(
     request: Request,
     patient_in: PatientCreate,
-    db: AsyncSession = Depends(get_db)
+    audit_service: AuditLogServiceDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("patients.create"))
 ):
     """
     Endpoint ka purpose: New patient create karna clinic mein
@@ -237,6 +244,15 @@ async def create_patient(
         # New patient database record create hota hai
         patient = await patient_service.create_patient(db, clinic_id, patient_in)
         
+        await audit_service.log_event(
+            clinic_id=clinic_id,
+            user_id=request.state.user_id if hasattr(request.state, "user_id") else None,
+            action="create",
+            entity_type="patient",
+            entity_id=patient.id,
+            details=patient_in.model_dump(mode='json')
+        )
+        
         logger.info(f"Patient created successfully: {patient.id}")
         return ResponseEnvelope(data=patient)
         
@@ -253,7 +269,8 @@ async def create_patient(
 async def get_patient(
     request: Request,
     id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("patients.view"))
 ):
     """
     Endpoint ka purpose: Specific patient ke details fetch karna
@@ -316,9 +333,11 @@ async def get_patient(
         clinic_id = request.state.clinic_id
         logger.debug(f"Fetching patient {id} from clinic {clinic_id}")
         
+        user_id = request.state.user_id if hasattr(request.state, "user_id") else None
+        
         # Service layer ko call karte hain
         # Patient fetch hota hai by ID aur clinic check
-        patient = await patient_service.get_patient_by_id(db, clinic_id, id)
+        patient = await patient_service.get_patient_by_id(db, clinic_id, id, scope=scope, user_id=user_id)
         
         # Patient not found - 404 error return
         if not patient:
@@ -347,13 +366,26 @@ async def update_patient(
     request: Request,
     id: str,
     patient_in: PatientUpdate,
-    db: AsyncSession = Depends(get_db)
+    audit_service: AuditLogServiceDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("patients.edit"))
 ):
     logger.info(f"Update patient request - id: {id}")
     try:
         clinic_id = request.state.clinic_id
+        user_id = request.state.user_id if hasattr(request.state, "user_id") else None
         
-        patient = await patient_service.update_patient(db, clinic_id, id, patient_in)
+        patient = await patient_service.update_patient(db, clinic_id, id, patient_in, scope=scope, user_id=user_id)
+        
+        await audit_service.log_event(
+            clinic_id=clinic_id,
+            user_id=request.state.user_id if hasattr(request.state, "user_id") else None,
+            action="update",
+            entity_type="patient",
+            entity_id=patient.id,
+            details=patient_in.model_dump(exclude_unset=True, mode='json')
+        )
+        
         return ResponseEnvelope(data=patient)
         
     except HTTPException:
@@ -370,8 +402,9 @@ async def update_patient(
 async def delete_patient(
     request: Request,
     id: str,
+    audit_service: AuditLogServiceDep,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_admin)
+    scope: CapabilityScope = Depends(require_capability("patients.delete"))
 ):
     logger.info(f"Delete patient request - id: {id}")
     try:
@@ -379,6 +412,16 @@ async def delete_patient(
         user_id = request.state.user_id
         
         await patient_service.delete_patient(db, clinic_id, id, user_id)
+        
+        await audit_service.log_event(
+            clinic_id=clinic_id,
+            user_id=user_id,
+            action="delete",
+            entity_type="patient",
+            entity_id=uuid.UUID(id),
+            details={"deleted_by": user_id}
+        )
+        
         return ResponseEnvelope(data=None)
         
     except HTTPException:

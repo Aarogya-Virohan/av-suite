@@ -5,12 +5,16 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from app.core.dependencies import require_permission
-from app.enums.user import UserRole
+from sqlalchemy.ext.asyncio import AsyncSession
 
-
-from app.core.dependencies import SessionDep, get_current_clinic, get_current_user
+from app.core.dependencies import (
+    SessionDep,
+    get_current_clinic,
+    get_current_user,
+    require_capability,
+)
 from app.enums.appointment import AppointmentStatus
+from app.enums.permission import CapabilityScope
 from app.models.clinic import Clinic
 from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
@@ -28,7 +32,7 @@ from app.services.appointment import (
     AppointmentValidationError,
 )
 
-router = APIRouter(dependencies=[Depends(require_permission("appointments"))])
+router = APIRouter()
 
 
 async def get_appointment_service(session: SessionDep) -> AppointmentService:
@@ -50,9 +54,17 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 async def create_appointment(
     payload: AppointmentCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: AppointmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("appointments.create")),
 ) -> AppointmentResponse:
     """Create a new staff-scheduled appointment for the authenticated clinic."""
+
+    if scope == CapabilityScope.OWN and payload.therapist_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only create appointments assigned to yourself.",
+        )
 
     try:
         appointment = await service.create_appointment(clinic.id, payload)
@@ -72,12 +84,13 @@ async def list_appointments(
     therapist_id: Annotated[UUID | None, Query(alias="therapist")] = None,
     patient_id: Annotated[UUID | None, Query(alias="patient")] = None,
     status_filter: Annotated[AppointmentStatus | None, Query(alias="status")] = None,
+    scope: CapabilityScope = Depends(require_capability("appointments.view")),
 ) -> AppointmentListResponse:
     """List appointments for the authenticated clinic with filtering by date, therapist, or patient."""
 
-    # Enforce own-scope filtering for therapists
+    # Enforce own-scope filtering: therapist may only see their own appointments
     effective_therapist_id = therapist_id
-    if user.role == UserRole.THERAPIST:
+    if scope == CapabilityScope.OWN:
         effective_therapist_id = user.id
 
     appointments = await service.list_appointments(
@@ -105,13 +118,17 @@ async def get_appointment(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: AppointmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("appointments.view")),
 ) -> AppointmentResponse:
     """Retrieve an appointment by ID for the authenticated clinic."""
 
     try:
         appointment = await service.get_appointment(clinic.id, id)
-        if user.role == UserRole.THERAPIST and appointment.therapist_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own appointments.")
+        if scope == CapabilityScope.OWN and appointment.therapist_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only access your own appointments.",
+            )
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -124,13 +141,23 @@ async def update_appointment(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: AppointmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("appointments.edit")),
 ) -> AppointmentResponse:
     """Reschedule or update appointment status/details for the authenticated clinic."""
 
     try:
         appointment = await service.get_appointment(clinic.id, id)
-        if user.role == UserRole.THERAPIST and appointment.therapist_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only update your own appointments.")
+        if scope == CapabilityScope.OWN and appointment.therapist_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only update your own appointments.",
+            )
+        # Block therapist reassignment when own-scoped
+        if scope == CapabilityScope.OWN and payload.therapist_id is not None and payload.therapist_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You cannot reassign an appointment to another therapist.",
+            )
         appointment = await service.update_appointment(clinic.id, id, payload)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
@@ -145,13 +172,17 @@ async def soft_cancel_appointment(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: AppointmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("appointments.edit")),
 ) -> AppointmentResponse:
     """Soft-cancel an appointment for the authenticated clinic."""
 
     try:
         appointment = await service.get_appointment(clinic.id, id)
-        if user.role == UserRole.THERAPIST and appointment.therapist_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only cancel your own appointments.")
+        if scope == CapabilityScope.OWN and appointment.therapist_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only cancel your own appointments.",
+            )
         appointment = await service.soft_cancel(clinic.id, id)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:

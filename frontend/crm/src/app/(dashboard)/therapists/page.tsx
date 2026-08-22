@@ -16,7 +16,7 @@ export default function TherapistsPage() {
   const role = useAuthStore((s) => s.role);
   const { data: usersResponse, isLoading } = useUsers();
   const users = usersResponse || [];
-  const initialTherapists = users.filter((u: User) => u.role === 'therapist' || u.role === 'admin');
+  const initialTherapists = users.filter((u: User) => u.role === 'therapist');
   const [therapists, setTherapists] = useState<User[]>([]);
 
   React.useEffect(() => {
