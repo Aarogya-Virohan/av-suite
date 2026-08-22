@@ -6,7 +6,7 @@ from uuid import UUID
 import logging
 
 from app.core.database import get_db
-from app.core.dependencies import require_permission
+from app.core.dependencies import require_permission, get_current_user
 from app.models.user import User
 from app.schemas.user import UserRead, UserCreate
 from app.core.security import get_password_hash
@@ -136,7 +136,8 @@ async def update_user_permissions(
     user_id: UUID, 
     permissions: List[UserPermissionCreate], 
     request: Request, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Completely replace the user's explicit permission overrides.
@@ -151,7 +152,7 @@ async def update_user_permissions(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    granted_by = request.state.user.id if hasattr(request.state, "user") and request.state.user else None
+    granted_by = current_user.id
     
     # Lockout Guard: Prevent removing the last 'permissions.manage' or 'users.manage' capability
     new_perms_manage_override = next((p.scope for p in permissions if p.capability_key == 'permissions.manage'), None)
