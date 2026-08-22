@@ -21,7 +21,7 @@ Rebuilding the CRM frontend from scratch at `frontend/crm/` inside the `av-suite
 
 ---
 
-## 3. RBAC
+## 3. RBACb
 
 Centralized in `src/config/permissions.ts`. Source of truth is the RBAC Spec (Onkar, July 2026). This matrix is implemented as a typed, exported config object — changing a permission is a data edit, not a code refactor.
 

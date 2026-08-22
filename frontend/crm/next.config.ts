@@ -10,7 +10,7 @@ const cspHeader = `
   base-uri 'self';
   form-action 'self';
   frame-ancestors 'none';
-  connect-src 'self' http://localhost:8000 ws://localhost:3000 wss://localhost:3000 https://* wss://*;
+  connect-src 'self' http://localhost:8000 http://127.0.0.1:8000 http://10.255.255.254:8000 ws://localhost:3000 wss://localhost:3000 https://* wss://*;
 `.replace(/\n/g, '');
 
 const nextConfig: NextConfig = {
