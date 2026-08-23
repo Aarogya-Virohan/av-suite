@@ -31,7 +31,7 @@ from app.services.posture.calculator import (
     calc_shoulder_asymmetry_mm,
     calc_ear_level_asymmetry_mm,
     calc_trunk_lateral_shift_mm,
-    calc_trunk_lateral_deviation_mm,
+    calc_scoliosis_screen_mm,
     calc_scapular_height_asymmetry_mm,
     calc_heel_valgus,
     calc_pelvic_rotation,
@@ -424,26 +424,26 @@ async def analyze_posture(
 
     back_pixels_per_cm = estimate_pixels_per_cm(back_landmarks, back_height_px, patient_height_cm)
 
-    # PT-P01 — Trunk Lateral Deviation
+    # PT-P01 — Scoliosis Screen
     try:
         check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ANKLE, RIGHT_ANKLE])
 
         if back_pixels_per_cm is None:
             back_measurements.append(
-                measurement("PT-P01", "Trunk Lateral Deviation", None, "mm", "not_available")
+                measurement("PT-P01", "Scoliosis Screen", None, "mm", "not_available")
             )
         else:
-            trunk_deviation = calc_trunk_lateral_deviation_mm(back_landmarks, back_width_px, back_pixels_per_cm)
-            severity = classify("PT-P01", trunk_deviation)
+            scoliosis = calc_scoliosis_screen_mm(back_landmarks, back_width_px, back_pixels_per_cm)
+            severity = classify("PT-P01", scoliosis)
             findings["PT-P01"] = severity
 
             back_measurements.append(
-                measurement("PT-P01", "Trunk Lateral Deviation", trunk_deviation, "mm", severity)
+                measurement("PT-P01", "Scoliosis Screen", scoliosis, "mm", severity)
             )
 
     except InsufficientVisibilityError:
         back_measurements.append(
-            measurement("PT-P01", "Trunk Lateral Deviation", None, "mm", "insufficient_data")
+            measurement("PT-P01", "Scoliosis Screen", None, "mm", "insufficient_data")
         )
 
     # PT-P02 — Scapular Height Asymmetry
