@@ -33,10 +33,11 @@ SEVERITY_STYLES: dict[str, tuple[str, str]] = {
     "not_available": ("#64748b", "#f8fafc"),
 }
 
+# Wording supplied by the founders (clinical sign-off), lightly adjusted for
+# grammar only. Do not reword without going back to them.
 DISCLAIMER = (
-    "<strong>Screening and documentation aid &mdash; not a diagnostic device.</strong> "
-    "Automated 2D landmark measurements carry inherent error and require "
-    "interpretation by a qualified physiotherapist."
+    "<strong>This report is intended for subjective examination and screening "
+    "purposes only. Please correlate clinically.</strong>"
 )
 
 

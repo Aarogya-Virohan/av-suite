@@ -31,7 +31,7 @@ from app.services.posture.calculator import (
     calc_shoulder_asymmetry_mm,
     calc_ear_level_asymmetry_mm,
     calc_trunk_lateral_shift_mm,
-    calc_scoliosis_screen_mm,
+    calc_trunk_lateral_deviation_mm,
     calc_scapular_height_asymmetry_mm,
     calc_heel_valgus,
     calc_pelvic_rotation,
@@ -92,13 +92,27 @@ async def analyze_posture(
     age: int = Form(...),
     gender: str = Form(...),
     case_ref: str = Form(...),
-    patient_height_cm: float | None = Form(None),
+    patient_height_cm: float = Form(...),
     clinician_name: str = Form(""),
 ):
 
     # ---------------------------------
     # Read Uploaded Images
     # ---------------------------------
+
+    # Height drives the pixel-to-millimetre calibration in
+    # estimate_pixels_per_cm. An out-of-range value does not fail loudly --
+    # it silently rescales every millimetre parameter in the report, so a
+    # typo of 17 for 170 would produce confident readings that are wrong by
+    # a factor of ten. Reject it here rather than reporting it.
+    if not 50 <= patient_height_cm <= 250:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Patient height must be between 50 and 250 cm. "
+                f"Received: {patient_height_cm} cm."
+            ),
+        )
 
     front_bytes = await front_image.read()
     side_bytes = await side_image.read()
@@ -410,26 +424,26 @@ async def analyze_posture(
 
     back_pixels_per_cm = estimate_pixels_per_cm(back_landmarks, back_height_px, patient_height_cm)
 
-    # PT-P01 — Scoliosis Screen
+    # PT-P01 — Trunk Lateral Deviation
     try:
         check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ANKLE, RIGHT_ANKLE])
 
         if back_pixels_per_cm is None:
             back_measurements.append(
-                measurement("PT-P01", "Scoliosis Screen", None, "mm", "not_available")
+                measurement("PT-P01", "Trunk Lateral Deviation", None, "mm", "not_available")
             )
         else:
-            scoliosis = calc_scoliosis_screen_mm(back_landmarks, back_width_px, back_pixels_per_cm)
-            severity = classify("PT-P01", scoliosis)
+            trunk_deviation = calc_trunk_lateral_deviation_mm(back_landmarks, back_width_px, back_pixels_per_cm)
+            severity = classify("PT-P01", trunk_deviation)
             findings["PT-P01"] = severity
 
             back_measurements.append(
-                measurement("PT-P01", "Scoliosis Screen", scoliosis, "mm", severity)
+                measurement("PT-P01", "Trunk Lateral Deviation", trunk_deviation, "mm", severity)
             )
 
     except InsufficientVisibilityError:
         back_measurements.append(
-            measurement("PT-P01", "Scoliosis Screen", None, "mm", "insufficient_data")
+            measurement("PT-P01", "Trunk Lateral Deviation", None, "mm", "insufficient_data")
         )
 
     # PT-P02 — Scapular Height Asymmetry

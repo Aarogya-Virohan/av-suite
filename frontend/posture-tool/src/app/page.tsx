@@ -65,6 +65,19 @@ useState<PostureReport | null>(null)
 const [loading, setLoading] =
 useState(false)
 
+// Height drives the pixel-to-millimetre calibration. A missing value
+// means the millimetre parameters cannot be computed at all; a wrong
+// one (170 typed as 17) is worse, because every millimetre reading
+// then comes out confidently scaled by the wrong factor with no error
+// raised anywhere. Bound it to a plausible human range.
+const heightNumber = Number(patientHeightCm)
+
+const isHeightValid =
+patientHeightCm.trim() !== "" &&
+Number.isFinite(heightNumber) &&
+heightNumber >= 50 &&
+heightNumber <= 250
+
 const handleAnalyze = async () => {
 if (
 !frontFile ||
@@ -197,17 +210,25 @@ return ( <div className="min-h-screen bg-slate-100">
                 className="rounded-xl border p-3"
               />
 
-              <input
-                type="number"
-                placeholder="Height (cm)"
-                value={patientHeightCm}
-                onChange={(e) =>
-                  setPatientHeightCm(
-                    e.target.value
-                  )
-                }
-                className="rounded-xl border p-3"
-              />
+              <div>
+                <input
+                  type="number"
+                  placeholder="Height in cm *"
+                  value={patientHeightCm}
+                  onChange={(e) =>
+                    setPatientHeightCm(
+                      e.target.value
+                    )
+                  }
+                  className="w-full rounded-xl border p-3"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Required. Used to convert pixel
+                  measurements into millimetres &mdash;
+                  without it, asymmetry parameters
+                  cannot be reported.
+                </p>
+              </div>
 
               <input
                 type="text"
@@ -300,6 +321,7 @@ return ( <div className="min-h-screen bg-slate-100">
               !frontImage ||
               !sideImage ||
               !backImage ||
+              !isHeightValid ||
               loading
             }
             className="

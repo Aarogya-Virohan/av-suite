@@ -385,14 +385,18 @@ def calc_trunk_lateral_shift_mm(
 # ---------------------------------------------------------------------------
 
 
-def calc_scoliosis_screen_mm(
+def calc_trunk_lateral_deviation_mm(
     landmarks: list[Landmark], image_width_px: int, pixels_per_cm: float
 ) -> float:
     """
-    PT-P01 — Scoliosis screen. Lateral deviation of the trunk midline
-    (shoulder midpoint) from the pelvic midline (hip midpoint), used as
-    a stable proxy for the plumb line. Unit: millimetres. MediaPipe
-    approximation only — NOT a Cobb angle, screening purposes only.
+    PT-P01 — Trunk lateral deviation (posterior view). Horizontal offset
+    of the shoulder midpoint from the hip midpoint. Unit: millimetres.
+
+    This is a postural asymmetry measurement, NOT a scoliosis screen.
+    Scoliosis is defined by lateral curvature and rotation of the spine
+    and is screened on the spinous processes, which MediaPipe cannot
+    detect at all. Naming this output after scoliosis would assert a
+    spinal finding the method is incapable of producing.
     """
 
     mid_shoulder_x = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2

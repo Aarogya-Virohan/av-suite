@@ -1,6 +1,6 @@
 from typing import Any
 
-from app.services.posture.classifier import SEVERITY_LABELS
+from app.services.posture.classifier import SEVERITY_LABELS, is_borderline
 
 
 def measurement(
@@ -11,6 +11,13 @@ def measurement(
     severity: str,
 ) -> dict[str, Any]:
 
+    # A grade sitting within measurement noise of a boundary is reported as
+    # provisional rather than as a settled tier. Checked here because every
+    # parameter in the report passes through this function.
+    borderline = severity in ("none", "mild", "moderate", "severe") and is_borderline(
+        param_id, value, unit
+    )
+
     return {
         "paramId": param_id,
         "label": label,
@@ -18,6 +25,7 @@ def measurement(
         "unit": unit,
         "severityLabel": SEVERITY_LABELS.get(severity, severity.upper()),
         "severity": severity,
+        "borderline": borderline,
     }
 
 

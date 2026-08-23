@@ -127,6 +127,58 @@ THRESHOLDS: dict[str, dict] = {
 }
 
 
+# Measurement noise near a hard cut-off can flip a patient's grade. A value
+# of 5.02 against a 5.00 boundary is not meaningfully different from 4.98,
+# but one grades MILD and the other NONE. The pose model's own error is
+# reported at roughly 1.5-2 degrees for 2D frontal angles, so any value
+# sitting within that distance of a boundary cannot be assigned to a tier
+# with confidence.
+#
+# These margins are provisional. Per clinical review, the severity tiers
+# themselves have no published basis for most parameters and will be set
+# from collected data; these buffers should be revised at the same time.
+BORDERLINE_MARGIN_DEGREES = 2.0
+BORDERLINE_MARGIN_MM = 2.0
+
+
+def is_borderline(param_id: str, value: float, unit: str) -> bool:
+    """
+    True when `value` sits close enough to any severity boundary that
+    measurement noise could move it into an adjacent tier.
+
+    This does not change the assigned severity. It marks the grade as
+    provisional so a clinician knows not to lean on it.
+    """
+
+    if param_id not in THRESHOLDS:
+        return False
+
+    if not isinstance(value, (int, float)):
+        return False
+
+    margin = BORDERLINE_MARGIN_MM if unit == "mm" else BORDERLINE_MARGIN_DEGREES
+
+    rule = THRESHOLDS[param_id]
+
+    boundaries = [
+        rule.get(key)
+        for key in (
+            "none_min",
+            "mild_min",
+            "moderate_min",
+            "none_max",
+            "mild_max",
+            "moderate_max",
+            "none_max_female",
+            "mild_max_female",
+            "moderate_max_female",
+        )
+        if rule.get(key) is not None
+    ]
+
+    return any(abs(value - b) <= margin for b in boundaries)
+
+
 SEVERITY_LABELS: dict[str, str] = {
     "none": "NONE",
     "mild": "MILD",
