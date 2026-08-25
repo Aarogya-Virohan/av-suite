@@ -114,9 +114,12 @@ class TreatmentSessionService:
     async def update_session(
         self, clinic_id: UUID, session_id: UUID, payload: TreatmentSessionUpdate
     ) -> TreatmentSession:
-        """Update a clinic-scoped treatment session."""
+        """Update a clinic-scoped treatment session (only if not finalized)."""
 
         session = await self.get_session(clinic_id, session_id)
+        if session.finalized:
+            raise TreatmentValidationError("Finalized treatment session cannot be edited.")
+
         update_data = payload.model_dump(exclude_unset=True)
 
         if payload.pain_score is not None and not (0 <= payload.pain_score <= 10):
@@ -154,18 +157,21 @@ class SoapAssessmentService:
     repository: SoapAssessmentRepository
     patient_repository: PatientRepository
     appointment_repository: AppointmentRepository
+    user_repository: UserRepository | None
 
     def __init__(
         self,
         repository: SoapAssessmentRepository,
         patient_repository: PatientRepository,
         appointment_repository: AppointmentRepository,
+        user_repository: UserRepository | None = None,
     ) -> None:
         """Inject repository dependencies."""
 
         self.repository = repository
         self.patient_repository = patient_repository
         self.appointment_repository = appointment_repository
+        self.user_repository = user_repository
 
     async def create_assessment(self, clinic_id: UUID, payload: SoapAssessmentCreate) -> SoapAssessment:
         """Validate dependencies and create a clinic-scoped SOAP assessment."""
@@ -181,6 +187,13 @@ class SoapAssessmentService:
             if appointment is None:
                 raise TreatmentValidationError(
                     f"Appointment '{payload.appointment_id}' does not exist or does not belong to clinic '{clinic_id}'."
+                )
+
+        if payload.therapist_id is not None and self.user_repository is not None:
+            therapist = await self.user_repository.get_by_id(payload.therapist_id, clinic_id=clinic_id)
+            if therapist is None:
+                raise TreatmentValidationError(
+                    f"Therapist '{payload.therapist_id}' does not exist or does not belong to clinic '{clinic_id}'."
                 )
 
         obj_in = payload.model_dump()
@@ -204,6 +217,7 @@ class SoapAssessmentService:
         *,
         patient_id: UUID | None = None,
         appointment_id: UUID | None = None,
+        therapist_id: UUID | None = None,
         specialty: str | None = None,
         is_reassessment: bool | None = None,
         offset: int = 0,
@@ -215,6 +229,7 @@ class SoapAssessmentService:
             clinic_id=clinic_id,
             patient_id=patient_id,
             appointment_id=appointment_id,
+            therapist_id=therapist_id,
             specialty=specialty,
             is_reassessment=is_reassessment,
             offset=offset,
@@ -224,9 +239,12 @@ class SoapAssessmentService:
     async def update_assessment(
         self, clinic_id: UUID, assessment_id: UUID, payload: SoapAssessmentUpdate
     ) -> SoapAssessment:
-        """Update a clinic-scoped SOAP assessment."""
+        """Update a clinic-scoped SOAP assessment (only if not finalized)."""
 
         assessment = await self.get_assessment(clinic_id, assessment_id)
+        if assessment.finalized:
+            raise TreatmentValidationError("Finalized SOAP assessment cannot be edited.")
+
         update_data = payload.model_dump(exclude_unset=True)
 
         if payload.appointment_id is not None:
@@ -234,6 +252,13 @@ class SoapAssessmentService:
             if appointment is None:
                 raise TreatmentValidationError(
                     f"Appointment '{payload.appointment_id}' does not exist or does not belong to clinic '{clinic_id}'."
+                )
+
+        if payload.therapist_id is not None and self.user_repository is not None:
+            therapist = await self.user_repository.get_by_id(payload.therapist_id, clinic_id=clinic_id)
+            if therapist is None:
+                raise TreatmentValidationError(
+                    f"Therapist '{payload.therapist_id}' does not exist or does not belong to clinic '{clinic_id}'."
                 )
 
         if not update_data:

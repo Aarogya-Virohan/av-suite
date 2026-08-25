@@ -4,8 +4,8 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from app.core.dependencies import require_roles
-from app.enums.user import UserRole
+from app.core.dependencies import require_capability
+from app.enums.permission import CapabilityScope
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,12 +24,16 @@ from app.schemas.booking import (
     AppointmentRequestUpdate,
     PublicClinicBrandingResponse,
 )
-from app.services.booking import BookingNotFoundError, BookingService, BookingValidationError
+from app.services.booking import (
+    BookingNotFoundError,
+    BookingService,
+    BookingValidationError,
+)
 
 from app.schemas.envelope import ResponseEnvelope
 
 router = APIRouter()
-ProtectedRouterDep = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+ProtectedRouterDep = Depends(require_capability("booking.requests.manage"))
 
 
 async def get_booking_service(
@@ -51,7 +55,11 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 
 # --- Public Unauthenticated Booking Endpoints ---
 
-@router.get("/booking/branding/{clinic_slug}", response_model=ResponseEnvelope[PublicClinicBrandingResponse])
+
+@router.get(
+    "/booking/branding/{clinic_slug}",
+    response_model=ResponseEnvelope[PublicClinicBrandingResponse],
+)
 async def get_public_clinic_branding(
     clinic_slug: str,
     service: BookingServiceDep,
@@ -62,34 +70,52 @@ async def get_public_clinic_branding(
         result = await service.get_clinic_branding(clinic_slug)
         return ResponseEnvelope(data=result)
     except BookingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
-@router.post("/booking/request", response_model=ResponseEnvelope[AppointmentRequestResponse], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/booking/request",
+    response_model=ResponseEnvelope[AppointmentRequestResponse],
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_public_appointment_request(
     payload: AppointmentRequestCreate,
     service: BookingServiceDep,
-    clinic_id: Annotated[UUID | None, Query(alias="clinic_id")] = None,
+    clinic_slug: Annotated[str | None, Query(alias="clinic_slug")] = None,
 ) -> ResponseEnvelope[AppointmentRequestResponse]:
-    """Public unauthenticated endpoint to submit an appointment request."""
+    """Public unauthenticated endpoint to submit an appointment request using clinic slug."""
 
-    target_clinic_id = clinic_id
-    if target_clinic_id is None:
+    target_clinic_slug = clinic_slug
+    if target_clinic_slug is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="clinic_id query parameter is required for public booking request.",
+            detail="clinic_slug query parameter is required for public booking request.",
         )
 
     try:
-        request_record = await service.create_request(target_clinic_id, payload)
-        return ResponseEnvelope(data=AppointmentRequestResponse.model_validate(request_record))
+        request_record = await service.create_request_by_slug(
+            target_clinic_slug, payload
+        )
+        return ResponseEnvelope(
+            data=AppointmentRequestResponse.model_validate(request_record)
+        )
     except BookingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except BookingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.put("/booking/{id}", response_model=ResponseEnvelope[AppointmentRequestResponse], dependencies=[ProtectedRouterDep])
+@router.put(
+    "/booking/{id}",
+    response_model=ResponseEnvelope[AppointmentRequestResponse],
+    dependencies=[ProtectedRouterDep],
+)
 async def update_booking_request(
     id: UUID,
     payload: AppointmentRequestUpdate,
@@ -102,12 +128,20 @@ async def update_booking_request(
         req = await service.update_request(clinic.id, id, payload)
         return ResponseEnvelope(data=AppointmentRequestResponse.model_validate(req))
     except BookingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except BookingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.delete("/booking/{id}", response_model=ResponseEnvelope[dict[str, str]], dependencies=[ProtectedRouterDep])
+@router.delete(
+    "/booking/{id}",
+    response_model=ResponseEnvelope[dict[str, str]],
+    dependencies=[ProtectedRouterDep],
+)
 async def delete_booking_request(
     id: UUID,
     clinic: CurrentClinicDep,
@@ -117,18 +151,29 @@ async def delete_booking_request(
 
     try:
         await service.delete_request(clinic.id, id)
-        return ResponseEnvelope(data={"message": "Appointment request deleted successfully."})
+        return ResponseEnvelope(
+            data={"message": "Appointment request deleted successfully."}
+        )
     except BookingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 # --- Authenticated Staff Appointment Request Queue Endpoints ---
 
-@router.get("/appointment-requests", response_model=ResponseEnvelope[list[AppointmentRequestResponse]], dependencies=[ProtectedRouterDep])
+
+@router.get(
+    "/appointment-requests",
+    response_model=ResponseEnvelope[list[AppointmentRequestResponse]],
+    dependencies=[ProtectedRouterDep],
+)
 async def list_appointment_requests(
     clinic: CurrentClinicDep,
     service: BookingServiceDep,
-    status_filter: Annotated[AppointmentRequestStatus | None, Query(alias="status")] = None,
+    status_filter: Annotated[
+        AppointmentRequestStatus | None, Query(alias="status")
+    ] = None,
     search: Annotated[str | None, Query(alias="search")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
@@ -145,11 +190,19 @@ async def list_appointment_requests(
     items = [AppointmentRequestResponse.model_validate(req) for req in requests]
     return ResponseEnvelope(
         data=items,
-        meta={"total": len(requests) if len(requests) < limit else len(items) + offset, "offset": offset, "limit": limit}
+        meta={
+            "total": len(requests) if len(requests) < limit else len(items) + offset,
+            "offset": offset,
+            "limit": limit,
+        },
     )
 
 
-@router.get("/appointment-requests/{id}", response_model=ResponseEnvelope[AppointmentRequestResponse], dependencies=[ProtectedRouterDep])
+@router.get(
+    "/appointment-requests/{id}",
+    response_model=ResponseEnvelope[AppointmentRequestResponse],
+    dependencies=[ProtectedRouterDep],
+)
 async def get_appointment_request(
     id: UUID,
     clinic: CurrentClinicDep,
@@ -161,10 +214,17 @@ async def get_appointment_request(
         req = await service.get_request(clinic.id, id)
         return ResponseEnvelope(data=AppointmentRequestResponse.model_validate(req))
     except BookingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
-@router.post("/appointment-requests/{id}/approve", response_model=ResponseEnvelope[dict[str, object]], status_code=status.HTTP_200_OK, dependencies=[ProtectedRouterDep])
+@router.post(
+    "/appointment-requests/{id}/approve",
+    response_model=ResponseEnvelope[dict[str, object]],
+    status_code=status.HTTP_200_OK,
+    dependencies=[ProtectedRouterDep],
+)
 async def approve_appointment_request(
     id: UUID,
     payload: AppointmentRequestApprovePayload,
@@ -177,12 +237,21 @@ async def approve_appointment_request(
         response = await service.approve_request(clinic.id, id, payload)
         return ResponseEnvelope(data=response)
     except BookingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except BookingValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.post("/appointment-requests/{id}/reject", response_model=ResponseEnvelope[AppointmentRequestResponse], status_code=status.HTTP_200_OK, dependencies=[ProtectedRouterDep])
+@router.post(
+    "/appointment-requests/{id}/reject",
+    response_model=ResponseEnvelope[AppointmentRequestResponse],
+    status_code=status.HTTP_200_OK,
+    dependencies=[ProtectedRouterDep],
+)
 async def reject_appointment_request(
     id: UUID,
     clinic: CurrentClinicDep,
@@ -193,6 +262,10 @@ async def reject_appointment_request(
 
     try:
         rejected_req = await service.reject_request(clinic.id, id, notes=notes)
-        return ResponseEnvelope(data=AppointmentRequestResponse.model_validate(rejected_req))
+        return ResponseEnvelope(
+            data=AppointmentRequestResponse.model_validate(rejected_req)
+        )
     except BookingNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

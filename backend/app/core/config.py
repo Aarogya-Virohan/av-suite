@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     # Supabase Session Pooler use karta hai IPv4 compatibility ke liye
     # Yeh required field hai - .env mein must set hona chahiye
     DATABASE_URL: str
+    TEST_DATABASE_URL: str | None = None
     
     # JWT (JSON Web Token) Configuration
     # JWT authentication stateless authentication provide karta hai
@@ -66,9 +67,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     
     # JWT_EXPIRE_MINUTES: Token validity period
-    # 1440 = 24 hours (default)
+    # 15 = 15 minutes (default for short-lived access tokens)
     # Shorter period = better security, longer period = better UX
-    JWT_EXPIRE_MINUTES: int = 1440
+    JWT_EXPIRE_MINUTES: int = 15
     
     # Redis Configuration (Optional)
     # Redis caching aur session management ke liye use hota hai

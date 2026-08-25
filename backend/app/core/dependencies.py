@@ -11,10 +11,13 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.rbac import PERMISSION_MAP, resolve_capability_scope
 from app.core.security import decode_token
+from app.enums.permission import CapabilityScope
 from app.models.clinic import Clinic
 from app.enums.user import UserRole, normalize_user_role
 from app.models.user import User
+from app.models.user_permission import UserPermission
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -39,6 +42,23 @@ class AuthenticatedContext:
     clinic: Clinic
 
 
+@dataclass(slots=True)
+class PermissionContext:
+    """Request-level permission context caching capability overrides."""
+
+    user: User
+    clinic: Clinic
+    overrides: dict[str, CapabilityScope]
+
+    def effective_scope(self, capability_key: str) -> CapabilityScope:
+        """Resolve the effective scope for a capability using cached overrides."""
+        return resolve_capability_scope(
+            role=self.user.role,
+            capability_key=capability_key,
+            user_permissions=self.overrides,
+        )
+
+
 def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User:
     """Ensure the authenticated user has one of the allowed roles."""
 
@@ -49,6 +69,24 @@ def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User
         )
 
     return current_user
+
+
+def require_permission(resource: str) -> Callable[[User], User]:
+    """
+    Checks if the current user has the required role for a given resource.
+    The allowed roles are fetched from the centralized PERMISSION_MAP.
+    """
+    allowed_roles = PERMISSION_MAP.get(resource, [])
+    
+    def permission_checker(user: User = Depends(get_current_user)) -> User:
+        if normalize_user_role(user.role) not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Operation not permitted. '{resource}' requires one of: {[r.value for r in allowed_roles]}",
+            )
+        return user
+
+    return permission_checker
 
 
 async def get_authenticated_context(token: TokenDep, session: SessionDep) -> AuthenticatedContext:
@@ -101,6 +139,46 @@ async def get_authenticated_context(token: TokenDep, session: SessionDep) -> Aut
 
 
 AuthenticatedContextDep = Annotated[AuthenticatedContext, Depends(get_authenticated_context)]
+
+
+async def get_permission_context(
+    auth_context: AuthenticatedContextDep,
+    session: SessionDep,
+) -> PermissionContext:
+    """Load explicit capability overrides once per request."""
+    
+    from sqlalchemy import select
+    
+    stmt = select(UserPermission).where(
+        UserPermission.user_id == auth_context.user.id,
+        UserPermission.clinic_id == auth_context.clinic.id,
+    )
+    result = await session.execute(stmt)
+    overrides = {p.capability_key: p.scope for p in result.scalars()}
+    
+    return PermissionContext(
+        user=auth_context.user,
+        clinic=auth_context.clinic,
+        overrides=overrides,
+    )
+
+
+PermissionContextDep = Annotated[PermissionContext, Depends(get_permission_context)]
+
+
+def require_capability(capability_key: str) -> Callable[..., CapabilityScope]:
+    """Dependency that enforces a capability check using the request context."""
+
+    def dependency(perm_ctx: PermissionContextDep) -> CapabilityScope:
+        scope = perm_ctx.effective_scope(capability_key)
+        if scope == CapabilityScope.NONE:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing required capability: {capability_key}",
+            )
+        return scope
+
+    return dependency
 
 
 async def get_current_user(

@@ -37,17 +37,41 @@ class DocumentService:
         self.patient_repository = patient_repository
         self.treatment_repository = treatment_repository
 
-    async def create_document(self, clinic_id: UUID, payload: PatientDocumentCreate) -> PatientDocument:
+    async def document_belongs_to_therapist(
+        self, clinic_id: UUID, document_id: UUID, therapist_id: UUID
+    ) -> bool:
+        """Check ownership through scheduled appointments or treatment sessions."""
+
+        return await self.document_repository.belongs_to_therapist(
+            clinic_id=clinic_id, document_id=document_id, therapist_id=therapist_id
+        )
+
+    async def patient_belongs_to_therapist(
+        self, clinic_id: UUID, patient_id: UUID, therapist_id: UUID
+    ) -> bool:
+        """Check patient ownership through scheduled appointments or treatments."""
+
+        return await self.document_repository.patient_belongs_to_therapist(
+            clinic_id=clinic_id, patient_id=patient_id, therapist_id=therapist_id
+        )
+
+    async def create_document(
+        self, clinic_id: UUID, payload: PatientDocumentCreate
+    ) -> PatientDocument:
         """Register document metadata for a patient ensuring clinic ownership."""
 
-        patient = await self.patient_repository.get_by_patient_id(payload.patient_id, clinic_id=clinic_id)
+        patient = await self.patient_repository.get_by_patient_id(
+            payload.patient_id, clinic_id=clinic_id
+        )
         if patient is None:
             raise DocumentValidationError(
                 f"Patient '{payload.patient_id}' does not exist or does not belong to clinic '{clinic_id}'."
             )
 
         if payload.treatment_id is not None:
-            treatment = await self.treatment_repository.get_by_id(payload.treatment_id, clinic_id=clinic_id)
+            treatment = await self.treatment_repository.get_by_id(
+                payload.treatment_id, clinic_id=clinic_id
+            )
             if treatment is None:
                 raise DocumentValidationError(
                     f"Treatment '{payload.treatment_id}' does not exist or does not belong to clinic '{clinic_id}'."
@@ -60,9 +84,13 @@ class DocumentService:
     async def get_document(self, clinic_id: UUID, document_id: UUID) -> PatientDocument:
         """Retrieve a patient document ensuring clinic scoping."""
 
-        document = await self.document_repository.get_by_id(document_id, clinic_id=clinic_id)
+        document = await self.document_repository.get_by_id(
+            document_id, clinic_id=clinic_id
+        )
         if document is None:
-            raise DocumentNotFoundError(f"Document '{document_id}' not found for clinic '{clinic_id}'.")
+            raise DocumentNotFoundError(
+                f"Document '{document_id}' not found for clinic '{clinic_id}'."
+            )
         return document
 
     async def list_documents(
@@ -79,6 +107,29 @@ class DocumentService:
 
         return await self.document_repository.list_documents(
             clinic_id=clinic_id,
+            patient_id=patient_id,
+            treatment_id=treatment_id,
+            category=category,
+            offset=offset,
+            limit=limit,
+        )
+
+    async def list_documents_for_therapist(
+        self,
+        clinic_id: UUID,
+        therapist_id: UUID,
+        *,
+        patient_id: UUID | None = None,
+        treatment_id: UUID | None = None,
+        category: DocumentCategory | None = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> list[PatientDocument]:
+        """List documents for the therapist's own patients."""
+
+        return await self.document_repository.list_documents_for_therapist(
+            clinic_id=clinic_id,
+            therapist_id=therapist_id,
             patient_id=patient_id,
             treatment_id=treatment_id,
             category=category,

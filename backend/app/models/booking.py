@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 from app.models.base import TimestampMixin, UUIDMixin
 from app.enums.booking import AppointmentRequestStatus
+from app.enums.shared import Gender
 from app.models.clinic import Clinic
 
 
@@ -40,7 +41,9 @@ class AppointmentRequest(UUIDMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(length=255), nullable=False)
     phone: Mapped[str] = mapped_column(String(length=50), nullable=False)
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    gender: Mapped[str | None] = mapped_column(String(length=20), nullable=True)
+    gender: Mapped[Gender | None] = mapped_column(
+        Enum(Gender, name="gender_type", values_callable=lambda x: [e.value for e in x], create_type=False), nullable=True
+    )
 
     chief_complaint: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

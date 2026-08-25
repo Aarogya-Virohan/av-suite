@@ -26,3 +26,4 @@ class Clinic(Base, TimestampMixin):
     exercises = relationship("Exercise", back_populates="clinic")
     prescriptions = relationship("Prescription", back_populates="clinic")
     posture_sessions = relationship("PostureSession", back_populates="clinic")
+    user_permissions = relationship("UserPermission", back_populates="clinic", cascade="all, delete-orphan")
