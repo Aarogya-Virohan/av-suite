@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import ENUM as PGENUM
 
 
 revision: str = "f1a2b3c4d6e7"
@@ -18,7 +19,16 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-capability_scope = sa.Enum("none", "own", "all", name="capability_scope")
+# The enum type is created explicitly below (capability_scope.create(...)).
+# create_type=False ensures op.create_table() does not emit a second
+# CREATE TYPE "capability_scope", which would raise DuplicateObjectError.
+capability_scope = PGENUM(
+    "none",
+    "own",
+    "all",
+    name="capability_scope",
+    create_type=False,
+)
 
 
 def upgrade() -> None:
