@@ -4,8 +4,8 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from app.core.dependencies import require_permission
-from app.enums.user import UserRole
+from app.core.dependencies import require_capability
+from app.enums.permission import CapabilityScope
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +33,7 @@ from app.services.booking import (
 from app.schemas.envelope import ResponseEnvelope
 
 router = APIRouter()
-ProtectedRouterDep = Depends(require_permission("booking"))
+ProtectedRouterDep = Depends(require_capability("booking.requests.manage"))
 
 
 async def get_booking_service(

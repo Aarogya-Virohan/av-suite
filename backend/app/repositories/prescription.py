@@ -71,12 +71,15 @@ class PrescriptionRepository(BaseRepository[Prescription]):
     async def get_prescriptions(
         self,
         clinic_id: UUID,
+        physio_id: Optional[UUID] = None,
         patient_id: Optional[UUID] = None,
         search: Optional[str] = None,
         page: int = 1,
         page_size: int = 10
     ) -> Tuple[List[Prescription], int]:
         query = select(Prescription).where(Prescription.clinic_id == clinic_id)
+        if physio_id:
+            query = query.where(Prescription.physio_id == physio_id)
         if patient_id:
             query = query.where(Prescription.patient_id == patient_id)
 

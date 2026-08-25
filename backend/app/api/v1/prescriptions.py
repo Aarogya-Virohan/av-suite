@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import Annotated, List, Optional
 import uuid
 import logging
-from app.enums.user import UserRole
+from app.core.dependencies import get_current_user
+from app.enums.permission import CapabilityScope
+from app.models.user import User
 
 from app.core.database import get_db
-from app.core.dependencies import require_permission
+from app.core.dependencies import require_capability
 from app.schemas.prescription import (
     PrescriptionCreate,
     PrescriptionRead,
@@ -21,7 +23,8 @@ import os
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(dependencies=[Depends(require_permission("prescriptions"))])
+router = APIRouter(dependencies=[Depends(require_capability("prescriptions.create"))])
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 @router.post(
@@ -33,7 +36,8 @@ router = APIRouter(dependencies=[Depends(require_permission("prescriptions"))])
 async def create_prescription(
     request: Request,
     prescription_in: PrescriptionCreate,
-    db: AsyncSession = Depends(get_db)
+    user: CurrentUserDep,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Creates a new exercise prescription for a patient.
@@ -44,7 +48,7 @@ async def create_prescription(
     )
     try:
         clinic_id = request.state.clinic_id
-        physio_id = request.state.user_id
+        physio_id = user.id
 
         prescription = await prescription_service.create_prescription(
             db, uuid.UUID(clinic_id), uuid.UUID(physio_id), prescription_in
@@ -62,12 +66,14 @@ async def create_prescription(
 )
 async def list_prescriptions(
     request: Request,
+    user: CurrentUserDep,
     patient_id: Optional[uuid.UUID] = Query(None, description="Filter by patient ID"),
     search: Optional[str] = Query(
         None, description="Search by patient name, exercise title, or related fields"
     ),
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
 ):
     """
     List prescriptions in a clinic, optionally filtered by patient.
@@ -78,10 +84,11 @@ async def list_prescriptions(
         prescriptions, total = await prescription_service.get_prescriptions(
             db,
             uuid.UUID(clinic_id),
-            patient_id,
-            search,
-            pagination.page,
-            pagination.page_size,
+            None if scope == CapabilityScope.ALL else user.id,
+            patient_id=patient_id,
+            search=search,
+            page=pagination.page,
+            page_size=pagination.page_size,
         )
         meta = MetaPagination(
             total=total, page=pagination.page, page_size=pagination.page_size
@@ -96,7 +103,11 @@ async def list_prescriptions(
     "/{id}", response_model=ResponseEnvelope[PrescriptionRead], tags=["Prescriptions"]
 )
 async def get_prescription(
-    request: Request, id: uuid.UUID, db: AsyncSession = Depends(get_db)
+    request: Request,
+    id: uuid.UUID,
+    user: CurrentUserDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
 ):
     """
     Fetches a specific prescription by ID.
@@ -112,6 +123,8 @@ async def get_prescription(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Prescription not found or not in user's clinic",
             )
+        if scope == CapabilityScope.OWN and prescription.physio_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own prescriptions.")
         return ResponseEnvelope(data=prescription)
     except HTTPException:
         raise
@@ -127,7 +140,9 @@ async def update_prescription(
     request: Request,
     id: uuid.UUID,
     patch_in: PrescriptionPatch,
-    db: AsyncSession = Depends(get_db)
+    user: CurrentUserDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
 ):
     """
     Patches/updates prescription details.
@@ -135,7 +150,11 @@ async def update_prescription(
     logger.info(f"Patching prescription: {id}")
     try:
         clinic_id = request.state.clinic_id
-
+        existing = await prescription_service.get_prescription_by_id(db, uuid.UUID(clinic_id), id)
+        if not existing:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prescription not found or not in user's clinic")
+        if scope == CapabilityScope.OWN and existing.physio_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own prescriptions.")
         prescription = await prescription_service.patch_prescription(
             db, uuid.UUID(clinic_id), id, patch_in
         )
@@ -156,11 +175,18 @@ async def update_prescription(
 async def delete_prescription(
     request: Request,
     id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
+    user: CurrentUserDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
 ):
     """Deletes a prescription by ID in clinic scope."""
 
     clinic_id = request.state.clinic_id
+    prescription = await prescription_service.get_prescription_by_id(db, uuid.UUID(clinic_id), id)
+    if not prescription:
+        raise HTTPException(status_code=404, detail="Prescription not found or not in user's clinic")
+    if scope == CapabilityScope.OWN and prescription.physio_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own prescriptions.")
     deleted = await prescription_service.delete_prescription(
         db, uuid.UUID(clinic_id), id
     )
@@ -174,7 +200,11 @@ async def delete_prescription(
 
 @router.post("/{id}/pdf", response_model=ResponseEnvelope[dict], tags=["Prescriptions"])
 async def generate_pdf(
-    request: Request, id: uuid.UUID, db: AsyncSession = Depends(get_db)
+    request: Request,
+    id: uuid.UUID,
+    user: CurrentUserDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
 ):
     """
     Generates a PDF for the prescription and returns the static file URL.
@@ -182,6 +212,11 @@ async def generate_pdf(
     logger.info(f"Generating PDF for prescription: {id}")
     try:
         clinic_id = request.state.clinic_id
+        prescription = await prescription_service.get_prescription_by_id(db, uuid.UUID(clinic_id), id)
+        if not prescription:
+            raise HTTPException(status_code=404, detail="Prescription not found")
+        if scope == CapabilityScope.OWN and prescription.physio_id != user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only generate your own prescription PDF.")
         response = await prescription_service.generate_prescription_pdf_response(
             db, uuid.UUID(clinic_id), id
         )
@@ -195,7 +230,11 @@ async def generate_pdf(
 
 @router.get("/{id}/pdf/download", tags=["Prescriptions"])
 async def download_pdf(
-    request: Request, id: uuid.UUID, db: AsyncSession = Depends(get_db)
+    request: Request,
+    id: uuid.UUID,
+    user: CurrentUserDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
 ):
     """
     Securely streams the prescription PDF, scoped to the requester's clinic.
@@ -205,6 +244,8 @@ async def download_pdf(
     rx = await prescription_service.get_prescription_by_id(db, uuid.UUID(clinic_id), id)
     if not rx or not rx.pdf_key:
         raise HTTPException(status_code=404, detail="PDF not found")
+    if scope == CapabilityScope.OWN and rx.physio_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only download your own prescription PDF.")
     file_path = os.path.join("static", "prescriptions", rx.pdf_key)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="PDF file not found on server")

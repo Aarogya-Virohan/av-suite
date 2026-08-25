@@ -4,12 +4,15 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from app.core.dependencies import require_permission
-from app.enums.user import UserRole
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session, get_current_clinic, get_current_user
+from app.core.dependencies import (
+    get_async_session,
+    get_current_clinic,
+    get_current_user,
+    require_capability,
+)
+from app.enums.permission import CapabilityScope
 from app.models.clinic import Clinic
 from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
@@ -28,7 +31,7 @@ from app.services.treatment import (
     TreatmentValidationError,
 )
 
-router = APIRouter(dependencies=[Depends(require_permission("assessments"))])
+router = APIRouter()
 
 
 async def get_assessment_service(
@@ -44,25 +47,37 @@ async def get_assessment_service(
     )
 
 
-
 AssessmentServiceDep = Annotated[SoapAssessmentService, Depends(get_assessment_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
-@router.post("", response_model=SoapAssessmentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=SoapAssessmentResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_soap_assessment(
     payload: SoapAssessmentCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: AssessmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("assessments.create")),
 ) -> SoapAssessmentResponse:
     """Create a new SOAP assessment for the authenticated clinic."""
+
+    # Enforce OWN scope: therapist can only create assessments for themselves
+    if scope == CapabilityScope.OWN and payload.therapist_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only create assessments assigned to yourself.",
+        )
 
     try:
         assessment = await service.create_assessment(clinic.id, payload)
         return SoapAssessmentResponse.model_validate(assessment)
     except TreatmentValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
 @router.get("", response_model=SoapAssessmentListResponse)
@@ -77,12 +92,13 @@ async def list_soap_assessments(
     therapist_id: Annotated[UUID | None, Query(alias="therapist_id")] = None,
     specialty: Annotated[str | None, Query()] = None,
     is_reassessment: Annotated[bool | None, Query()] = None,
+    scope: CapabilityScope = Depends(require_capability("assessments.view")),
 ) -> SoapAssessmentListResponse:
     """List SOAP assessments for the authenticated clinic with optional filtering."""
 
-    # Enforce own-scope filtering for therapists
+    # Enforce OWN scope: therapist can only see their own assessments
     effective_therapist_id = therapist_id
-    if user.role == UserRole.THERAPIST:
+    if scope == CapabilityScope.OWN:
         effective_therapist_id = user.id
 
     assessments = await service.list_assessments(
@@ -111,16 +127,23 @@ async def get_soap_assessment(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: AssessmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("assessments.view")),
 ) -> SoapAssessmentResponse:
     """Retrieve a SOAP assessment by ID for the authenticated clinic."""
 
     try:
         assessment = await service.get_assessment(clinic.id, id)
-        if user.role == UserRole.THERAPIST and assessment.therapist_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own assessments.")
+        # Enforce OWN scope: therapist can only access their own assessments
+        if scope == CapabilityScope.OWN and assessment.therapist_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only access your own assessments.",
+            )
         return SoapAssessmentResponse.model_validate(assessment)
     except TreatmentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.patch("/{id}", response_model=SoapAssessmentResponse)
@@ -130,16 +153,35 @@ async def update_soap_assessment(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: AssessmentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("assessments.edit")),
 ) -> SoapAssessmentResponse:
     """Update a SOAP assessment for the authenticated clinic."""
 
     try:
         assessment = await service.get_assessment(clinic.id, id)
-        if user.role == UserRole.THERAPIST and assessment.therapist_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own assessments.")
+        # Enforce OWN scope: therapist can only edit their own assessments
+        if scope == CapabilityScope.OWN and assessment.therapist_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only edit your own assessments.",
+            )
+        # Also prevent reassignment to another therapist if scope is OWN
+        if (
+            scope == CapabilityScope.OWN
+            and payload.therapist_id is not None
+            and payload.therapist_id != user.id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You cannot reassign an assessment to another therapist.",
+            )
         assessment = await service.update_assessment(clinic.id, id, payload)
         return SoapAssessmentResponse.model_validate(assessment)
     except TreatmentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except TreatmentValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
