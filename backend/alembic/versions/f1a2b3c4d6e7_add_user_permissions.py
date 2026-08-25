@@ -12,7 +12,6 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.dialects.postgresql import ENUM as PGENUM
 
-
 revision: str = "f1a2b3c4d6e7"
 down_revision: Union[str, Sequence[str], None] = "e9f1a2b3c4d5"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -43,13 +42,25 @@ def upgrade() -> None:
         sa.Column("capability_key", sa.String(length=150), nullable=False),
         sa.Column("scope", capability_scope, nullable=False),
         sa.Column("granted_by", PGUUID(as_uuid=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["clinic_id"], ["clinics.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["granted_by"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("user_id", "capability_key", name="uq_user_permissions_user_capability"),
+        sa.UniqueConstraint(
+            "user_id", "capability_key", name="uq_user_permissions_user_capability"
+        ),
     )
     op.create_index(
         "ix_user_permissions_clinic_user",

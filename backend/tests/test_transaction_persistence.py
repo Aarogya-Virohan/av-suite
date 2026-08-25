@@ -29,16 +29,17 @@ from app.enums.user import UserRole
 @pytest.fixture
 async def real_postgres_client(db_session):
     """Client that uses the real get_db dependency for PostgreSQL transaction testing."""
+
     # Override to use our test session
     async def override_get_db():
         yield db_session
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
-    
+
     app.dependency_overrides.clear()
 
 
@@ -47,7 +48,7 @@ async def test_clinic_with_user(db_session):
     """Create a test clinic with admin user for persistence tests."""
     clinic_id = uuid.uuid4()
     user_id = uuid.uuid4()
-    
+
     clinic = Clinic(
         id=clinic_id,
         name=f"Persistence Test Clinic {uuid.uuid4().hex[:8]}",
@@ -55,8 +56,9 @@ async def test_clinic_with_user(db_session):
         plan_tier="clinical_pro",
     )
     db_session.add(clinic)
-    
+
     from app.models.user import User
+
     user = User(
         id=user_id,
         clinic_id=clinic_id,
@@ -69,10 +71,12 @@ async def test_clinic_with_user(db_session):
     )
     db_session.add(user)
     await db_session.flush()
-    
+
     # Generate token
-    token = create_access_token(subject=user_id, clinic_id=clinic_id, role=UserRole.ADMIN.value)
-    
+    token = create_access_token(
+        subject=user_id, clinic_id=clinic_id, role=UserRole.ADMIN.value
+    )
+
     return {
         "clinic_id": clinic_id,
         "user_id": user_id,
@@ -96,7 +100,7 @@ class TestTransactionPersistence:
         """POST /patients should persist the patient record."""
         clinic = test_clinic_with_user
         headers = {"Authorization": f"Bearer {clinic['token']}"}
-        
+
         # Create patient - use schema fields (first_name, last_name)
         patient_data = {
             "first_name": "Persist",
@@ -110,7 +114,7 @@ class TestTransactionPersistence:
         )
         assert response.status_code in (200, 201), response.text
         patient_id = self._extract_id(response)
-        
+
         # Verify persistence by fetching the patient
         get_response = await real_postgres_client.get(
             f"{settings.API_V1_PREFIX}/patients/{patient_id}",
@@ -128,7 +132,7 @@ class TestTransactionPersistence:
         """POST /leads should persist the lead record."""
         clinic = test_clinic_with_user
         headers = {"Authorization": f"Bearer {clinic['token']}"}
-        
+
         # Create lead - use schema fields (name, phone, email, source, stage)
         lead_data = {
             "name": "Persist Test Lead",
@@ -144,7 +148,7 @@ class TestTransactionPersistence:
         )
         assert response.status_code in (200, 201), response.text
         lead_id = self._extract_id(response)
-        
+
         # Verify persistence by fetching the lead
         get_response = await real_postgres_client.get(
             f"{settings.API_V1_PREFIX}/leads/{lead_id}",
@@ -161,7 +165,7 @@ class TestTransactionPersistence:
         """POST /appointments should persist the appointment record."""
         clinic = test_clinic_with_user
         headers = {"Authorization": f"Bearer {clinic['token']}"}
-        
+
         # First create a patient
         patient_response = await real_postgres_client.post(
             f"{settings.API_V1_PREFIX}/patients",
@@ -169,7 +173,7 @@ class TestTransactionPersistence:
             headers=headers,
         )
         patient_id = self._extract_id(patient_response)
-        
+
         # Create appointment
         appointment_data = {
             "patient_id": patient_id,
@@ -184,7 +188,7 @@ class TestTransactionPersistence:
         )
         assert response.status_code in (200, 201), response.text
         appointment_id = self._extract_id(response)
-        
+
         # Verify persistence by fetching the appointment
         get_response = await real_postgres_client.get(
             f"{settings.API_V1_PREFIX}/appointments/{appointment_id}",
@@ -201,15 +205,19 @@ class TestTransactionPersistence:
         """POST /treatments should persist the treatment session record."""
         clinic = test_clinic_with_user
         headers = {"Authorization": f"Bearer {clinic['token']}"}
-        
+
         # First create a patient
         patient_response = await real_postgres_client.post(
             f"{settings.API_V1_PREFIX}/patients",
-            json={"first_name": "Treatment", "last_name": "Patient", "phone": "6666666666"},
+            json={
+                "first_name": "Treatment",
+                "last_name": "Patient",
+                "phone": "6666666666",
+            },
             headers=headers,
         )
         patient_id = self._extract_id(patient_response)
-        
+
         # Create treatment session - requires 'treatment' field
         treatment_data = {
             "patient_id": patient_id,
@@ -225,7 +233,7 @@ class TestTransactionPersistence:
         )
         assert response.status_code in (200, 201), response.text
         session_id = self._extract_id(response)
-        
+
         # Verify persistence by fetching the session
         get_response = await real_postgres_client.get(
             f"{settings.API_V1_PREFIX}/treatments/{session_id}",
@@ -242,8 +250,8 @@ class TestTransactionPersistence:
         """POST /booking/request should persist the appointment request record."""
         clinic = test_clinic_with_user
         headers = {"Authorization": f"Bearer {clinic['token']}"}
-        
-        # Create public booking request (no auth required for initial request)
+
+        # Create public booking request using clinic slug (no auth required for initial request)
         # Uses AppointmentRequestCreate schema: name, phone, optional age, gender, chief_complaint, notes, preferred_date, preferred_slot
         booking_data = {
             "name": "Booking Request Patient",
@@ -251,21 +259,33 @@ class TestTransactionPersistence:
             "notes": "Test booking request",
             "preferred_date": "2026-08-26",
         }
-        # Pass clinic_id as query parameter
+        # Use clinic name as slug (the get_by_slug_or_id method matches clinic name)
+        # Clinic name format: "Persistence Test Clinic {uuid_hex[:8]}"
+        # For testing, we'll need to query the clinic name from the database
+        clinic_query = await db_session.execute(
+            select(Clinic).where(Clinic.id == clinic["clinic_id"])
+        )
+        clinic_record = clinic_query.scalar_one()
+        clinic_slug = clinic_record.name
+
         response = await real_postgres_client.post(
-            f"{settings.API_V1_PREFIX}/booking/request?clinic_id={clinic['clinic_id']}",
+            f"{settings.API_V1_PREFIX}/booking/request?clinic_slug={clinic_slug}",
             json=booking_data,
         )
         assert response.status_code in (200, 201), response.text
         request_id = self._extract_id(response)
-        
+
         # Verify persistence by querying directly
         result = await db_session.execute(
-            select(AppointmentRequest).where(AppointmentRequest.id == uuid.UUID(request_id))
+            select(AppointmentRequest).where(
+                AppointmentRequest.id == uuid.UUID(request_id)
+            )
         )
         saved_request = result.scalar_one_or_none()
         assert saved_request is not None
         assert saved_request.name == "Booking Request Patient"
+        # Verify it was created for the correct clinic
+        assert saved_request.clinic_id == clinic["clinic_id"]
 
 
 class TestTransactionRollback:
@@ -278,7 +298,7 @@ class TestTransactionRollback:
         """Verify that validation errors cause rollback and don't leave partial data."""
         clinic = test_clinic_with_user
         headers = {"Authorization": f"Bearer {clinic['token']}"}
-        
+
         # Try to create an appointment with invalid patient_id (doesn't exist)
         # This should fail validation and rollback
         appointment_data = {
@@ -294,10 +314,12 @@ class TestTransactionRollback:
         )
         # Should fail because patient doesn't exist
         assert response.status_code in [400, 404, 422], response.text
-        
+
         # Verify no orphan appointment was created
         result = await db_session.execute(
-            select(Appointment).where(Appointment.therapist_id == clinic["therapist_id"])
+            select(Appointment).where(
+                Appointment.therapist_id == clinic["therapist_id"]
+            )
         )
         appointments = result.scalars().all()
         # Should be empty because the request should have rolled back
@@ -313,7 +335,7 @@ class TestExplicitCommitsPreserved:
     ):
         """auth_service.register_user has an explicit commit - verify it still works."""
         unique_email = f"register_{uuid.uuid4().hex[:8]}@test.com"
-        
+
         response = await real_postgres_client.post(
             f"{settings.API_V1_PREFIX}/auth/register",
             json={
@@ -325,9 +347,10 @@ class TestExplicitCommitsPreserved:
             },
         )
         assert response.status_code in (200, 201), response.text
-        
+
         # Verify user was persisted
         from app.models.user import User
+
         result = await db_session.execute(
             select(User).where(User.email == unique_email)
         )
