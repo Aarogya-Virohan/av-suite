@@ -124,7 +124,10 @@ async def get_prescription(
                 detail="Prescription not found or not in user's clinic",
             )
         if scope == CapabilityScope.OWN and prescription.physio_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only access your own prescriptions.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only access your own prescriptions.",
+            )
         return ResponseEnvelope(data=prescription)
     except HTTPException:
         raise
@@ -150,11 +153,19 @@ async def update_prescription(
     logger.info(f"Patching prescription: {id}")
     try:
         clinic_id = request.state.clinic_id
-        existing = await prescription_service.get_prescription_by_id(db, uuid.UUID(clinic_id), id)
+        existing = await prescription_service.get_prescription_by_id(
+            db, uuid.UUID(clinic_id), id
+        )
         if not existing:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prescription not found or not in user's clinic")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Prescription not found or not in user's clinic",
+            )
         if scope == CapabilityScope.OWN and existing.physio_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own prescriptions.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only edit your own prescriptions.",
+            )
         prescription = await prescription_service.patch_prescription(
             db, uuid.UUID(clinic_id), id, patch_in
         )
@@ -182,11 +193,18 @@ async def delete_prescription(
     """Deletes a prescription by ID in clinic scope."""
 
     clinic_id = request.state.clinic_id
-    prescription = await prescription_service.get_prescription_by_id(db, uuid.UUID(clinic_id), id)
+    prescription = await prescription_service.get_prescription_by_id(
+        db, uuid.UUID(clinic_id), id
+    )
     if not prescription:
-        raise HTTPException(status_code=404, detail="Prescription not found or not in user's clinic")
+        raise HTTPException(
+            status_code=404, detail="Prescription not found or not in user's clinic"
+        )
     if scope == CapabilityScope.OWN and prescription.physio_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own prescriptions.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own prescriptions.",
+        )
     deleted = await prescription_service.delete_prescription(
         db, uuid.UUID(clinic_id), id
     )
@@ -212,11 +230,16 @@ async def generate_pdf(
     logger.info(f"Generating PDF for prescription: {id}")
     try:
         clinic_id = request.state.clinic_id
-        prescription = await prescription_service.get_prescription_by_id(db, uuid.UUID(clinic_id), id)
+        prescription = await prescription_service.get_prescription_by_id(
+            db, uuid.UUID(clinic_id), id
+        )
         if not prescription:
             raise HTTPException(status_code=404, detail="Prescription not found")
         if scope == CapabilityScope.OWN and prescription.physio_id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only generate your own prescription PDF.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only generate your own prescription PDF.",
+            )
         response = await prescription_service.generate_prescription_pdf_response(
             db, uuid.UUID(clinic_id), id
         )
@@ -245,7 +268,10 @@ async def download_pdf(
     if not rx or not rx.pdf_key:
         raise HTTPException(status_code=404, detail="PDF not found")
     if scope == CapabilityScope.OWN and rx.physio_id != user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only download your own prescription PDF.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only download your own prescription PDF.",
+        )
     file_path = os.path.join("static", "prescriptions", rx.pdf_key)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="PDF file not found on server")
