@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi import File
 from fastapi import Form
 from fastapi import UploadFile
+
+from app.core.dependencies import require_capability
 
 from app.services.posture.detector import detect_pose
 
@@ -31,7 +33,7 @@ from pathlib import Path
 router = APIRouter(prefix="/posture", tags=["posture"])
 
 
-@router.post("/analyze")
+@router.post("/analyze", dependencies=[Depends(require_capability("posture.create"))])
 async def analyze_posture(
     front_image: UploadFile = File(...),
     side_image: UploadFile = File(...),
