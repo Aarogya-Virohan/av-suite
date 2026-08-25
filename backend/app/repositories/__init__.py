@@ -14,6 +14,7 @@ from app.repositories.document import PatientDocumentRepository
 from app.repositories.lead import LeadRepository
 from app.repositories.patient import PatientRepository
 from app.repositories.treatment import SoapAssessmentRepository, TreatmentSessionRepository
+from app.repositories.user_permission import UserPermissionRepository
 from app.repositories.user import UserRepository
 
 __all__ = [
@@ -33,4 +34,5 @@ __all__ = [
     "SoapAssessmentRepository",
     "TreatmentSessionRepository",
     "UserRepository",
+    "UserPermissionRepository",
 ]

@@ -22,21 +22,7 @@ def annotate_pose(image_bytes: bytes, results) -> bytes:
     connections = (
         list(mp_pose.POSE_CONNECTIONS) if mp_pose.POSE_CONNECTIONS is not None else None
     )
-
-    # Neon green, slightly thicker than the default (2px) for better
-    # visibility against varied backgrounds. Landmark dots keep the
-    # library default (red).
-    connection_drawing_spec = mp_drawing.DrawingSpec(
-        color=(20, 255, 57),  # BGR for neon green (#39FF14)
-        thickness=3,
-    )
-
-    mp_drawing.draw_landmarks(
-        annotated,
-        results.pose_landmarks,
-        connections,
-        connection_drawing_spec=connection_drawing_spec,
-    )
+    mp_drawing.draw_landmarks(annotated, results.pose_landmarks, connections)
 
     success, buffer = cv2.imencode(".jpg", annotated)
 

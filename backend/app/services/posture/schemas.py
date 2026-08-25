@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-Severity = Literal["none", "mild", "moderate", "severe", "insufficient_data", "not_available"]
+Severity = Literal["none", "mild", "moderate", "severe", "insufficient_data"]
 
 
 @dataclass

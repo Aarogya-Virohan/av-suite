@@ -87,6 +87,18 @@ class BookingService:
         )
         return await self.request_repository.create(req_data)
 
+    async def create_request_by_slug(
+        self, clinic_slug: str, payload: AppointmentRequestCreate
+    ) -> AppointmentRequest:
+        """Create a new public appointment request for a clinic identified by slug."""
+
+        clinic = await self.clinic_repository.get_by_slug_or_id(clinic_slug)
+        if clinic is None:
+            raise BookingNotFoundError(f"Clinic '{clinic_slug}' not found.")
+
+        # Use existing create_request logic with resolved clinic_id
+        return await self.create_request(clinic.id, payload)
+
     async def get_request(
         self, clinic_id: UUID, request_id: UUID
     ) -> AppointmentRequest:

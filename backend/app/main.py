@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 # FastAPI Application Instance
 # Title aur version OpenAPI documentation mein display hote hain
 # Swagger UI: http://localhost:8000/docs
+from app.exceptions import BaseAppException, app_exception_handler
+
 app = FastAPI(
     title="AV Suite Backend Foundation",
     version="0.1.0",
@@ -43,6 +45,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Register central exception handler for custom application errors
+app.add_exception_handler(BaseAppException, app_exception_handler)
 
 import os
 

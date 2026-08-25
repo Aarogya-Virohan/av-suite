@@ -20,6 +20,7 @@ class TreatmentSessionBase(BaseModel):
     treatment: str
     home_advice: str | None = None
     notes: str | None = None
+    finalized: bool = False
 
 
 class TreatmentSessionCreate(TreatmentSessionBase):
@@ -38,6 +39,7 @@ class TreatmentSessionUpdate(BaseModel):
     treatment: str | None = None
     home_advice: str | None = None
     notes: str | None = None
+    finalized: bool | None = None
 
 
 class TreatmentSessionResponse(TreatmentSessionBase):
@@ -67,9 +69,11 @@ class SoapAssessmentBase(BaseModel):
 
     patient_id: UUID
     appointment_id: UUID | None = None
+    therapist_id: UUID | None = None
     specialty: str
     diagnosis: str | None = None
     is_reassessment: bool = False
+    finalized: bool = False
     form_data: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -83,9 +87,11 @@ class SoapAssessmentUpdate(BaseModel):
     """Payload for updating a SOAP Assessment."""
 
     appointment_id: UUID | None = None
+    therapist_id: UUID | None = None
     specialty: str | None = None
     diagnosis: str | None = None
     is_reassessment: bool | None = None
+    finalized: bool | None = None
     form_data: dict[str, Any] | None = None
 
 

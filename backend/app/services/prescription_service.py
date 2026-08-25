@@ -59,6 +59,7 @@ async def get_prescription_by_id(
 async def get_prescriptions(
     db: AsyncSession,
     clinic_id: uuid.UUID,
+    physio_id: Optional[uuid.UUID] = None,
     patient_id: Optional[uuid.UUID] = None,
     search: Optional[str] = None,
     page: int = 1,
@@ -72,7 +73,7 @@ async def get_prescriptions(
 
         repo = PrescriptionRepository(db)
         return await repo.get_prescriptions(
-            clinic_id, patient_id, search, page, page_size
+            clinic_id, physio_id, patient_id, search, page, page_size
         )
     except Exception as e:
         logger.error(f"Error listing prescriptions: {str(e)}")

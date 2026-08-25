@@ -18,6 +18,9 @@ JWT_EXPIRE_MINUTES=1440
 # Redis
 REDIS_URL=redis://localhost:6379
 
+# Supermemory
+SUPERMEMORY_API_KEY=your_supermemory_api_key
+
 # Runtime
 ENVIRONMENT=development
 DEBUG=true

@@ -11,7 +11,7 @@ API Endpoints:
 
 Authorization:
 - All endpoints require valid JWT token
-- check_physio_or_admin: Physios aur admins ko access (patients view/create)
+- check_therapist_or_admin: Therapists aur admins ko access
 - Clinic isolation: Patient data sirf user ke clinic mein accessible
 
 Response Format:
@@ -26,7 +26,7 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.core.dependencies import require_roles
+from app.core.dependencies import require_permission, require_admin
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # APIRouter instance jo patient endpoints organize karta hai
 # Prefix: /api/v1/patients (main router mein define hota hai)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_permission("patients"))])
 
 
 
@@ -51,13 +51,12 @@ async def list_patients(
     request: Request,
     search: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
-    db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Endpoint ka purpose: Clinic ke sare patients ko list karna pagination ke saath
     Yeh endpoint patient listing handle karta hai jismein:
-    1. Authorization check (physio ya admin)
+    1. Authorization check (therapist ya admin)
     2. Clinic-specific patients fetch karte hain
     3. Pagination apply karte hain
     4. Metadata ke saath results return karte hain
@@ -105,7 +104,7 @@ async def list_patients(
     Security:
     - JWT token required: All requests authenticated hone chahiye
     - Clinic isolation: Sirf user ke clinic ke patients visible
-    - Role check: Only admin/physio access kar sakte hain
+    - Role check: Only admin/therapist access kar sakte hain
     
     Pagination:
     - Server-side pagination: Large datasets efficiently handle
@@ -159,8 +158,7 @@ async def list_patients(
 async def create_patient(
     request: Request,
     patient_in: PatientCreate,
-    db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Endpoint ka purpose: New patient create karna clinic mein
@@ -206,10 +204,10 @@ async def create_patient(
     Security:
     - JWT token required: All requests authenticated
     - Clinic isolation: Patient automatically current clinic se associated
-    - Role check: Only admin/physio create kar sakte hain
+    - Role check: Only admin/therapist create kar sakte hain
     
     Business Logic:
-    1. Authorization check - physio ya admin
+    1. Authorization check - therapist ya admin
     2. Request data validation (Pydantic schema)
     3. Patient database record create
     4. Created patient return
@@ -255,8 +253,7 @@ async def create_patient(
 async def get_patient(
     request: Request,
     id: str,
-    db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Endpoint ka purpose: Specific patient ke details fetch karna
@@ -297,11 +294,11 @@ async def get_patient(
     Security:
     - JWT token required: All requests authenticated
     - Clinic isolation: Patient sirf user ke clinic mein
-    - Role check: Only admin/physio access kar sakte hain
+    - Role check: Only admin/therapist access kar sakte hain
     - Cross-clinic prevention: Can't access other clinic's patients
     
     Business Logic:
-    1. Authorization check - physio ya admin
+    1. Authorization check - therapist ya admin
     2. Patient fetch by ID aur clinic check
     3. Patient found = return data, Not found = 404
     
@@ -350,8 +347,7 @@ async def update_patient(
     request: Request,
     id: str,
     patient_in: PatientUpdate,
-    db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    db: AsyncSession = Depends(get_db)
 ):
     logger.info(f"Update patient request - id: {id}")
     try:
@@ -375,7 +371,7 @@ async def delete_patient(
     request: Request,
     id: str,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    _ = Depends(require_admin)
 ):
     logger.info(f"Delete patient request - id: {id}")
     try:

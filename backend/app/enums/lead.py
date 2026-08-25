@@ -11,3 +11,14 @@ class LeadStage(StrEnum):
     QUALIFIED = "qualified"
     CONVERTED = "converted"
     LOST = "lost"
+
+
+class LeadSource(StrEnum):
+    """Sources where a lead originated."""
+
+    WEBSITE = "website"
+    REFERRAL = "referral"
+    SOCIAL_MEDIA = "social_media"
+    WALK_IN = "walk_in"
+    ADVERTISEMENT = "advertisement"
+    OTHER = "other"

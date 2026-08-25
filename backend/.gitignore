@@ -33,16 +33,29 @@ htmlcov/
 # Logs
 *.log
 
-# Database
+# Database & Specs
 *.db
 *.sqlite
 *.sqlite3
 *.sql
-
+*.json
+*.yaml
+*.yml
+docs/*.html
 # Temporary & Working Files - These are development artifacts, not part of codebase
 plan.md
+docs\crm\MIGRATION_CONFLICT_AND_ACTION_PLAN.md
+app\integrations\supermemory.py
+app\api\v1\memory.py
+app\schemas\memory.py
+app\services\memory.py
+tests\test_memory.py
+*memory.py
 # (Only temporary working notes excluded - all documentation MD files are INCLUDED)
 
 # Task-specific files (reference only, not part of production)
 tarun_task_03.txt
 FINAL_SUMMARY.txt
+seed_db.py
+openapi.json
+openapi.yaml
