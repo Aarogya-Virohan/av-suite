@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { useAppointments, useUpdateAppointmentStatus } from '../../../features/appointments/api';
+import { useClinicSettings } from '../../../features/settings/api';
 import { AddAppointmentSlideOver } from '../../../features/appointments/components/AddAppointmentSlideOver';
 import { RescheduleSlideOver } from '../../../features/appointments/components/RescheduleSlideOver';
 import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
@@ -56,12 +57,24 @@ export default function AppointmentsPage() {
     fetchRequests();
   }, []);
 
+  // Clinic Settings for Booking Link
+  const { data: clinicSettings } = useClinicSettings();
+  const generateSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  const clinicName = clinicSettings?.name || 'aarogya';
+  const slug = generateSlug(clinicName);
+
+  const defaultBookingUrl = typeof window !== 'undefined' ? `${window.location.origin}/booking/${slug}` : `/booking/${slug}`;
+
   // Booking Link State
-  const [bookingUrl, setBookingUrl] = useState(
-    typeof window !== 'undefined'
-      ? localStorage.getItem('av_crm_booking_url') || `${window.location.origin}/booking/aarogya`
-      : '/booking/aarogya'
-  );
+  const [bookingUrl, setBookingUrl] = useState(defaultBookingUrl);
+  
+  React.useEffect(() => {
+    if (clinicSettings?.name && typeof window !== 'undefined') {
+       const newUrl = `${window.location.origin}/booking/${generateSlug(clinicSettings.name)}`;
+       setBookingUrl(newUrl);
+       localStorage.setItem('av_crm_booking_url', newUrl);
+    }
+  }, [clinicSettings?.name]);
   const [showQr, setShowQr] = useState(false);
 
   const filteredAppointments = appointments.filter((apt) => {
@@ -85,39 +98,38 @@ export default function AppointmentsPage() {
 
   const handleApproveRequest = async (req: BookingRequest) => {
     try {
+      const userId = useAuthStore.getState().userId;
       await apiClient.post(`/appointment-requests/${req.id}/approve`, {
-        therapist_id: 'usr_therapist_1',
+        therapist_id: userId || undefined,
         duration_minutes: 30,
-      }).catch(() => null);
+      });
 
-      setRequests((prev) =>
-        prev.map((r) => (r.id === req.id ? { ...r, status: 'approved' } : r))
-      );
+      // Refetch requests from backend to reflect actual state
+      const res = await apiClient.get('/appointment-requests');
+      setRequests(res.data?.data || res.data || []);
       toast.success(`Request approved! Appointment created for ${req.name}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Failed to approve request');
+      toast.error(err?.message || 'Failed to approve request');
     }
   };
 
   const handleRejectRequest = async (req: BookingRequest) => {
     try {
-      await apiClient.post(`/appointment-requests/${req.id}/reject`).catch(() => null);
-      setRequests((prev) =>
-        prev.map((r) => (r.id === req.id ? { ...r, status: 'rejected' } : r))
-      );
+      await apiClient.post(`/appointment-requests/${req.id}/reject`);
+
+      // Refetch requests from backend to reflect actual state
+      const res = await apiClient.get('/appointment-requests');
+      setRequests(res.data?.data || res.data || []);
       toast.success(`Request rejected`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Failed to reject request');
+      toast.error(err?.message || 'Failed to reject request');
     }
   };
 
   const handleSaveBookingUrl = (url: string) => {
-    setBookingUrl(url);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('av_crm_booking_url', url);
-    }
+    // URL is now read-only and dynamically generated based on clinic name
   };
 
   const pendingRequestsCount = requests.filter((r) => r.status === 'pending').length;
@@ -346,8 +358,8 @@ export default function AppointmentsPage() {
                 <input
                   type="text"
                   value={bookingUrl}
-                  onChange={(e) => handleSaveBookingUrl(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-xs text-white placeholder-slate-300 focus:outline-none"
+                  readOnly
+                  className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-xs text-white placeholder-slate-300 focus:outline-none cursor-not-allowed opacity-90"
                 />
                 <button
                   onClick={() => {
