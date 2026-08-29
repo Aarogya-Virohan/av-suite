@@ -83,7 +83,7 @@ async def create_user(
     new_user = User(
         clinic_id=clinic_id,
         email=payload.email,
-        hashed_password=hashed_password,
+        password_hash=hashed_password,
         first_name=fname or "",
         last_name=lname or "",
         phone=payload.phone,
@@ -230,3 +230,48 @@ async def update_user_permissions(
     await db.commit()
     
     return ResponseEnvelope(data=updated_perms)
+
+@router.delete("/{user_id}", response_model=ResponseEnvelope[None], tags=["Users"])
+async def delete_user(
+    user_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Remove a user from the clinic.
+    """
+    clinic_id = request.state.clinic_id
+    
+    # Prevent self-deletion
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot remove yourself.")
+        
+    user_stmt = select(User).where(User.id == user_id, User.clinic_id == clinic_id)
+    user = (await db.execute(user_stmt)).scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Prevent deleting the last admin
+    if user.role == UserRole.ADMIN.value:
+        all_admins_stmt = select(User).where(User.clinic_id == clinic_id, User.role == UserRole.ADMIN.value, User.is_active == True, User.id != user_id)
+        other_admins = (await db.execute(all_admins_stmt)).scalars().all()
+        if not other_admins:
+            raise HTTPException(status_code=400, detail="Cannot remove the last clinic administrator.")
+            
+    await db.delete(user)
+    
+    # Audit log
+    audit_service = AuditLogService(AuditLogRepository(db))
+    await audit_service.log_event(
+        clinic_id=clinic_id,
+        user_id=current_user.id,
+        action="delete_user",
+        entity_type="users",
+        entity_id=user_id,
+        details={"deleted_user_email": user.email, "deleted_user_role": user.role}
+    )
+    
+    await db.commit()
+    return ResponseEnvelope(data=None)

@@ -9,17 +9,19 @@ import { useUsers } from '../../../features/users/api';
 import { useAuditLogs } from '../../../features/audit/api';
 import { useAuthStore } from '../../../store';
 import { canAccessModule } from '../../../config/permissions';
-import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Palette, Upload, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Palette, Upload, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClinicSettings, useUpdateClinicSettings } from '../../../features/settings/api';
 import { AddUserSlideOver } from '../../../features/users/components/AddUserSlideOver';
 import { UserPermissionsSlideOver } from '../../../features/users/components/UserPermissionsSlideOver';
+import { useDeleteUser } from '../../../features/users/api';
 import { JsonViewerSlideOver } from '../../../components/ui/JsonViewerSlideOver';
 
 type TabKey = 'clinic' | 'users' | 'audit';
 
 export default function SettingsPage() {
   const role = useAuthStore((s) => s.role);
+  const userId = useAuthStore((s) => s.userId);
 
   const [activeTab, setActiveTab] = useState<TabKey>('clinic');
   const [clinicName, setClinicName] = useState('');
@@ -38,6 +40,7 @@ export default function SettingsPage() {
 
   const { data: clinicSettings, isLoading: isLoadingSettings } = useClinicSettings();
   const updateSettings = useUpdateClinicSettings();
+  const deleteUser = useDeleteUser();
 
   React.useEffect(() => {
     if (clinicSettings) {
@@ -55,7 +58,7 @@ export default function SettingsPage() {
   const { data: usersResponse, isLoading: isLoadingUsers } = useUsers();
   const users = usersResponse || [];
 
-  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(auditPage, 50);
+  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(auditPage, 50, userId);
   const auditLogs = auditResponse?.data || [];
   const auditTotal = auditResponse?.meta?.total || auditLogs.length;
 
@@ -136,15 +139,36 @@ export default function SettingsPage() {
       key: 'actions',
       header: 'Actions',
       render: (u) => (
-        <button
-          onClick={() => {
-            setSelectedUser(u);
-            setIsPermissionsOpen(true);
-          }}
-          className="text-xs px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 dark:text-indigo-300 font-semibold rounded-md transition-colors"
-        >
-          Edit Permissions
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setSelectedUser(u);
+              setIsPermissionsOpen(true);
+            }}
+            className="text-xs px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 dark:text-indigo-300 font-semibold rounded-md transition-colors cursor-pointer"
+          >
+            Edit Permissions
+          </button>
+          {u.id !== userId && (
+            <button
+              onClick={async () => {
+                if (window.confirm(`Are you sure you want to remove ${u.first_name} ${u.last_name}?`)) {
+                  try {
+                    await deleteUser.mutateAsync(u.id);
+                    toast.success('User removed successfully');
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.detail || 'Failed to remove user');
+                  }
+                }
+              }}
+              disabled={deleteUser.isPending}
+              className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-colors cursor-pointer disabled:opacity-50"
+              title="Remove User"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       ),
     },
   ];
