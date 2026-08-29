@@ -74,7 +74,7 @@ export function TreatmentsTab({ patientId }: { patientId: string }) {
             No treatment sessions logged yet for this patient.
           </div>
         ) : (
-          sessions.map((session) => (
+          sessions.map((session: any) => (
             <div
               key={session.id}
               className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3 shadow-xs"

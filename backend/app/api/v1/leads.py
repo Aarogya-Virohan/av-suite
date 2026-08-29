@@ -6,10 +6,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session, get_current_clinic, require_permission
+from app.core.dependencies import get_async_session, get_current_clinic, get_current_user, require_permission
 from app.enums.lead import LeadStage
 from app.enums.user import UserRole
 from app.models.clinic import Clinic
+from app.models.user import User
 from app.repositories.lead import LeadRepository
 from app.repositories.patient import PatientRepository
 from app.repositories.user import UserRepository
@@ -39,6 +40,7 @@ async def get_lead_service(
 
 LeadServiceDep = Annotated[LeadService, Depends(get_lead_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 # --- Lead Endpoints ---
@@ -47,9 +49,14 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 async def create_lead(
     payload: LeadCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: LeadServiceDep,
 ) -> LeadResponse:
     """Create a new sales lead for the authenticated clinic."""
+
+    # Auto-fill assigned_to from the authenticated user when not provided
+    if payload.assigned_to is None:
+        payload.assigned_to = user.id
 
     try:
         lead = await service.create_lead(clinic.id, payload)

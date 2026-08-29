@@ -54,9 +54,14 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
 async def create_soap_assessment(
     payload: SoapAssessmentCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: AssessmentServiceDep,
 ) -> SoapAssessmentResponse:
     """Create a new SOAP assessment for the authenticated clinic."""
+
+    # Auto-fill therapist_id from the authenticated user when not provided
+    if payload.therapist_id is None:
+        payload.therapist_id = user.id
 
     try:
         assessment = await service.create_assessment(clinic.id, payload)

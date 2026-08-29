@@ -49,15 +49,11 @@ export function SoapNotesTab({
   const createAssessment = useCreateAssessment();
   const updateAssessment = useUpdateAssessment();
 
-  const [activeNote, setActiveNote] = useState<SoapAssessment>(() => {
+  const [activeNote, setActiveNote] = useState<Partial<SoapAssessment>>(() => {
     const existing = assessments[0];
     if (existing) return existing;
     return {
-      id: `soap_${Date.now()}`,
-      clinic_id: 'cln_aarogya_1',
       patient_id: patientId,
-      appointment_id: null,
-      author_id: 'usr_therapist_1',
       specialty: 'physiotherapy',
       diagnosis: '',
       is_reassessment: isReassessmentOnly,
@@ -68,14 +64,11 @@ export function SoapNotesTab({
         plan: '',
         specialty_data: {},
       },
-      finalized_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     };
   });
 
   useEffect(() => {
-    if (assessments.length > 0 && activeNote.id.startsWith('soap_')) {
+    if (assessments.length > 0 && !activeNote.id) {
       setActiveNote(assessments[0]);
     }
   }, [assessments, activeNote.id]);
@@ -102,14 +95,16 @@ export function SoapNotesTab({
         finalized: true,
       };
 
-      if (activeNote.id.startsWith('soap_')) {
+      let updatedNote;
+      if (!activeNote.id) {
         // Create new
-        await createAssessment.mutateAsync(payload);
+        updatedNote = await createAssessment.mutateAsync(payload);
       } else {
         // Update existing
-        await updateAssessment.mutateAsync({ id: activeNote.id, values: payload });
+        updatedNote = await updateAssessment.mutateAsync({ id: activeNote.id, values: payload });
       }
 
+      setActiveNote(updatedNote);
       toast.success('SOAP note finalized & locked');
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to finalize note');
@@ -122,7 +117,9 @@ export function SoapNotesTab({
       return;
     }
     try {
-      await updateAssessment.mutateAsync({ id: activeNote.id, values: { finalized: false } });
+      if (!activeNote.id) return;
+      const updatedNote = await updateAssessment.mutateAsync({ id: activeNote.id, values: { finalized: false } });
+      setActiveNote(updatedNote);
       toast.success('Note re-opened for editing (Audit log recorded)');
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to re-open note');
@@ -166,8 +163,8 @@ export function SoapNotesTab({
             )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            {isFinalized
-              ? `Finalized on ${new Date(activeNote.finalized_at!).toLocaleString()}`
+            {isFinalized && activeNote.finalized_at
+              ? `Finalized on ${new Date(activeNote.finalized_at).toLocaleString()}`
               : 'Changes autosaved every 2 seconds'}
           </p>
         </div>

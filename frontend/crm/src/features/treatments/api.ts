@@ -11,7 +11,9 @@ export function useTreatments(patientId: string) {
       const res = await apiClient.get('/treatments', {
         params: { patient_id: patientId },
       });
-      return res.data as { data: any[]; meta: any };
+      // Backend returns { items: [], total, offset, limit }
+      const items = res.data?.items || res.data?.data || [];
+      return { data: items, meta: { total: res.data?.total || 0 } };
     },
     enabled: !!patientId,
   });
