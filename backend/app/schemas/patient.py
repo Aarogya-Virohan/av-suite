@@ -40,10 +40,11 @@ class PatientBase(BaseModel):
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if v is None or v == "":
             return None
-        v = v.strip()
-        if not PHONE_PATTERN.match(v):
-            raise ValueError("Phone number must be exactly 10 digits")
-        return v
+        cleaned = re.sub(r"[\s\-]", "", v.strip())
+        match = re.match(r"^(?:\+91|91)?([0-9]{10})$", cleaned)
+        if not match:
+            raise ValueError("Phone number must be a valid 10-digit number (e.g. 9876543210 or +919876543210)")
+        return match.group(1)
 
     @field_validator("date_of_birth")
     @classmethod
@@ -92,12 +93,13 @@ class PatientUpdate(BaseModel):
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if v is None or v == "":
             return None
-        v = v.strip()
-        if not PHONE_PATTERN.match(v):
-            raise ValueError("Phone number must be exactly 10 digits")
-        return v
+        cleaned = re.sub(r"[\s\-]", "", v.strip())
+        match = re.match(r"^(?:\+91|91)?([0-9]{10})$", cleaned)
+        if not match:
+            raise ValueError("Phone number must be a valid 10-digit number (e.g. 9876543210 or +919876543210)")
+        return match.group(1)
 
-    @field_validator("date_of_birth")
+    @field_validator("date_of_birth")   
     @classmethod
     def validate_dob(cls, v: Optional[date]) -> Optional[date]:
         if v is None:

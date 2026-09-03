@@ -44,24 +44,24 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 ```
 
 **Checklist**:
-- [ ] `POST /auth/login` with valid credentials → 200, returns `access_token`
-- [ ] `POST /auth/login` with wrong password → 401 or 422
-- [ ] `POST /auth/login` with missing fields → 422 Unprocessable Entity
-- [ ] `GET /api/v1/patients` with valid token → 200 (not 401)
-- [ ] `GET /api/v1/patients` without token → 401
-- [ ] `GET /api/v1/patients` with expired token → 401
-- [ ] `GET /health` without any token → 200 (public route, no auth)
-- [ ] `GET /docs` without any token → 200 (public route)
+- [x] `POST /auth/login` with valid credentials → 200, returns `access_token`
+- [x] `POST /auth/login` with wrong password → 401 or 422
+- [x] `POST /auth/login` with missing fields → 422 Unprocessable Entity
+- [x] `GET /api/v1/patients` with valid token → 200 (not 401)
+- [x] `GET /api/v1/patients` without token → 401
+- [x] `GET /api/v1/patients` with expired token → 401
+- [x] `GET /health` without any token → 200 (public route, no auth)
+- [x] `GET /docs` without any token → 200 (public route)
 
 ### Frontend Tests
 
-- [ ] `/login` page renders correctly (no blank screen)
-- [ ] Valid login → redirects to `/dashboard`
-- [ ] Invalid login → error message displayed (not generic "something went wrong")
-- [ ] After login, refreshing the page keeps the user logged in (token persists in localStorage)
-- [ ] Visiting `/dashboard` while not logged in → redirects to `/login`
-- [ ] Logout button clears token → redirect to `/login`
-- [ ] After logout, browser back button does not show protected content
+- [x] `/login` page renders correctly (no blank screen)
+- [x] Valid login → redirects to `/dashboard`
+- [x] Invalid login → error message displayed (not generic "something went wrong")
+- [x] After login, refreshing the page keeps the user logged in (token persists in localStorage)
+- [x] Visiting `/dashboard` while not logged in → redirects to `/login`
+- [x] Logout button clears token → redirect to `/login`
+- [x] After logout, browser back button does not show protected content
 
 ---
 
