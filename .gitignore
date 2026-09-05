@@ -49,6 +49,7 @@ coverage/
 .codex
 AGENTS.md
 CLAUDE.md
+record.html
 
 # Data and Specs
 *.sql

@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store';
-import { setStoredToken } from '../../lib/auth';
+import { setStoredToken, getStoredToken, isTokenExpired } from '../../lib/auth';
 import { apiClient } from '../../lib/api-client';
 import { Stethoscope, Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
 
@@ -23,6 +23,16 @@ export default function LoginPage() {
   const setToken = useAuthStore((s) => s.setToken);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const token = getStoredToken();
+    if (token && !isTokenExpired(token)) {
+      router.replace('/dashboard');
+      return;
+    }
+    setIsCheckingAuth(false);
+  }, [router]);
 
   const {
     register,
@@ -49,7 +59,7 @@ export default function LoginPage() {
       setStoredToken(token);
       setToken(token);
       toast.success('Successfully logged in');
-      router.push('/dashboard');
+      router.replace('/dashboard');
     } catch (err: unknown) {
       console.error('Login error:', err);
       const errorMessage =
@@ -59,6 +69,17 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-teal-400">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span className="text-sm font-medium">Verifying session...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
