@@ -1,6 +1,8 @@
 import math
 from typing import Literal
 
+from .exceptions import InsufficientVisibilityError, VISIBILITY_THRESHOLD
+
 NOSE = 0
 
 LEFT_EAR = 7
@@ -332,6 +334,22 @@ def estimate_pixels_per_cm(
 
     if not patient_height_cm or patient_height_cm <= 0:
         return None
+
+    # The calibration itself rests on NOSE and both ANKLEs. MediaPipe
+    # still returns coordinates for landmarks it cannot actually see, so
+    # without this check a hidden ankle produces a wrong scale factor
+    # rather than no scale factor -- and every millimetre parameter in
+    # the report (PT-A02, PT-A03, PT-A10, PT-P01, PT-P02) is silently
+    # rescaled by it. Fail loudly instead: the caller already converts
+    # this into a per-parameter "insufficient_data" result.
+    failed = [
+        idx
+        for idx in (NOSE, LEFT_ANKLE, RIGHT_ANKLE)
+        if landmarks[idx].visibility < VISIBILITY_THRESHOLD
+    ]
+
+    if failed:
+        raise InsufficientVisibilityError(failed)
 
     nose = landmarks[NOSE]
     ankle_mid_y = (landmarks[LEFT_ANKLE].y + landmarks[RIGHT_ANKLE].y) / 2

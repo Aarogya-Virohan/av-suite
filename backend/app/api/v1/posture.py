@@ -347,7 +347,17 @@ async def analyze_posture(
 
     # PT-A02 / PT-A03 / PT-A10 — millimetre measurements (need patient height for calibration)
 
-    pixels_per_cm = estimate_pixels_per_cm(front_landmarks, front_height_px, patient_height_cm)
+    # Calibration rests on NOSE and both ANKLEs. If those are not visible we
+    # get no scale factor, and the millimetre parameters below cannot be
+    # computed -- but the angle parameters do not depend on it and must keep
+    # working, so this is caught here rather than failing the whole request.
+    # The reason is carried forward so the report can say which it was.
+    try:
+        pixels_per_cm = estimate_pixels_per_cm(front_landmarks, front_height_px, patient_height_cm)
+        calibration_status = "not_available"
+    except InsufficientVisibilityError:
+        pixels_per_cm = None
+        calibration_status = "insufficient_data"
 
     mm_params = [
         ("PT-A02", "Shoulder Level Asymmetry", LEFT_SHOULDER, RIGHT_SHOULDER, "y"),
@@ -360,7 +370,7 @@ async def analyze_posture(
 
             if pixels_per_cm is None:
                 front_measurements.append(
-                    measurement(param_id, label, None, "mm", "not_available")
+                    measurement(param_id, label, None, "mm", calibration_status)
                 )
                 continue
 
@@ -385,7 +395,7 @@ async def analyze_posture(
 
         if pixels_per_cm is None:
             front_measurements.append(
-                measurement("PT-A03", "Trunk Lateral Shift", None, "mm", "not_available")
+                measurement("PT-A03", "Trunk Lateral Shift", None, "mm", calibration_status)
             )
         else:
             trunk_shift = calc_trunk_lateral_shift_mm(front_landmarks, front_width_px, pixels_per_cm)
@@ -422,15 +432,20 @@ async def analyze_posture(
 
     back_width_px, back_height_px = get_image_dimensions(back_bytes)
 
-    back_pixels_per_cm = estimate_pixels_per_cm(back_landmarks, back_height_px, patient_height_cm)
+    try:
+        back_pixels_per_cm = estimate_pixels_per_cm(back_landmarks, back_height_px, patient_height_cm)
+        back_calibration_status = "not_available"
+    except InsufficientVisibilityError:
+        back_pixels_per_cm = None
+        back_calibration_status = "insufficient_data"
 
     # PT-P01 — Scoliosis Screen
     try:
-        check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ANKLE, RIGHT_ANKLE])
+        check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP])
 
         if back_pixels_per_cm is None:
             back_measurements.append(
-                measurement("PT-P01", "Scoliosis Screen", None, "mm", "not_available")
+                measurement("PT-P01", "Scoliosis Screen", None, "mm", back_calibration_status)
             )
         else:
             scoliosis = calc_scoliosis_screen_mm(back_landmarks, back_width_px, back_pixels_per_cm)
@@ -452,7 +467,7 @@ async def analyze_posture(
 
         if back_pixels_per_cm is None:
             back_measurements.append(
-                measurement("PT-P02", "Scapular Height Asymmetry", None, "mm", "not_available")
+                measurement("PT-P02", "Scapular Height Asymmetry", None, "mm", back_calibration_status)
             )
         else:
             scapular = calc_scapular_height_asymmetry_mm(back_landmarks, back_height_px, back_pixels_per_cm)

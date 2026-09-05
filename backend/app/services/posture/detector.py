@@ -4,15 +4,12 @@ from mediapipe import solutions as mp_solutions
 
 from .decoder import decode_image_bytes
 from .schemas import Landmark
-from .exceptions import InsufficientVisibilityError
+from .exceptions import InsufficientVisibilityError, VISIBILITY_THRESHOLD
 
 mp_pose = mp_solutions.pose  # type: ignore
 
 # initialize a Pose estimator
 pose = mp_pose.Pose(static_image_mode=True, model_complexity=1)
-
-VISIBILITY_THRESHOLD = 0.65
-
 
 def get_image_dimensions(image_bytes: bytes) -> tuple[int, int]:
     """Returns (width_px, height_px) for an encoded image."""
