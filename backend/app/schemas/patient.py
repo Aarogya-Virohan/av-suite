@@ -46,11 +46,13 @@ class PatientBase(BaseModel):
             raise ValueError("Phone number must be a valid 10-digit number (e.g. 9876543210 or +919876543210)")
         return match.group(1)
 
-    @field_validator("date_of_birth")
+    @field_validator("date_of_birth", mode="before")
     @classmethod
-    def validate_dob(cls, v: Optional[date]) -> Optional[date]:
-        if v is None:
-            return v
+    def validate_dob(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            v = date.fromisoformat(v)
         if v > date.today():
             raise ValueError("Date of birth cannot be in the future")
         if v.year < date.today().year - 130:
@@ -99,11 +101,13 @@ class PatientUpdate(BaseModel):
             raise ValueError("Phone number must be a valid 10-digit number (e.g. 9876543210 or +919876543210)")
         return match.group(1)
 
-    @field_validator("date_of_birth")   
+    @field_validator("date_of_birth", mode="before")   
     @classmethod
-    def validate_dob(cls, v: Optional[date]) -> Optional[date]:
-        if v is None:
-            return v
+    def validate_dob(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            v = date.fromisoformat(v)
         if v > date.today():
             raise ValueError("Date of birth cannot be in the future")
         if v.year < date.today().year - 130:

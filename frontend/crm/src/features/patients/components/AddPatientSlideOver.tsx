@@ -38,7 +38,11 @@ export function AddPatientSlideOver({ isOpen, onClose }: AddPatientSlideOverProp
 
   const onSubmit = async (values: PatientFormValues) => {
     try {
-      await createPatient.mutateAsync(values);
+      const payload = {
+        ...values,
+        date_of_birth: values.date_of_birth ? values.date_of_birth : undefined,
+      };
+      await createPatient.mutateAsync(payload as any);
       toast.success(`Patient ${values.first_name} ${values.last_name} created successfully`);
       reset();
       onClose();

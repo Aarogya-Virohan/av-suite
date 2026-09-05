@@ -209,7 +209,6 @@ class AnalyticsRepository:
             TreatmentSession.clinic_id == clinic_id,
             TreatmentSession.therapist_id == therapist_id,
             TreatmentSession.treatment_date >= month_start,
-            TreatmentSession.deleted_at.is_(None),
         )
 
         # SOAP notes authored by this therapist this month

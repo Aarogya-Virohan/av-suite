@@ -12,20 +12,33 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [isChecking, setIsChecking] = useState(true);
 
-  useEffect(() => {
+  const checkAuth = React.useCallback(() => {
     const token = getStoredToken();
 
     if (!token || isTokenExpired(token)) {
+      setIsChecking(true);
       useAuthStore.getState().logout();
-      router.replace('/login');
-      return;
+      window.location.replace('/login');
+      return false;
     }
 
     setToken(token);
     setIsChecking(false);
+    return true;
   }, [router, setToken]);
 
-  if (isChecking && !isAuthenticated) {
+  useEffect(() => {
+    checkAuth();
+
+    const handlePageShow = () => {
+      checkAuth();
+    };
+
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [checkAuth]);
+
+  if (isChecking || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="flex items-center gap-3 text-teal-400">
