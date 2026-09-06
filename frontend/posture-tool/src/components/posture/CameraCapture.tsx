@@ -213,44 +213,90 @@ export default function CameraCapture({
 }
 
 function SilhouetteGuide({ view }: { view: CaptureView }) {
+  // Portrait frame. The outline is drawn near-full height so that a
+  // patient standing inside it is automatically at the right distance
+  // and fully in frame -- landmarks near the edge of the frame are the
+  // ones the pose model loses first, and a lost ankle invalidates every
+  // millimetre measurement in the report.
+  const FRONT = [
+    "M50 12",
+    "c4 0 7 3 7 7",
+    "c0 3 -1 6 -3 8",
+    "c5 2 12 4 15 8",
+    "c3 4 4 12 5 20",
+    "l2 18",
+    "l-6 2",
+    "l-3 -16",
+    "l-2 26",
+    "l-2 30",
+    "l-1 42",
+    "l-7 0",
+    "l-2 -42",
+    "l-2 -22",
+    "l-2 22",
+    "l-2 42",
+    "l-7 0",
+    "l-1 -42",
+    "l-2 -30",
+    "l-2 -26",
+    "l-3 16",
+    "l-6 -2",
+    "l2 -18",
+    "c1 -8 2 -16 5 -20",
+    "c3 -4 10 -6 15 -8",
+    "c-2 -2 -3 -5 -3 -8",
+    "c0 -4 3 -7 7 -7",
+    "z",
+  ].join(" ")
+
+  const SIDE = [
+    "M52 12",
+    "c5 0 8 3 8 8",
+    "c0 4 -2 7 -5 9",
+    "c6 2 10 6 11 12",
+    "l2 22",
+    "l-5 1",
+    "l-2 -14",
+    "l-1 24",
+    "c0 8 2 14 2 22",
+    "l-1 34",
+    "l-7 0",
+    "l-1 -34",
+    "l-2 -20",
+    "l-3 20",
+    "l-2 34",
+    "l-7 0",
+    "l2 -36",
+    "c0 -10 1 -20 2 -30",
+    "l-1 -22",
+    "c1 -8 5 -14 12 -17",
+    "c-3 -2 -5 -5 -5 -9",
+    "c0 -5 3 -8 8 -8",
+    "z",
+  ].join(" ")
+
   return (
     <svg
       viewBox="0 0 100 200"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="xMidYMid slice"
       className="pointer-events-none absolute inset-0 h-full w-full"
     >
-      <g
-        fill="none"
-        stroke="rgba(255,255,255,0.85)"
-        strokeWidth="0.8"
-        strokeDasharray="3 2"
-      >
-        {view === "side" ? (
-          <>
-            <circle cx="50" cy="22" r="10" />
-            <path d="M50 32 L50 96" />
-            <path d="M50 44 L46 70" />
-            <path d="M50 96 L48 140 L50 178" />
-            <path d="M50 178 L60 180" />
-          </>
-        ) : (
-          <>
-            <circle cx="50" cy="22" r="10" />
-            <path d="M34 44 L66 44" />
-            <path d="M50 32 L50 96" />
-            <path d="M34 44 L30 78" />
-            <path d="M66 44 L70 78" />
-            <path d="M38 96 L62 96" />
-            <path d="M42 96 L40 178" />
-            <path d="M58 96 L60 178" />
-          </>
-        )}
-      </g>
+      <path
+        d={view === "side" ? SIDE : FRONT}
+        fill="rgba(255,255,255,0.10)"
+        stroke="rgba(255,255,255,0.75)"
+        strokeWidth="0.7"
+        strokeLinejoin="round"
+      />
 
-      <g stroke="rgba(255,255,255,0.35)" strokeWidth="0.4">
-        <path d="M50 8 L50 192" />
-        <path d="M20 178 L80 178" />
-      </g>
+      {/* Floor line: the patient's feet belong on it, which fixes both
+          distance and the vertical position of the ankles in frame. */}
+      <path
+        d="M18 190 L82 190"
+        stroke="rgba(255,255,255,0.45)"
+        strokeWidth="0.6"
+        strokeDasharray="4 3"
+      />
     </svg>
   )
 }
