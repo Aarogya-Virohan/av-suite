@@ -248,6 +248,7 @@ return ( <div className="min-h-screen bg-slate-100">
 
               <UploadZone
                 label="Front View"
+                view="front"
                 setImage={
                   setFrontImage
                 }
@@ -258,6 +259,7 @@ return ( <div className="min-h-screen bg-slate-100">
 
               <UploadZone
                 label="Side View"
+                view="side"
                 setImage={
                   setSideImage
                 }
@@ -268,6 +270,7 @@ return ( <div className="min-h-screen bg-slate-100">
 
               <UploadZone
                 label="Back View"
+                view="back"
                 setImage={
                   setBackImage
                 }
