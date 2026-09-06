@@ -20,7 +20,7 @@ export default function ViewSection({
         </h2>
 
         <span className="text-sm text-gray-500">
-          Accuracy: {(data.accuracy * 100).toFixed(1)}%
+          Landmark visibility: {(data.accuracy * 100).toFixed(1)}%
         </span>
       </div>
 

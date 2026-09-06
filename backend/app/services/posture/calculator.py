@@ -510,7 +510,10 @@ def calc_detection_confidence(landmarks: list[Landmark]) -> float:
     """
     Rough per-view detection confidence: the average MediaPipe visibility
     score across all landmarks, rounded to 2 decimals. Used as the
-    "Accuracy" badge instead of a hardcoded constant.
+    "Landmark visibility" figure on the report. This is how clearly
+    MediaPipe could see the landmarks, not how accurate the resulting
+    measurements are: a landmark can be fully visible and still be
+    measured with substantial error.
     """
 
     if not landmarks:

@@ -107,7 +107,7 @@ def _view_section(title: str, view: dict) -> str:
 
     accuracy = view.get("accuracy")
     accuracy_text = (
-        f"Landmark confidence: {accuracy * 100:.1f}%"
+        f"Landmark visibility: {accuracy * 100:.1f}%"
         if isinstance(accuracy, (int, float))
         else ""
     )
