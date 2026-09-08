@@ -15,6 +15,13 @@ interface CameraCaptureProps {
 // levelled camera; this cannot measure camera height, only tilt, so it
 // is a partial check and is worded as guidance rather than a gate.
 const LEVEL_TOLERANCE_DEG = 3
+// Beyond this the tilt is bad enough to distort landmark positions more
+// than the measurements we report. It warns rather than blocks: a small
+// share of captures happen without a tripod, and refusing to take the
+// photo at all leaves the clinician with nothing, which is worse than a
+// flagged imperfect one. The angle is recorded with the capture so a
+// questionable frame can be identified later.
+const LEVEL_BLOCK_DEG = 10
 
 const GUIDANCE: Record<CaptureView, string> = {
   front: "Patient faces the camera. Feet on the floor markers, arms relaxed at the sides, eyes level and looking straight ahead.",
@@ -34,6 +41,11 @@ export default function CameraCapture({
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const [tilt, setTilt] = useState<number | null>(null)
+  const [layers, setLayers] = useState<GuideLayers>({
+    lines: true,
+    grid: true,
+  })
+  const [showSetup, setShowSetup] = useState(true)
 
   // ---- camera ----
   useEffect(() => {
@@ -83,6 +95,22 @@ export default function CameraCapture({
       streamRef.current = null
     }
   }, [])
+
+  // ---- back button ----
+  // The camera is a state overlay, not a route, so Android's back button
+  // would navigate off the site and close the whole capture. Push a
+  // history entry on open and close on popstate instead.
+  useEffect(() => {
+    window.history.pushState({ cameraOpen: true }, "")
+
+    const onPop = () => onClose()
+
+    window.addEventListener("popstate", onPop)
+
+    return () => {
+      window.removeEventListener("popstate", onPop)
+    }
+  }, [onClose])
 
   // ---- tilt ----
   // iOS requires an explicit user gesture before orientation events are
@@ -144,7 +172,9 @@ export default function CameraCapture({
     )
   }, [view, onCapture, onClose])
 
-  const level = tilt !== null && Math.abs(tilt) <= LEVEL_TOLERANCE_DEG
+  const absTilt = tilt === null ? null : Math.abs(tilt)
+  const level = absTilt !== null && absTilt <= LEVEL_TOLERANCE_DEG
+  const severeTilt = absTilt !== null && absTilt > LEVEL_BLOCK_DEG
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
@@ -164,10 +194,38 @@ export default function CameraCapture({
           ref={videoRef}
           playsInline
           muted
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
         />
 
-        {ready && <SilhouetteGuide view={view} />}
+        {ready && <SilhouetteGuide layers={layers} />}
+
+        {showSetup && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/95 px-6">
+            <div className="w-full max-w-sm space-y-4">
+              <h3 className="text-sm font-medium text-white">Before you capture</h3>
+
+              <ul className="space-y-2.5 text-[13px] leading-snug text-white/75">
+                <li>Camera on a tripod, roughly at half the patient&apos;s height.</li>
+                <li>Tripod 1.5 to 3 m from the patient, in the same spot every visit.</li>
+                <li>Patient stands on the floor marker, feet in the standard position.</li>
+                <li>Minimal clothing so the shoulders, hips, knees and ankles are visible.</li>
+                <li>Whole body inside the frame: the top of the head and the feet both within the guide lines. The calibration is measured from the nose to the ankles, so a cropped head or foot drops every millimetre measurement from the report.</li>
+              </ul>
+
+              <p className="text-[11px] leading-snug text-white/45">
+                Distance and camera height are set once on the tripod, not adjusted per patient. Changing them between visits makes measurements incomparable.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowSetup(false)}
+                className="w-full rounded-xl bg-white py-2.5 text-sm font-medium text-slate-900"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="absolute inset-0 flex items-center justify-center p-8">
@@ -176,8 +234,38 @@ export default function CameraCapture({
         )}
       </div>
 
-      <div className="space-y-3 px-4 py-4">
-        <p className="text-xs leading-relaxed text-white/70">
+      <div className="space-y-2 px-3 pb-3 pt-2">
+        <div className="flex gap-1.5">
+          {(
+            [
+              ["lines", "Lines"],
+              ["grid", "Grid"],
+            ] as [keyof GuideLayers, string][]
+          ).map(([key, text]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setLayers((l) => ({ ...l, [key]: !l[key] }))}
+              className={`rounded-full border px-2.5 py-0.5 text-[11px] transition ${
+                layers[key]
+                  ? "border-white/80 bg-white/90 text-slate-900"
+                  : "border-white/25 text-white/50"
+              }`}
+            >
+              {text}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setShowSetup(true)}
+            className="rounded-full border border-white/25 px-2.5 py-0.5 text-[11px] text-white/50"
+          >
+            Setup
+          </button>
+        </div>
+
+        <p className="text-[11px] leading-snug text-white/60">
           {GUIDANCE[view]}
         </p>
 
@@ -185,17 +273,25 @@ export default function CameraCapture({
           <button
             type="button"
             onClick={enableTilt}
-            className="w-full rounded-lg border border-white/30 py-2 text-xs text-white/80"
+            className="w-full rounded-lg border border-white/25 py-1.5 text-[11px] text-white/70"
           >
             Enable level check
           </button>
         ) : (
           <p
-            className={`text-xs ${level ? "text-emerald-400" : "text-amber-400"}`}
+            className={`text-[11px] ${
+              severeTilt
+                ? "text-rose-400"
+                : level
+                  ? "text-emerald-400"
+                  : "text-amber-400"
+            }`}
           >
-            {level
-              ? `Camera is level (${tilt}\u00b0)`
-              : `Camera is tilted ${tilt}\u00b0. Hold it upright and level with the patient.`}
+            {severeTilt
+              ? `Camera is tilted ${tilt}\u00b0. Straighten it before capturing -- this much tilt distorts the measurements.`
+              : level
+                ? `Camera is level (${tilt}\u00b0)`
+                : `Camera is tilted ${tilt}\u00b0. Straighten it for a cleaner frame.`}
           </p>
         )}
 
@@ -203,7 +299,7 @@ export default function CameraCapture({
           type="button"
           onClick={capture}
           disabled={!ready}
-          className="w-full rounded-xl bg-white py-3 font-medium text-slate-900 disabled:opacity-40"
+          className="w-full rounded-xl bg-white py-2.5 text-sm font-medium text-slate-900 disabled:opacity-30"
         >
           Capture
         </button>
@@ -212,91 +308,74 @@ export default function CameraCapture({
   )
 }
 
-function SilhouetteGuide({ view }: { view: CaptureView }) {
-  // Portrait frame. The outline is drawn near-full height so that a
-  // patient standing inside it is automatically at the right distance
-  // and fully in frame -- landmarks near the edge of the frame are the
-  // ones the pose model loses first, and a lost ankle invalidates every
-  // millimetre measurement in the report.
-  const FRONT = [
-    "M50 12",
-    "c4 0 7 3 7 7",
-    "c0 3 -1 6 -3 8",
-    "c5 2 12 4 15 8",
-    "c3 4 4 12 5 20",
-    "l2 18",
-    "l-6 2",
-    "l-3 -16",
-    "l-2 26",
-    "l-2 30",
-    "l-1 42",
-    "l-7 0",
-    "l-2 -42",
-    "l-2 -22",
-    "l-2 22",
-    "l-2 42",
-    "l-7 0",
-    "l-1 -42",
-    "l-2 -30",
-    "l-2 -26",
-    "l-3 16",
-    "l-6 -2",
-    "l2 -18",
-    "c1 -8 2 -16 5 -20",
-    "c3 -4 10 -6 15 -8",
-    "c-2 -2 -3 -5 -3 -8",
-    "c0 -4 3 -7 7 -7",
-    "z",
-  ].join(" ")
+type GuideLayers = {
+  lines: boolean
+  grid: boolean
+}
 
-  const SIDE = [
-    "M52 12",
-    "c5 0 8 3 8 8",
-    "c0 4 -2 7 -5 9",
-    "c6 2 10 6 11 12",
-    "l2 22",
-    "l-5 1",
-    "l-2 -14",
-    "l-1 24",
-    "c0 8 2 14 2 22",
-    "l-1 34",
-    "l-7 0",
-    "l-1 -34",
-    "l-2 -20",
-    "l-3 20",
-    "l-2 34",
-    "l-7 0",
-    "l2 -36",
-    "c0 -10 1 -20 2 -30",
-    "l-1 -22",
-    "c1 -8 5 -14 12 -17",
-    "c-3 -2 -5 -5 -5 -9",
-    "c0 -5 3 -8 8 -8",
-    "z",
-  ].join(" ")
+// Frame bounds in viewBox units (0-200 tall). Deliberately not a body
+// outline: with the camera on a tripod at a fixed distance, the operator
+// must not move the patient to fit a shape. Doing that puts a short and a
+// tall patient at different distances and therefore under different
+// perspective distortion, which is what breaks visit-to-visit comparison.
+// The one thing that must hold in every frame is that the whole body is
+// inside it, because the pixel-to-millimetre calibration is measured
+// nose-to-ankle and drops every millimetre parameter if either end is
+// cropped.
+const FRAME = { head: 12, feet: 188 }
 
+function SilhouetteGuide({ layers }: { layers: GuideLayers }) {
   return (
+    <>
+    {layers.lines && (
+      <>
+        <span
+          className="pointer-events-none absolute left-3 text-[11px] font-medium tracking-wide text-white"
+          style={{ top: `${(FRAME.head / 200) * 100}%`, transform: "translateY(-135%)", textShadow: "0 0 3px rgba(0,0,0,0.9)" }}
+        >
+          Top of head inside this line
+        </span>
+        <span
+          className="pointer-events-none absolute left-3 text-[11px] font-medium tracking-wide text-white"
+          style={{ top: `${(FRAME.feet / 200) * 100}%`, transform: "translateY(35%)", textShadow: "0 0 3px rgba(0,0,0,0.9)" }}
+        >
+          Feet inside this line
+        </span>
+      </>
+    )}
     <svg
       viewBox="0 0 100 200"
-      preserveAspectRatio="xMidYMid slice"
+      preserveAspectRatio="none"
       className="pointer-events-none absolute inset-0 h-full w-full"
     >
-      <path
-        d={view === "side" ? SIDE : FRONT}
-        fill="rgba(255,255,255,0.10)"
-        stroke="rgba(255,255,255,0.75)"
-        strokeWidth="0.7"
-        strokeLinejoin="round"
-      />
+      {layers.grid && (
+        <g>
+          {Array.from({ length: 19 }, (_, i) => (i + 1) * 10).map((y) => (
+            <line key={`h${y}`} x1="0" y1={y} x2="100" y2={y} stroke="rgba(255,255,255,0.22)" strokeWidth="0.25" />
+          ))}
+          {Array.from({ length: 9 }, (_, i) => (i + 1) * 10).map((x) => (
+            <line key={`v${x}`} x1={x} y1="0" x2={x} y2="200" stroke="rgba(255,255,255,0.22)" strokeWidth="0.25" />
+          ))}
+        </g>
+      )}
 
-      {/* Floor line: the patient's feet belong on it, which fixes both
-          distance and the vertical position of the ankles in frame. */}
-      <path
-        d="M18 190 L82 190"
-        stroke="rgba(255,255,255,0.45)"
-        strokeWidth="0.6"
-        strokeDasharray="4 3"
-      />
+      {layers.lines && (
+        <g>
+          <line x1="50" y1="0" x2="50" y2="200" stroke="rgba(0,0,0,0.5)" strokeWidth="1.1" />
+          <line x1="50" y1="0" x2="50" y2="200" stroke="rgba(255,255,255,0.75)" strokeWidth="0.4" strokeDasharray="3 2.5" />
+
+          {[
+            { y: FRAME.head, label: "Top of head inside this line" },
+            { y: FRAME.feet, label: "Feet inside this line" },
+          ].map(({ y, label }) => (
+            <g key={label}>
+              <line x1="0" y1={y} x2="100" y2={y} stroke="rgba(0,0,0,0.5)" strokeWidth="1.4" />
+              <line x1="0" y1={y} x2="100" y2={y} stroke="rgba(255,255,255,0.85)" strokeWidth="0.5" strokeDasharray="4 3" />
+            </g>
+          ))}
+        </g>
+      )}
     </svg>
+    </>
   )
 }

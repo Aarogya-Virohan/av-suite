@@ -116,7 +116,10 @@ try {
 
   console.error(error)
 
-  alert("Analysis failed")
+  alert(
+    "Analysis failed: " +
+      (error instanceof Error ? error.message : String(error)),
+  )
 
 } finally {
 

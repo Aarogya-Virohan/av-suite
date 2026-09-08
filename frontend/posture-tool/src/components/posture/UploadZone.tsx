@@ -20,7 +20,6 @@ export default function UploadZone({
   setImageFile,
 }: UploadZoneProps) {
   const [cameraOpen, setCameraOpen] = useState(false)
-
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
 
