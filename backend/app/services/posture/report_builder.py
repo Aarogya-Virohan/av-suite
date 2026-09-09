@@ -9,6 +9,7 @@ def measurement(
     value: float,
     unit: str,
     severity: str,
+    side: str | None = None,
 ) -> dict[str, Any]:
 
     # A grade sitting within measurement noise of a boundary is reported as
@@ -26,6 +27,12 @@ def measurement(
         "severityLabel": SEVERITY_LABELS.get(severity, severity.upper()),
         "severity": severity,
         "borderline": borderline,
+        # Which way the deviation goes. Magnitude alone is not a clinical
+        # finding: a left head tilt and a right head tilt carry different
+        # muscle patterns and different corrections, and the report was
+        # printing the same row for both. Thresholds stay on the magnitude,
+        # so this adds information without moving any grade.
+        "side": side,
     }
 
 

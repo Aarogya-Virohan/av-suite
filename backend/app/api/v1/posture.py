@@ -20,6 +20,7 @@ from app.services.posture.pdf_service import generate_posture_pdf
 
 from app.services.posture.calculator import (
     calc_cva,
+    to_geometric_space,
     calc_forward_trunk_lean,
     get_lateral_side,
     calc_head_lateral_tilt,
@@ -131,6 +132,9 @@ async def analyze_posture(
 
     lateral_side = get_lateral_side(side_landmarks)
 
+    side_width_px, side_height_px = get_image_dimensions(side_bytes)
+    side_geo = to_geometric_space(side_landmarks, side_width_px, side_height_px)
+
     ear_idx = LEFT_EAR if lateral_side == "left" else RIGHT_EAR
     shoulder_idx_lat = LEFT_SHOULDER if lateral_side == "left" else RIGHT_SHOULDER
     hip_idx_lat = LEFT_HIP if lateral_side == "left" else RIGHT_HIP
@@ -141,7 +145,7 @@ async def analyze_posture(
     try:
         check_visibility(side_landmarks, [ear_idx, shoulder_idx_lat])
 
-        cva = calc_cva(side_landmarks, side=lateral_side)
+        cva = calc_cva(side_geo, side=lateral_side)
         severity = classify("PT-L01", cva)
         findings["PT-L01"] = severity
 
@@ -158,7 +162,7 @@ async def analyze_posture(
     try:
         check_visibility(side_landmarks, [shoulder_idx_lat, hip_idx_lat])
 
-        trunk_lean = calc_forward_trunk_lean(side_landmarks, side=lateral_side)
+        trunk_lean = calc_forward_trunk_lean(side_geo, side=lateral_side)
         severity = classify("PT-L05", trunk_lean)
         findings["PT-L05"] = severity
 
@@ -182,7 +186,7 @@ async def analyze_posture(
             [hip_idx_lat, knee_idx_lat, ankle_idx_lat, ear_idx, shoulder_idx_lat],
         )
 
-        knee_hyperext = calc_knee_hyperextension(side_landmarks, side=lateral_side)
+        knee_hyperext = calc_knee_hyperextension(side_geo, side=lateral_side)
         severity = classify("PT-L06", knee_hyperext)
         findings["PT-L06"] = severity
 
@@ -215,12 +219,13 @@ async def analyze_posture(
     front_measurements = []
 
     front_width_px, front_height_px = get_image_dimensions(front_bytes)
+    front_geo = to_geometric_space(front_landmarks, front_width_px, front_height_px)
 
     # PT-A01 — Head Lateral Tilt
     try:
         check_visibility(front_landmarks, [NOSE, LEFT_SHOULDER, RIGHT_SHOULDER])
 
-        head_tilt = calc_head_lateral_tilt(front_landmarks)
+        head_tilt = calc_head_lateral_tilt(front_geo)
         severity = classify("PT-A01", head_tilt)
         findings["PT-A01"] = severity
 
@@ -237,7 +242,7 @@ async def analyze_posture(
     try:
         check_visibility(front_landmarks, [LEFT_HIP, RIGHT_HIP])
 
-        obliquity = calc_pelvic_obliquity(front_landmarks)
+        obliquity = calc_pelvic_obliquity(front_geo)
         severity = classify("PT-A04", obliquity)
         findings["PT-A04"] = severity
 
@@ -272,7 +277,7 @@ async def analyze_posture(
             check_visibility(front_landmarks, [hip_i, knee_i, ankle_i])
 
             side_key = "left" if side_label == "Left" else "right"
-            deviation, direction = calc_knee_frontal_deviation(front_landmarks, side_key)
+            deviation, direction = calc_knee_frontal_deviation(front_geo, side_key)
 
             param_id = direction_param[direction]
             severity = classify(param_id, deviation, gender=gender)
@@ -308,7 +313,7 @@ async def analyze_posture(
         try:
             check_visibility(front_landmarks, [shoulder_i, elbow_i, wrist_i])
 
-            carrying_angle = calc_elbow_carrying_angle(front_landmarks, side_key)
+            carrying_angle = calc_elbow_carrying_angle(front_geo, side_key)
 
             if abs(carrying_angle) < 1.5:
                 # Near-zero deviation is measurement noise on an
@@ -431,6 +436,7 @@ async def analyze_posture(
     back_measurements = []
 
     back_width_px, back_height_px = get_image_dimensions(back_bytes)
+    back_geo = to_geometric_space(back_landmarks, back_width_px, back_height_px)
 
     try:
         back_pixels_per_cm = estimate_pixels_per_cm(back_landmarks, back_height_px, patient_height_cm)
@@ -491,7 +497,7 @@ async def analyze_posture(
         try:
             check_visibility(back_landmarks, [knee_i, ankle_i, heel_i])
 
-            heel_valgus = calc_heel_valgus(back_landmarks, side_key)
+            heel_valgus = calc_heel_valgus(back_geo, side_key)
             severity = classify("PT-P03", heel_valgus)
             findings[f"PT-P03_{side_key}"] = severity
 
@@ -508,7 +514,7 @@ async def analyze_posture(
     try:
         check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP])
 
-        pelvic_rotation = calc_pelvic_rotation(back_landmarks)
+        pelvic_rotation = calc_pelvic_rotation(back_geo)
         severity = classify("PT-P04", pelvic_rotation)
         findings["PT-P04"] = severity
 
@@ -525,7 +531,7 @@ async def analyze_posture(
     try:
         check_visibility(back_landmarks, [LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX])
 
-        toe_asymmetry = calc_bilateral_toe_asymmetry(back_landmarks)
+        toe_asymmetry = calc_bilateral_toe_asymmetry(back_geo)
         severity = classify("PT-P05", toe_asymmetry)
         findings["PT-P05"] = severity
 

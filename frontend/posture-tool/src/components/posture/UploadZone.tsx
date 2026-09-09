@@ -20,12 +20,16 @@ export default function UploadZone({
   setImageFile,
 }: UploadZoneProps) {
   const [cameraOpen, setCameraOpen] = useState(false)
+  const [thumb, setThumb] = useState<string | null>(null)
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
 
     if (!file) return
 
-    setImage(URL.createObjectURL(file))
+    const url = URL.createObjectURL(file)
+
+    setThumb(url)
+    setImage(url)
 
     setImageFile(file)
   }
@@ -68,6 +72,19 @@ export default function UploadZone({
         Use camera
       </button>
 
+      {thumb && (
+        <div className="mb-3 flex items-center gap-3 rounded-lg bg-emerald-50 p-2">
+          <img
+            src={thumb}
+            alt=""
+            className="h-14 w-14 rounded object-cover"
+          />
+          <span className="text-sm font-medium text-emerald-800">
+            Captured
+          </span>
+        </div>
+      )}
+
       <input
         type="file"
         accept="image/*"
@@ -89,6 +106,7 @@ export default function UploadZone({
           view={view}
           label={label}
           onCapture={(file, previewUrl) => {
+            setThumb(previewUrl)
             setImage(previewUrl)
             setImageFile(file)
           }}

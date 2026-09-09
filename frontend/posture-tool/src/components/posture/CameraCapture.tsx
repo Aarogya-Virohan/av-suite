@@ -165,7 +165,13 @@ export default function CameraCapture({
         })
 
         onCapture(file, URL.createObjectURL(blob))
-        onClose()
+
+        // Close after handing the file over. The camera modal pushed a
+        // history entry when it opened, so step back through it rather than
+        // calling onClose directly -- otherwise the entry is left behind and
+        // the next Android back press closes the site instead of doing
+        // nothing.
+        window.history.back()
       },
       "image/jpeg",
       0.95,

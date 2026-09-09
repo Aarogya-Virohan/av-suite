@@ -64,6 +64,47 @@ def angle_between_points(
 from .schemas import Landmark
 
 
+def to_geometric_space(
+    landmarks: list[Landmark],
+    image_width_px: int,
+    image_height_px: int,
+) -> list[Landmark]:
+    """
+    Return a copy of the landmarks with x rescaled so one x unit and one y
+    unit represent the same physical distance.
+
+    MediaPipe normalises x by image width and y by image height. On any
+    non-square image those units differ, so an angle computed from raw
+    normalised coordinates is distorted by the frame shape. A 3:4 portrait
+    photo inflates angles measured from vertical by about 33%, and the same
+    patient shot at 9:16 reads differently again, which breaks visit-to-visit
+    comparison.
+
+    Multiplying x by (width / height) puts both axes into height-normalised
+    units, the same scale a pixel-space calculation uses.
+
+    Pass the result to the angle functions only. The millimetre functions and
+    estimate_pixels_per_cm apply their own per-axis scaling and must keep
+    receiving the raw landmarks.
+    """
+
+    if not image_width_px or not image_height_px:
+        raise ValueError("Image dimensions are required to rescale landmarks")
+
+    aspect = image_width_px / image_height_px
+
+    return [
+        Landmark(
+            index=lm.index,
+            x=lm.x * aspect,
+            y=lm.y,
+            z=lm.z,
+            visibility=lm.visibility,
+        )
+        for lm in landmarks
+    ]
+
+
 def get_lateral_side(landmarks: list[Landmark]) -> Literal["left", "right"]:
     """
     For a side/lateral photo, only one side of the body faces the camera
@@ -122,6 +163,38 @@ def calc_pelvic_obliquity(landmarks: list[Landmark]) -> float:
     dy = right.y - left.y
 
     return math.degrees(math.atan2(abs(dy), abs(dx)))
+
+
+
+# Direction helpers.
+#
+# MediaPipe's y grows downward and its "left"/"right" landmark names are the
+# subject's own left and right, not the viewer's. Every direction below is
+# reported from the patient's perspective, which is how a physiotherapist
+# records a finding.
+#
+# The magnitude is unchanged and the severity thresholds still run on it.
+# These only say which way the deviation goes.
+
+
+def _higher_side(left_y: float, right_y: float, tol: float = 1e-6) -> str | None:
+    """Which side sits higher in the image (smaller y is higher)."""
+
+    if abs(left_y - right_y) < tol:
+        return None
+
+    return "left" if left_y < right_y else "right"
+
+
+def _shifted_side(a_x: float, b_x: float, tol: float = 1e-6) -> str | None:
+    """Which way a is displaced relative to b, from the patient's view."""
+
+    if abs(a_x - b_x) < tol:
+        return None
+
+    # A larger normalised x is further to the image right, which is the
+    # patient's left when they face the camera.
+    return "left" if a_x > b_x else "right"
 
 
 def midpoint(
@@ -236,6 +309,54 @@ def calc_head_lateral_tilt(landmarks: list[Landmark]) -> float:
         mid_shoulder,
         vertical_ref,
     )
+
+
+
+def head_lateral_tilt_side(landmarks: list[Landmark]) -> str | None:
+    """
+    Which way the head is tilted, for PT-A01. The angle itself comes from
+    calc_head_lateral_tilt and is unsigned; this only names the direction,
+    so no grade changes. Anterior view: the patient faces the camera, so
+    image-right is the patient's left.
+    """
+
+    mid_shoulder_x = (
+        landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x
+    ) / 2
+
+    return _shifted_side(landmarks[NOSE].x, mid_shoulder_x)
+
+
+def pelvic_obliquity_side(landmarks: list[Landmark]) -> str | None:
+    """Which hip sits higher, for PT-A04. Anterior view."""
+
+    return _higher_side(landmarks[LEFT_HIP].y, landmarks[RIGHT_HIP].y)
+
+
+def shoulder_asymmetry_side(landmarks: list[Landmark]) -> str | None:
+    """Which shoulder sits higher, for PT-A02 and PT-P02."""
+
+    return _higher_side(landmarks[LEFT_SHOULDER].y, landmarks[RIGHT_SHOULDER].y)
+
+
+def ear_asymmetry_side(landmarks: list[Landmark]) -> str | None:
+    """Which ear sits higher, for PT-A10. Anterior view."""
+
+    return _higher_side(landmarks[LEFT_EAR].y, landmarks[RIGHT_EAR].y)
+
+
+def trunk_shift_side(landmarks: list[Landmark]) -> str | None:
+    """
+    Which way the shoulder midpoint sits relative to the hip midpoint, for
+    PT-A03 (anterior) and PT-P01 (posterior). Left/right here are the
+    landmark names, which are the patient's own sides in both views, so the
+    result reads the same way from either photograph.
+    """
+
+    shoulder_mid = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2
+    hip_mid = (landmarks[LEFT_HIP].x + landmarks[RIGHT_HIP].x) / 2
+
+    return _shifted_side(shoulder_mid, hip_mid)
 
 
 def calc_knee_frontal_deviation(
@@ -490,7 +611,14 @@ def calc_foot_axis_angle(landmarks: list[Landmark], side: Literal["left", "right
     dx = foot_index.x - heel.x
     dy = foot_index.y - heel.y
 
-    return math.degrees(math.atan2(abs(dx), abs(dy)))
+    # Signed, and normalised so that positive always means toe-out for both
+    # feet. In image coordinates an out-turned left foot and an out-turned
+    # right foot have opposite dx, so a plain abs() folded them together and
+    # a plain signed value made a normal symmetric stance look like a large
+    # asymmetry. Mirroring the left foot puts both on one convention.
+    outward = -dx if side == "left" else dx
+
+    return math.degrees(math.atan2(outward, abs(dy)))
 
 
 def calc_bilateral_toe_asymmetry(landmarks: list[Landmark]) -> float:
@@ -503,6 +631,9 @@ def calc_bilateral_toe_asymmetry(landmarks: list[Landmark]) -> float:
     left_angle = calc_foot_axis_angle(landmarks, "left")
     right_angle = calc_foot_axis_angle(landmarks, "right")
 
+    # Both angles use the same toe-out-positive convention, so this compares
+    # like with like: a patient standing with both feet turned out by the
+    # same amount now reads as symmetric, which is what it is.
     return abs(left_angle - right_angle)
 
 
