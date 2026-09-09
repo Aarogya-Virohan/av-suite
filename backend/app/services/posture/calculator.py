@@ -436,10 +436,17 @@ def calc_elbow_carrying_angle(
 
     midline_x = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2
 
+    # MediaPipe's LEFT_* landmarks are the patient's own left, which in an
+    # anterior photo sits at image-right (larger x). Verified against a
+    # known back-camera photograph. Valgus means the forearm deviates away
+    # from the midline, so for the patient's left arm that is a larger x,
+    # and for the right arm a smaller x. The previous conditions had both
+    # of these reversed, which made every normally-standing patient return
+    # a negative angle on both arms.
     if side == "left":
-        return deviation if wrist.x < midline_x else -deviation
+        return deviation if wrist.x > midline_x else -deviation
 
-    return deviation if wrist.x > midline_x else -deviation
+    return deviation if wrist.x < midline_x else -deviation
 
 
 def estimate_pixels_per_cm(

@@ -322,7 +322,16 @@ async def analyze_posture(
                 # (PT-A05/A06).
                 severity = "none"
             elif carrying_angle < 0:
-                # Varus deviation is always severe, regardless of magnitude.
+                # TODO(clinical): this grades any varus as severe without
+                # looking at magnitude, so a 2 degree and a 20 degree varus
+                # read the same. It also sits outside the THRESHOLDS table
+                # in classifier.py, so a threshold review will not see it.
+                # Cubitus varus needs its own bands from the founders.
+                # Until 2026-09-10 the sign convention in
+                # calc_elbow_carrying_angle was inverted, so every normally
+                # standing patient hit this branch and both elbows printed
+                # SEVERE. That is fixed; this branch now only fires on a
+                # genuine varus, where it still over-grades.
                 severity = "severe"
             else:
                 severity = classify("PT-A08", carrying_angle, gender=gender)

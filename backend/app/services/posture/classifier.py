@@ -208,7 +208,8 @@ def classify(
 
     gender:
         Patient gender, only used for parameters with gender-dependent
-        normal ranges (currently PT-A05 — Knee Valgus).
+        normal ranges (currently PT-A05 Knee Valgus and PT-A08 Elbow
+        Carrying Angle, which has separate female bands in THRESHOLDS).
 
     Returns
     -------
