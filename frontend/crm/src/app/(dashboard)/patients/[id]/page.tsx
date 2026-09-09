@@ -3,15 +3,16 @@
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AppShell } from '../../../../components/layout/AppShell';
-import { usePatient } from '../../../../features/patients/api';
+import { usePatient, useDeletePatient } from '../../../../features/patients/api';
 import { useAuthStore } from '../../../../store';
 import { getPermissionsForRole } from '../../../../config/permissions';
 import { TreatmentsTab } from '../../../../features/patients/components/TreatmentsTab';
 import { SoapNotesTab } from '../../../../features/patients/components/SoapNotesTab';
 import { DocumentsTab } from '../../../../features/patients/components/DocumentsTab';
 import { ProgressionTab } from '../../../../features/patients/components/ProgressionTab';
+import { EditPatientSlideOver } from '../../../../features/patients/components/EditPatientSlideOver';
 import { WhatsAppButton, openWhatsApp } from '../../../../components/ui/WhatsAppButton';
-import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, TrendingDown, Activity, FileCheck, Camera, Dumbbell } from 'lucide-react';
+import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, TrendingDown, Activity, FileCheck, Camera, Dumbbell, Edit2, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../../../../lib/api-client';
 import { toast } from 'sonner';
 import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } from '../../../../features/prescriptions/api';
@@ -26,6 +27,8 @@ export default function PatientWorkspacePage() {
 
   const { data: patient, isLoading } = usePatient(patientId);
   const [activeTab, setActiveTab] = useState<TabKey>('timeline');
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const deletePatient = useDeletePatient();
 
   const { data: prescriptions, isLoading: isRxLoading } = usePrescriptions(patientId);
   const createRx = useCreatePrescription();
@@ -56,6 +59,18 @@ export default function PatientWorkspacePage() {
       </AppShell>
     );
   }
+
+  const handleDelete = async () => {
+    if (window.confirm(`Are you sure you want to delete ${patient.first_name} ${patient.last_name}?`)) {
+      try {
+        await deletePatient.mutateAsync(patient.id);
+        toast.success('Patient deleted successfully');
+        router.push('/patients');
+      } catch (err) {
+        toast.error('Failed to delete patient');
+      }
+    }
+  };
 
   const handleSendWaSessionReport = () => {
     const message = `🏥 *Aarogya Virohan — Session Report*\n\nHi ${patient.first_name},\n\nSession completed successfully.\nInitial Pain: 8/10\nCurrent Pain: 3/10 (▼ 5 pts improved)\nTreatment: IFT therapy & core stabilization\nHome Advice: Cat-camel stretches twice daily\n\nThank you for visiting!`;
@@ -200,6 +215,36 @@ export default function PatientWorkspacePage() {
                 <Dumbbell className="w-3.5 h-3.5" />
                 <span>Exercise Library</span>
               </a>
+
+              <button
+                onClick={handleGenerateRx}
+                disabled={isRxLoading || createRx.isPending || generatePdf.isPending}
+                className="ml-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                <FileCheck className="w-3.5 h-3.5" />
+                <span>Auto-Rx</span>
+              </button>
+
+              {getPermissionsForRole(role).actions.createEditPatient && (
+                <button
+                  onClick={() => setIsEditOpen(true)}
+                  className="ml-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
+              )}
+
+              {getPermissionsForRole(role).actions.deletePatient && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deletePatient.isPending}
+                  className="ml-1 px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -272,12 +317,14 @@ export default function PatientWorkspacePage() {
 
           {activeTab === 'billing' && (
             <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Patient Invoices & Payments</h3>
-              <p className="text-xs text-slate-500">Invoices and payments for this patient.</p>
+              <div className="flex items-center justify-center h-full text-sm text-slate-500 font-medium bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                Not implemented yet
+              </div>
             </div>
           )}
         </div>
       </div>
+      <EditPatientSlideOver isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} patient={patient} />
     </AppShell>
   );
 }

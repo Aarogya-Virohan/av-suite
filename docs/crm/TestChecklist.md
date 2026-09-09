@@ -77,18 +77,18 @@ curl http://localhost:8000/api/v1/analytics/overview \
 ```
 
 **Checklist**:
-- [ ] `GET /analytics/overview` with valid token → 200
-- [ ] Response contains all 4 fields: `total_patients`, `active_appointments_today`, `monthly_revenue`, `pending_leads`
-- [ ] All values are numbers (not null, not string)
-- [ ] Clinic A's token cannot see Clinic B's analytics (multi-tenant isolation)
+- [x] `GET /analytics/overview` with valid token → 200
+- [x] Response contains all 4 fields: `total_patients`, `active_appointments_today`, `monthly_revenue`, `pending_leads`
+- [x] All values are numbers (not null, not string)
+- [x] Clinic A's token cannot see Clinic B's analytics (multi-tenant isolation)
 
 ### Frontend Tests
 
-- [ ] Dashboard loads and shows 4 KPI cards
-- [ ] KPI cards show actual numbers (not all 0)
-- [ ] Loading spinner shown during initial fetch
-- [ ] If backend is down, error message shown (not indefinite spinner)
-- [ ] Numbers update after data changes (e.g., add a patient → refresh → count increases)
+- [x] Dashboard loads and shows 4 KPI cards
+- [x] KPI cards show actual numbers (not all 0)
+- [x] Loading spinner shown during initial fetch
+- [x] If backend is down, error message shown (not indefinite spinner)
+- [x] Numbers update after data changes (e.g., add a patient → refresh → count increases)
 
 ---
 
@@ -121,22 +121,22 @@ curl -X POST http://localhost:8000/api/v1/leads/{id}/convert \
 ```
 
 **Checklist**:
-- [ ] `GET /leads` → 200, returns array
-- [ ] `GET /leads?stage=new` → only returns leads with stage=new
-- [ ] `POST /leads` with valid data → 201, lead created with correct clinic_id
-- [ ] `POST /leads` without auth → 401
-- [ ] `PATCH /leads/{id}` → stage updated
-- [ ] `PATCH /leads/{id}` with wrong clinic's ID → 404 or 403 (not the other clinic's lead)
-- [ ] `POST /leads/{id}/convert` → lead stage = converted, new Patient record created
+- [x] `GET /leads` → 200, returns array
+- [x] `GET /leads?stage=new` → only returns leads with stage=new
+- [x] `POST /leads` with valid data → 201, lead created with correct clinic_id
+- [x] `POST /leads` without auth → 401
+- [x] `PATCH /leads/{id}` → stage updated
+- [x] `PATCH /leads/{id}` with wrong clinic's ID → 404 or 403 (not the other clinic's lead)
+- [x] `POST /leads/{id}/convert` → lead stage = converted, new Patient record created
 
 ### Frontend Tests
 
-- [ ] Leads page renders without error
-- [ ] Leads list shows real data from API
-- [ ] Create Lead form: submitting valid data creates a lead visible in list
-- [ ] Create Lead form: submitting invalid data (missing name) shows inline error
-- [ ] Stage update persists on page refresh
-- [ ] Convert Lead: clicking convert creates a patient (verify by checking patients list)
+- [x] Leads page renders without error
+- [x] Leads list shows real data from API
+- [x] Create Lead form: submitting valid data creates a lead visible in list
+- [x] Create Lead form: submitting invalid data (missing name) shows inline error
+- [x] Stage update persists on page refresh
+- [x] Convert Lead: clicking convert creates a patient (verify by checking patients list)
 
 ---
 
@@ -159,22 +159,22 @@ curl -X POST http://localhost:8000/api/v1/patients \
 ```
 
 **Checklist**:
-- [ ] `GET /patients` → 200, returns clinic-scoped list
-- [ ] `GET /patients/{id}` → returns single patient with full detail
-- [ ] `POST /patients` → creates patient with correct clinic_id
-- [ ] `PUT /patients/{id}` → updates patient data
-- [ ] `DELETE /patients/{id}` → soft delete (record moves to recycle bin, not deleted from DB)
-- [ ] `GET /patients` after soft delete → deleted patient not in list
-- [ ] Multi-tenant: Clinic A cannot access Clinic B's patients (try with different JWT)
+- [x] `GET /patients` → 200, returns clinic-scoped list
+- [x] `GET /patients/{id}` → returns single patient with full detail
+- [x] `POST /patients` → creates patient with correct clinic_id
+- [x] `PUT /patients/{id}` → updates patient data
+- [x] `DELETE /patients/{id}` → soft delete (record moves to recycle bin, not deleted from DB)
+- [x] `GET /patients` after soft delete → deleted patient not in list
+- [x] Multi-tenant: Clinic A cannot access Clinic B's patients (try with different JWT)
 
 ### Frontend Tests
 
-- [ ] Patients page renders
-- [ ] Patient list shows real data
-- [ ] Search / filter works
-- [ ] Patient detail page loads correctly
-- [ ] Edit patient → changes persist
-- [ ] Delete patient → patient disappears from list, appears in recycle bin
+- [x] Patients page renders
+- [x] Patient list shows real data
+- [x] Search / filter works
+- [x] Patient detail page loads correctly
+- [x] Edit patient → changes persist
+- [x] Delete patient → patient disappears from list, appears in recycle bin
 
 ---
 
