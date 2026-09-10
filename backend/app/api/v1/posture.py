@@ -24,6 +24,11 @@ from app.services.posture.calculator import (
     calc_forward_trunk_lean,
     get_lateral_side,
     calc_head_lateral_tilt,
+    head_lateral_tilt_side,
+    pelvic_obliquity_side,
+    shoulder_asymmetry_side,
+    ear_asymmetry_side,
+    trunk_shift_side,
     calc_pelvic_obliquity,
     calc_knee_frontal_deviation,
     calc_knee_hyperextension,
@@ -76,9 +81,21 @@ from app.services.posture.report_builder import (
 router = APIRouter(prefix="/posture", tags=["posture"])
 
 
-def _annotate_or_blank(image_bytes: bytes, pose_results) -> str:
+def _annotate_or_blank(
+    image_bytes: bytes,
+    pose_results,
+    landmarks=None,
+    pixels_per_cm: float | None = None,
+    view: str = "front",
+) -> str:
     try:
-        annotated_bytes = annotate_pose(image_bytes, pose_results)
+        annotated_bytes = annotate_pose(
+            image_bytes,
+            pose_results,
+            landmarks=landmarks,
+            pixels_per_cm=pixels_per_cm,
+            view=view,
+        )
         return "data:image/jpeg;base64," + base64.b64encode(annotated_bytes).decode("utf-8")
     except ValueError:
         return ""
@@ -199,7 +216,23 @@ async def analyze_posture(
             measurement("PT-L06", "Knee Hyperextension", None, "\u00b0", "insufficient_data")
         )
 
-    side_photo_url = _annotate_or_blank(side_bytes, side_results)
+    # Calibration is not otherwise needed on the sagittal view, since it
+    # produces no millimetre parameter. It is computed here only to scale
+    # the reference grid, and a failure degrades to no grid, not an error.
+    try:
+        side_pixels_per_cm = estimate_pixels_per_cm(
+            side_landmarks, side_height_px, patient_height_cm
+        )
+    except InsufficientVisibilityError:
+        side_pixels_per_cm = None
+
+    side_photo_url = _annotate_or_blank(
+        side_bytes,
+        side_results,
+        landmarks=side_landmarks,
+        pixels_per_cm=side_pixels_per_cm,
+        view="side",
+    )
 
     side_view = build_side_view_result(
         measurements=side_measurements,
@@ -230,7 +263,14 @@ async def analyze_posture(
         findings["PT-A01"] = severity
 
         front_measurements.append(
-            measurement("PT-A01", "Head Lateral Tilt", head_tilt, "\u00b0", severity)
+            measurement(
+                "PT-A01",
+                "Head Lateral Tilt",
+                head_tilt,
+                "\u00b0",
+                severity,
+                side=head_lateral_tilt_side(front_landmarks),
+            )
         )
 
     except InsufficientVisibilityError:
@@ -247,7 +287,14 @@ async def analyze_posture(
         findings["PT-A04"] = severity
 
         front_measurements.append(
-            measurement("PT-A04", "Pelvic Obliquity", obliquity, "\u00b0", severity)
+            measurement(
+                "PT-A04",
+                "Pelvic Obliquity",
+                obliquity,
+                "\u00b0",
+                severity,
+                side=pelvic_obliquity_side(front_landmarks),
+            )
         )
 
     except InsufficientVisibilityError:
@@ -396,7 +443,15 @@ async def analyze_posture(
             severity = classify(param_id, value)
             findings[param_id] = severity
 
-            front_measurements.append(measurement(param_id, label, value, "mm", severity))
+            side_value = (
+                shoulder_asymmetry_side(front_landmarks)
+                if param_id == "PT-A02"
+                else ear_asymmetry_side(front_landmarks)
+            )
+
+            front_measurements.append(
+                measurement(param_id, label, value, "mm", severity, side=side_value)
+            )
 
         except InsufficientVisibilityError:
             front_measurements.append(
@@ -417,7 +472,14 @@ async def analyze_posture(
             findings["PT-A03"] = severity
 
             front_measurements.append(
-                measurement("PT-A03", "Trunk Lateral Shift", trunk_shift, "mm", severity)
+                measurement(
+                    "PT-A03",
+                    "Trunk Lateral Shift",
+                    trunk_shift,
+                    "mm",
+                    severity,
+                    side=trunk_shift_side(front_landmarks),
+                )
             )
 
     except InsufficientVisibilityError:
@@ -425,7 +487,13 @@ async def analyze_posture(
             measurement("PT-A03", "Trunk Lateral Shift", None, "mm", "insufficient_data")
         )
 
-    front_photo_url = _annotate_or_blank(front_bytes, front_results)
+    front_photo_url = _annotate_or_blank(
+        front_bytes,
+        front_results,
+        landmarks=front_landmarks,
+        pixels_per_cm=pixels_per_cm,
+        view="front",
+    )
 
     front_view = build_side_view_result(
         measurements=front_measurements,
@@ -553,7 +621,13 @@ async def analyze_posture(
             measurement("PT-P05", "Bilateral Toe Angle Asymmetry", None, "\u00b0", "insufficient_data")
         )
 
-    back_photo_url = _annotate_or_blank(back_bytes, back_results)
+    back_photo_url = _annotate_or_blank(
+        back_bytes,
+        back_results,
+        landmarks=back_landmarks,
+        pixels_per_cm=back_pixels_per_cm,
+        view="back",
+    )
 
     back_view = build_side_view_result(
         measurements=back_measurements,
