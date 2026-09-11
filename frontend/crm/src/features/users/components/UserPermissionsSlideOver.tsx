@@ -11,39 +11,7 @@ interface Props {
   user: User | null;
 }
 
-const CAPABILITIES = [
-  { key: 'patients.view', label: 'View Patients', scopes: ['none', 'own', 'all'] },
-  { key: 'patients.create', label: 'Create Patients', scopes: ['none', 'all'] },
-  { key: 'patients.edit', label: 'Edit Patients', scopes: ['none', 'own', 'all'] },
-  { key: 'patients.delete', label: 'Delete Patients', scopes: ['none', 'all'] },
-  { key: 'appointments.view', label: 'View Appointments', scopes: ['none', 'own', 'all'] },
-  { key: 'appointments.create', label: 'Create Appointments', scopes: ['none', 'own', 'all'] },
-  { key: 'appointments.edit', label: 'Edit Appointments', scopes: ['none', 'own', 'all'] },
-  { key: 'treatments.view', label: 'View Treatments', scopes: ['none', 'own', 'all'] },
-  { key: 'treatments.create', label: 'Create Treatments', scopes: ['none', 'own', 'all'] },
-  { key: 'treatments.edit', label: 'Edit Treatments', scopes: ['none', 'own', 'all'] },
-  { key: 'analytics.my_performance', label: 'Analytics: My Performance', scopes: ['none', 'own'] },
-  { key: 'analytics.clinic_financials', label: 'Analytics: Clinic Financials', scopes: ['none', 'all'] },
-  { key: 'users.manage', label: 'Manage Users', scopes: ['none', 'all'] },
-  { key: 'permissions.manage', label: 'Manage Permissions', scopes: ['none', 'all'] },
-  { key: 'leads.view', label: 'View Leads', scopes: ['none', 'own', 'all'] },
-  { key: 'leads.create', label: 'Create Leads', scopes: ['none', 'own', 'all'] },
-  { key: 'leads.edit', label: 'Edit Leads', scopes: ['none', 'own', 'all'] },
-  { key: 'leads.delete', label: 'Delete Leads', scopes: ['none', 'all'] },
-  { key: 'billing.view', label: 'View Billing', scopes: ['none', 'all'] },
-  { key: 'billing.create', label: 'Create Billing', scopes: ['none', 'all'] },
-  { key: 'billing.edit', label: 'Edit Billing', scopes: ['none', 'all'] },
-  { key: 'billing.delete', label: 'Delete Billing', scopes: ['none', 'all'] },
-  { key: 'documents.view', label: 'View Documents', scopes: ['none', 'own', 'all'] },
-  { key: 'documents.upload', label: 'Upload Documents', scopes: ['none', 'own', 'all'] },
-  { key: 'documents.delete', label: 'Delete Documents', scopes: ['none', 'all'] },
-  { key: 'settings.manage', label: 'Manage Settings', scopes: ['none', 'all'] },
-  { key: 'booking.manage', label: 'Manage Booking', scopes: ['none', 'all'] },
-  { key: 'packages.manage', label: 'Manage Packages', scopes: ['none', 'all'] },
-  { key: 'exercises.manage', label: 'Manage Exercises', scopes: ['none', 'all'] },
-  { key: 'posture.manage', label: 'Manage Posture', scopes: ['none', 'all'] },
-  { key: 'prescriptions.manage', label: 'Manage Prescriptions', scopes: ['none', 'all'] },
-];
+import { CANONICAL_CAPABILITIES } from '../../../config/permissions';
 
 export function UserPermissionsSlideOver({ isOpen, onClose, user }: Props) {
   const { data: permissions, isLoading } = useUserPermissions(user?.id || '');
@@ -119,10 +87,15 @@ export function UserPermissionsSlideOver({ isOpen, onClose, user }: Props) {
           </div>
 
           <div className="space-y-4">
-            {CAPABILITIES.map((cap) => (
+            {CANONICAL_CAPABILITIES.map((cap) => (
               <div key={cap.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800">
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{cap.label}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      {cap.module}
+                    </span>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{cap.label}</p>
+                  </div>
                   <p className="text-[10px] text-slate-500 font-mono mt-0.5">{cap.key}</p>
                 </div>
                 <div className="w-full sm:w-32">
@@ -131,7 +104,7 @@ export function UserPermissionsSlideOver({ isOpen, onClose, user }: Props) {
                     onChange={(e) => handleScopeChange(cap.key, e.target.value)}
                     className="w-full px-2 py-1.5 text-xs rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
                   >
-                    {cap.scopes.map((s) => (
+                    {cap.allowedScopes.map((s) => (
                       <option key={s} value={s}>
                         {s.toUpperCase()}
                       </option>
