@@ -478,7 +478,7 @@ async def analyze_posture(
                     trunk_shift,
                     "mm",
                     severity,
-                    side=trunk_shift_side(front_landmarks),
+                    side=trunk_shift_side(front_landmarks, "anterior"),
                 )
             )
 
@@ -536,7 +536,14 @@ async def analyze_posture(
             findings["PT-P01"] = severity
 
             back_measurements.append(
-                measurement("PT-P01", "Scoliosis Screen", scoliosis, "mm", severity)
+                measurement(
+                    "PT-P01",
+                    "Scoliosis Screen",
+                    scoliosis,
+                    "mm",
+                    severity,
+                    side=trunk_shift_side(back_landmarks, "posterior"),
+                )
             )
 
     except InsufficientVisibilityError:
@@ -558,7 +565,14 @@ async def analyze_posture(
             findings["PT-P02"] = severity
 
             back_measurements.append(
-                measurement("PT-P02", "Scapular Height Asymmetry", scapular, "mm", severity)
+                measurement(
+                    "PT-P02",
+                    "Scapular Height Asymmetry",
+                    scapular,
+                    "mm",
+                    severity,
+                    side=shoulder_asymmetry_side(back_landmarks),
+                )
             )
 
     except InsufficientVisibilityError:

@@ -186,15 +186,35 @@ def _higher_side(left_y: float, right_y: float, tol: float = 1e-6) -> str | None
     return "left" if left_y < right_y else "right"
 
 
-def _shifted_side(a_x: float, b_x: float, tol: float = 1e-6) -> str | None:
-    """Which way a is displaced relative to b, from the patient's view."""
+def _shifted_side(
+    a_x: float,
+    b_x: float,
+    view: Literal["anterior", "posterior"],
+    tol: float = 1e-6,
+) -> str | None:
+    """
+    Which way a is displaced relative to b, from the patient's own view.
+
+    A larger normalised x sits further to the image right. In an anterior
+    photograph the patient faces the camera, so image-right is their left.
+    In a posterior photograph they face away, so image-right is their right.
+
+    view has no default on purpose. A caller that forgets it raises instead
+    of quietly returning the opposite side.
+    """
+
+    if view not in ("anterior", "posterior"):
+        raise ValueError(
+            f"view must be 'anterior' or 'posterior', got {view!r}"
+        )
 
     if abs(a_x - b_x) < tol:
         return None
 
-    # A larger normalised x is further to the image right, which is the
-    # patient's left when they face the camera.
-    return "left" if a_x > b_x else "right"
+    if view == "anterior":
+        return "left" if a_x > b_x else "right"
+
+    return "right" if a_x > b_x else "left"
 
 
 def midpoint(
@@ -316,15 +336,17 @@ def head_lateral_tilt_side(landmarks: list[Landmark]) -> str | None:
     """
     Which way the head is tilted, for PT-A01. The angle itself comes from
     calc_head_lateral_tilt and is unsigned; this only names the direction,
-    so no grade changes. Anterior view: the patient faces the camera, so
-    image-right is the patient's left.
+    so no grade changes.
+
+    Anterior view only. PT-A01 is not measured from behind, so the view is
+    hardcoded here rather than exposed as a parameter.
     """
 
     mid_shoulder_x = (
         landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x
     ) / 2
 
-    return _shifted_side(landmarks[NOSE].x, mid_shoulder_x)
+    return _shifted_side(landmarks[NOSE].x, mid_shoulder_x, "anterior")
 
 
 def pelvic_obliquity_side(landmarks: list[Landmark]) -> str | None:
@@ -345,18 +367,23 @@ def ear_asymmetry_side(landmarks: list[Landmark]) -> str | None:
     return _higher_side(landmarks[LEFT_EAR].y, landmarks[RIGHT_EAR].y)
 
 
-def trunk_shift_side(landmarks: list[Landmark]) -> str | None:
+def trunk_shift_side(
+    landmarks: list[Landmark], view: Literal["anterior", "posterior"]
+) -> str | None:
     """
     Which way the shoulder midpoint sits relative to the hip midpoint, for
-    PT-A03 (anterior) and PT-P01 (posterior). Left/right here are the
-    landmark names, which are the patient's own sides in both views, so the
-    result reads the same way from either photograph.
+    PT-A03 (anterior) and PT-P01 (posterior).
+
+    Both midpoints are averaged x-coordinates. Averaging discards the
+    landmark labels, so what reaches the comparison is image position alone
+    and the view has to be supplied. The same physical offset reads as a
+    left shift from the front and a right shift from behind.
     """
 
     shoulder_mid = (landmarks[LEFT_SHOULDER].x + landmarks[RIGHT_SHOULDER].x) / 2
     hip_mid = (landmarks[LEFT_HIP].x + landmarks[RIGHT_HIP].x) / 2
 
-    return _shifted_side(shoulder_mid, hip_mid)
+    return _shifted_side(shoulder_mid, hip_mid, view)
 
 
 def calc_knee_frontal_deviation(
