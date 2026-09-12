@@ -40,6 +40,38 @@ DISCLAIMER = (
     "purposes only. Please correlate clinically.</strong>"
 )
 
+# Separate from DISCLAIMER above, which carries the founders' sign-off and is
+# not to be edited here. This one is ours and only explains a convention.
+SIDE_NOTE = "Left and right refer to the patient's own sides."
+
+# Direction wording, keyed on paramId rather than label so a label change
+# cannot silently detach the copy from its parameter.
+#
+# Two kinds of finding. Some parameters say which way the patient deviates,
+# others say which landmark sits higher. Reporting both in one shared phrasing
+# was rejected: it reads as a contradiction when a head tilts one way and the
+# ear on the other side sits higher, and it discards which side compensates.
+# The deviation rows keep a preposition so the two kinds stay distinguishable
+# at a glance, and the higher rows name the body part because two of them are
+# shoulders in different sections of the report.
+SIDE_WORDING: dict[str, dict[str, str]] = {
+    "PT-A01": {"left": "Tilted to left", "right": "Tilted to right"},
+    "PT-A03": {"left": "Shifted to left", "right": "Shifted to right"},
+    "PT-P01": {"left": "Shifted to left", "right": "Shifted to right"},
+    "PT-A02": {"left": "Left shoulder higher", "right": "Right shoulder higher"},
+    "PT-A10": {"left": "Left ear higher", "right": "Right ear higher"},
+    "PT-A04": {"left": "Left hip higher", "right": "Right hip higher"},
+    "PT-P02": {"left": "Left shoulder higher", "right": "Right shoulder higher"},
+}
+
+# A direction is only meaningful once the magnitude itself is a finding. Below
+# that, sub-millimetre landmark noise decides the side, and printing it would
+# put a direction on every healthy patient. The side stays in the report JSON
+# either way, so tracking a direction over time is unaffected.
+SIDE_HIDDEN_SEVERITIES = frozenset(
+    {"none", "insufficient_data", "not_available"}
+)
+
 
 def _esc(value: Any) -> str:
     """Escape a value for safe inclusion in the HTML template."""
@@ -76,10 +108,22 @@ def _measurement_rows(measurements: list[dict]) -> str:
         else:
             value_text = f"{_esc(value)}{_esc(unit)}"
 
+        side_text = SIDE_WORDING.get(str(m.get("paramId")), {}).get(
+            str(m.get("side"))
+        )
+
+        if side_text is None or severity in SIDE_HIDDEN_SEVERITIES:
+            param_cell = _esc(m.get("label"))
+        else:
+            param_cell = (
+                f'{_esc(m.get("label"))}'
+                f'<span class="side">{_esc(side_text)}</span>'
+            )
+
         rows.append(
             f"""
             <tr>
-                <td class="param">{_esc(m.get('label'))}</td>
+                <td class="param">{param_cell}</td>
                 <td class="value">{value_text}</td>
                 <td class="severity">
                     <span style="color:{colour};background:{background};">
@@ -477,6 +521,20 @@ def build_report_html(report: dict) -> str:
         border-top: none;
     }}
 
+    .side {{
+        display: block;
+        margin-top: 2px;
+        font-size: 7.5pt;
+        font-weight: 400;
+        color: #64748b;
+    }}
+
+    .side-note {{
+        margin-top: 14px;
+        font-size: 7.5pt;
+        color: #94a3b8;
+    }}
+
     .disclaimer {{
         margin-top: 18px;
         border-top: 1px solid #e2e8f0;
@@ -535,6 +593,7 @@ def build_report_html(report: dict) -> str:
     </tr>
 </table>
 
+<p class="side-note">{SIDE_NOTE}</p>
 <p class="disclaimer">{DISCLAIMER}</p>
 
 </body>
