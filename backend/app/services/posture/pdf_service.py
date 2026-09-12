@@ -104,7 +104,10 @@ def _measurement_rows(measurements: list[dict]) -> str:
         # capture -- show it as unmeasured rather than as a zero or a blank,
         # so a clinician cannot read it as a normal finding.
         if value is None or value == "":
-            value_text = "&mdash;"
+            # A neutral placeholder on purpose. The finding column alongside
+            # already carries the reason and the action, so spelling it out
+            # again here would say the same thing twice and could drift.
+            value_text = "&ndash;"
         else:
             value_text = f"{_esc(value)}{_esc(unit)}"
 
@@ -243,7 +246,9 @@ def build_report_html(report: dict) -> str:
     global_index = report.get("globalIndex") or {}
 
     score = global_index.get("score")
-    score_text = f"{score}%" if score is not None else "&mdash;"
+    # The index stands alone with no finding column beside it, so a bare
+    # dash would read as empty rather than as unavailable.
+    score_text = f"{score}%" if score is not None else "Not available"
 
     return f"""
 <!DOCTYPE html>
@@ -256,7 +261,7 @@ def build_report_html(report: dict) -> str:
         margin: 16mm 14mm;
 
         @bottom-left {{
-            content: "{CLINIC_NAME} — Clinical Posture Assessment";
+            content: "{CLINIC_NAME} – Clinical Posture Assessment";
             font-family: Helvetica, Arial, sans-serif;
             font-size: 7.5pt;
             color: #64748b;
