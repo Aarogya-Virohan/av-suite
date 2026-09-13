@@ -7,11 +7,23 @@ export type Severity =
   | "not_available"
 
 export interface Measurement {
+  paramId: string
   label: string
   value: number | string | null
   unit: string
   severityLabel: string
   severity: Severity
+  borderline: boolean
+
+  // Which way the deviation goes, from the patient's own perspective, with
+  // sideLabel carrying the wording to print. Both come from the backend so
+  // the phrase is identical here and on the PDF.
+  //
+  // sideLabel is sent whenever a direction exists, including at severities
+  // this view does not show it at. Deciding when to show it is this
+  // component's job, not the payload's.
+  side: "left" | "right" | null
+  sideLabel: string | null
 }
 
 export interface ViewData {

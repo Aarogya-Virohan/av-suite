@@ -227,9 +227,9 @@ return ( <div className="min-h-screen bg-slate-100">
                 />
                 <p className="mt-1 text-xs text-slate-500">
                   Required. Used to convert pixel
-                  measurements into millimetres &mdash;
-                  without it, asymmetry parameters
-                  cannot be reported.
+                  measurements into millimetres. Without
+                  it, asymmetry parameters cannot be
+                  reported.
                 </p>
               </div>
 
