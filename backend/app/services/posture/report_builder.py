@@ -3,6 +3,27 @@ from typing import Any
 from app.services.posture.classifier import SEVERITY_LABELS, is_borderline
 
 
+# Direction wording, keyed on paramId rather than label so a label change
+# cannot silently detach the copy from its parameter.
+#
+# Two kinds of finding. Some parameters say which way the patient deviates,
+# others say which landmark sits higher. Reporting both in one shared phrasing
+# was rejected: it reads as a contradiction when a head tilts one way and the
+# ear on the other side sits higher, and it discards which side compensates.
+# The deviation rows keep a preposition so the two kinds stay distinguishable
+# at a glance, and the higher rows name the body part because two of them are
+# shoulders in different sections of the report.
+SIDE_WORDING: dict[str, dict[str, str]] = {
+    "PT-A01": {"left": "Tilted to left", "right": "Tilted to right"},
+    "PT-A03": {"left": "Shifted to left", "right": "Shifted to right"},
+    "PT-P01": {"left": "Shifted to left", "right": "Shifted to right"},
+    "PT-A02": {"left": "Left shoulder higher", "right": "Right shoulder higher"},
+    "PT-A10": {"left": "Left ear higher", "right": "Right ear higher"},
+    "PT-A04": {"left": "Left hip higher", "right": "Right hip higher"},
+    "PT-P02": {"left": "Left shoulder higher", "right": "Right shoulder higher"},
+}
+
+
 def measurement(
     param_id: str,
     label: str,
@@ -33,6 +54,14 @@ def measurement(
         # printing the same row for both. Thresholds stay on the magnitude,
         # so this adds information without moving any grade.
         "side": side,
+        # The same direction as display copy. Kept here so the clinical
+        # wording is defined once and every surface prints the identical
+        # phrase; a consumer that renders side itself would be re-inventing
+        # it. This is always populated when side is present, including at
+        # severities a given surface chooses not to show it at. Whether to
+        # display it is a presentation decision and belongs to the surface,
+        # not to the report.
+        "sideLabel": SIDE_WORDING.get(param_id, {}).get(side or ""),
     }
 
 
