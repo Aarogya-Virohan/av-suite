@@ -18,7 +18,9 @@ class PatientRepository(BaseRepository[Patient]):
 
         super().__init__(session, Patient)
 
-    async def get_by_patient_id(self, id: UUID, *, clinic_id: UUID | None = None) -> Patient | None:
+    async def get_by_patient_id(
+        self, id: UUID, *, clinic_id: UUID | None = None
+    ) -> Patient | None:
         """Return a single patient by primary key ID and clinic scope."""
 
         return await self.get_by_id(id, clinic_id=clinic_id)
@@ -28,14 +30,24 @@ class PatientRepository(BaseRepository[Patient]):
         name: str,
         *,
         clinic_id: UUID | None = None,
+        owner_id: UUID | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[Patient]:
         """Search patients by case-insensitive name match."""
 
         effective_limit = min(limit, 500)
-        statement = select(Patient).where(Patient.full_name.ilike(f"%{name.strip()}%"))
-        statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
+        statement = select(Patient).where(
+            Patient.full_name.ilike(f"%{name.strip()}%"),
+            Patient.deleted_at.is_(None),
+        )
+        if owner_id is not None:
+            statement = statement.where(Patient.user_id == owner_id)
+        statement = (
+            self._apply_clinic_scope(statement, clinic_id)
+            .offset(offset)
+            .limit(effective_limit)
+        )
         result = await self.session.scalars(statement)
         return list(result.all())
 
@@ -44,14 +56,24 @@ class PatientRepository(BaseRepository[Patient]):
         phone: str,
         *,
         clinic_id: UUID | None = None,
+        owner_id: UUID | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[Patient]:
         """Search patients by phone number match."""
 
         effective_limit = min(limit, 500)
-        statement = select(Patient).where(Patient.phone.ilike(f"%{phone.strip()}%"))
-        statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
+        statement = select(Patient).where(
+            Patient.phone.ilike(f"%{phone.strip()}%"),
+            Patient.deleted_at.is_(None),
+        )
+        if owner_id is not None:
+            statement = statement.where(Patient.user_id == owner_id)
+        statement = (
+            self._apply_clinic_scope(statement, clinic_id)
+            .offset(offset)
+            .limit(effective_limit)
+        )
         result = await self.session.scalars(statement)
         return list(result.all())
 
@@ -60,6 +82,7 @@ class PatientRepository(BaseRepository[Patient]):
         email: str,
         *,
         clinic_id: UUID | None = None,
+        owner_id: UUID | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[Patient]:
@@ -69,8 +92,17 @@ class PatientRepository(BaseRepository[Patient]):
             return []
 
         effective_limit = min(limit, 500)
-        statement = select(Patient).where(getattr(Patient, "email").ilike(f"%{email.strip()}%"))
-        statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
+        statement = select(Patient).where(
+            getattr(Patient, "email").ilike(f"%{email.strip()}%"),
+            Patient.deleted_at.is_(None),
+        )
+        if owner_id is not None:
+            statement = statement.where(Patient.user_id == owner_id)
+        statement = (
+            self._apply_clinic_scope(statement, clinic_id)
+            .offset(offset)
+            .limit(effective_limit)
+        )
         result = await self.session.scalars(statement)
         return list(result.all())
 
@@ -85,17 +117,22 @@ class PatientRepository(BaseRepository[Patient]):
 
         effective_limit = min(limit, 500)
         statement = select(Patient).where(Patient.status == PatientStatus.ACTIVE)
-        statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
+        statement = (
+            self._apply_clinic_scope(statement, clinic_id)
+            .offset(offset)
+            .limit(effective_limit)
+        )
         result = await self.session.scalars(statement)
         return list(result.all())
 
     async def update_patient(self, db_obj: Patient, update_data: dict) -> Patient:
         """Update only supplied fields and preserve updated_at."""
-        
+
         return await self.update(db_obj, update_data)
 
-    async def soft_delete_patient(self, db_obj: Patient, deleted_by: UUID | None = None) -> None:
+    async def soft_delete_patient(
+        self, db_obj: Patient, deleted_by: UUID | None = None
+    ) -> None:
         """Soft delete a patient."""
-        
-        await self.delete(db_obj, deleted_by)
 
+        await self.delete(db_obj, deleted_by)

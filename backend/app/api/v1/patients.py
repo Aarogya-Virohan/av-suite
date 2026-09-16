@@ -11,7 +11,7 @@ API Endpoints:
 
 Authorization:
 - All endpoints require valid JWT token
-- check_physio_or_admin: Physios aur admins ko access (patients view/create)
+- check_therapist_or_admin: Therapists aur admins ko access
 - Clinic isolation: Patient data sirf user ke clinic mein accessible
 
 Response Format:
@@ -23,10 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import uuid
 import logging
-from app.enums.user import UserRole
-
 from app.core.database import get_db
-from app.core.dependencies import require_roles
+from app.core.dependencies import get_current_user, require_capability
+from app.enums.permission import CapabilityScope
+from app.models.user import User
 from app.schemas.patient import PatientCreate, PatientRead, PatientUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
@@ -40,24 +40,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-
-
-@router.get(
-    "",
-    response_model=ResponseEnvelope[List[PatientRead]],
-    tags=["Patients"]
-)
+@router.get("", response_model=ResponseEnvelope[List[PatientRead]], tags=["Patients"])
 async def list_patients(
     request: Request,
+    user: User = Depends(get_current_user),
     search: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    scope: CapabilityScope = Depends(require_capability("patients.view")),
 ):
     """
     Endpoint ka purpose: Clinic ke sare patients ko list karna pagination ke saath
     Yeh endpoint patient listing handle karta hai jismein:
-    1. Authorization check (physio ya admin)
+    1. Authorization check (therapist ya admin)
     2. Clinic-specific patients fetch karte hain
     3. Pagination apply karte hain
     4. Metadata ke saath results return karte hain
@@ -105,7 +100,7 @@ async def list_patients(
     Security:
     - JWT token required: All requests authenticated hone chahiye
     - Clinic isolation: Sirf user ke clinic ke patients visible
-    - Role check: Only admin/physio access kar sakte hain
+    - Role check: Only admin/therapist access kar sakte hain
     
     Pagination:
     - Server-side pagination: Large datasets efficiently handle
@@ -116,51 +111,60 @@ async def list_patients(
     curl -X GET "http://localhost:8000/api/v1/patients?page=1&page_size=10" \\
       -H "Authorization: Bearer eyJhbGc..."
     """
-    
-    logger.info(f"List patients request - page: {pagination.page}, size: {pagination.page_size}")
-    
+
+    logger.info(
+        f"List patients request - page: {pagination.page}, size: {pagination.page_size}"
+    )
+
     try:
         # Authorization check is handled by Depends
-        
+
         # request.state se clinic_id extract karte hain
         # JWT token decode se clinic_id set hota hai middleware mein
         clinic_id = request.state.clinic_id
         logger.debug(f"Fetching patients for clinic: {clinic_id}")
-        
+
         # Service layer ko call karte hain
         # Patients list aur total count return hota hai
         if search:
-            patients, total = await patient_service.search_patients(db, clinic_id, search, pagination)
+            patients, total = await patient_service.search_patients(
+                db,
+                clinic_id,
+                search,
+                pagination,
+                owner_id=user.id if scope == CapabilityScope.OWN else None,
+            )
         else:
-            patients, total = await patient_service.get_patients(db, clinic_id, pagination)
-        
+            patients, total = await patient_service.get_patients(
+                db,
+                clinic_id,
+                pagination,
+                owner_id=user.id if scope == CapabilityScope.OWN else None,
+            )
+
         # Pagination metadata prepare karte hain
         # Frontend pagination UI ke liye total aur current page info
         meta = MetaPagination(
-            total=total,
-            page=pagination.page,
-            page_size=pagination.page_size
+            total=total, page=pagination.page, page_size=pagination.page_size
         )
-        
+
         logger.info(f"Retrieved {len(patients)} patients, total: {total}")
         return ResponseEnvelope(data=patients, meta=meta)
-        
+
     except Exception as e:
         logger.error(f"List patients error: {str(e)}")
         raise
 
 
 @router.post(
-    "",
-    response_model=ResponseEnvelope[PatientRead],
-    status_code=201,
-    tags=["Patients"]
+    "", response_model=ResponseEnvelope[PatientRead], status_code=201, tags=["Patients"]
 )
 async def create_patient(
     request: Request,
     patient_in: PatientCreate,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    _: CapabilityScope = Depends(require_capability("patients.create")),
 ):
     """
     Endpoint ka purpose: New patient create karna clinic mein
@@ -206,10 +210,10 @@ async def create_patient(
     Security:
     - JWT token required: All requests authenticated
     - Clinic isolation: Patient automatically current clinic se associated
-    - Role check: Only admin/physio create kar sakte hain
+    - Role check: Only admin/therapist create kar sakte hain
     
     Business Logic:
-    1. Authorization check - physio ya admin
+    1. Authorization check - therapist ya admin
     2. Request data validation (Pydantic schema)
     3. Patient database record create
     4. Created patient return
@@ -225,38 +229,39 @@ async def create_patient(
         "phone": "9876543210"
       }'
     """
-    
-    logger.info(f"Create patient request - {patient_in.first_name} {patient_in.last_name}")
-    
+
+    logger.info(
+        f"Create patient request - {patient_in.first_name} {patient_in.last_name}"
+    )
+
     try:
         # Authorization check is handled by Depends
-        
+
         # request.state se clinic_id extract karte hain
         clinic_id = request.state.clinic_id
         logger.debug(f"Creating patient in clinic: {clinic_id}")
-        
+
         # Service layer ko call karte hain
         # New patient database record create hota hai
-        patient = await patient_service.create_patient(db, clinic_id, patient_in)
-        
+        patient = await patient_service.create_patient(
+            db, clinic_id, patient_in, user.id
+        )
+
         logger.info(f"Patient created successfully: {patient.id}")
         return ResponseEnvelope(data=patient)
-        
+
     except Exception as e:
         logger.error(f"Create patient error: {str(e)}")
         raise
 
 
-@router.get(
-    "/{id}",
-    response_model=ResponseEnvelope[PatientRead],
-    tags=["Patients"]
-)
+@router.get("/{id}", response_model=ResponseEnvelope[PatientRead], tags=["Patients"])
 async def get_patient(
     request: Request,
     id: str,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    scope: CapabilityScope = Depends(require_capability("patients.view")),
 ):
     """
     Endpoint ka purpose: Specific patient ke details fetch karna
@@ -297,11 +302,11 @@ async def get_patient(
     Security:
     - JWT token required: All requests authenticated
     - Clinic isolation: Patient sirf user ke clinic mein
-    - Role check: Only admin/physio access kar sakte hain
+    - Role check: Only admin/therapist access kar sakte hain
     - Cross-clinic prevention: Can't access other clinic's patients
     
     Business Logic:
-    1. Authorization check - physio ya admin
+    1. Authorization check - therapist ya admin
     2. Patient fetch by ID aur clinic check
     3. Patient found = return data, Not found = 404
     
@@ -309,31 +314,36 @@ async def get_patient(
     curl -X GET http://localhost:8000/api/v1/patients/12345678-1234-5678-1234-567812345678 \\
       -H "Authorization: Bearer eyJhbGc..."
     """
-    
+
     logger.info(f"Get patient request - id: {id}")
-    
+
     try:
         # Authorization check is handled by Depends
-        
+
         # request.state se clinic_id extract karte hain
         clinic_id = request.state.clinic_id
         logger.debug(f"Fetching patient {id} from clinic {clinic_id}")
-        
+
         # Service layer ko call karte hain
         # Patient fetch hota hai by ID aur clinic check
-        patient = await patient_service.get_patient_by_id(db, clinic_id, id)
-        
+        patient = await patient_service.get_patient_by_id(
+            db,
+            clinic_id,
+            id,
+            owner_id=user.id if scope == CapabilityScope.OWN else None,
+        )
+
         # Patient not found - 404 error return
         if not patient:
             logger.warning(f"Patient not found: {id} in clinic {clinic_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Patient not found or not in caller's clinic"
+                detail="Patient not found or not in caller's clinic",
             )
-        
+
         logger.info(f"Patient found: {patient.id}")
         return ResponseEnvelope(data=patient)
-        
+
     except HTTPException:
         # Already handled exceptions ko re-raise karte hain
         raise
@@ -341,54 +351,53 @@ async def get_patient(
         logger.error(f"Get patient error: {str(e)}")
         raise
 
-@router.patch(
-    "/{id}",
-    response_model=ResponseEnvelope[PatientRead],
-    tags=["Patients"]
-)
+
+@router.patch("/{id}", response_model=ResponseEnvelope[PatientRead], tags=["Patients"])
 async def update_patient(
     request: Request,
     id: str,
     patient_in: PatientUpdate,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    scope: CapabilityScope = Depends(require_capability("patients.edit")),
 ):
     logger.info(f"Update patient request - id: {id}")
     try:
         clinic_id = request.state.clinic_id
-        
-        patient = await patient_service.update_patient(db, clinic_id, id, patient_in)
+
+        patient = await patient_service.update_patient(
+            db,
+            clinic_id,
+            id,
+            patient_in,
+            owner_id=user.id if scope == CapabilityScope.OWN else None,
+        )
         return ResponseEnvelope(data=patient)
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Update patient error: {str(e)}")
         raise
 
-@router.delete(
-    "/{id}",
-    response_model=ResponseEnvelope[None],
-    tags=["Patients"]
-)
+
+@router.delete("/{id}", response_model=ResponseEnvelope[None], tags=["Patients"])
 async def delete_patient(
     request: Request,
     id: str,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))
+    _: CapabilityScope = Depends(require_capability("patients.delete")),
 ):
     logger.info(f"Delete patient request - id: {id}")
     try:
         clinic_id = request.state.clinic_id
         user_id = request.state.user_id
-        
+
         await patient_service.delete_patient(db, clinic_id, id, user_id)
         return ResponseEnvelope(data=None)
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Delete patient error: {str(e)}")
         raise
-
-

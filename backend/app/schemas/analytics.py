@@ -50,10 +50,34 @@ class BookingAnalytics(BaseModel):
 
 
 class AnalyticsOverviewResponse(BaseModel):
-    """Aggregated dashboard overview response schema."""
+    """Aggregated dashboard overview response schema (admin/clinic-wide)."""
 
     patients: PatientAnalytics
     appointments: AppointmentAnalytics
     revenue: RevenueAnalytics
     leads: LeadAnalytics
     booking: BookingAnalytics
+
+
+class TherapistPerformanceResponse(BaseModel):
+    """
+    Therapist-scoped performance metrics for /analytics/my-performance.
+
+    Per RBAC Spec §4: Analytics for therapist = 'Own only'.
+    Per Rev3 scope: split analytics into my-performance vs clinic-financials.
+    Only contains data belonging to the requesting therapist.
+    """
+
+    # Appointment counts (scoped to this therapist)
+    today_appointments: int
+    completed_appointments_this_month: int
+    cancelled_appointments_this_month: int
+
+    # Treatment sessions logged by this therapist this month
+    treatment_sessions_this_month: int
+
+    # SOAP notes authored by this therapist
+    soap_notes_this_month: int
+
+    # Patient count assigned to this therapist (via appointments this month)
+    patients_seen_this_month: int

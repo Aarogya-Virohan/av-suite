@@ -1,15 +1,5 @@
 fastapi==0.115.0
-uvicorn[standard]==0.30.6
-pydantic==2.7.0
-pydantic-settings==2.2.1
-sqlalchemy==2.0.30
-greenlet==3.5.1
-asyncpg==0.29.0
-alembic==1.13.1
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-email-validator==2.0.0
-weasyprint==69.0
+uvicorn==0.30.6
 mediapipe==0.10.14
 opencv-python-headless==4.10.0.84
 numpy==1.26.4

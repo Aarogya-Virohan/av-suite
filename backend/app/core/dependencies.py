@@ -11,16 +11,20 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.rbac import resolve_capability_scope
 from app.core.security import decode_token
+from app.enums.permission import CapabilityScope
 from app.models.clinic import Clinic
 from app.enums.user import UserRole, normalize_user_role
 from app.models.user import User
-
+from app.models.user_permission import UserPermission
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-async def get_async_session(session: AsyncSession = Depends(get_db)) -> AsyncGenerator[AsyncSession, None]:
+async def get_async_session(
+    session: AsyncSession = Depends(get_db),
+) -> AsyncGenerator[AsyncSession, None]:
     """Yield an async database session for route dependencies."""
     yield session
 
@@ -39,6 +43,23 @@ class AuthenticatedContext:
     clinic: Clinic
 
 
+@dataclass(slots=True)
+class PermissionContext:
+    """Request-level permission context caching capability overrides."""
+
+    user: User
+    clinic: Clinic
+    overrides: dict[str, CapabilityScope]
+
+    def effective_scope(self, capability_key: str) -> CapabilityScope:
+        """Resolve the effective scope for a capability using cached overrides."""
+        return resolve_capability_scope(
+            role=self.user.role,
+            capability_key=capability_key,
+            user_permissions=self.overrides,
+        )
+
+
 def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User:
     """Ensure the authenticated user has one of the allowed roles."""
 
@@ -51,9 +72,10 @@ def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User
     return current_user
 
 
-async def get_authenticated_context(token: TokenDep, session: SessionDep) -> AuthenticatedContext:
+async def get_authenticated_context(
+    token: TokenDep, session: SessionDep
+) -> AuthenticatedContext:
     """Resolve the authenticated user and clinic from an access token."""
-
 
     try:
         claims = decode_token(token)
@@ -100,7 +122,49 @@ async def get_authenticated_context(token: TokenDep, session: SessionDep) -> Aut
     return AuthenticatedContext(user=user, clinic=clinic)
 
 
-AuthenticatedContextDep = Annotated[AuthenticatedContext, Depends(get_authenticated_context)]
+AuthenticatedContextDep = Annotated[
+    AuthenticatedContext, Depends(get_authenticated_context)
+]
+
+
+async def get_permission_context(
+    auth_context: AuthenticatedContextDep,
+    session: SessionDep,
+) -> PermissionContext:
+    """Load explicit capability overrides once per request."""
+
+    from sqlalchemy import select
+
+    stmt = select(UserPermission).where(
+        UserPermission.user_id == auth_context.user.id,
+        UserPermission.clinic_id == auth_context.clinic.id,
+    )
+    result = await session.execute(stmt)
+    overrides = {p.capability_key: p.scope for p in result.scalars()}
+
+    return PermissionContext(
+        user=auth_context.user,
+        clinic=auth_context.clinic,
+        overrides=overrides,
+    )
+
+
+PermissionContextDep = Annotated[PermissionContext, Depends(get_permission_context)]
+
+
+def require_capability(capability_key: str) -> Callable[..., CapabilityScope]:
+    """Dependency that enforces a capability check using the request context."""
+
+    def dependency(perm_ctx: PermissionContextDep) -> CapabilityScope:
+        scope = perm_ctx.effective_scope(capability_key)
+        if scope == CapabilityScope.NONE:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing required capability: {capability_key}",
+            )
+        return scope
+
+    return dependency
 
 
 async def get_current_user(
@@ -122,7 +186,9 @@ async def get_current_clinic(
 def require_roles(*roles: UserRole) -> RoleDependency:
     """Return a dependency that requires any of the specified roles."""
 
-    async def dependency(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+    async def dependency(
+        current_user: Annotated[User, Depends(get_current_user)],
+    ) -> User:
         """Validate role membership for the authenticated user."""
 
         return _require_user_roles(current_user, roles)
@@ -130,19 +196,25 @@ def require_roles(*roles: UserRole) -> RoleDependency:
     return dependency
 
 
-async def require_admin(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+async def require_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
     """Require the authenticated user to have the admin role."""
 
     return _require_user_roles(current_user, (UserRole.ADMIN,))
 
 
-async def require_therapist(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+async def require_therapist(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
     """Require the authenticated user to have the therapist role."""
 
     return _require_user_roles(current_user, (UserRole.THERAPIST,))
 
 
-async def require_front_desk(current_user: Annotated[User, Depends(get_current_user)]) -> User:
+async def require_front_desk(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
     """Require the authenticated user to have the front desk role."""
 
     return _require_user_roles(current_user, (UserRole.FRONT_DESK,))

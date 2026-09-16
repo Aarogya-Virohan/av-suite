@@ -26,6 +26,7 @@ Configuration Sources:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.rbac import validate_role_templates
 from app.middleware.clinic_gate import ClinicGateMiddleware
 from app.api.v1.router import api_router
 from app.api.v1.posture import router as posture_router
@@ -33,9 +34,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+validate_role_templates()
+
 # FastAPI Application Instance
 # Title aur version OpenAPI documentation mein display hote hain
 # Swagger UI: http://localhost:8000/docs
+from app.exceptions import BaseAppException, app_exception_handler
+
 app = FastAPI(
     title="AV Suite Backend Foundation",
     version="0.1.0",
@@ -44,12 +49,14 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# Register central exception handler for custom application errors
+app.add_exception_handler(BaseAppException, app_exception_handler)
+
 import os
 
 # NOTE: removed public StaticFiles mount for /static -- prescription PDFs
 # contain patient PHI and must only be served via the authenticated
 # download route (GET /api/v1/prescriptions/{id}/pdf/download)
-
 
 
 # Clinic Gate Middleware
@@ -87,9 +94,9 @@ logger.info("ClinicGateMiddleware registered")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,  # Settings se load hota hai
-    allow_credentials=True,                     # Cookie/auth headers allow
-    allow_methods=["*"],                        # All HTTP methods
-    allow_headers=["*"],                        # All headers allowed
+    allow_credentials=True,  # Cookie/auth headers allow
+    allow_methods=["*"],  # All HTTP methods
+    allow_headers=["*"],  # All headers allowed
 )
 logger.info(f"CORSMiddleware configured with origins: {settings.cors_origins_list}")
 
@@ -106,10 +113,7 @@ logger.info(f"CORSMiddleware configured with origins: {settings.cors_origins_lis
 # - API versioning: V1, V2, etc. support
 # - Route organization: Separate router files
 # - Modular architecture: Routes separately manage
-app.include_router(
-    api_router,
-    prefix=settings.API_V1_PREFIX  # "/api/v1" from settings
-)
+app.include_router(api_router, prefix=settings.API_V1_PREFIX)  # "/api/v1" from settings
 logger.info(f"API router registered with prefix: {settings.API_V1_PREFIX}")
 
 # Posture Tool Router Registration
@@ -142,40 +146,40 @@ logger.info("Posture router registered")
     "/health",
     tags=["Health"],
     summary="Application health check",
-    description="Simple health check endpoint for monitoring"
+    description="Simple health check endpoint for monitoring",
 )
 async def health_check():
     """
     Endpoint ka purpose: Application health monitoring aur status check
     Yeh endpoint simple health status return karta hai.
-    
+
     HTTP Method: GET
     URL: /health
     Status Code: 200 OK (application is running)
-    
+
     Response:
     {
         "status": "healthy"
     }
-    
+
     Use Cases:
     - Kubernetes liveness probe configuration
     - Docker health check script
     - Load balancer routing decisions
     - Monitoring system uptime tracking
     - Application restart trigger (agar unhealthy)
-    
+
     Notes:
     - Database connection check nahi karte (simple fast response)
     - External services check nahi karte (avoid cascading failures)
     - Basic operation verify karte hain (process running, port listening)
     - Security: Public endpoint (no authentication required)
-    
+
     Example:
     curl -X GET http://localhost:8000/health
     Response: {"status":"healthy"}
     """
-    
+
     logger.debug("Health check requested")
     return {"status": "healthy"}
 
@@ -208,11 +212,11 @@ async def health_check():
 # FastAPI OpenAPI documentation mein use hota hai
 if __name__ == "__main__":
     import uvicorn
-    
+
     # Development server start karte hain
     # Note: Production mein Docker/k8s/external server use karo
     # uvicorn --host 0.0.0.0 --port 8000 --workers 4 app.main:app
-    
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
