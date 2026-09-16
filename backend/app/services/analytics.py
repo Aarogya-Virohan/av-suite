@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from app.schemas.analytics import AnalyticsOverviewResponse, TherapistPerformanceResponse
+from app.schemas.analytics import (
+    AnalyticsOverviewResponse,
+    TherapistPerformanceResponse,
+)
 from app.repositories.analytics import AnalyticsRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,8 +34,12 @@ class AnalyticsService:
 
         # 2. Appointment metrics
         today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
-        today_end = datetime(now.year, now.month, now.day, 23, 59, 59, tzinfo=timezone.utc)
-        appointment_analytics = await repo.get_appointment_stats(clinic_id, today_start, today_end)
+        today_end = datetime(
+            now.year, now.month, now.day, 23, 59, 59, tzinfo=timezone.utc
+        )
+        appointment_analytics = await repo.get_appointment_stats(
+            clinic_id, today_start, today_end
+        )
 
         # 3. Revenue metrics
         revenue_analytics = await repo.get_revenue_stats(clinic_id, month_start)
@@ -51,7 +58,9 @@ class AnalyticsService:
             booking=booking_analytics,
         )
 
-    async def get_my_performance(self, clinic_id: UUID, therapist_id: UUID) -> TherapistPerformanceResponse:
+    async def get_my_performance(
+        self, clinic_id: UUID, therapist_id: UUID | None
+    ) -> TherapistPerformanceResponse:
         """
         Compute therapist-scoped 'own only' performance metrics.
 
@@ -63,7 +72,9 @@ class AnalyticsService:
         now = datetime.now(timezone.utc)
         month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
         today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
-        today_end = datetime(now.year, now.month, now.day, 23, 59, 59, tzinfo=timezone.utc)
+        today_end = datetime(
+            now.year, now.month, now.day, 23, 59, 59, tzinfo=timezone.utc
+        )
 
         repo = AnalyticsRepository(self.session)
 

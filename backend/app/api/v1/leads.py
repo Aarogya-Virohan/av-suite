@@ -54,7 +54,7 @@ async def create_lead(
     payload: LeadCreate,
     clinic: CurrentClinicDep,
     service: LeadServiceDep,
-    scope: CapabilityScope = Depends(require_capability("leads.manage")),
+    scope: CapabilityScope = Depends(require_capability("leads.create")),
 ) -> LeadResponse:
     """Create a new sales lead for the authenticated clinic."""
 
@@ -118,7 +118,7 @@ async def update_lead(
     payload: LeadUpdate,
     clinic: CurrentClinicDep,
     service: LeadServiceDep,
-    scope: CapabilityScope = Depends(require_capability("leads.manage")),
+    scope: CapabilityScope = Depends(require_capability("leads.edit")),
 ) -> LeadResponse:
     """Update lead stage, assignment, notes, or contact info."""
 
@@ -142,7 +142,7 @@ async def convert_lead(
     id: UUID,
     clinic: CurrentClinicDep,
     service: LeadServiceDep,
-    scope: CapabilityScope = Depends(require_capability("leads.manage")),
+    scope: CapabilityScope = Depends(require_capability("leads.convert")),
 ) -> LeadConvertResponse:
     """Convert a lead into an active patient record."""
 
@@ -167,7 +167,7 @@ async def delete_lead(
     id: UUID,
     clinic: CurrentClinicDep,
     service: LeadServiceDep,
-    scope: CapabilityScope = Depends(require_capability("leads.manage")),
+    scope: CapabilityScope = Depends(require_capability("leads.delete")),
 ) -> None:
     """Delete a lead record for the clinic."""
 

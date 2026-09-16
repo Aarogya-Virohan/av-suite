@@ -33,7 +33,6 @@ from app.services.booking import (
 from app.schemas.envelope import ResponseEnvelope
 
 router = APIRouter()
-ProtectedRouterDep = Depends(require_capability("booking.requests.manage"))
 
 
 async def get_booking_service(
@@ -114,7 +113,7 @@ async def create_public_appointment_request(
 @router.put(
     "/booking/{id}",
     response_model=ResponseEnvelope[AppointmentRequestResponse],
-    dependencies=[ProtectedRouterDep],
+    dependencies=[Depends(require_capability("booking.edit"))],
 )
 async def update_booking_request(
     id: UUID,
@@ -140,7 +139,7 @@ async def update_booking_request(
 @router.delete(
     "/booking/{id}",
     response_model=ResponseEnvelope[dict[str, str]],
-    dependencies=[ProtectedRouterDep],
+    dependencies=[Depends(require_capability("booking.delete"))],
 )
 async def delete_booking_request(
     id: UUID,
@@ -166,7 +165,7 @@ async def delete_booking_request(
 @router.get(
     "/appointment-requests",
     response_model=ResponseEnvelope[list[AppointmentRequestResponse]],
-    dependencies=[ProtectedRouterDep],
+    dependencies=[Depends(require_capability("booking.view"))],
 )
 async def list_appointment_requests(
     clinic: CurrentClinicDep,
@@ -201,7 +200,7 @@ async def list_appointment_requests(
 @router.get(
     "/appointment-requests/{id}",
     response_model=ResponseEnvelope[AppointmentRequestResponse],
-    dependencies=[ProtectedRouterDep],
+    dependencies=[Depends(require_capability("booking.view"))],
 )
 async def get_appointment_request(
     id: UUID,
@@ -223,7 +222,7 @@ async def get_appointment_request(
     "/appointment-requests/{id}/approve",
     response_model=ResponseEnvelope[dict[str, object]],
     status_code=status.HTTP_200_OK,
-    dependencies=[ProtectedRouterDep],
+    dependencies=[Depends(require_capability("booking.approve"))],
 )
 async def approve_appointment_request(
     id: UUID,
@@ -250,7 +249,7 @@ async def approve_appointment_request(
     "/appointment-requests/{id}/reject",
     response_model=ResponseEnvelope[AppointmentRequestResponse],
     status_code=status.HTTP_200_OK,
-    dependencies=[ProtectedRouterDep],
+    dependencies=[Depends(require_capability("booking.approve"))],
 )
 async def reject_appointment_request(
     id: UUID,

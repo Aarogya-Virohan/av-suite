@@ -50,7 +50,9 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
-@router.post("", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_appointment(
     payload: AppointmentCreate,
     clinic: CurrentClinicDep,
@@ -70,7 +72,9 @@ async def create_appointment(
         appointment = await service.create_appointment(clinic.id, payload)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
 @router.get("", response_model=AppointmentListResponse)
@@ -131,7 +135,9 @@ async def get_appointment(
             )
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.patch("/{id}", response_model=AppointmentResponse)
@@ -153,7 +159,11 @@ async def update_appointment(
                 detail="You can only update your own appointments.",
             )
         # Block therapist reassignment when own-scoped
-        if scope == CapabilityScope.OWN and payload.therapist_id is not None and payload.therapist_id != user.id:
+        if (
+            scope == CapabilityScope.OWN
+            and payload.therapist_id is not None
+            and payload.therapist_id != user.id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You cannot reassign an appointment to another therapist.",
@@ -161,9 +171,13 @@ async def update_appointment(
         appointment = await service.update_appointment(clinic.id, id, payload)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except AppointmentValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
 @router.delete("/{id}", response_model=AppointmentResponse)
@@ -172,7 +186,7 @@ async def soft_cancel_appointment(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: AppointmentServiceDep,
-    scope: CapabilityScope = Depends(require_capability("appointments.edit")),
+    scope: CapabilityScope = Depends(require_capability("appointments.delete")),
 ) -> AppointmentResponse:
     """Soft-cancel an appointment for the authenticated clinic."""
 
@@ -186,4 +200,6 @@ async def soft_cancel_appointment(
         appointment = await service.soft_cancel(clinic.id, id)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

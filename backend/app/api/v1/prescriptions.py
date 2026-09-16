@@ -23,7 +23,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(dependencies=[Depends(require_capability("prescriptions.create"))])
+router = APIRouter()
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
@@ -73,7 +73,7 @@ async def list_prescriptions(
     ),
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db),
-    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.view")),
 ):
     """
     List prescriptions in a clinic, optionally filtered by patient.
@@ -107,7 +107,7 @@ async def get_prescription(
     id: uuid.UUID,
     user: CurrentUserDep,
     db: AsyncSession = Depends(get_db),
-    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.view")),
 ):
     """
     Fetches a specific prescription by ID.
@@ -145,7 +145,7 @@ async def update_prescription(
     patch_in: PrescriptionPatch,
     user: CurrentUserDep,
     db: AsyncSession = Depends(get_db),
-    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.edit")),
 ):
     """
     Patches/updates prescription details.
@@ -188,7 +188,7 @@ async def delete_prescription(
     id: uuid.UUID,
     user: CurrentUserDep,
     db: AsyncSession = Depends(get_db),
-    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.delete")),
 ):
     """Deletes a prescription by ID in clinic scope."""
 
@@ -222,7 +222,7 @@ async def generate_pdf(
     id: uuid.UUID,
     user: CurrentUserDep,
     db: AsyncSession = Depends(get_db),
-    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.view")),
 ):
     """
     Generates a PDF for the prescription and returns the static file URL.
@@ -257,7 +257,7 @@ async def download_pdf(
     id: uuid.UUID,
     user: CurrentUserDep,
     db: AsyncSession = Depends(get_db),
-    scope: CapabilityScope = Depends(require_capability("prescriptions.create")),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.view")),
 ):
     """
     Securely streams the prescription PDF, scoped to the requester's clinic.

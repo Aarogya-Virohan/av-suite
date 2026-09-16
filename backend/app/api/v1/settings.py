@@ -42,15 +42,14 @@ async def get_settings_service(
 SettingsServiceDep = Annotated[ClinicSettingsService, Depends(get_settings_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
-CapabilityDep = Annotated[CapabilityScope, Depends(require_capability("settings.edit"))]
 
 
 @router.get("/settings/clinic", response_model=ClinicSettingsResponse)
 async def get_clinic_settings(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
-    scope: CapabilityDep,
     service: SettingsServiceDep,
+    scope: CapabilityScope = Depends(require_capability("settings.view")),
 ) -> ClinicSettingsResponse:
     """Retrieve clinic branding and configuration settings."""
 
@@ -68,8 +67,8 @@ async def update_clinic_settings(
     payload: ClinicSettingsUpdate,
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
-    scope: CapabilityDep,
     service: SettingsServiceDep,
+    scope: CapabilityScope = Depends(require_capability("settings.edit")),
 ) -> ClinicSettingsResponse:
     """Update clinic branding settings (admin only)."""
 

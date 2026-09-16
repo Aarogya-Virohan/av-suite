@@ -25,7 +25,7 @@ from app.services.recycle_bin import (
     RecycleBinService,
 )
 
-router = APIRouter(dependencies=[Depends(require_capability("recyclebin.restore"))])
+router = APIRouter()
 
 
 async def get_recycle_bin_service(
@@ -50,6 +50,7 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 async def list_recycle_bin_items(
     clinic: CurrentClinicDep,
     service: RecycleBinServiceDep,
+    _: None = Depends(require_capability("recyclebin.view")),
     resource_type: Annotated[str | None, Query(alias="resource_type")] = None,
 ) -> RecycleBinListResponse:
     """List soft-deleted resources for the authenticated clinic."""
@@ -71,6 +72,7 @@ async def restore_recycle_bin_item(
     id: UUID,
     clinic: CurrentClinicDep,
     service: RecycleBinServiceDep,
+    _: None = Depends(require_capability("recyclebin.restore")),
 ) -> RecycleBinRestoreResponse:
     """Restore a soft-deleted resource belonging to the authenticated clinic."""
 

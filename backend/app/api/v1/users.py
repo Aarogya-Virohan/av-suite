@@ -12,11 +12,15 @@ from app.schemas.envelope import ResponseEnvelope
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(dependencies=[Depends(require_capability("therapists.view"))])
+router = APIRouter()
 
 
 @router.get("", response_model=ResponseEnvelope[List[UserRead]], tags=["Users"])
-async def list_users(request: Request, db: AsyncSession = Depends(get_db)):
+async def list_users(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_capability("users.view")),
+):
     """
     List all users/therapists in the clinic.
     """

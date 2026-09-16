@@ -265,7 +265,7 @@ async def update_document(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: DocumentServiceDep,
-    scope: CapabilityScope = Depends(require_capability("documents.upload")),
+    scope: CapabilityScope = Depends(require_capability("documents.edit")),
 ) -> PatientDocumentResponse:
     """Update document metadata."""
 
@@ -298,7 +298,7 @@ async def delete_document(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: DocumentServiceDep,
-    scope: CapabilityScope = Depends(require_capability("documents.upload")),
+    scope: CapabilityScope = Depends(require_capability("documents.delete")),
 ) -> None:
     """Delete a patient document record."""
 

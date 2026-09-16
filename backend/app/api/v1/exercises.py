@@ -28,7 +28,8 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.core.dependencies import require_admin, require_permission
+from app.core.dependencies import require_capability
+from app.enums.permission import CapabilityScope
 from app.schemas.exercise import ExerciseCreate, ExerciseRead, ExerciseUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
@@ -39,21 +40,18 @@ logger = logging.getLogger(__name__)
 
 # APIRouter instance jo exercise endpoints organize karta hai
 # Prefix: /api/v1/exercises (main router mein define hota hai)
-router = APIRouter(dependencies=[Depends(require_permission("exercises"))])
+router = APIRouter()
 
 
-@router.get(
-    "",
-    response_model=ResponseEnvelope[List[ExerciseRead]],
-    tags=["Exercises"]
-)
+@router.get("", response_model=ResponseEnvelope[List[ExerciseRead]], tags=["Exercises"])
 async def list_exercises(
     request: Request,
     body_part: Optional[str] = Query(None, description="Filter by body part"),
     is_free: Optional[bool] = Query(None, description="Filter by free/paid status"),
     search: Optional[str] = Query(None, description="Search in exercise title"),
     pagination: PaginationParams = Depends(get_pagination_params),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: CapabilityScope = Depends(require_capability("exercises.view")),
 ):
     """
     Endpoint ka purpose: Exercises list karna advanced filtering aur pagination ke saath
@@ -131,9 +129,11 @@ async def list_exercises(
     curl -X GET "http://localhost:8000/api/v1/exercises?body_part=Shoulder&is_free=true&page=1" \\
       -H "Authorization: Bearer eyJhbGc..."
     """
-    
-    logger.info(f"List exercises - filters: body_part={body_part}, is_free={is_free}, search={search}")
-    
+
+    logger.info(
+        f"List exercises - filters: body_part={body_part}, is_free={is_free}, search={search}"
+    )
+
     try:
         # request.state se clinic_id extract karte hain
         # JWT token decode se clinic_id set hota hai middleware mein
@@ -144,18 +144,16 @@ async def list_exercises(
         exercises, total = await exercise_service.get_exercises(
             db, clinic_id, pagination, body_part, is_free, search
         )
-        
+
         # Pagination metadata prepare karte hain
         # Frontend pagination UI ke liye total aur current page info
         meta = MetaPagination(
-            total=total,
-            page=pagination.page,
-            page_size=pagination.page_size
+            total=total, page=pagination.page, page_size=pagination.page_size
         )
-        
+
         logger.info(f"Retrieved {len(exercises)} exercises, total: {total}")
         return ResponseEnvelope(data=exercises, meta=meta)
-        
+
     except Exception as e:
         logger.error(f"List exercises error: {str(e)}")
         raise
@@ -165,13 +163,13 @@ async def list_exercises(
     "",
     response_model=ResponseEnvelope[ExerciseRead],
     status_code=201,
-    tags=["Exercises"]
+    tags=["Exercises"],
 )
 async def create_exercise(
     request: Request,
     exercise_in: ExerciseCreate,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_admin)
+    _=Depends(require_capability("exercises.create")),
 ):
     """
     Endpoint ka purpose: New exercise create karna clinic mein (admin only)
@@ -250,23 +248,22 @@ async def create_exercise(
         "video_url": "https://cdn.example.com/exercise-shoulder-rotation.mp4"
       }'
     """
-    
+
     logger.info(f"Create exercise request - {exercise_in.title}")
-    
+
     try:
 
-        
         # request.state se clinic_id extract karte hain
         clinic_id = request.state.clinic_id
         logger.debug(f"Creating exercise in clinic: {clinic_id}")
-        
+
         # Service layer ko call karte hain
         # New exercise database record create hota hai
         exercise = await exercise_service.create_exercise(db, clinic_id, exercise_in)
-        
+
         logger.info(f"Exercise created successfully: {exercise.id}")
         return ResponseEnvelope(data=exercise)
-        
+
     except HTTPException:
         # Already handled exceptions ko re-raise karte hain
         raise
@@ -278,12 +275,13 @@ async def create_exercise(
 @router.get(
     "/by-condition",
     response_model=ResponseEnvelope[List[ExerciseRead]],
-    tags=["Exercises"]
+    tags=["Exercises"],
 )
 async def get_exercises_by_condition(
     request: Request,
     condition: str = Query(..., description="Condition name to filter by"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: CapabilityScope = Depends(require_capability("exercises.view")),
 ):
     """
     Endpoint to filter exercises by condition name.
@@ -293,9 +291,15 @@ async def get_exercises_by_condition(
     try:
         clinic_id = request.state.clinic_id
         cond_clean = condition.strip().lower()
-        
+
         condition_map = {
-            "forward head posture": ["chin tucks", "cervical flexion isometrics (front press)", "cervical  extension isometrics  (back press)", " lateral flexion  isometric  – right side", "neck side stretch"],
+            "forward head posture": [
+                "chin tucks",
+                "cervical flexion isometrics (front press)",
+                "cervical  extension isometrics  (back press)",
+                " lateral flexion  isometric  – right side",
+                "neck side stretch",
+            ],
             "rounded shoulders": ["wall slides", "scapular squeezes", "wall push ups"],
             "pelvic tilt": ["bridging", "glute squeeze"],
             "scoliosis": ["cat cow stretch", "scapular squeezes"],
@@ -303,18 +307,17 @@ async def get_exercises_by_condition(
             "shoulder mobility": ["pendulum exercise", "wall slides"],
             "neck pain": ["chin tucks", "neck side stretch"],
         }
-        
+
         from sqlalchemy import or_
         from sqlalchemy.future import select
         from app.models.exercise import Exercise
-        
+
         query = select(Exercise).where(
             or_(
-                Exercise.clinic_id == uuid.UUID(clinic_id),
-                Exercise.clinic_id.is_(None)
+                Exercise.clinic_id == uuid.UUID(clinic_id), Exercise.clinic_id.is_(None)
             )
         )
-        
+
         if cond_clean in condition_map:
             titles = condition_map[cond_clean]
             title_filters = [Exercise.title.ilike(f"%{t}%") for t in titles]
@@ -323,10 +326,10 @@ async def get_exercises_by_condition(
             query = query.where(
                 or_(
                     Exercise.title.ilike(f"%{condition}%"),
-                    Exercise.description.ilike(f"%{condition}%")
+                    Exercise.description.ilike(f"%{condition}%"),
                 )
             )
-            
+
         result = await db.execute(query)
         exercises = result.scalars().all()
         return ResponseEnvelope(data=list(exercises))
@@ -335,15 +338,12 @@ async def get_exercises_by_condition(
         raise
 
 
-@router.get(
-    "/{id}",
-    response_model=ResponseEnvelope[ExerciseRead],
-    tags=["Exercises"]
-)
+@router.get("/{id}", response_model=ResponseEnvelope[ExerciseRead], tags=["Exercises"])
 async def get_exercise(
     request: Request,
     id: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: CapabilityScope = Depends(require_capability("exercises.view")),
 ):
     """
     Endpoint ka purpose: Specific exercise ke details fetch karna
@@ -406,30 +406,30 @@ async def get_exercise(
     - Load exercise instructions
     - Retrieve exercise metadata for prescriptions
     """
-    
+
     logger.info(f"Get exercise request - id: {id}")
-    
+
     try:
         # request.state se clinic_id extract karte hain
         clinic_id = request.state.clinic_id
         logger.debug(f"Fetching exercise {id} for clinic {clinic_id}")
-        
+
         # Service layer ko call karte hain
         # Exercise fetch hota hai by ID aur clinic check
         # Clinic-specific + global exercises accessible
         exercise = await exercise_service.get_exercise_by_id(db, clinic_id, id)
-        
+
         # Exercise not found - 404 error return
         if not exercise:
             logger.warning(f"Exercise not found: {id} for clinic {clinic_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Exercise not found or not in caller's clinic"
+                detail="Exercise not found or not in caller's clinic",
             )
-        
+
         logger.info(f"Exercise found: {exercise.id}")
         return ResponseEnvelope(data=exercise)
-        
+
     except HTTPException:
         # Already handled exceptions ko re-raise karte hain
         raise
@@ -438,17 +438,13 @@ async def get_exercise(
         raise
 
 
-@router.put(
-    "/{id}",
-    response_model=ResponseEnvelope[ExerciseRead],
-    tags=["Exercises"]
-)
+@router.put("/{id}", response_model=ResponseEnvelope[ExerciseRead], tags=["Exercises"])
 async def update_exercise(
     request: Request,
     id: str,
     exercise_in: ExerciseUpdate,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_admin),
+    _=Depends(require_capability("exercises.edit")),
 ):
     """Update an existing exercise."""
 
@@ -462,16 +458,12 @@ async def update_exercise(
     return ResponseEnvelope(data=exercise)
 
 
-@router.delete(
-    "/{id}",
-    response_model=ResponseEnvelope[dict],
-    tags=["Exercises"]
-)
+@router.delete("/{id}", response_model=ResponseEnvelope[dict], tags=["Exercises"])
 async def delete_exercise(
     request: Request,
     id: str,
     db: AsyncSession = Depends(get_db),
-    _ = Depends(require_admin),
+    _=Depends(require_capability("exercises.delete")),
 ):
     """Delete an exercise."""
 
@@ -483,4 +475,3 @@ async def delete_exercise(
             detail="Exercise not found or not in caller's clinic",
         )
     return ResponseEnvelope(data={"message": "Exercise deleted successfully."})
-

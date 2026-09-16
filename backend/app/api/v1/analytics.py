@@ -3,19 +3,22 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from app.core.dependencies import require_permission, require_roles, get_current_user
-from app.enums.user import UserRole
+from app.core.dependencies import require_capability, get_current_user
+from app.enums.permission import CapabilityScope
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session, get_current_clinic
 from app.models.clinic import Clinic
 from app.models.user import User
-from app.schemas.analytics import AnalyticsOverviewResponse, TherapistPerformanceResponse
+from app.schemas.analytics import (
+    AnalyticsOverviewResponse,
+    TherapistPerformanceResponse,
+)
 from app.services.analytics import AnalyticsService
 from app.schemas.envelope import ResponseEnvelope
 
-router = APIRouter(dependencies=[Depends(require_permission("analytics"))])
+router = APIRouter()
 
 
 async def get_analytics_service(
@@ -31,11 +34,13 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
-@router.get("/analytics/overview", response_model=ResponseEnvelope[AnalyticsOverviewResponse])
+@router.get(
+    "/analytics/overview", response_model=ResponseEnvelope[AnalyticsOverviewResponse]
+)
 async def get_analytics_overview(
     clinic: CurrentClinicDep,
     service: AnalyticsServiceDep,
-    _: User = Depends(require_roles(UserRole.ADMIN)),
+    _: CapabilityScope = Depends(require_capability("analytics.clinic_financials")),
 ) -> ResponseEnvelope[AnalyticsOverviewResponse]:
     """
     Retrieve clinic-wide analytics metrics (admin only).
@@ -49,11 +54,15 @@ async def get_analytics_overview(
     return ResponseEnvelope(data=result)
 
 
-@router.get("/analytics/my-performance", response_model=ResponseEnvelope[TherapistPerformanceResponse])
+@router.get(
+    "/analytics/my-performance",
+    response_model=ResponseEnvelope[TherapistPerformanceResponse],
+)
 async def get_my_performance(
     clinic: CurrentClinicDep,
     current_user: CurrentUserDep,
     service: AnalyticsServiceDep,
+    scope: CapabilityScope = Depends(require_capability("analytics.my_performance")),
 ) -> ResponseEnvelope[TherapistPerformanceResponse]:
     """
     Retrieve therapist-scoped performance metrics (therapist + admin access).
@@ -66,5 +75,6 @@ async def get_my_performance(
     Admins may also call this endpoint to preview the therapist view.
     """
 
-    result = await service.get_my_performance(clinic.id, current_user.id)
+    therapist_id = None if scope == CapabilityScope.ALL else current_user.id
+    result = await service.get_my_performance(clinic.id, therapist_id)
     return ResponseEnvelope(data=result)
