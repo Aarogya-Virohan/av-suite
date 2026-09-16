@@ -23,8 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import uuid
 import logging
-from app.enums.user import UserRole
-
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_capability
 from app.enums.permission import CapabilityScope
@@ -42,17 +40,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _reject_unsupported_patient_own_scope(scope: CapabilityScope) -> None:
-    if scope == CapabilityScope.OWN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Patient ownership is unavailable because the data model does not record a creator.",
-        )
-
-
 @router.get("", response_model=ResponseEnvelope[List[PatientRead]], tags=["Patients"])
 async def list_patients(
     request: Request,
+    user: User = Depends(get_current_user),
     search: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db),
@@ -121,7 +112,6 @@ async def list_patients(
       -H "Authorization: Bearer eyJhbGc..."
     """
 
-    _reject_unsupported_patient_own_scope(scope)
     logger.info(
         f"List patients request - page: {pagination.page}, size: {pagination.page_size}"
     )
@@ -138,11 +128,18 @@ async def list_patients(
         # Patients list aur total count return hota hai
         if search:
             patients, total = await patient_service.search_patients(
-                db, clinic_id, search, pagination
+                db,
+                clinic_id,
+                search,
+                pagination,
+                owner_id=user.id if scope == CapabilityScope.OWN else None,
             )
         else:
             patients, total = await patient_service.get_patients(
-                db, clinic_id, pagination
+                db,
+                clinic_id,
+                pagination,
+                owner_id=user.id if scope == CapabilityScope.OWN else None,
             )
 
         # Pagination metadata prepare karte hain
@@ -165,6 +162,7 @@ async def list_patients(
 async def create_patient(
     request: Request,
     patient_in: PatientCreate,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     _: CapabilityScope = Depends(require_capability("patients.create")),
 ):
@@ -245,7 +243,9 @@ async def create_patient(
 
         # Service layer ko call karte hain
         # New patient database record create hota hai
-        patient = await patient_service.create_patient(db, clinic_id, patient_in)
+        patient = await patient_service.create_patient(
+            db, clinic_id, patient_in, user.id
+        )
 
         logger.info(f"Patient created successfully: {patient.id}")
         return ResponseEnvelope(data=patient)
@@ -259,6 +259,7 @@ async def create_patient(
 async def get_patient(
     request: Request,
     id: str,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     scope: CapabilityScope = Depends(require_capability("patients.view")),
 ):
@@ -314,7 +315,6 @@ async def get_patient(
       -H "Authorization: Bearer eyJhbGc..."
     """
 
-    _reject_unsupported_patient_own_scope(scope)
     logger.info(f"Get patient request - id: {id}")
 
     try:
@@ -326,7 +326,12 @@ async def get_patient(
 
         # Service layer ko call karte hain
         # Patient fetch hota hai by ID aur clinic check
-        patient = await patient_service.get_patient_by_id(db, clinic_id, id)
+        patient = await patient_service.get_patient_by_id(
+            db,
+            clinic_id,
+            id,
+            owner_id=user.id if scope == CapabilityScope.OWN else None,
+        )
 
         # Patient not found - 404 error return
         if not patient:
@@ -352,15 +357,21 @@ async def update_patient(
     request: Request,
     id: str,
     patient_in: PatientUpdate,
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     scope: CapabilityScope = Depends(require_capability("patients.edit")),
 ):
-    _reject_unsupported_patient_own_scope(scope)
     logger.info(f"Update patient request - id: {id}")
     try:
         clinic_id = request.state.clinic_id
 
-        patient = await patient_service.update_patient(db, clinic_id, id, patient_in)
+        patient = await patient_service.update_patient(
+            db,
+            clinic_id,
+            id,
+            patient_in,
+            owner_id=user.id if scope == CapabilityScope.OWN else None,
+        )
         return ResponseEnvelope(data=patient)
 
     except HTTPException:
