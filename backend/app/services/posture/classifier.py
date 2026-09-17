@@ -208,6 +208,33 @@ THRESHOLDS: dict[str, dict] = {
 BORDERLINE_MARGIN_DEGREES = 2.0
 BORDERLINE_MARGIN_MM = 2.0
 
+# Per-parameter overrides where a published minimum detectable change is
+# wider than the flat default above. A validated smartphone application
+# for measuring the craniovertebral angle reported an MDC of 4.96 degrees
+# within a rater and 5.52 between raters. PT-L01's own bands are 5 degrees
+# wide, narrower than that MDC, so the flat 2.0 degree margin understates
+# how much a repeat measurement can move. Set to the between-rater figure,
+# the more conservative of the two.
+#
+# No other parameter here has a reported MDC, so no other override exists.
+# Do not add one without a citation.
+BORDERLINE_MARGIN_OVERRIDES_DEGREES: dict[str, float] = {
+    "PT-L01": 5.52,
+}
+
+# Some severity rules contain a boundary that is not a key in THRESHOLDS,
+# because the rule is partly hardcoded outside this table (see PT-A08's
+# handling in posture.py). Those boundaries are invisible to the
+# THRESHOLDS-only scan below, so they are listed here explicitly. This is
+# not a substitute for moving the rule into THRESHOLDS, it only makes sure
+# the value nearest that hardcoded cliff still gets flagged as provisional.
+_EXTRA_BOUNDARIES: dict[str, list[float]] = {
+    # posture.py grades any carrying angle at or below -1.5 degrees as
+    # SEVERE outright, and anything with |value| < 1.5 as NONE. -1.5 is
+    # therefore a hard decision point this table has no key for.
+    "PT-A08": [-1.5, 1.5],
+}
+
 # Any rule key ending in one of these is a severity boundary. Collected by
 # suffix rather than by a fixed list so a new rule shape cannot silently
 # add a boundary the borderline check never looks at.
@@ -229,7 +256,12 @@ def is_borderline(param_id: str, value: float, unit: str) -> bool:
     if not isinstance(value, (int, float)):
         return False
 
-    margin = BORDERLINE_MARGIN_MM if unit == "mm" else BORDERLINE_MARGIN_DEGREES
+    if unit == "mm":
+        margin = BORDERLINE_MARGIN_MM
+    else:
+        margin = BORDERLINE_MARGIN_OVERRIDES_DEGREES.get(
+            param_id, BORDERLINE_MARGIN_DEGREES
+        )
 
     rule = THRESHOLDS[param_id]
 
@@ -238,6 +270,8 @@ def is_borderline(param_id: str, value: float, unit: str) -> bool:
         for key, v in rule.items()
         if key.endswith(_BOUNDARY_SUFFIXES) and isinstance(v, (int, float))
     ]
+
+    boundaries.extend(_EXTRA_BOUNDARIES.get(param_id, []))
 
     return any(abs(value - b) <= margin for b in boundaries)
 
