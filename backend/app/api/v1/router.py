@@ -27,7 +27,7 @@ Each router independently defined aur yahan combined hota hai.
 """
 
 from fastapi import APIRouter
-from app.api.v1 import auth, exercises, patients, posture, prescriptions
+from app.api.v1 import auth, exercises, patients, prescriptions
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,17 +70,6 @@ api_router.include_router(
     tags=["Patients"]
 )
 logger.info("Patients router included: /api/v1/patients")
-
-# Posture Router
-# Prefix: /api/v1/posture
-# Endpoints: POST /sessions, GET /sessions, GET /sessions/{id}
-# Authentication: Required (JWT token)
-api_router.include_router(
-    posture.router,
-    prefix="/posture",
-    tags=["Posture"]
-)
-logger.info("Posture router included: /api/v1/posture")
 
 # Prescriptions Router
 # Prefix: /api/v1/prescriptions
