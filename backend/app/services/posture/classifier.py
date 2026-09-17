@@ -88,13 +88,19 @@ THRESHOLDS: dict[str, dict] = {
         "moderate_low": -10,
         "moderate_high": 10,
     },
-    # No published source. The 2 degree normal ceiling sits inside the
-    # method's own frontal angle error of roughly 1.5 to 2 degrees, so a
-    # level head can grade MILD on noise alone. Open.
+    # No published source for the tier boundaries themselves. The normal
+    # ceiling was 2 degrees against a reported 2D frontal angle error of
+    # roughly 1.5 to 2 degrees for this method, so a perfectly level head
+    # could grade MILD on measurement noise alone. Moved to 3 degrees on
+    # 18 Sept, above the method's own error band rather than inside it.
+    # mild_max moved from 5 to 7 to keep the mild band a similar width;
+    # moderate_max is unchanged. This is still not a clinical reference
+    # range, it is a noise-floor correction, and should be revisited once
+    # real photo data exists.
     "PT-A01": {
         "direction": "higher_worse",
-        "none_max": 2,
-        "mild_max": 5,
+        "none_max": 3,
+        "mild_max": 7,
         "moderate_max": 10,
     },
     # No published source. 2D validity unverified, direction logic not yet
