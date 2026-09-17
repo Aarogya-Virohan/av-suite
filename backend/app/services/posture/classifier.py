@@ -75,13 +75,18 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 6,
         "moderate_max": 10,
     },
-    # No published source. Value is also unsigned, so a backward lean
-    # reads the same as a forward one.
+    # No published source. The value is signed since 18 Sept, positive
+    # forward and negative backward, so the bands are mirrored rather
+    # than one sided; a backward lean would otherwise grade NONE at any
+    # size. The tier boundaries themselves are unchanged.
     "PT-L05": {
-        "direction": "higher_worse",
-        "none_max": 3,
-        "mild_max": 6,
-        "moderate_max": 10,
+        "direction": "centred",
+        "none_low": -3,
+        "none_high": 3,
+        "mild_low": -6,
+        "mild_high": 6,
+        "moderate_low": -10,
+        "moderate_high": 10,
     },
     # No published source. The 2 degree normal ceiling sits inside the
     # method's own frontal angle error of roughly 1.5 to 2 degrees, so a

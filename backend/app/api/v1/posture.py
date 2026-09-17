@@ -20,6 +20,7 @@ from app.services.posture.pdf_service import generate_posture_pdf
 
 from app.services.posture.calculator import (
     calc_cva,
+    cva_head_position,
     to_geometric_space,
     calc_forward_trunk_lean,
     get_lateral_side,
@@ -86,6 +87,17 @@ from app.services.posture.report_builder import (
 # now follows the sign. The severity bands are deliberately untouched here:
 # they still grade only the hyperextension side, which needs clinical input.
 KNEE_SAGITTAL_LABEL = "Knee Sagittal Alignment"
+
+# PT-L05 is signed since 18 Sept: positive is forward, negative is
+# backward. The row label previously said "Forward Trunk Lean"
+# unconditionally, so a backward lean would have printed under a name
+# that says the opposite of what was measured.
+def _trunk_lean_label(value: float) -> str:
+    if value < 0:
+        return "Backward Trunk Lean"
+    if value > 0:
+        return "Forward Trunk Lean"
+    return "Trunk Lean"
 
 
 def _knee_sagittal_label(value: float) -> str:
@@ -196,14 +208,23 @@ async def analyze_posture(
 
     # PT-L01 — Forward Head (CVA)
     try:
-        check_visibility(side_landmarks, [ear_idx, shoulder_idx_lat])
+        check_visibility(side_landmarks, [NOSE, ear_idx, shoulder_idx_lat])
 
         cva = calc_cva(side_geo, side=lateral_side)
         severity = classify("PT-L01", cva)
         findings["PT-L01"] = severity
 
+        head_position = cva_head_position(side_geo, side=lateral_side)
+
         side_measurements.append(
-            measurement("PT-L01", "Forward Head (CVA)", cva, "\u00b0", severity)
+            measurement(
+                "PT-L01",
+                "Forward Head (CVA)",
+                cva,
+                "\u00b0",
+                severity,
+                side=head_position if head_position != "neutral" else None,
+            )
         )
 
     except InsufficientVisibilityError:
@@ -213,14 +234,20 @@ async def analyze_posture(
 
     # PT-L05 — Forward Trunk Lean
     try:
-        check_visibility(side_landmarks, [shoulder_idx_lat, hip_idx_lat])
+        check_visibility(side_landmarks, [NOSE, shoulder_idx_lat, hip_idx_lat])
 
         trunk_lean = calc_forward_trunk_lean(side_geo, side=lateral_side)
         severity = classify("PT-L05", trunk_lean)
         findings["PT-L05"] = severity
 
         side_measurements.append(
-            measurement("PT-L05", "Forward Trunk Lean", trunk_lean, "\u00b0", severity)
+            measurement(
+                "PT-L05",
+                _trunk_lean_label(trunk_lean),
+                trunk_lean,
+                "\u00b0",
+                severity,
+            )
         )
 
     except InsufficientVisibilityError:

@@ -15,6 +15,7 @@ from app.services.posture.classifier import SEVERITY_LABELS, is_borderline
 # shoulders in different sections of the report.
 SIDE_WORDING: dict[str, dict[str, str]] = {
     "PT-A01": {"left": "Tilted to left", "right": "Tilted to right"},
+    "PT-L01": {"anterior": "Head anterior to shoulder", "posterior": "Head posterior to shoulder"},
     "PT-A03": {"left": "Shifted to left", "right": "Shifted to right"},
     "PT-P01": {"left": "Shifted to left", "right": "Shifted to right"},
     "PT-A02": {"left": "Left shoulder higher", "right": "Right shoulder higher"},

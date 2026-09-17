@@ -136,6 +136,17 @@ def calc_cva(landmarks: list[Landmark], side: Literal["left", "right"] | None = 
     reference makes this independent of which way the subject faces in
     the photo (a fixed reference can otherwise produce an obtuse/reflex
     angle like 114° for a person facing the other direction).
+
+    The angle is deliberately left unsigned. A negative craniovertebral
+    angle is not a clinical quantity, so a sign would carry no meaning.
+    What the magnitude alone does not say is whether the ear sits
+    anterior or posterior to the shoulder, and only the anterior case is
+    forward head posture. That is reported separately by
+    cva_head_position, which does not affect the grade.
+
+    Note also that published craniovertebral reference values are
+    measured from C7 to the tragus. MediaPipe returns no C7 landmark, so
+    this measures ear to shoulder and the two are not interchangeable.
     """
 
     if side is None:
@@ -148,6 +159,33 @@ def calc_cva(landmarks: list[Landmark], side: Literal["left", "right"] | None = 
     dy = ear.y - shoulder.y
 
     return math.degrees(math.atan2(abs(dy), abs(dx)))
+
+
+def cva_head_position(
+    landmarks: list[Landmark], side: Literal["left", "right"] | None = None
+) -> Literal["anterior", "posterior", "neutral"]:
+    """
+    Whether the ear sits in front of or behind the shoulder on the
+    lateral view, relative to the direction the subject faces.
+
+    PT-L01 reports magnitude only, so on its own it cannot tell forward
+    head posture from a head held behind the shoulder line. This does
+    not change any grade.
+    """
+
+    if side is None:
+        side = get_lateral_side(landmarks)
+
+    ear = landmarks[LEFT_EAR if side == "left" else RIGHT_EAR]
+    shoulder = landmarks[LEFT_SHOULDER if side == "left" else RIGHT_SHOULDER]
+
+    offset = ear.x - shoulder.x
+    facing = facing_direction(landmarks, side)
+
+    if offset == 0 or facing == 0:
+        return "neutral"
+
+    return "anterior" if (offset > 0) == (facing > 0) else "posterior"
 
 
 def calc_pelvic_obliquity(landmarks: list[Landmark]) -> float:
@@ -228,9 +266,46 @@ def midpoint(
     )
 
 
+def facing_direction(
+    landmarks: list[Landmark], side: Literal["left", "right"] | None = None
+) -> float:
+    """
+    Which way the subject faces on a lateral photograph, as a signed
+    horizontal offset: positive means anterior is the +x direction,
+    negative means anterior is -x. Magnitude carries no meaning, only
+    the sign is used.
+
+    Taken from the nose against the shoulder. The nose is the most
+    reliably anterior landmark on a lateral view and, unlike the ear, it
+    is not itself one of the points whose anterior/posterior position is
+    being measured, so using it keeps the reference independent of the
+    finding. In forward head posture the ear translates anteriorly,
+    which is exactly the case where an ear-based reference is weakest.
+    """
+
+    if side is None:
+        side = get_lateral_side(landmarks)
+
+    nose = landmarks[NOSE]
+    shoulder = landmarks[LEFT_SHOULDER if side == "left" else RIGHT_SHOULDER]
+
+    return nose.x - shoulder.x
+
+
 def calc_forward_trunk_lean(
     landmarks: list[Landmark], side: Literal["left", "right"] | None = None
 ) -> float:
+    """
+    PT-L05, trunk lean from vertical on the lateral view, in degrees,
+    signed:
+
+        positive = forward, the shoulder sits anterior to the hip
+        negative = backward, the shoulder sits posterior to the hip
+
+    The function previously returned an unsigned vertex angle, so a
+    backward lean produced the same number as a forward one under a row
+    labelled Forward Trunk Lean.
+    """
 
     if side is None:
         side = get_lateral_side(landmarks)
@@ -243,11 +318,19 @@ def calc_forward_trunk_lean(
         hip.y - 1.0,
     )
 
-    return angle_between_points(
+    magnitude = angle_between_points(
         (shoulder.x, shoulder.y),
         (hip.x, hip.y),
         vertical_ref,
     )
+
+    offset = shoulder.x - hip.x
+    facing = facing_direction(landmarks, side)
+
+    if offset == 0 or facing == 0:
+        return magnitude
+
+    return magnitude if (offset > 0) == (facing > 0) else -magnitude
 
 
 def calc_knee_hyperextension(
