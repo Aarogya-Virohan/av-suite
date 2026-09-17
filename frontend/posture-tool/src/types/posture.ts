@@ -61,7 +61,15 @@ export interface PostureReport {
   synthesis: SynthesisData
 
   globalIndex: {
-    score: number
+    // Null when no parameter produced a grade. The backend used to send 100
+    // with "Optimal Alignment" in that case; it now sends null and
+    // "Not assessable", so this must stay nullable.
+    score: number | null
     descriptor: string
+    // How many parameters the score rests on, and how many rows the report
+    // printed. Carried for now, not rendered: how an incomplete index should
+    // be shown is an open clinical question.
+    graded?: number
+    attempted?: number
   }
 }

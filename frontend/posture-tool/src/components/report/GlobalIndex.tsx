@@ -1,5 +1,5 @@
 interface Props {
-  score: number
+  score: number | null
   descriptor: string
 }
 
@@ -28,8 +28,16 @@ export default function GlobalIndex({
             border-slate-900
           "
         >
-          <span className="text-5xl font-bold text-slate-900">
-            {score}%
+          {/* A null score means nothing was graded. Rendering it would
+              have printed "null%" inside the dial. */}
+          <span
+            className={
+              score === null
+                ? 'px-4 text-center text-base font-semibold text-slate-500'
+                : 'text-5xl font-bold text-slate-900'
+            }
+          >
+            {score === null ? 'Not available' : `${score}%`}
           </span>
         </div>
 

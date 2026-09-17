@@ -10,7 +10,9 @@ from app.services.posture.calculator import (
     LEFT_ELBOW,
     LEFT_SHOULDER,
     LEFT_WRIST,
+    RIGHT_ELBOW,
     RIGHT_SHOULDER,
+    RIGHT_WRIST,
 )
 
 from app.services.posture.schemas import Landmark
@@ -225,17 +227,29 @@ def test_calc_knee_hyperextension_straight_leg_is_zero() -> None:
     assert result == pytest.approx(0.0)
 
 
+# These two tests were left behind by the 10 September sign-convention fix
+# and were failing on dev. They placed the patient's LEFT shoulder at image
+# x = 0.3, which is the assumption the fix corrected. In an un-mirrored
+# anterior photograph the subject faces the camera, so the patient's own
+# left arm appears on the right of the frame at a LARGER x. The fixtures
+# below use that geometry. Written this way the pair also pins the
+# convention down, so a future reader cannot make the suite green again by
+# flipping the sign back.
+
+
 def test_calc_elbow_carrying_angle_valgus_is_positive() -> None:
 
     points = _blank_landmarks()
 
+    # Anterior view, un-mirrored: patient-left sits at the larger x.
     # Body midline (mean of both shoulders) at x = 0.5.
-    _set(points, LEFT_SHOULDER, 0.3, 0.3)
-    _set(points, RIGHT_SHOULDER, 0.7, 0.3)
+    _set(points, LEFT_SHOULDER, 0.7, 0.3)
+    _set(points, RIGHT_SHOULDER, 0.3, 0.3)
 
-    _set(points, LEFT_ELBOW, 0.3, 0.5)
-    # Left side: wrist.x < midline_x (0.5) -> valgus -> positive.
-    _set(points, LEFT_WRIST, 0.2, 0.7)
+    _set(points, LEFT_ELBOW, 0.7, 0.5)
+    # Valgus: the forearm deviates away from the midline. On the patient's
+    # left arm that means wrist.x > midline_x (0.5) -> positive.
+    _set(points, LEFT_WRIST, 0.8, 0.7)
 
     result = calc_elbow_carrying_angle(points, "left")
 
@@ -246,13 +260,33 @@ def test_calc_elbow_carrying_angle_varus_is_negative() -> None:
 
     points = _blank_landmarks()
 
-    _set(points, LEFT_SHOULDER, 0.3, 0.3)
-    _set(points, RIGHT_SHOULDER, 0.7, 0.3)
+    _set(points, LEFT_SHOULDER, 0.7, 0.3)
+    _set(points, RIGHT_SHOULDER, 0.3, 0.3)
 
-    _set(points, LEFT_ELBOW, 0.3, 0.5)
-    # Left side: wrist.x >= midline_x (0.5) -> varus -> negative.
-    _set(points, LEFT_WRIST, 0.6, 0.7)
+    _set(points, LEFT_ELBOW, 0.7, 0.5)
+    # Varus: the forearm crosses back toward the midline. On the patient's
+    # left arm that means wrist.x <= midline_x (0.5) -> negative.
+    _set(points, LEFT_WRIST, 0.4, 0.7)
 
     result = calc_elbow_carrying_angle(points, "left")
 
     assert result < 0
+
+
+def test_calc_elbow_carrying_angle_right_arm_mirrors_left() -> None:
+    """The right arm must use the opposite x comparison, not the same one."""
+
+    points = _blank_landmarks()
+
+    _set(points, LEFT_SHOULDER, 0.7, 0.3)
+    _set(points, RIGHT_SHOULDER, 0.3, 0.3)
+
+    _set(points, RIGHT_ELBOW, 0.3, 0.5)
+    # Patient-right arm sits at the smaller x, so valgus is wrist.x < 0.5.
+    _set(points, RIGHT_WRIST, 0.2, 0.7)
+
+    assert calc_elbow_carrying_angle(points, "right") > 0
+
+    _set(points, RIGHT_WRIST, 0.6, 0.7)
+
+    assert calc_elbow_carrying_angle(points, "right") < 0

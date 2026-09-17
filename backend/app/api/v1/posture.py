@@ -78,6 +78,24 @@ from app.services.posture.report_builder import (
     measurement,
 )
 
+
+# PT-L06 returns a signed value: negative is hyperextension, positive is a
+# flexed knee. The row label was fixed text reading "Knee Hyperextension",
+# so a flexed knee printed under a hyperextension heading and the sample
+# report's 5.25 degrees was flexion described as its opposite. The label
+# now follows the sign. The severity bands are deliberately untouched here:
+# they still grade only the hyperextension side, which needs clinical input.
+KNEE_SAGITTAL_LABEL = "Knee Sagittal Alignment"
+
+
+def _knee_sagittal_label(value: float) -> str:
+    if value < 0:
+        return "Knee Hyperextension"
+    if value > 0:
+        return "Knee Flexion"
+    return KNEE_SAGITTAL_LABEL
+
+
 router = APIRouter(prefix="/posture", tags=["posture"])
 
 
@@ -203,17 +221,25 @@ async def analyze_posture(
             [hip_idx_lat, knee_idx_lat, ankle_idx_lat, ear_idx, shoulder_idx_lat],
         )
 
-        knee_hyperext = calc_knee_hyperextension(side_geo, side=lateral_side)
-        severity = classify("PT-L06", knee_hyperext)
+        knee_sagittal = calc_knee_hyperextension(side_geo, side=lateral_side)
+        severity = classify("PT-L06", knee_sagittal)
         findings["PT-L06"] = severity
 
         side_measurements.append(
-            measurement("PT-L06", "Knee Hyperextension", knee_hyperext, "\u00b0", severity)
+            measurement(
+                "PT-L06",
+                _knee_sagittal_label(knee_sagittal),
+                knee_sagittal,
+                "\u00b0",
+                severity,
+            )
         )
 
     except InsufficientVisibilityError:
         side_measurements.append(
-            measurement("PT-L06", "Knee Hyperextension", None, "\u00b0", "insufficient_data")
+            measurement(
+                "PT-L06", KNEE_SAGITTAL_LABEL, None, "\u00b0", "insufficient_data"
+            )
         )
 
     # Calibration is not otherwise needed on the sagittal view, since it
@@ -659,7 +685,14 @@ async def analyze_posture(
     # Global Stability Index
     # ---------------------------------
 
-    global_index = calculate_global_index(findings.values())
+    # attempted is every row the report will print, graded or not, so the
+    # payload records how much of the assessment the score rests on.
+    global_index = calculate_global_index(
+        findings.values(),
+        attempted=len(side_measurements)
+        + len(front_measurements)
+        + len(back_measurements),
+    )
 
     # ---------------------------------
     # Patient
