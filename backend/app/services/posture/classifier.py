@@ -14,58 +14,86 @@ class ThresholdRule(TypedDict):
     direction: Literal[
         "lower_worse",
         "higher_worse",
+        "centred",
     ]
 
 
+# SOURCE STATUS, read this before changing any number below.
+#
+# Each rule carries a source line. "No published source" means exactly
+# that: the number is inherited from an earlier build and nobody has been
+# able to point at a reference range for it. Do not attach a citation to
+# one of those rows unless the citation actually publishes that band.
 THRESHOLDS: dict[str, dict] = {
+    # Bands from the published craniovertebral angle literature, but the
+    # tool measures ear to shoulder rather than tragus to C7 because
+    # MediaPipe returns no C7 landmark, so the reference range does not
+    # transfer directly. Open with the founders.
     "PT-L01": {
         "direction": "lower_worse",
         "none_min": 50,
         "mild_min": 45,
         "moderate_min": 40,
     },
+    # No published source.
     "PT-A02": {
         "direction": "higher_worse",
         "none_max": 5,
         "mild_max": 10,
         "moderate_max": 20,
     },
+    # No published source. Asymmetric with PT-A05 and has no female band.
     "PT-A06": {
         "direction": "higher_worse",
         "none_max": 3,
         "mild_max": 7,
         "moderate_max": 12,
     },
+    # PT-A03 and PT-P01 are the same calculation on two views. They used
+    # to carry different bands (10/20/30 here, 5/15/25 on the back view),
+    # so one patient could get two contradictory grades for one number on
+    # one report. Harmonised onto the tighter set on 18 Sept. Neither set
+    # had a published source; the tighter one was kept because it is the
+    # more conservative of two unsourced options.
     "PT-A03": {
         "direction": "higher_worse",
-        "none_max": 10,
-        "mild_max": 20,
-        "moderate_max": 30,
+        "none_max": 5,
+        "mild_max": 15,
+        "moderate_max": 25,
     },
+    # No published source.
     "PT-A04": {
         "direction": "higher_worse",
         "none_max": 3,
         "mild_max": 5,
         "moderate_max": 10,
     },
+    # No published source.
     "PT-A10": {
         "direction": "higher_worse",
         "none_max": 3,
         "mild_max": 6,
         "moderate_max": 10,
     },
+    # No published source. Value is also unsigned, so a backward lean
+    # reads the same as a forward one.
     "PT-L05": {
         "direction": "higher_worse",
         "none_max": 3,
         "mild_max": 6,
         "moderate_max": 10,
     },
+    # No published source. The 2 degree normal ceiling sits inside the
+    # method's own frontal angle error of roughly 1.5 to 2 degrees, so a
+    # level head can grade MILD on noise alone. Open.
     "PT-A01": {
         "direction": "higher_worse",
         "none_max": 2,
         "mild_max": 5,
         "moderate_max": 10,
     },
+    # No published source. 2D validity unverified, direction logic not yet
+    # checked against real photographs.
     "PT-A05": {
         "direction": "higher_worse",
         "none_max": 5,
@@ -73,42 +101,77 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 9,
         "moderate_max": 13,
     },
+    # Same measurement as PT-A03, same bands since 18 Sept. See PT-A03.
     "PT-P01": {
         "direction": "higher_worse",
         "none_max": 5,
         "mild_max": 15,
         "moderate_max": 25,
     },
+    # No published source. Identical calculation to PT-A02.
     "PT-P02": {
         "direction": "higher_worse",
         "none_max": 5,
         "mild_max": 10,
         "moderate_max": 20,
     },
+    # Rearfoot / calcaneal alignment, signed: positive is valgus
+    # (eversion), negative is varus (inversion).
+    #
+    # This parameter is graded as deviation from the healthy population
+    # mean, not as deviation from zero. In 88 healthy adults the mean
+    # relaxed calcaneal stance position was 6.07 degrees of valgus with a
+    # standard deviation of 2.71, and 95 percent of adults fell between 3
+    # and 9 degrees of valgus. The same study found the long assumed
+    # normal of 0 plus or minus 2 degrees held for under 2 percent of
+    # adults.
+    #
+    # The previous 0 to 5 normal band therefore graded the population mean
+    # as MILD and a perfectly ordinary foot as abnormal. Bands below are
+    # the study's own 95 percent range for normal, then one standard
+    # deviation per tier in both directions. Every number here comes from
+    # that one study; none of them is an estimate.
     "PT-P03": {
-        "direction": "higher_worse",
-        "none_max": 5,
-        "mild_max": 8,
-        "moderate_max": 12,
+        "direction": "centred",
+        "none_low": 3.0,
+        "none_high": 9.0,
+        "mild_low": 0.6,
+        "mild_high": 11.8,
+        "moderate_low": -2.1,
+        "moderate_high": 14.5,
     },
+    # No published source. The definition itself is unsettled: the code
+    # computes shoulder line angle minus hip line angle, which reduces to
+    # pelvic obliquity when the shoulders are level, and pelvic obliquity
+    # is already reported as PT-A04.
     "PT-P04": {
         "direction": "higher_worse",
         "none_max": 5,
         "mild_max": 8,
         "moderate_max": 12,
     },
+    # No published source. Normative data exists for the foot progression
+    # angle itself but not for the difference between one person's two
+    # feet, which is what this grades.
     "PT-P05": {
         "direction": "higher_worse",
         "none_max": 5,
         "mild_max": 8,
         "moderate_max": 12,
     },
+    # Grades the hyperextension side only. Any non negative value grades
+    # NONE, so a flexion contracture of any size reads as normal. Flexion
+    # bands are outstanding.
     "PT-L06": {
         "direction": "lower_worse",
         "none_min": -5,
         "mild_min": -10,
         "moderate_min": -15,
     },
+    # A separate hardcoded rule outside this table grades any negative
+    # carrying angle as SEVERE with a discontinuity at -1.5 degrees. That
+    # rule is not reachable from here, and the parameter's validity from a
+    # standing photograph is with the founders.
     "PT-A08": {
         "direction": "higher_worse",
         "none_max": 10,
@@ -134,6 +197,11 @@ THRESHOLDS: dict[str, dict] = {
 BORDERLINE_MARGIN_DEGREES = 2.0
 BORDERLINE_MARGIN_MM = 2.0
 
+# Any rule key ending in one of these is a severity boundary. Collected by
+# suffix rather than by a fixed list so a new rule shape cannot silently
+# add a boundary the borderline check never looks at.
+_BOUNDARY_SUFFIXES = ("_min", "_max", "_low", "_high")
+
 
 def is_borderline(param_id: str, value: float, unit: str) -> bool:
     """
@@ -155,19 +223,9 @@ def is_borderline(param_id: str, value: float, unit: str) -> bool:
     rule = THRESHOLDS[param_id]
 
     boundaries = [
-        rule.get(key)
-        for key in (
-            "none_min",
-            "mild_min",
-            "moderate_min",
-            "none_max",
-            "mild_max",
-            "moderate_max",
-            "none_max_female",
-            "mild_max_female",
-            "moderate_max_female",
-        )
-        if rule.get(key) is not None
+        v
+        for key, v in rule.items()
+        if key.endswith(_BOUNDARY_SUFFIXES) and isinstance(v, (int, float))
     ]
 
     return any(abs(value - b) <= margin for b in boundaries)
@@ -250,6 +308,22 @@ def classify(
             return "mild"
 
         if value <= moderate_max:
+            return "moderate"
+
+        return "severe"
+
+    if direction == "centred":
+        # Normal is a band around a population mean, not a ceiling above
+        # zero, and the value is signed. Deviation in either direction is
+        # graded on the same tiers.
+
+        if rule["none_low"] <= value <= rule["none_high"]:
+            return "none"
+
+        if rule["mild_low"] <= value <= rule["mild_high"]:
+            return "mild"
+
+        if rule["moderate_low"] <= value <= rule["moderate_high"]:
             return "moderate"
 
         return "severe"
