@@ -94,13 +94,17 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
         ],
     },
     {
-        # PT-P01 — Scoliosis Screen
+        # PT-P01 — Trunk Lateral Deviation (Posterior)
         "param_id": "PT-P01",
         "hypertonic": ["Quadratus Lumborum", "Erector Spinae (one side)"],
         "inhibited": ["Obliques", "Gluteus Medius"],
-        "corrective": [
-            {"exercise": "Schroth Method Breathing", "dosage": "Daily 15 min"},
-        ],
+        # Schroth Method Breathing was removed on 18 Sept. Schroth is
+        # curve pattern specific, the classification is meant to be used
+        # by certified Schroth therapists, and this parameter produces no
+        # curve classification and no spinal measurement of any kind. No
+        # replacement exercise was substituted, because no automatic
+        # exercise can be justified from a shoulder to hip offset alone.
+        "corrective": [],
     },
     {
         # PT-P02 — Scapular Asymmetry (Winging / Height)
@@ -112,7 +116,7 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
         ],
     },
     {
-        # PT-P03 — Heel Valgus / Subtalar Alignment
+        # PT-P03 — Rearfoot / Calcaneal Alignment
         "param_id": "PT-P03",
         "hypertonic": ["Peroneals"],
         "inhibited": ["Tibialis Posterior"],

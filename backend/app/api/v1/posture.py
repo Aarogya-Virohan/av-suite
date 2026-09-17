@@ -37,7 +37,7 @@ from app.services.posture.calculator import (
     calc_shoulder_asymmetry_mm,
     calc_ear_level_asymmetry_mm,
     calc_trunk_lateral_shift_mm,
-    calc_scoliosis_screen_mm,
+    calc_trunk_lateral_deviation_mm,
     calc_scapular_height_asymmetry_mm,
     calc_heel_valgus,
     calc_pelvic_rotation,
@@ -94,6 +94,24 @@ def _knee_sagittal_label(value: float) -> str:
     if value > 0:
         return "Knee Flexion"
     return KNEE_SAGITTAL_LABEL
+
+
+# PT-P01 measures the horizontal offset between the shoulder midpoint and
+# the hip midpoint. No spinal landmark is involved, because MediaPipe
+# returns none, so the row cannot carry the word scoliosis on a clinic
+# report above a physiotherapist signature line. Renamed 18 Sept. An
+# earlier rename was reverted at 6ac72e4; this one is deliberate.
+P01_LABEL = "Trunk Lateral Deviation (Posterior)"
+
+
+def _rearfoot_label(value: float, side_label: str) -> str:
+    """PT-P03 is signed, so the row name follows the direction."""
+
+    if value < 0:
+        return f"Rearfoot Varus ({side_label})"
+    if value > 0:
+        return f"Rearfoot Valgus ({side_label})"
+    return f"Rearfoot Alignment ({side_label})"
 
 
 router = APIRouter(prefix="/posture", tags=["posture"])
@@ -548,24 +566,24 @@ async def analyze_posture(
         back_pixels_per_cm = None
         back_calibration_status = "insufficient_data"
 
-    # PT-P01 — Scoliosis Screen
+    # PT-P01 — Trunk Lateral Deviation (Posterior)
     try:
         check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP])
 
         if back_pixels_per_cm is None:
             back_measurements.append(
-                measurement("PT-P01", "Scoliosis Screen", None, "mm", back_calibration_status)
+                measurement("PT-P01", P01_LABEL, None, "mm", back_calibration_status)
             )
         else:
-            scoliosis = calc_scoliosis_screen_mm(back_landmarks, back_width_px, back_pixels_per_cm)
-            severity = classify("PT-P01", scoliosis)
+            trunk_dev = calc_trunk_lateral_deviation_mm(back_landmarks, back_width_px, back_pixels_per_cm)
+            severity = classify("PT-P01", trunk_dev)
             findings["PT-P01"] = severity
 
             back_measurements.append(
                 measurement(
                     "PT-P01",
-                    "Scoliosis Screen",
-                    scoliosis,
+                    P01_LABEL,
+                    trunk_dev,
                     "mm",
                     severity,
                     side=trunk_shift_side(back_landmarks, "posterior"),
@@ -574,7 +592,7 @@ async def analyze_posture(
 
     except InsufficientVisibilityError:
         back_measurements.append(
-            measurement("PT-P01", "Scoliosis Screen", None, "mm", "insufficient_data")
+            measurement("PT-P01", P01_LABEL, None, "mm", "insufficient_data")
         )
 
     # PT-P02 — Scapular Height Asymmetry
@@ -606,7 +624,7 @@ async def analyze_posture(
             measurement("PT-P02", "Scapular Height Asymmetry", None, "mm", "insufficient_data")
         )
 
-    # PT-P03 — Heel Valgus (bilateral)
+    # PT-P03 — Rearfoot / calcaneal alignment (bilateral, signed)
     for side_label, knee_i, ankle_i, heel_i, side_key in [
         ("Left", LEFT_KNEE, LEFT_ANKLE, LEFT_HEEL, "left"),
         ("Right", RIGHT_KNEE, RIGHT_ANKLE, RIGHT_HEEL, "right"),
@@ -619,12 +637,12 @@ async def analyze_posture(
             findings[f"PT-P03_{side_key}"] = severity
 
             back_measurements.append(
-                measurement("PT-P03", f"Heel Valgus ({side_label})", heel_valgus, "\u00b0", severity)
+                measurement("PT-P03", _rearfoot_label(heel_valgus, side_label), heel_valgus, "\u00b0", severity)
             )
 
         except InsufficientVisibilityError:
             back_measurements.append(
-                measurement("PT-P03", f"Heel Valgus ({side_label})", None, "\u00b0", "insufficient_data")
+                measurement("PT-P03", f"Rearfoot Alignment ({side_label})", None, "\u00b0", "insufficient_data")
             )
 
     # PT-P04 — Pelvic Rotation

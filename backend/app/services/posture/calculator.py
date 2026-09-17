@@ -558,11 +558,11 @@ def calc_trunk_lateral_shift_mm(
 # ---------------------------------------------------------------------------
 
 
-def calc_scoliosis_screen_mm(
+def calc_trunk_lateral_deviation_mm(
     landmarks: list[Landmark], image_width_px: int, pixels_per_cm: float
 ) -> float:
     """
-    PT-P01 — Scoliosis screen. Lateral deviation of the trunk midline
+    PT-P01 — Trunk lateral deviation. Lateral deviation of the trunk midline
     (shoulder midpoint) from the pelvic midline (hip midpoint), used as
     a stable proxy for the plumb line. Unit: millimetres. MediaPipe
     approximation only — NOT a Cobb angle, screening purposes only.
@@ -588,9 +588,20 @@ def calc_scapular_height_asymmetry_mm(
 
 def calc_heel_valgus(landmarks: list[Landmark], side: Literal["left", "right"]) -> float:
     """
-    PT-P03 — Heel Valgus / Subtalar Alignment. Deviation of the heel
-    from the knee-ankle (lower leg) axis, in degrees. Magnitude only
-    (direction not distinguished in this version).
+    PT-P03, rearfoot / calcaneal alignment, posterior view. Deviation of
+    the heel from the knee-ankle (lower leg) axis, in degrees, signed:
+
+        positive = valgus, the heel deviates laterally (eversion)
+        negative = varus, the heel deviates medially (inversion)
+
+    The function previously returned magnitude only, so a varus heel was
+    reported under a label saying valgus, which points an orthotic and an
+    exercise the wrong way.
+
+    Lateral is decided from the midpoint of the two ankles rather than
+    from the left/right landmark labels. On a posterior photograph the
+    model can swap those labels, and a swap that affects both legs
+    equally still leaves lateral and medial correct.
     """
 
     knee = landmarks[LEFT_KNEE if side == "left" else RIGHT_KNEE]
@@ -603,7 +614,25 @@ def calc_heel_valgus(landmarks: list[Landmark], side: Literal["left", "right"]) 
         (heel.x, heel.y),
     )
 
-    return 180.0 - raw_angle
+    magnitude = 180.0 - raw_angle
+
+    # Where the heel sits relative to the knee-ankle line extended down
+    # to the heel's own height.
+    if ankle.y != knee.y:
+        t = (heel.y - knee.y) / (ankle.y - knee.y)
+    else:
+        t = 1.0
+
+    expected_x = knee.x + t * (ankle.x - knee.x)
+    offset = heel.x - expected_x
+
+    midline_x = (landmarks[LEFT_ANKLE].x + landmarks[RIGHT_ANKLE].x) / 2
+    lateral_is_positive_x = ankle.x >= midline_x
+
+    if (offset >= 0) == lateral_is_positive_x:
+        return magnitude
+
+    return -magnitude
 
 
 def calc_pelvic_rotation(landmarks: list[Landmark]) -> float:
