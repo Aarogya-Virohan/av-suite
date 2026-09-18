@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.enums.lead import LeadStage
+from app.enums.lead import LeadStage, LeadSource
 
 
 class LeadBase(BaseModel):
@@ -14,7 +14,7 @@ class LeadBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Full name of prospective patient lead.")
     phone: str = Field(..., min_length=1, max_length=50, description="Contact phone number.")
     email: EmailStr | str | None = Field(default=None, max_length=255, description="Contact email address.")
-    source: str | None = Field(default=None, max_length=100, description="Lead acquisition source (e.g. google, meta).")
+    source: LeadSource | None = Field(default=None, description="Lead acquisition source.")
     stage: LeadStage = Field(default=LeadStage.NEW, description="Lifecycle stage of lead.")
     notes: str | None = Field(default=None, max_length=2000, description="Internal notes regarding lead.")
 
@@ -31,7 +31,7 @@ class LeadUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     phone: str | None = Field(default=None, min_length=1, max_length=50)
     email: EmailStr | str | None = Field(default=None, max_length=255)
-    source: str | None = Field(default=None, max_length=100)
+    source: LeadSource | None = Field(default=None)
     stage: LeadStage | None = Field(default=None)
     assigned_to: UUID | None = Field(default=None)
     notes: str | None = Field(default=None, max_length=2000)

@@ -52,6 +52,7 @@ class LeadRepository(BaseRepository[Lead]):
                 )
             )
 
+        statement = self._apply_soft_delete_filter(statement)
         statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())

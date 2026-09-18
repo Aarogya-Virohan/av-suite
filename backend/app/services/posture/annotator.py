@@ -1,13 +1,21 @@
 import cv2
-import mediapipe as mp
-from mediapipe.python.solutions import drawing_utils, pose
 import numpy as np
 
-mp_drawing = drawing_utils
-mp_pose = pose
+try:
+    import mediapipe as mp
+    from mediapipe.python.solutions import drawing_utils, pose
+    mp_drawing = drawing_utils
+    mp_pose = pose
+except Exception:
+    mp_drawing = None
+    mp_pose = None
 
 
 def annotate_pose(image_bytes: bytes, results) -> bytes:
+    if mp_drawing is None or mp_pose is None:
+        raise RuntimeError(
+            "MediaPipe Pose drawing utilities are not available in the current environment."
+        )
 
     np_arr = np.frombuffer(image_bytes, np.uint8)
 
@@ -22,21 +30,7 @@ def annotate_pose(image_bytes: bytes, results) -> bytes:
     connections = (
         list(mp_pose.POSE_CONNECTIONS) if mp_pose.POSE_CONNECTIONS is not None else None
     )
-
-    # Neon green, slightly thicker than the default (2px) for better
-    # visibility against varied backgrounds. Landmark dots keep the
-    # library default (red).
-    connection_drawing_spec = mp_drawing.DrawingSpec(
-        color=(20, 255, 57),  # BGR for neon green (#39FF14)
-        thickness=3,
-    )
-
-    mp_drawing.draw_landmarks(
-        annotated,
-        results.pose_landmarks,
-        connections,
-        connection_drawing_spec=connection_drawing_spec,
-    )
+    mp_drawing.draw_landmarks(annotated, results.pose_landmarks, connections)
 
     success, buffer = cv2.imencode(".jpg", annotated)
 

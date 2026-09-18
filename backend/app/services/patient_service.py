@@ -22,16 +22,36 @@ from app.models.patient import Patient
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.common import PaginationParams
 from typing import Optional, List, Tuple
-import uuid
+from app.enums.permission import CapabilityScope
+from app.models.appointment import Appointment
+from app.models.treatment import TreatmentSession
+from sqlalchemy import exists, or_
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
 
+def apply_patient_scope(query, scope: CapabilityScope, user_id: str):
+    if scope == CapabilityScope.OWN and user_id:
+        u_id = uuid.UUID(user_id)
+        has_appointment = exists().where(
+            Appointment.patient_id == Patient.id,
+            Appointment.therapist_id == u_id
+        )
+        has_treatment = exists().where(
+            TreatmentSession.patient_id == Patient.id,
+            TreatmentSession.therapist_id == u_id
+        )
+        return query.where(or_(has_appointment, has_treatment))
+    return query
+
 async def get_patients(
     db: AsyncSession,
     clinic_id: str,
-    pagination: PaginationParams
+    pagination: PaginationParams,
+    scope: CapabilityScope = None,
+    user_id: str = None
 ) -> Tuple[List[Patient], int]:
     """
     Function ka purpose: Clinic ke sare patients ko list karna pagination ke saath
@@ -88,6 +108,8 @@ async def get_patients(
         # Clinic ID se filter karte hain (security)
         # UUID format mein convert karte hain string se
         query = select(Patient).where(Patient.clinic_id == uuid.UUID(clinic_id))
+        if scope:
+            query = apply_patient_scope(query, scope, user_id)
 
         # Total count calculate karte hain pagination metadata ke liye
         # Subquery use karte hain counting ke liye
@@ -204,7 +226,9 @@ async def create_patient(
 async def get_patient_by_id(
     db: AsyncSession,
     clinic_id: str,
-    patient_id: str
+    patient_id: str,
+    scope: CapabilityScope = None,
+    user_id: str = None
 ) -> Optional[Patient]:
     """
     Function ka purpose: Specific patient ko fetch karna clinic context mein
@@ -254,6 +278,8 @@ async def get_patient_by_id(
             Patient.id == uuid.UUID(patient_id),
             Patient.clinic_id == uuid.UUID(clinic_id)
         )
+        if scope:
+            query = apply_patient_scope(query, scope, user_id)
         
         # Query execute karte hain
         result = await db.execute(query)
@@ -280,13 +306,24 @@ async def update_patient(
     db: AsyncSession,
     clinic_id: str,
     patient_id: str,
-    patient_in: PatientUpdate
+    patient_in: PatientUpdate,
+    scope: CapabilityScope = None,
+    user_id: str = None
 ) -> Patient:
     from app.repositories.patient import PatientRepository
     try:
         logger.info(f"Updating patient {patient_id} in clinic {clinic_id}")
         repo = PatientRepository(db)
-        patient = await repo.get_by_patient_id(uuid.UUID(patient_id), clinic_id=uuid.UUID(clinic_id))
+        
+        # Check using query to apply scope
+        query = select(Patient).where(
+            Patient.id == uuid.UUID(patient_id),
+            Patient.clinic_id == uuid.UUID(clinic_id)
+        )
+        if scope:
+            query = apply_patient_scope(query, scope, user_id)
+        result = await db.execute(query)
+        patient = result.scalars().first()
         if not patient:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Patient not found")
@@ -330,7 +367,9 @@ async def search_patients(
     db: AsyncSession,
     clinic_id: str,
     search: str,
-    pagination: PaginationParams
+    pagination: PaginationParams,
+    scope: CapabilityScope = None,
+    user_id: str = None
 ) -> Tuple[List[Patient], int]:
     from app.repositories.patient import PatientRepository
     try:
@@ -341,15 +380,19 @@ async def search_patients(
         offset = (pagination.page - 1) * pagination.page_size
         limit = pagination.page_size
         
-        # Simple heuristic: if it's 10 digits, search by phone
-        # if it contains '@', search by email
-        # else search by name
         if search.isdigit() and len(search) == 10:
-            patients = await repo.search_by_phone(search, clinic_id=c_id, offset=offset, limit=limit)
+            query = select(Patient).where(Patient.phone.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
         elif '@' in search:
-            patients = await repo.search_by_email(search, clinic_id=c_id, offset=offset, limit=limit)
+            query = select(Patient).where(Patient.email.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
         else:
-            patients = await repo.search_by_name(search, clinic_id=c_id, offset=offset, limit=limit)
+            query = select(Patient).where(Patient.full_name.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
+            
+        if scope:
+            query = apply_patient_scope(query, scope, user_id)
+            
+        query = query.offset(offset).limit(limit)
+        result = await db.execute(query)
+        patients = list(result.scalars().all())
             
         # Since repository search methods don't return total count efficiently in the same way,
         # we can just return len(patients) as total for now, or we'd need to add count methods to the repo.

@@ -1,6 +1,7 @@
 from app.models.base import Base, TimestampMixin, UUIDMixin, SoftDeleteMixin
 from app.models.clinic import Clinic, ClinicPlanTier
 from app.models.user import User
+from app.models.user_permission import UserPermission
 from app.models.patient import Patient, PatientStatus
 from app.models.exercise import Exercise
 from app.models.prescription import Prescription, PrescriptionItem
@@ -23,6 +24,7 @@ __all__ = [
     "Clinic",
     "ClinicPlanTier",
     "User",
+    "UserPermission",
     "Patient",
     "PatientStatus",
     "Exercise",
