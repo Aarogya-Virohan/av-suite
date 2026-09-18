@@ -228,6 +228,20 @@ def build_report_html(report: dict) -> str:
     # dash would read as empty rather than as unavailable.
     score_text = f"{score}%" if score is not None else "Not available"
 
+    # The index has been computable from a different number of parameters
+    # for every patient, and two patients with identical severe findings
+    # could get very different scores depending on how much else happened
+    # to be measurable from their photos. The score without this count is
+    # not comparable across patients or across visits. Not shown when
+    # attempted is 0 or missing, since there is nothing to qualify then.
+    graded = global_index.get("graded")
+    attempted = global_index.get("attempted")
+    basis_text = (
+        f"Based on {graded} of {attempted} parameters"
+        if attempted
+        else None
+    )
+
     return f"""
 <!DOCTYPE html>
 <html>
@@ -480,6 +494,11 @@ def build_report_html(report: dict) -> str:
         color: #334155;
         margin: 0;
     }}
+    .index-block .index-basis {{
+        font-size: 7pt;
+        color: #94a3b8;
+        margin: 3px 0 0 0;
+    }}
 
     .signature {{
         margin-top: 22px;
@@ -566,6 +585,7 @@ def build_report_html(report: dict) -> str:
     <p class="label">Global Stability Index</p>
     <p class="score">{score_text}</p>
     <p class="descriptor">{_esc(global_index.get('descriptor'))}</p>
+    {f'<p class="index-basis">{_esc(basis_text)}</p>' if basis_text else ''}
 </div>
 
 <table class="signature">

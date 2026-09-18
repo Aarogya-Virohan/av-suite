@@ -37,6 +37,8 @@ export default function ReportCard({
       <GlobalIndex
         score={data.globalIndex.score}
         descriptor={data.globalIndex.descriptor}
+        graded={data.globalIndex.graded}
+        attempted={data.globalIndex.attempted}
       />
 
     </div>

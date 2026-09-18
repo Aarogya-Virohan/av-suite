@@ -1,12 +1,24 @@
 interface Props {
   score: number | null
   descriptor: string
+  graded?: number
+  attempted?: number
 }
 
 export default function GlobalIndex({
   score,
-  descriptor
+  descriptor,
+  graded,
+  attempted
 }: Props) {
+  // The index has been computable from a different number of parameters
+  // for every patient, so the same severe findings can produce very
+  // different scores depending on how much else was measurable. Shown
+  // only when there is something to qualify.
+  const basisText =
+    attempted != null && attempted > 0
+      ? `Based on ${graded ?? 0} of ${attempted} parameters`
+      : null
   return (
     <div className="print-section print-tight rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
 
@@ -44,6 +56,12 @@ export default function GlobalIndex({
         <p className="mt-6 text-xl font-semibold text-slate-900">
           {descriptor}
         </p>
+
+        {basisText && (
+          <p className="mt-2 text-sm text-slate-500">
+            {basisText}
+          </p>
+        )}
 
       </div>
     </div>
