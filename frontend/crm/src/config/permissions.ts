@@ -114,12 +114,12 @@ export const CANONICAL_CAPABILITIES: CapabilityMeta[] = [
   { key: 'leads.convert', module: 'Leads', label: 'Convert Leads to Patients', allowedScopes: ['none', 'own', 'all'] },
   // Appointments
   { key: 'appointments.view', module: 'Appointments', label: 'View Appointments', allowedScopes: ['none', 'own', 'all'] },
-  { key: 'appointments.create', module: 'Appointments', label: 'Create Appointments', allowedScopes: ['none', 'all'] },
+  { key: 'appointments.create', module: 'Appointments', label: 'Create Appointments', allowedScopes: ['none', 'own', 'all'] },
   { key: 'appointments.edit', module: 'Appointments', label: 'Edit / Reschedule Appointments', allowedScopes: ['none', 'own', 'all'] },
   { key: 'appointments.delete', module: 'Appointments', label: 'Cancel / Delete Appointments', allowedScopes: ['none', 'own', 'all'] },
   // Treatments
   { key: 'treatments.view', module: 'Treatments', label: 'View Treatment Sessions', allowedScopes: ['none', 'own', 'all'] },
-  { key: 'treatments.create', module: 'Treatments', label: 'Create Treatment Sessions', allowedScopes: ['none', 'all'] },
+  { key: 'treatments.create', module: 'Treatments', label: 'Create Treatment Sessions', allowedScopes: ['none', 'own', 'all'] },
   { key: 'treatments.edit', module: 'Treatments', label: 'Edit Treatment Sessions', allowedScopes: ['none', 'own', 'all'] },
   { key: 'treatments.delete', module: 'Treatments', label: 'Delete Treatment Sessions', allowedScopes: ['none', 'own', 'all'] },
   // Assessments
@@ -205,11 +205,11 @@ export const CANONICAL_ROLE_TEMPLATES: Record<UserRole, Partial<Record<Canonical
     'leads.delete': 'none',
     'leads.convert': 'none',
     'appointments.view': 'own',
-    'appointments.create': 'all',
+    'appointments.create': 'own',
     'appointments.edit': 'own',
     'appointments.delete': 'own',
     'treatments.view': 'own',
-    'treatments.create': 'all',
+    'treatments.create': 'own',
     'treatments.edit': 'own',
     'treatments.delete': 'own',
     'assessments.view': 'own',

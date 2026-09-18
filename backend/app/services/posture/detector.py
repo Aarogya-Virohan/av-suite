@@ -1,20 +1,27 @@
 import cv2
-import mediapipe as mp
-from mediapipe import solutions as mp_solutions
 import numpy as np
 
 from .schemas import Landmark
 from .exceptions import InsufficientVisibilityError
 
-mp_pose = mp_solutions.pose  # type: ignore
-
-# initialize a Pose estimator
-pose = mp_pose.Pose(static_image_mode=True, model_complexity=1)
+try:
+    import mediapipe as mp
+    from mediapipe import solutions as mp_solutions
+    mp_pose = mp_solutions.pose  # type: ignore
+    # initialize a Pose estimator
+    pose = mp_pose.Pose(static_image_mode=True, model_complexity=1)
+except Exception:
+    mp_pose = None
+    pose = None
 
 VISIBILITY_THRESHOLD = 0.65
 
 
 def detect_pose(image_bytes: bytes) -> list[Landmark]:
+    if pose is None:
+        raise RuntimeError(
+            "MediaPipe Pose solution is not available in the current environment."
+        )
 
     np_arr = np.frombuffer(image_bytes, np.uint8)
 

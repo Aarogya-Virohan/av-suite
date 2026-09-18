@@ -7,6 +7,13 @@ from typing import AsyncGenerator
 import os
 import uuid
 
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+os.environ.setdefault("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-at-least-32-chars-long-123456")
+os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
+os.environ.setdefault("SUPABASE_SECRET_KEY", "test-secret-key")
+os.environ.setdefault("CLINIC_DOCUMENTS_BUCKET", "test-bucket")
+
 from app.main import app
 from app.core.database import get_db
 from app.models.base import Base

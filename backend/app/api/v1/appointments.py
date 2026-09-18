@@ -172,8 +172,9 @@ async def soft_cancel_appointment(
     clinic: CurrentClinicDep,
     user: CurrentUserDep,
     service: AppointmentServiceDep,
-    scope: CapabilityScope = Depends(require_capability("appointments.edit")),
+    scope: CapabilityScope = Depends(require_capability("appointments.delete")),
 ) -> AppointmentResponse:
+
     """Soft-cancel an appointment for the authenticated clinic."""
 
     try:

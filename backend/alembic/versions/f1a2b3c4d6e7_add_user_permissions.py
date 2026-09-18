@@ -23,7 +23,9 @@ capability_scope = ENUM("none", "own", "all", name="capability_scope", create_ty
 
 def upgrade() -> None:
     bind = op.get_bind()
-    op.execute("DO $$ BEGIN CREATE TYPE capability_scope AS ENUM ('none', 'own', 'all'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    if bind.dialect.name == "postgresql":
+        capability_scope.create(bind, checkfirst=True)
+
 
     op.create_table(
         "user_permissions",

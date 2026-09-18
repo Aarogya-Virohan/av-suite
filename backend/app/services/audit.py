@@ -33,6 +33,16 @@ class AuditLogService:
         """Record an audit log entry safely without causing parent transaction failure."""
 
         try:
+            if isinstance(clinic_id, str):
+                clinic_id = UUID(clinic_id)
+            if isinstance(user_id, str):
+                user_id = UUID(user_id)
+            if isinstance(entity_id, str):
+                try:
+                    entity_id = UUID(entity_id)
+                except ValueError:
+                    pass
+
             log_data = {
                 "clinic_id": clinic_id,
                 "user_id": user_id,
@@ -46,6 +56,10 @@ class AuditLogService:
             return log_entry
         except Exception as exc:
             logger.warning("Failed to record audit log event (%s on %s): %s", action, entity_type, exc)
+            try:
+                await self.audit_repository.session.rollback()
+            except Exception:
+                pass
             return None
 
     async def list_logs(

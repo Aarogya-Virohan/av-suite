@@ -1,13 +1,21 @@
 import cv2
-import mediapipe as mp
-from mediapipe.python.solutions import drawing_utils, pose
 import numpy as np
 
-mp_drawing = drawing_utils
-mp_pose = pose
+try:
+    import mediapipe as mp
+    from mediapipe.python.solutions import drawing_utils, pose
+    mp_drawing = drawing_utils
+    mp_pose = pose
+except Exception:
+    mp_drawing = None
+    mp_pose = None
 
 
 def annotate_pose(image_bytes: bytes, results) -> bytes:
+    if mp_drawing is None or mp_pose is None:
+        raise RuntimeError(
+            "MediaPipe Pose drawing utilities are not available in the current environment."
+        )
 
     np_arr = np.frombuffer(image_bytes, np.uint8)
 

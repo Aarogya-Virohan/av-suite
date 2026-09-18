@@ -6,7 +6,8 @@ from uuid import UUID
 import logging
 
 from app.core.database import get_db
-from app.core.dependencies import require_permission, get_current_user
+from app.core.dependencies import get_current_user, require_capability
+from app.enums.permission import CapabilityScope
 from app.models.user import User
 from app.schemas.user import UserRead, UserCreate
 from app.core.security import get_password_hash
@@ -19,10 +20,15 @@ from app.services.audit import AuditLogService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(dependencies=[Depends(require_permission("clinic_admin"))])
+router = APIRouter()
+
 
 @router.get("", response_model=ResponseEnvelope[List[UserRead]], tags=["Users"])
-async def list_users(request: Request, db: AsyncSession = Depends(get_db)):
+async def list_users(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("users.view")),
+):
     """
     List all users/therapists in the clinic.
     """
@@ -46,7 +52,7 @@ async def list_users(request: Request, db: AsyncSession = Depends(get_db)):
             "role": user.role,
             "is_active": user.is_active,
             "created_at": user.created_at,
-            "updated_at": user.updated_at
+            "updated_at": user.updated_at,
         }
         users_data.append(u_dict)
         
@@ -57,7 +63,8 @@ async def list_users(request: Request, db: AsyncSession = Depends(get_db)):
 async def create_user(
     payload: UserCreate, 
     request: Request, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("users.create")),
 ):
     """
     Create a new user in the clinic.
@@ -114,7 +121,12 @@ async def create_user(
 
 
 @router.get("/{user_id}/permissions", response_model=ResponseEnvelope[List[UserPermissionRead]], tags=["Users"])
-async def get_user_permissions(user_id: UUID, request: Request, db: AsyncSession = Depends(get_db)):
+async def get_user_permissions(
+    user_id: UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("permissions.view")),
+):
     """
     Get all explicit permission overrides for a user in the clinic.
     """
@@ -137,7 +149,8 @@ async def update_user_permissions(
     permissions: List[UserPermissionCreate], 
     request: Request, 
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    scope: CapabilityScope = Depends(require_capability("permissions.edit")),
 ):
     """
     Completely replace the user's explicit permission overrides.
@@ -154,12 +167,12 @@ async def update_user_permissions(
         
     granted_by = current_user.id
     
-    # Lockout Guard: Prevent removing the last 'permissions.manage' or 'users.manage' capability
-    new_perms_manage_override = next((p.scope for p in permissions if p.capability_key == 'permissions.manage'), None)
-    new_users_manage_override = next((p.scope for p in permissions if p.capability_key == 'users.manage'), None)
+    # Lockout Guard: Prevent removing 'permissions.edit' or 'users.edit' capability from last admin
+    new_perms_override = next((p.scope for p in permissions if p.capability_key in ('permissions.edit', 'permissions.manage')), None)
+    new_users_override = next((p.scope for p in permissions if p.capability_key in ('users.edit', 'users.manage')), None)
     
-    # We only care if they are explicitly being set to 'none' and they are currently an Admin
-    if user.role == UserRole.ADMIN.value and (new_perms_manage_override == 'none' or new_users_manage_override == 'none'):
+    # We only care if they are explicitly being set to 'none' and target is currently an Admin
+    if user.role == UserRole.ADMIN.value and (new_perms_override == 'none' or new_users_override == 'none'):
         # Check if any OTHER active admin exists without a 'none' override
         all_admins_stmt = select(User).where(User.clinic_id == clinic_id, User.role == UserRole.ADMIN.value, User.is_active == True, User.id != user_id)
         other_admins = (await db.execute(all_admins_stmt)).scalars().all()
@@ -167,8 +180,8 @@ async def update_user_permissions(
         has_other_admin_with_perms = False
         for admin in other_admins:
             admin_overrides = await repo.list_for_user_in_clinic(clinic_id, admin.id)
-            perms_override = next((p.scope for p in admin_overrides if p.capability_key == 'permissions.manage'), None)
-            users_override = next((p.scope for p in admin_overrides if p.capability_key == 'users.manage'), None)
+            perms_override = next((p.scope for p in admin_overrides if p.capability_key in ('permissions.edit', 'permissions.manage')), None)
+            users_override = next((p.scope for p in admin_overrides if p.capability_key in ('users.edit', 'users.manage')), None)
             
             # If the other admin does not have a 'none' override for either, they are safe
             if perms_override != 'none' and users_override != 'none':
@@ -231,12 +244,14 @@ async def update_user_permissions(
     
     return ResponseEnvelope(data=updated_perms)
 
+
 @router.delete("/{user_id}", response_model=ResponseEnvelope[None], tags=["Users"])
 async def delete_user(
     user_id: UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    scope: CapabilityScope = Depends(require_capability("users.delete")),
 ):
     """
     Remove a user from the clinic.

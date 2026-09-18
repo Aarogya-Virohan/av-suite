@@ -458,16 +458,16 @@ async def test_frontdesk_can_view_and_create(
     assert create_response.status_code == 201
 
 
-async def test_frontdesk_cannot_edit(
+async def test_frontdesk_can_edit(
     client: AsyncClient,
     frontdesk_auth_headers: dict,
     appointments: tuple,
 ) -> None:
-    """Front desk has NONE for appointments.edit (not in role template) → 403."""
+    """Front desk has ALL for appointments.edit (by role template to allow rescheduling) → 200."""
     appt_own, _ = appointments
     response = await client.patch(
         f"/api/v1/appointments/{appt_own.id}",
         json={"duration_minutes": 45},
         headers=frontdesk_auth_headers,
     )
-    assert response.status_code == 403
+    assert response.status_code == 200

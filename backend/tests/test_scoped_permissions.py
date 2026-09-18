@@ -15,7 +15,7 @@ def test_known_capability_lookup() -> None:
 
     assert capability is not None
     assert capability.key == "analytics.my_performance"
-    assert capability.allowed_scopes == {CapabilityScope.NONE, CapabilityScope.OWN}
+    assert capability.allowed_scopes == {CapabilityScope.NONE, CapabilityScope.OWN, CapabilityScope.ALL}
 
 
 def test_unknown_capability_resolves_to_denied() -> None:
@@ -27,8 +27,8 @@ def test_unknown_capability_resolves_to_denied() -> None:
 def test_role_template_lookup() -> None:
     template = get_role_template(UserRole.ADMIN)
 
-    assert template["permissions.manage"] == CapabilityScope.ALL
-    assert template["users.manage"] == CapabilityScope.ALL
+    assert template["permissions.edit"] == CapabilityScope.ALL
+    assert template["users.edit"] == CapabilityScope.ALL
 
 
 def test_default_role_permission_resolution() -> None:
@@ -44,19 +44,19 @@ def test_default_role_permission_resolution() -> None:
 def test_explicit_none_override_denies_role_template_grant() -> None:
     scope = resolve_capability_scope(
         UserRole.ADMIN,
-        "permissions.manage",
-        user_permissions={"permissions.manage": CapabilityScope.NONE},
+        "permissions.edit",
+        user_permissions={"permissions.edit": CapabilityScope.NONE},
     )
 
     assert scope == CapabilityScope.NONE
 
 
 def test_allowed_scope_validation() -> None:
-    scope = validate_capability_scope("permissions.manage", "all")
+    scope = validate_capability_scope("permissions.edit", "all")
 
     assert scope == CapabilityScope.ALL
 
 
 def test_disallowed_scope_validation() -> None:
     with pytest.raises(ValueError):
-        validate_capability_scope("permissions.manage", CapabilityScope.OWN)
+        validate_capability_scope("permissions.edit", CapabilityScope.OWN)

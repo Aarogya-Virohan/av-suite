@@ -9,7 +9,11 @@ from app.models.prescription import Prescription
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
 from app.repositories.prescription import PrescriptionRepository
 from app.utils.whatsapp import build_whatsapp_link
-from weasyprint import HTML
+
+try:
+    from weasyprint import HTML
+except (ImportError, OSError):
+    HTML = None
 
 logger = logging.getLogger(__name__)
 
@@ -471,6 +475,10 @@ async def generate_prescription_pdf(
         """
 
         # Generate PDF using WeasyPrint
+        if HTML is None:
+            raise RuntimeError(
+                "PDF generation requires WeasyPrint and native GTK/Pango libraries to be installed on the system."
+            )
         HTML(string=html_content).write_pdf(pdf_path)
 
         # Save pdf key back to the database
