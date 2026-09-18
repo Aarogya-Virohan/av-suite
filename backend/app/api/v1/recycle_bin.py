@@ -4,7 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_capability
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,7 +25,7 @@ from app.services.recycle_bin import (
     RecycleBinService,
 )
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter()
 
 
 async def get_recycle_bin_service(
@@ -50,6 +50,7 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 async def list_recycle_bin_items(
     clinic: CurrentClinicDep,
     service: RecycleBinServiceDep,
+    _: None = Depends(require_capability("recyclebin.view")),
     resource_type: Annotated[str | None, Query(alias="resource_type")] = None,
 ) -> RecycleBinListResponse:
     """List soft-deleted resources for the authenticated clinic."""
@@ -58,21 +59,30 @@ async def list_recycle_bin_items(
         items = await service.list_deleted(clinic.id, resource_type=resource_type)
         return RecycleBinListResponse(items=items, total=len(items))
     except RecycleBinError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.post("/recycle-bin/{resource}/{id}/restore", response_model=RecycleBinRestoreResponse)
+@router.post(
+    "/recycle-bin/{resource}/{id}/restore", response_model=RecycleBinRestoreResponse
+)
 async def restore_recycle_bin_item(
     resource: str,
     id: UUID,
     clinic: CurrentClinicDep,
     service: RecycleBinServiceDep,
+    _: None = Depends(require_capability("recyclebin.restore")),
 ) -> RecycleBinRestoreResponse:
     """Restore a soft-deleted resource belonging to the authenticated clinic."""
 
     try:
         return await service.restore_resource(clinic.id, resource, id)
     except RecycleBinNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except RecycleBinError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
