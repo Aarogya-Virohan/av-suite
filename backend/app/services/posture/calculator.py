@@ -720,10 +720,22 @@ def calc_heel_valgus(landmarks: list[Landmark], side: Literal["left", "right"]) 
 
 def calc_pelvic_rotation(landmarks: list[Landmark]) -> float:
     """
-    PT-P04 — Pelvic Rotation (Axial). Angular difference between the
-    shoulder-line orientation and hip-line orientation, in degrees.
-    A larger difference indicates the pelvis is rotated relative to
-    the shoulder girdle.
+    PT-P04. Angular difference between the shoulder-line orientation and
+    the hip-line orientation, in degrees.
+
+    This is not axial rotation and does not measure torsion. It cannot,
+    because MediaPipe returns no landmark on the spine or pelvis that
+    would let a 2D photograph see rotation about a vertical axis. When
+    the shoulder line is level this reduces to the hip line's own angle
+    from horizontal, which is exactly what PT-A04 (Pelvic Obliquity)
+    already reports.
+
+    The function name and the parameter's own label still say
+    "rotation," which this measurement is not. Left as is pending a
+    founder decision on what to call it and whether it should stay
+    separate from PT-A04 at all, see the 15 September status document,
+    Section B2 item 12 and question D-list. Do not attach a rotation or
+    torsion citation to this parameter; none applies to what it computes.
     """
 
     shoulder_dx = landmarks[RIGHT_SHOULDER].x - landmarks[LEFT_SHOULDER].x
