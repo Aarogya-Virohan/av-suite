@@ -91,6 +91,27 @@ def build_side_view_result(
     }
 
 
+# Which state of the analysis code produced a report.
+#
+# Grades move when thresholds, sign conventions or calibration change, so
+# two reports for the same patient are only comparable if they came from
+# the same version. Without this stamp there is no way to tell a real
+# change in a patient from a change in our own bands, and the September
+# work changed several: PT-A03 and PT-P01 onto one threshold set, PT-P03
+# onto population-centred bands, PT-A01's normal ceiling above the noise
+# floor, PT-L05 and PT-P03 signed.
+#
+# Bump this whenever a change moves a number or a grade on the report.
+# Do not bump it for wording, layout or comments.
+#
+# Known still to come, which will each need a bump: the millimetre
+# calibration constant in calculator.py (currently 0.97, which inflates
+# every millimetre value by roughly 15 percent, and must be measured on
+# our own photographs before it is changed), and any threshold the
+# founders set from their own reference ranges.
+ANALYSIS_VERSION = "2026-09-18"
+
+
 def build_report_response(
     patient: dict[str, Any],
     side_view: dict[str, Any],
@@ -102,6 +123,7 @@ def build_report_response(
 
     return {
         "patient": patient,
+        "analysisVersion": ANALYSIS_VERSION,
         "views": {
             "side": side_view,
             "front": front_view,

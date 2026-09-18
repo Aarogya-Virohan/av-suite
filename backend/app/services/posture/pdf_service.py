@@ -223,6 +223,11 @@ def build_report_html(report: dict) -> str:
     views = report.get("views") or {}
     global_index = report.get("globalIndex") or {}
 
+    # Stamped so two reports for the same patient are only compared when
+    # they came from the same analysis code. Grades move when thresholds,
+    # sign conventions or calibration change.
+    analysis_version = report.get("analysisVersion")
+
     score = global_index.get("score")
     # The index stands alone with no finding column beside it, so a bare
     # dash would read as empty rather than as unavailable.
@@ -537,6 +542,12 @@ def build_report_html(report: dict) -> str:
         color: #94a3b8;
     }}
 
+    .analysis-version {{
+        margin-top: 6px;
+        font-size: 6.5pt;
+        color: #94a3b8;
+    }}
+
     .disclaimer {{
         margin-top: 18px;
         border-top: 1px solid #e2e8f0;
@@ -598,6 +609,7 @@ def build_report_html(report: dict) -> str:
 
 <p class="side-note">{SIDE_NOTE}</p>
 <p class="disclaimer">{DISCLAIMER}</p>
+{f'<p class="analysis-version">Analysis version {_esc(analysis_version)}. Values and grades are only comparable with reports carrying the same version.</p>' if analysis_version else ''}
 
 </body>
 </html>

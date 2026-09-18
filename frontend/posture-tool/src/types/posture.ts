@@ -60,6 +60,14 @@ export interface PostureReport {
 
   synthesis: SynthesisData
 
+  // Which state of the analysis code produced this report. Grades move
+  // when thresholds, sign conventions or calibration change, so two
+  // reports for the same patient are only comparable if this matches.
+  // Optional because reports generated before 18 Sept 2026 do not carry
+  // it, and the absence of it is itself the signal that a report predates
+  // the September threshold work.
+  analysisVersion?: string
+
   globalIndex: {
     // Null when no parameter produced a grade. The backend used to send 100
     // with "Optimal Alignment" in that case; it now sends null and
@@ -67,8 +75,7 @@ export interface PostureReport {
     score: number | null
     descriptor: string
     // How many parameters the score rests on, and how many rows the report
-    // printed. Carried for now, not rendered: how an incomplete index should
-    // be shown is an open clinical question.
+    // printed.
     graded?: number
     attempted?: number
   }
