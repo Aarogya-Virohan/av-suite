@@ -43,8 +43,11 @@ export default function AppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
   const [requests, setRequests] = useState<BookingRequest[]>([]);
 
-  // Fetch pending appointment requests from backend on mount
+  const canViewBookingRequests = role === 'admin' || role === 'front_desk';
+
+  // Fetch pending appointment requests from backend on mount (only for authorized roles)
   React.useEffect(() => {
+    if (!canViewBookingRequests) return;
     const fetchRequests = async () => {
       try {
         const res = await apiClient.get('/appointment-requests');
@@ -55,7 +58,7 @@ export default function AppointmentsPage() {
       }
     };
     fetchRequests();
-  }, []);
+  }, [canViewBookingRequests]);
 
   // Clinic Settings for Booking Link
   const { data: clinicSettings } = useClinicSettings();
@@ -167,22 +170,24 @@ export default function AppointmentsPage() {
             <span>Appointments Schedule</span>
           </button>
 
-          <button
-            onClick={() => setActiveSubTab('requests')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeSubTab === 'requests'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>Pending Requests</span>
-            {pendingRequestsCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500 text-white animate-pulse">
-                {pendingRequestsCount}
-              </span>
-            )}
-          </button>
+          {canViewBookingRequests && (
+            <button
+              onClick={() => setActiveSubTab('requests')}
+              className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                activeSubTab === 'requests'
+                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              <span>Pending Requests</span>
+              {pendingRequestsCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500 text-white animate-pulse">
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </button>
+          )}
 
           <button
             onClick={() => setActiveSubTab('bookingLink')}

@@ -14,6 +14,7 @@ import { EditPatientSlideOver } from '../../../../features/patients/components/E
 import { WhatsAppButton, openWhatsApp } from '../../../../components/ui/WhatsAppButton';
 import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, TrendingDown, Activity, FileCheck, Camera, Dumbbell, Edit2, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../../../../lib/api-client';
+import { getStoredToken } from '../../../../lib/auth';
 import { toast } from 'sonner';
 import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } from '../../../../features/prescriptions/api';
 
@@ -96,7 +97,7 @@ export default function PatientWorkspacePage() {
 
       const downloadUrl = `${API_BASE_URL}/prescriptions/${rxId}/pdf/download`;
       
-      const token = localStorage.getItem('av_crm_token');
+      const token = getStoredToken();
       const response = await fetch(downloadUrl, {
         headers: {
           'Authorization': `Bearer ${token}`

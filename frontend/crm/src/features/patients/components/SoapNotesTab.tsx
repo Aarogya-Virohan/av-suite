@@ -88,6 +88,7 @@ export function SoapNotesTab({
     try {
       const payload = {
         patient_id: patientId,
+        therapist_id: useAuthStore.getState().userId || undefined,
         specialty: activeNote.specialty,
         diagnosis: activeNote.diagnosis,
         is_reassessment: isReassessmentOnly,

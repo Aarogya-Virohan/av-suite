@@ -13,10 +13,11 @@ export const fetchAnalyticsOverview = async (): Promise<AnalyticsOverview> => {
   return data.data; // Standardized API response { data: ... }
 };
 
-export const useAnalyticsOverview = () => {
+export const useAnalyticsOverview = (enabled = true) => {
   return useQuery({
     queryKey: analyticsKeys.overview(),
     queryFn: fetchAnalyticsOverview,
+    enabled,
   });
 };
 
@@ -36,9 +37,10 @@ export const fetchMyPerformance = async (): Promise<TherapistPerformance> => {
   return data.data;
 };
 
-export const useMyPerformance = () => {
+export const useMyPerformance = (enabled = true) => {
   return useQuery({
     queryKey: analyticsKeys.myPerformance(),
     queryFn: fetchMyPerformance,
+    enabled,
   });
 };

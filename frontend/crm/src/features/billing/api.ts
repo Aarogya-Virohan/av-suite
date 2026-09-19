@@ -10,9 +10,9 @@ export function useInvoices() {
     queryKey: [...BILLING_QUERY_KEY, 'invoices'],
     queryFn: async () => {
       const res = await apiClient.get('/invoices');
-      const data = res.data?.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.items)) return data.items;
+      const raw = res.data?.items ?? res.data?.data ?? res.data;
+      if (Array.isArray(raw)) return raw;
+      if (raw && Array.isArray(raw.items)) return raw.items;
       return [];
     },
   });
@@ -23,9 +23,9 @@ export function usePayments() {
     queryKey: [...BILLING_QUERY_KEY, 'payments'],
     queryFn: async () => {
       const res = await apiClient.get('/payments');
-      const data = res.data?.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.items)) return data.items;
+      const raw = res.data?.items ?? res.data?.data ?? res.data;
+      if (Array.isArray(raw)) return raw;
+      if (raw && Array.isArray(raw.items)) return raw.items;
       return [];
     },
   });
@@ -36,9 +36,9 @@ export function usePackages() {
     queryKey: [...BILLING_QUERY_KEY, 'packages'],
     queryFn: async () => {
       const res = await apiClient.get('/packages');
-      const data = res.data?.data;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.items)) return data.items;
+      const raw = res.data?.items ?? res.data?.data ?? res.data;
+      if (Array.isArray(raw)) return raw;
+      if (raw && Array.isArray(raw.items)) return raw.items;
       return [];
     },
   });
