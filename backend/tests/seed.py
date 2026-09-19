@@ -1,256 +1,222 @@
 import sys
 import os
-# Add backend directory to Python path so app.* modules can be imported
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-"""
-Seed Script for AV Suite CRM
-============================
-This script is used to populate the local or remote database with robust dummy data.
-It should primarily be used for testing and local development.
-
-What this file does:
-1. Connects to the database using SQLAlchemy async session.
-2. Uses the Supabase client to upload a dummy PDF document to the 'documents' storage bucket.
-3. Seeds the following entities with complete data (filling all required and optional columns):
-   - Clinics (with 'clinical_pro' tier and documents enabled)
-   - Users (Admins, Therapists, Front Desk roles)
-   - Leads (Includes stage, source, and assignment tracking)
-   - Patients (Includes age, gender, exact 10-digit phone, and chief complaints)
-   - Exercises (Includes body_part and video URL placeholders)
-   - Treatment Sessions (Includes pain_score and home_advice)
-   - Patient Documents (Links the uploaded Supabase bucket file URLs to the patient's record)
-
-Usage:
-    cd backend
-    python tests/seed.py
-"""
-
 import asyncio
 from datetime import datetime, timezone, date
 import uuid
 
-from sqlalchemy.ext.asyncio import AsyncSession
+# Add backend directory to Python path so app.* modules can be imported
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from sqlalchemy import text
 from app.core.database import AsyncSessionLocal
 from app.core.security import get_password_hash
 from app.enums.user import UserRole
 from app.enums.shared import Gender
-from app.enums.document import DocumentCategory
 from app.enums.lead import LeadStage, LeadSource
-from app.models.clinic import Clinic
+from app.models.clinic import Clinic, ClinicPlanTier
 from app.models.user import User
 from app.models.patient import Patient
 from app.models.treatment import TreatmentSession
 from app.models.exercise import Exercise
 from app.models.lead import Lead
-from app.models.document import PatientDocument
-from app.core.config import settings
 
-from supabase import create_client, Client
+ALL_DATA_TABLES = [
+    "audit_logs",
+    "patient_documents",
+    "payments",
+    "invoice_items",
+    "invoices",
+    "patient_packages",
+    "packages",
+    "soap_assessments",
+    "treatment_sessions",
+    "appointment_requests",
+    "appointments",
+    "leads",
+    "posture_measurements",
+    "posture_sessions",
+    "prescription_items",
+    "prescriptions",
+    "exercises",
+    "patients",
+    "user_permissions",
+    "users",
+    "clinics",
+]
+
+
+async def wipe_database(session):
+    """Wipes all business and CRM data while keeping schema and migrations intact."""
+    tables_list = ", ".join(f'"{table}"' for table in ALL_DATA_TABLES)
+    print("Wiping all existing database records...")
+    await session.execute(text(f"TRUNCATE TABLE {tables_list} CASCADE;"))
+    await session.commit()
+    print("Database wiped successfully.")
+
 
 async def seed():
-    # Setup Supabase client for bucket operations
-    supabase_url = settings.SUPABASE_URL
-    supabase_key = settings.SUPABASE_SECRET_KEY
-    supabase: Client = create_client(supabase_url, supabase_key)
-
     async with AsyncSessionLocal() as session:
-        # Create 3 Clinics
+        # 1. Wipe whole database
+        await wipe_database(session)
+
+        print("Seeding fresh data (2 Clinics, Admins, Therapists, Leads, Exercises, Treatments)...")
+
+        # 2. Create 2 Clinics
         clinics = []
-        for i in range(1, 4):
+        for i in range(1, 3):
             clinic = Clinic(
                 id=uuid.uuid4(),
-                name=f"Av Suite Clinic {i}",
+                name=f"AV Suite Clinic {i}",
                 branding_logo_url=f"https://logo.example.com/clinic{i}.png",
-                branding_color="#000000",
-                plan_tier="clinical_pro",
+                branding_color="#0d9488" if i == 1 else "#2563eb",
+                plan_tier=ClinicPlanTier.clinical_pro,
                 is_partner_clinic=True,
-                is_documents_enabled=True
+                is_documents_enabled=True,
             )
             session.add(clinic)
             clinics.append(clinic)
-        
+
         await session.commit()
-        
-        # Add Users, Patients, Leads, Exercises, Treatments for each clinic
+
+        # 3. For each clinic, add Users (Admin, Therapists), Leads, Exercises, Treatments
         for idx, clinic in enumerate(clinics, start=1):
-            users_to_add = []
-            
-            # Admins
-            for a in range(1, 3):
-                users_to_add.append(User(
-                    id=uuid.uuid4(),
-                    clinic_id=clinic.id,
-                    email=f"admin{idx}_{a}@clinic.com",
-                    password_hash=get_password_hash("password123"),
-                    first_name=f"Admin{a}",
-                    last_name="User",
-                    role=UserRole.ADMIN,
-                    is_active=True,
-                ))
-
-            # Therapists
-            for t in range(1, 4):
-                users_to_add.append(User(
-                    id=uuid.uuid4(),
-                    clinic_id=clinic.id,
-                    email=f"therapist{idx}_{t}@clinic.com",
-                    password_hash=get_password_hash("password123"),
-                    first_name=f"Therapist{t}",
-                    last_name="User",
-                    role=UserRole.THERAPIST,
-                    is_active=True,
-                ))
-
-            # Front Desk
-            for f in range(1, 3):
-                users_to_add.append(User(
-                    id=uuid.uuid4(),
-                    clinic_id=clinic.id,
-                    email=f"frontdesk{idx}_{f}@clinic.com",
-                    password_hash=get_password_hash("password123"),
-                    first_name=f"FrontDesk{f}",
-                    last_name="User",
-                    role=UserRole.FRONT_DESK,
-                    is_active=True,
-                ))
-            
+            # Admin User
             admin = User(
                 id=uuid.uuid4(),
                 clinic_id=clinic.id,
                 email=f"admin{idx}@clinic.com",
                 password_hash=get_password_hash("password123"),
-                first_name="Admin",
+                first_name=f"Admin{idx}",
                 last_name="User",
                 role=UserRole.ADMIN,
                 is_active=True,
             )
-            therapist = User(
-                id=uuid.uuid4(),
-                clinic_id=clinic.id,
-                email=f"therapist{idx}@clinic.com",
-                password_hash=get_password_hash("password123"),
-                first_name="Therapist",
-                last_name="User",
-                role=UserRole.THERAPIST,
-                is_active=True,
-            )
+            session.add(admin)
+
+            # Therapists
+            therapists = []
+            for t_num in range(1, 3):
+                therapist = User(
+                    id=uuid.uuid4(),
+                    clinic_id=clinic.id,
+                    email=f"therapist{idx}_{t_num}@clinic.com",
+                    password_hash=get_password_hash("password123"),
+                    first_name=f"Therapist{t_num}",
+                    last_name=f"Clinic{idx}",
+                    role=UserRole.THERAPIST,
+                    is_active=True,
+                )
+                session.add(therapist)
+                therapists.append(therapist)
+
+            # Front Desk
             front_desk = User(
                 id=uuid.uuid4(),
                 clinic_id=clinic.id,
                 email=f"frontdesk{idx}@clinic.com",
                 password_hash=get_password_hash("password123"),
-                first_name="FrontDesk",
+                first_name=f"FrontDesk{idx}",
                 last_name="User",
                 role=UserRole.FRONT_DESK,
                 is_active=True,
             )
-            users_to_add.extend([admin, therapist, front_desk])
-            
-            session.add_all(users_to_add)
-            
+            session.add(front_desk)
+
+            await session.flush()
+
             # Leads
-            leads = []
-            lead_names = ["John Doe", "Jane Roe", "Alice Foo"]
-            for j in range(1, 4):
+            leads_data = [
+                ("Aarav Sharma", f"987654321{idx}", f"aarav{idx}@example.com", LeadSource.WEBSITE, LeadStage.NEW, "Inquired about shoulder rehabilitation."),
+                ("Diya Patel", f"987654322{idx}", f"diya{idx}@example.com", LeadSource.WALK_IN, LeadStage.CONTACTED, "Walk-in consultation for posture correction."),
+                ("Rohan Mehta", f"987654323{idx}", f"rohan{idx}@example.com", LeadSource.REFERRAL, LeadStage.QUALIFIED, "Referred by Dr. Verma for knee rehab."),
+            ]
+            for name, phone, email, source, stage, notes in leads_data:
                 lead = Lead(
                     id=uuid.uuid4(),
                     clinic_id=clinic.id,
-                    name=lead_names[j-1],
-                    phone=f"987654321{j}",
-                    email=f"lead{j}@clinic{idx}.com",
-                    source=LeadSource.WEBSITE,
-                    stage=LeadStage.NEW,
-                    assigned_to=front_desk.id,
-                    notes=f"Interested in initial assessment."
+                    name=name,
+                    phone=phone,
+                    email=email,
+                    source=source,
+                    stage=stage,
+                    assigned_to=therapists[0].id,
+                    notes=notes,
                 )
                 session.add(lead)
-                leads.append(lead)
 
-            # Patients
-            patients = []
-            patient_first_names = ["Alice", "Bob", "Charlie"]
-            for j in range(1, 4):
-                patient = Patient(
-                    id=uuid.uuid4(),
-                    clinic_id=clinic.id,
-                    user_id=None,
-                    first_name=patient_first_names[j-1],
-                    last_name="Smith",
-                    date_of_birth=date(1990, 1, 1),
-                    phone=f"123456789{j}",
-                    age=36,
-                    gender=Gender.MALE if j % 2 == 0 else Gender.FEMALE,
-                    chief_complaint="Lower back pain" if j == 1 else "Neck stiffness",
-                    referral_source="Google Search",
-                    status="active"
-                )
-                session.add(patient)
-                patients.append(patient)
-            
             # Exercises
-            for k in range(1, 3):
+            exercises_data = [
+                ("Shoulder External Rotation", "Rotate shoulder outward with resistance band", "Shoulder", "https://example.com/video/shoulder-rot.mp4"),
+                ("Cervical Retraction (Chin Tucks)", "Gently pull head straight back keeping eyes level", "Neck", "https://example.com/video/chin-tuck.mp4"),
+                ("Wall Angels", "Slide arms along wall maintaining back and elbow contact", "Upper Back", "https://example.com/video/wall-angels.mp4"),
+                ("Hamstring Stretch", "Hold seated forward reach for 30 seconds", "Legs", "https://example.com/video/hamstring.mp4"),
+            ]
+            for title, description, body_part, video_url in exercises_data:
                 exercise = Exercise(
                     id=uuid.uuid4(),
                     clinic_id=clinic.id,
-                    title=f"Exercise {k} for {clinic.name}",
-                    description="Standard exercise for rehabilitation.",
-                    body_part="Shoulder" if k == 1 else "Knee",
+                    title=title,
+                    description=description,
+                    body_part=body_part,
                     is_free=True,
-                    video_url="https://example.com/video.mp4"
+                    video_url=video_url,
                 )
                 session.add(exercise)
-                
+
             await session.flush()
-            
-            # Treatments & Documents
-            for p_idx, patient in enumerate(patients[:2]):
+
+            # Base patient required to link treatment sessions
+            patient = Patient(
+                id=uuid.uuid4(),
+                clinic_id=clinic.id,
+                first_name=f"Patient{idx}",
+                last_name="Sample",
+                date_of_birth=date(1992, 5, 15),
+                phone=f"912345678{idx}",
+                age=34,
+                gender=Gender.MALE if idx == 1 else Gender.FEMALE,
+                chief_complaint="Persistent lower back pain after desk work",
+                referral_source="Online Search",
+                status="active",
+            )
+            session.add(patient)
+            await session.flush()
+
+            # Treatments
+            treatments_data = [
+                ("Initial Assessment & Lumbar Mobilization", "Perform gentle lumbar extensions twice daily. Avoid prolonged sitting.", 6, "Patient demonstrated 30% limited lumbar flexion with mild tenderness."),
+                ("Follow-up Core Activation & Posture Correction", "Continue chin tucks and pelvic tilts 3x daily.", 3, "Significant improvement in lumbar mobility and reduced pain score."),
+            ]
+            for treat_name, advice, pain, notes in treatments_data:
                 treatment = TreatmentSession(
                     id=uuid.uuid4(),
                     clinic_id=clinic.id,
                     patient_id=patient.id,
                     appointment_id=None,
-                    therapist_id=therapist.id,
+                    therapist_id=therapists[0].id,
                     treatment_date=datetime.now(timezone.utc),
-                    pain_score=7,
-                    treatment="Initial Assessment",
-                    home_advice="Rest and apply ice.",
-                    notes="Patient showed restricted range of motion.",
-                    finalized=True
+                    pain_score=pain,
+                    treatment=treat_name,
+                    home_advice=advice,
+                    notes=notes,
+                    finalized=True,
                 )
                 session.add(treatment)
-                
-                # Upload Dummy Document to Supabase
-                file_path = f"{clinic.id}/{patient.id}/dummy_record_{p_idx}.pdf"
-                dummy_pdf_content = b"%PDF-1.4\n1 0 obj\n<< /Title (Dummy) >>\nendobj\n"
-                
-                try:
-                    res = supabase.storage.from_("documents").upload(
-                        file=dummy_pdf_content,
-                        path=file_path,
-                        file_options={"content-type": "application/pdf", "upsert": "true"}
-                    )
-                except Exception as e:
-                    print(f"Bucket upload failed: {e}")
-                
-                # Create Patient Document in DB
-                doc = PatientDocument(
-                    id=uuid.uuid4(),
-                    clinic_id=clinic.id,
-                    patient_id=patient.id,
-                    uploaded_by=therapist.id,
-                    treatment_id=treatment.id,
-                    file_url=file_path,
-                    file_type="application/pdf",
-                    file_size=len(dummy_pdf_content),
-                    label=f"Medical Record {p_idx+1}",
-                    category=DocumentCategory.MEDICAL_REPORT,
-                    notes="Auto-generated during seed."
-                )
-                session.add(doc)
 
         await session.commit()
-        print("Data and bucket seeded successfully!")
+        print("Database successfully wiped and freshly seeded!")
+        print("\n=== Available Logins (Password for all: password123) ===")
+        print("Clinic 1 (AV Suite Clinic 1):")
+        print("  - Admin:      admin1@clinic.com")
+        print("  - Therapist:  therapist1_1@clinic.com")
+        print("  - Therapist:  therapist1_2@clinic.com")
+        print("  - Front Desk: frontdesk1@clinic.com")
+        print("Clinic 2 (AV Suite Clinic 2):")
+        print("  - Admin:      admin2@clinic.com")
+        print("  - Therapist:  therapist2_1@clinic.com")
+        print("  - Therapist:  therapist2_2@clinic.com")
+        print("  - Front Desk: frontdesk2@clinic.com")
+
 
 if __name__ == "__main__":
     asyncio.run(seed())
