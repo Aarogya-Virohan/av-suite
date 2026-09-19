@@ -6,12 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
     "@supabase/ssr": "^0.12.4",
-    
     "@supabase/supabase-js": "^2.112.3",
     "@tanstack/react-query": "^5.66.0",
     "axios": "^1.7.9",
@@ -32,6 +32,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.6",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -41,6 +42,7 @@
     "nodemon": "^3.1.14",
     "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.135.0"
   }
 }
