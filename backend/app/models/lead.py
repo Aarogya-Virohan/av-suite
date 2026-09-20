@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDMixin
-from app.enums.lead import LeadStage
+from app.enums.lead import LeadStage, LeadSource
 from app.models.clinic import Clinic
 from app.models.patient import Patient
 from app.models.user import User
@@ -42,7 +42,9 @@ class Lead(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     name: Mapped[str] = mapped_column(String(length=255), nullable=False)
     phone: Mapped[str] = mapped_column(String(length=50), nullable=False)
     email: Mapped[str | None] = mapped_column(String(length=255), nullable=True)
-    source: Mapped[str | None] = mapped_column(String(length=100), nullable=True)
+    source: Mapped[LeadSource | None] = mapped_column(
+        Enum(LeadSource, name="lead_source_type", values_callable=lambda x: [e.value for e in x], create_type=False), nullable=True
+    )
 
     stage: Mapped[LeadStage] = mapped_column(
         Enum(

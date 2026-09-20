@@ -15,7 +15,16 @@ All responses ResponseEnvelope mein wrapped hote hain consistency ke liye.
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
+from app.core.dependencies import PermissionContextDep
+from app.core.rbac import CAPABILITY_REGISTRY
+from app.schemas.auth import (
+    RegisterRequest,
+    LoginRequest,
+    TokenResponse,
+    AuthMeResponse,
+    UserInfoResponse,
+    ClinicInfoResponse,
+)
 from app.schemas.envelope import ResponseEnvelope
 from app.services import auth_service
 import logging
@@ -25,6 +34,50 @@ logger = logging.getLogger(__name__)
 # APIRouter instance jo auth endpoints organize karta hai
 # Prefix: /api/v1/auth (main router mein define hota hai)
 router = APIRouter()
+
+
+@router.get(
+    "/me",
+    response_model=ResponseEnvelope[AuthMeResponse],
+    tags=["Authentication"],
+)
+async def get_me(
+    perm_ctx: PermissionContextDep,
+) -> ResponseEnvelope[AuthMeResponse]:
+    """
+    Get the currently authenticated user's details, clinic branding, and full effective capabilities.
+    Accessible to any active authenticated user.
+    """
+    capabilities = {
+        key: perm_ctx.effective_scope(key).value
+        for key in CAPABILITY_REGISTRY
+    }
+
+    user_info = UserInfoResponse(
+        id=perm_ctx.user.id,
+        clinic_id=perm_ctx.user.clinic_id,
+        email=perm_ctx.user.email,
+        first_name=perm_ctx.user.first_name,
+        last_name=perm_ctx.user.last_name,
+        role=str(perm_ctx.user.role),
+        is_active=perm_ctx.user.is_active,
+    )
+
+    clinic_info = ClinicInfoResponse(
+        id=perm_ctx.clinic.id,
+        name=perm_ctx.clinic.name,
+        branding_logo_url=perm_ctx.clinic.branding_logo_url,
+        branding_color=perm_ctx.clinic.branding_color,
+    )
+
+    return ResponseEnvelope(
+        data=AuthMeResponse(
+            user=user_info,
+            clinic=clinic_info,
+            capabilities=capabilities,
+        )
+    )
+
 
 
 @router.post(

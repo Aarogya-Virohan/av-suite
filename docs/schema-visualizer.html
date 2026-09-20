@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AV Suite — DB Schema Visualizer (v2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c14;--surface:#111827;--surface2:#1a2236;--surface3:#232e45;
+  --border:#2a3654;--border-bright:#3d5080;
+  --accent:#6366f1;--accent2:#818cf8;--accent-glow:rgba(99,102,241,.25);
+  --green:#10b981;--yellow:#f59e0b;--red:#ef4444;--cyan:#06b6d4;--orange:#f97316;
+  --text:#e2e8f0;--text-muted:#94a3b8;--text-dim:#64748b;
+  --pk:#fbbf24;--fk:#60a5fa;
+  --radius:12px;--radius-sm:6px;
+  --shadow:0 8px 32px rgba(0,0,0,.5);
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+  --sidebar:220px;--panel:390px;
+}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:16px;padding:0 24px;height:56px;min-height:56px;background:rgba(17,24,39,.97);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);z-index:100}
+.logo{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700}
+.logo-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+header h1{font-size:13px;font-weight:500;color:var(--text-muted)}
+.spacer{flex:1}
+.tab-bar{display:flex;gap:4px}
+.tab{padding:6px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;transition:all .2s;border:1px solid transparent;color:var(--text-muted)}
+.tab:hover{background:var(--surface2);color:var(--text)}
+.tab.active{background:var(--accent);color:#fff;box-shadow:0 0 16px var(--accent-glow)}
+.stats{display:flex;gap:16px;font-size:11px;color:var(--text-dim)}
+.stats b{color:var(--accent2)}
+.main{display:flex;flex:1;overflow:hidden}
+/* SIDEBAR */
+aside{width:var(--sidebar);min-width:var(--sidebar);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;z-index:10}
+aside::-webkit-scrollbar{width:4px}
+aside::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:2px}
+.sb-section{padding:12px 12px 4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim)}
+.sb-item{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-radius:var(--radius-sm);margin:1px 6px;font-size:12px;font-weight:500;transition:all .15s;color:var(--text-muted)}
+.sb-item:hover{background:var(--surface2);color:var(--text)}
+.sb-item.active{background:var(--accent-glow);color:var(--accent2);border-left:2px solid var(--accent);padding-left:10px}
+.sb-icon{width:20px;height:20px;border-radius:4px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0}
+.sb-count{margin-left:auto;background:var(--surface3);border-radius:10px;padding:1px 6px;font-size:10px;color:var(--text-dim)}
+.sb-divider{height:1px;background:var(--border);margin:6px 12px}
+/* CANVAS */
+.canvas-wrap{flex:1;position:relative;overflow:hidden}
+#canvas{position:absolute;inset:0;cursor:grab;user-select:none;transform-origin:0 0}
+#canvas.grabbing{cursor:grabbing}
+#lines{position:absolute;top:0;left:0;width:5000px;height:5000px;pointer-events:none}
+.canvas-ctrl{position:absolute;bottom:20px;left:20px;display:flex;gap:8px;z-index:50}
+.ctrl-btn{width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--text-muted);transition:all .15s}
+.ctrl-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--border-bright)}
+.zoom-disp{padding:0 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:11px;color:var(--text-dim);display:flex;align-items:center}
+.legend{position:absolute;bottom:20px;right:20px;z-index:50;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:11px;display:flex;flex-direction:column;gap:6px}
+.leg-row{display:flex;align-items:center;gap:8px;color:var(--text-muted)}
+.leg-dot{width:10px;height:10px;border-radius:50%}
+.leg-line{width:24px;height:2px}
+/* TABLE CARDS */
+.tcard{position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);min-width:215px;box-shadow:var(--shadow);transition:box-shadow .2s,border-color .2s;z-index:10}
+.tcard:hover{border-color:var(--border-bright);box-shadow:0 12px 40px rgba(0,0,0,.7)}
+.tcard.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow),var(--shadow);z-index:20}
+.thead{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;cursor:move}
+.thead-ico{font-size:13px}
+.thead-name{font-size:12.5px;font-weight:600}
+.thead-cnt{margin-left:auto;font-size:10px;color:var(--text-dim);background:var(--surface2);padding:2px 7px;border-radius:10px}
+.tcols{padding:5px 0}
+.tcol{display:flex;align-items:center;gap:6px;padding:3px 14px;font-size:11px;font-family:var(--mono);transition:background .1s}
+.tcol:hover{background:var(--surface2)}
+.badge{width:20px;text-align:center;font-size:9px;font-weight:700;border-radius:3px;padding:1px 3px;flex-shrink:0}
+.bpk{background:rgba(251,191,36,.15);color:var(--pk);border:1px solid rgba(251,191,36,.3)}
+.bfk{background:rgba(96,165,250,.15);color:var(--fk);border:1px solid rgba(96,165,250,.3)}
+.bnn{background:transparent;border:1px solid transparent}
+.cname{font-size:11.5px;font-weight:500;color:var(--text)}
+.ctype{font-size:10px;color:var(--text-dim);margin-left:auto}
+.cnull{font-size:9px;color:var(--red);margin-left:3px}
+/* DETAIL PANEL */
+.dpanel{width:var(--panel);min-width:var(--panel);background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;z-index:10}
+.dpanel.hidden{display:none}
+.dhead{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.dhead-ico{font-size:20px}
+.dhead-name{font-size:16px;font-weight:700}
+.dclose{margin-left:auto;width:28px;height:28px;border-radius:var(--radius-sm);background:var(--surface3);border:none;color:var(--text-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.dclose:hover{background:var(--red);color:#fff}
+.dbody{flex:1;overflow-y:auto}
+.dbody::-webkit-scrollbar{width:4px}
+.dbody::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.dsec{padding:16px 20px;border-bottom:1px solid var(--border)}
+.dsec-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:12px}
+.desc-txt{font-size:12px;color:var(--text-muted);line-height:1.6}
+.note-box{margin-top:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius-sm);padding:10px 12px;font-size:11.5px;color:#fcd34d;line-height:1.5}
+.note-box b{color:var(--yellow)}
+table.ctbl{width:100%;border-collapse:collapse;font-size:11px}
+table.ctbl th{text-align:left;padding:4px 6px;font-size:10px;font-weight:600;color:var(--text-dim);border-bottom:1px solid var(--border)}
+table.ctbl td{padding:6px;font-family:var(--mono);border-bottom:1px solid rgba(42,54,84,.4);vertical-align:top}
+table.ctbl tr:hover td{background:var(--surface2)}
+.cpk{color:var(--pk);font-size:9px;font-weight:700;padding:1px 4px;background:rgba(251,191,36,.1);border-radius:3px}
+.cfk{color:var(--fk);font-size:9px;font-weight:700;padding:1px 4px;background:rgba(96,165,250,.1);border-radius:3px}
+.cnn{color:var(--green);font-size:9px}
+.cnullable{color:var(--text-dim);font-size:9px}
+.cdef{color:var(--text-dim);font-size:10px}
+.fklist{display:flex;flex-direction:column;gap:8px}
+.fkitem{display:flex;align-items:flex-start;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:11px;cursor:pointer;transition:border-color .15s}
+.fkitem:hover{border-color:var(--accent)}
+.fkarrow{font-size:16px;color:var(--fk);margin-top:1px}
+.fkdetail{display:flex;flex-direction:column;gap:3px}
+.fkcol{font-family:var(--mono);color:var(--text);font-weight:500}
+.fkref{color:var(--text-muted);font-size:10.5px}
+.fkref b{color:var(--accent2)}
+.idxlist{display:flex;flex-direction:column;gap:4px}
+.idxitem{display:flex;align-items:center;gap:8px;font-size:11px;padding:5px 8px;background:var(--surface2);border-radius:var(--radius-sm)}
+.idxt{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600}
+.iuniq{background:rgba(52,211,153,.15);color:var(--green);border:1px solid rgba(52,211,153,.3)}
+.ireg{background:rgba(99,102,241,.1);color:var(--accent2);border:1px solid rgba(99,102,241,.2)}
+.idxname{font-family:var(--mono);color:var(--text-muted);font-size:10.5px}
+/* MIGRATION TRAIL */
+.mig-list{display:flex;flex-direction:column;gap:6px}
+.mig-item{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:11px}
+.mig-id{font-family:var(--mono);color:var(--accent2);font-size:10px;flex-shrink:0;margin-top:1px}
+.mig-desc{color:var(--text-muted);line-height:1.4}
+/* RBAC */
+#rbacView{display:none;flex:1;overflow-y:auto;padding:24px}
+#rbacView.active{display:block}
+.rbac-grid{display:grid;grid-template-columns:1fr;gap:20px}
+.rcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.rcard-head{padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:var(--surface2)}
+.rbadge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.r-admin{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+.r-therapist{background:rgba(99,102,241,.15);color:#818cf8;border:1px solid rgba(99,102,241,.3)}
+.r-front_desk{background:rgba(245,158,11,.15);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
+.r-patient{background:rgba(16,185,129,.15);color:#34d399;border:1px solid rgba(16,185,129,.3)}
+.rdesc{font-size:12px;color:var(--text-muted);margin-left:4px}
+table.ptbl{width:100%;border-collapse:collapse;font-size:11.5px}
+table.ptbl th{padding:8px 12px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim);background:var(--surface2)}
+table.ptbl td{padding:7px 12px;border-bottom:1px solid rgba(42,54,84,.4)}
+table.ptbl tr:last-child td{border-bottom:none}
+table.ptbl tr:hover td{background:var(--surface2)}
+.pres{font-family:var(--mono);color:var(--text);font-weight:500}
+.pacts{display:flex;gap:4px;flex-wrap:wrap}
+.pchip{font-size:9.5px;padding:2px 7px;border-radius:10px;font-weight:600}
+.pread{background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
+.pwrite{background:rgba(99,102,241,.12);color:var(--accent2);border:1px solid rgba(99,102,241,.3)}
+.pcreate{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.pdelete{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.pnone{background:rgba(100,116,139,.1);color:var(--text-dim);border:1px solid rgba(100,116,139,.2)}
+.scope-tag{font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(251,191,36,.1);color:var(--yellow);border:1px solid rgba(251,191,36,.2)}
+/* ENUMS */
+#enumsView{display:none;flex:1;overflow-y:auto;padding:24px}
+#enumsView.active{display:block}
+.enum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.ecard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.ecard-head{padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:8px}
+.ecard-name{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent2)}
+.ecard-src{font-size:10px;color:var(--text-dim);margin-left:auto}
+.evals{padding:12px 16px;display:flex;flex-wrap:wrap;gap:6px}
+.eval{padding:4px 10px;border-radius:var(--radius-sm);background:var(--surface2);border:1px solid var(--border);font-family:var(--mono);font-size:11.5px;color:var(--text-muted);transition:all .15s;cursor:default}
+.eval:hover{border-color:var(--accent);color:var(--accent2)}
+.eval.dep{border-color:var(--red);color:var(--red);opacity:.6}
+/* MIGRATION TRAIL TAB */
+#migView{display:none;flex:1;overflow-y:auto;padding:24px}
+#migView.active{display:block}
+.mig-timeline{display:flex;flex-direction:column;gap:0}
+.mig-step{display:flex;gap:16px;padding-bottom:24px;position:relative}
+.mig-step:not(:last-child)::before{content:'';position:absolute;left:19px;top:38px;bottom:0;width:2px;background:var(--border)}
+.mig-badge{width:40px;height:40px;border-radius:50%;background:var(--surface2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;z-index:1}
+.mig-body{flex:1;padding-top:6px}
+.mig-rev{font-family:var(--mono);font-size:10px;color:var(--accent2);margin-bottom:4px}
+.mig-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
+.mig-date{font-size:11px;color:var(--text-dim);margin-bottom:10px}
+.mig-changes{display:flex;flex-direction:column;gap:4px}
+.mig-change{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-muted);padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm)}
+.mig-plus{color:var(--green);font-weight:700;flex-shrink:0;margin-top:1px}
+.mig-info{color:var(--cyan);font-weight:700;flex-shrink:0;margin-top:1px}
+/* SCHEMA VIEW */
+#schemaView{display:flex;flex:1;overflow:hidden}
+#schemaView.hidden{display:none}
+.g-core .thead{background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(99,102,241,.04))}
+.g-scheduling .thead{background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(6,182,212,.04))}
+.g-clinical .thead{background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.04))}
+.g-billing .thead{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.04))}
+.g-crm .thead{background:linear-gradient(135deg,rgba(236,72,153,.12),rgba(236,72,153,.04))}
+.g-audit .thead{background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(239,68,68,.04))}
+.load{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;transition:opacity .4s}
+.load-ring{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-txt{font-size:13px;color:var(--text-muted);text-align:center}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border-bright);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div class="load" id="loader">
+  <div><div class="load-ring"></div><div class="load-txt">Building schema graph from migrations…</div></div>
+</div>
+
+<header>
+  <div class="logo"><div class="logo-dot"></div><span>AV Suite</span></div>
+  <h1>Database Schema Visualizer — v2 (Migration-Accurate)</h1>
+  <div class="spacer"></div>
+  <div class="tab-bar">
+    <div class="tab active" id="tab-schema" onclick="switchTab('schema')">⬡ ERD View</div>
+    <div class="tab" id="tab-rbac" onclick="switchTab('rbac')">🛡 RBAC Matrix</div>
+    <div class="tab" id="tab-enums" onclick="switchTab('enums')">Ω Enum Types</div>
+    <div class="tab" id="tab-mig" onclick="switchTab('mig')">📜 Migrations</div>
+  </div>
+  <div class="stats">
+    <span><b>20</b> tables</span>
+    <span><b>9</b> enums</span>
+    <span><b>9</b> migrations</span>
+    <span><b>4</b> roles</span>
+  </div>
+</header>
+
+<div class="main" id="mainArea">
+  <div id="schemaView">
+    <aside id="sidebar"></aside>
+    <div class="canvas-wrap">
+      <div id="canvas"><svg id="lines"></svg></div>
+      <div class="canvas-ctrl">
+        <button class="ctrl-btn" onclick="zoomBy(1.15)">+</button>
+        <div class="zoom-disp" id="zoomDisp">75%</div>
+        <button class="ctrl-btn" onclick="zoomBy(0.87)">−</button>
+        <button class="ctrl-btn" onclick="resetView()" title="Reset">⌂</button>
+        <button class="ctrl-btn" onclick="fitAll()" title="Fit All">⊞</button>
+      </div>
+      <div class="legend">
+        <div style="font-size:10px;font-weight:600;color:var(--text-dim);margin-bottom:4px">LEGEND</div>
+        <div class="leg-row"><div class="leg-dot" style="background:var(--pk)"></div>Primary Key</div>
+        <div class="leg-row"><div class="leg-dot" style="background:var(--fk)"></div>Foreign Key</div>
+        <div class="leg-row"><div class="leg-line" style="background:var(--accent)"></div>Required FK</div>
+        <div class="leg-row"><div class="leg-line" style="background:var(--yellow);opacity:.6"></div>Optional FK (NULL)</div>
+      </div>
+    </div>
+    <div class="dpanel hidden" id="dpanel">
+      <div class="dhead">
+        <span class="dhead-ico" id="dIco">📋</span>
+        <span class="dhead-name" id="dName">Table</span>
+        <button class="dclose" onclick="closePanel()">✕</button>
+      </div>
+      <div class="dbody" id="dbody"></div>
+    </div>
+  </div>
+  <div id="rbacView"><h2 style="font-size:20px;font-weight:700;margin-bottom:4px">RBAC Permission Matrix</h2><p style="font-size:12px;color:var(--text-muted);margin-bottom:24px">Based on AV Suite CRM RBAC Specification. See note on Patient role below.</p><div id="rbacNote" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:12px;color:#fcd34d;line-height:1.6"><b>⚠ Why does users.role have 'patient'?</b><br>The <code style="background:rgba(99,102,241,.15);padding:1px 5px;border-radius:3px;font-family:monospace">users</code> table stores login credentials for <em>staff</em> (admin, therapist, front_desk) and optionally for <em>patients with portal access</em>. A patient who only exists as a clinical record lives in the <code style="background:rgba(99,102,241,.15);padding:1px 5px;border-radius:3px;font-family:monospace">patients</code> table without any user row. If a patient is given portal login access, a <code>users</code> row is created with <code>role='patient'</code> and linked back via <code>patients.user_id</code> → <code>users.id</code>. So 'patient' in users is for portal-login patients only — not all patients.</div><div class="rbac-grid" id="rbacGrid"></div></div>
+  <div id="enumsView"><h2 style="font-size:20px;font-weight:700;margin-bottom:4px">ENUM Type Reference</h2><p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Actual PostgreSQL ENUM types present in Supabase after all migrations. Note: <code style="background:rgba(99,102,241,.15);padding:1px 5px;border-radius:3px;font-family:monospace">userrole</code> native enum was DROPPED in migration c5d8e9f4a1b2 — replaced by VARCHAR+CHECK.</p><div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px 14px;font-size:11.5px;color:#fca5a5;margin-bottom:20px">🚫 <b>userrole</b> (native enum) — DROPPED. Now enforced by CHECK constraint on <code>users.role</code>: admin | therapist | front_desk | patient</div><div class="enum-grid" id="enumGrid"></div></div>
+  <div id="migView"><h2 style="font-size:20px;font-weight:700;margin-bottom:4px">Migration History</h2><p style="font-size:12px;color:var(--text-muted);margin-bottom:24px">Complete Alembic migration chain. This is the ground truth for your Supabase schema.</p><div class="mig-timeline" id="migTimeline"></div></div>
+</div>
+
+<script>
+// ============================================================
+// GROUND TRUTH — built from all 9 Alembic migrations
+// ============================================================
+const T = {
+  clinics:{ico:'🏥',g:'core',
+    desc:'Top-level multi-tenant container. Every table row is scoped to a clinic_id.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1,def:'gen_random_uuid()'},
+      {n:'name',t:'VARCHAR(255)',nn:1},
+      {n:'branding_logo_url',t:'VARCHAR(2048)',mig:'b4c6f9d3e2a8'},
+      {n:'branding_color',t:'VARCHAR(32)',mig:'b4c6f9d3e2a8'},
+      {n:'plan_tier',t:'clinicplantier',nn:1,def:"'free'",mig:'b4c6f9d3e2a8'},
+      {n:'is_partner_clinic',t:'BOOLEAN',nn:1,def:'FALSE',mig:'b4c6f9d3e2a8'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[],idxs:[]},
+
+  users:{ico:'👤',g:'core',
+    desc:"Staff and portal-patient login accounts. Role is VARCHAR(50) with CHECK constraint (not an enum — native enum was dropped in migration c5d8e9f4a1b2). 'patient' role is ONLY for patients who are given portal login access; most patients have NO user row.",
+    note:"⚠ users.role = 'patient' does NOT mean all patients have a login. A patient in the patients table only gets a users row if given portal access. The link is: patients.user_id → users.id.",
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1,def:'gen_random_uuid()'},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id',onDel:'CASCADE'},
+      {n:'email',t:'VARCHAR(255)',nn:1,note:'UNIQUE'},
+      {n:'password_hash',t:'VARCHAR(255)',nn:1},
+      {n:'role',t:"VARCHAR(50) CHECK IN ('admin','therapist','front_desk')",nn:1,note:'Was native enum userrole; converted by c5d8e9f4a1b2. Patient role dropped.'},
+      {n:'first_name',t:'VARCHAR(100)',nn:1,mig:'9f3c7a21e6b4'},
+      {n:'last_name',t:'VARCHAR(100)',nn:1,mig:'9f3c7a21e6b4'},
+      {n:'phone',t:'VARCHAR(32)',mig:'2bfb0d5801d5'},
+      {n:'is_active',t:'BOOLEAN',nn:1,def:'TRUE',mig:'2bfb0d5801d5'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[{col:'clinic_id',ref:'clinics',rc:'id',onDel:'CASCADE'}],
+    idxs:[{n:'ix_users_email',u:1,c:'email'}]},
+
+  patients:{ico:'🤒',g:'core',
+    desc:'Clinical patient profiles. age and user_id dropped. Soft-deleted via deleted_at.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1,def:'gen_random_uuid()'},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id',onDel:'CASCADE'},
+      {n:'first_name',t:'VARCHAR(100)',nn:1},
+      {n:'last_name',t:'VARCHAR(100)',nn:1},
+      {n:'date_of_birth',t:'DATE'},
+      {n:'phone',t:'VARCHAR(20)'},
+      {n:'gender',t:'gender_type',mig:'8f23ba07cc87'},
+      {n:'chief_complaint',t:'TEXT',mig:'b4c6f9d3e2a8'},
+      {n:'referral_source',t:'VARCHAR(255)',mig:'b4c6f9d3e2a8'},
+      {n:'status',t:'patientstatus',nn:1,def:"'active'",mig:'b4c6f9d3e2a8'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'deleted_at',t:'TIMESTAMPTZ',note:'soft-delete',mig:'b4c6f9d3e2a8'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id',onDel:'CASCADE'},
+    ],idxs:[]},
+
+  exercises:{ico:'🏋',g:'core',
+    desc:'Rehab exercise library. clinic_id=NULL means a global system exercise accessible to all clinics.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,ref:'clinics.id',onDel:'CASCADE',note:'NULL = global'},
+      {n:'title',t:'VARCHAR(255)',nn:1},
+      {n:'description',t:'TEXT'},
+      {n:'body_part',t:'VARCHAR(100)'},
+      {n:'is_free',t:'BOOLEAN',nn:1,def:'FALSE'},
+      {n:'video_url',t:'VARCHAR(1024)'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[{col:'clinic_id',ref:'clinics',rc:'id',onDel:'CASCADE'}],idxs:[]},
+
+  appointment_requests:{ico:'📋',g:'scheduling',
+    desc:'Public pre-booking requests submitted before staff approval. NOT linked to any patient or user until approved.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'name',t:'VARCHAR(255)',nn:1},
+      {n:'phone',t:'VARCHAR(50)',nn:1},
+      {n:'date_of_birth',t:'DATE'},
+      {n:'gender',t:'gender_type'},
+      {n:'chief_complaint',t:'TEXT'},
+      {n:'notes',t:'TEXT'},
+      {n:'preferred_date',t:'DATE'},
+      {n:'preferred_slot',t:'VARCHAR(50)'},
+      {n:'status',t:'appointment_request_status',nn:1,def:"'pending'"},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[{col:'clinic_id',ref:'clinics',rc:'id'}],
+    idxs:[{n:'ix_appt_req_status',u:0,c:'status'},{n:'ix_appt_req_phone',u:0,c:'phone'},{n:'ix_appt_req_preferred_date',u:0,c:'preferred_date'}]},
+
+  appointments:{ico:'📅',g:'scheduling',
+    desc:'Confirmed scheduled appointments. appointment_type added.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id'},
+      {n:'therapist_id',t:'UUID',fk:1,nn:1,ref:'users.id'},
+      {n:'appointment_type',t:'VARCHAR(100)',nn:1,def:"'consultation'"},
+      {n:'scheduled_at',t:'TIMESTAMPTZ',nn:1},
+      {n:'duration_minutes',t:'INTEGER',nn:1,def:'30'},
+      {n:'status',t:'appointment_status',nn:1,def:"'scheduled'"},
+      {n:'source',t:'appointment_source',nn:1,def:"'manual'"},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'deleted_at',t:'TIMESTAMPTZ',note:'soft-delete'},
+      {n:'deleted_by',t:'UUID'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'patient_id',ref:'patients',rc:'id'},
+      {col:'therapist_id',ref:'users',rc:'id'},
+    ],
+    idxs:[{n:'ix_appts_therapist_id',u:0,c:'therapist_id'},{n:'ix_appts_scheduled_at',u:0,c:'scheduled_at'},{n:'ix_appts_status',u:0,c:'status'}]},
+
+  treatment_sessions:{ico:'💊',g:'clinical',
+    desc:'Physical therapy treatment records. finalized is a BOOLEAN (NOT a timestamp). Added by migration d6e7f8a9b0c1.',
+    note:"⚠ finalized is BOOLEAN NOT NULL DEFAULT false — NOT a timestamp. The backend schema.sql draft had finalized_at (TIMESTAMPTZ) but the actual migration used BOOLEAN.",
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id'},
+      {n:'appointment_id',t:'UUID',fk:1,ref:'appointments.id'},
+      {n:'therapist_id',t:'UUID',fk:1,nn:1,ref:'users.id'},
+      {n:'treatment_date',t:'TIMESTAMPTZ',nn:1},
+      {n:'pain_score',t:'INTEGER'},
+      {n:'treatment',t:'TEXT',nn:1},
+      {n:'home_advice',t:'TEXT'},
+      {n:'notes',t:'TEXT'},
+      {n:'finalized',t:'BOOLEAN',nn:1,def:'false',mig:'d6e7f8a9b0c1',note:'BOOL, not timestamp'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'patient_id',ref:'patients',rc:'id'},
+      {col:'appointment_id',ref:'appointments',rc:'id'},
+      {col:'therapist_id',ref:'users',rc:'id'},
+    ],
+    idxs:[{n:'ix_ts_treatment_date',u:0,c:'treatment_date'}]},
+
+  soap_assessments:{ico:'📝',g:'clinical',
+    desc:'SOAP clinical notes as JSONB. therapist_id (nullable FK) and finalized (BOOLEAN) were added by migration d6e7f8a9b0c1. No author_id — that was a schema.sql draft idea only.',
+    note:"⚠ Column is therapist_id (nullable UUID FK → users), NOT author_id. finalized is BOOLEAN NOT NULL DEFAULT false, NOT finalized_at TIMESTAMPTZ.",
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id'},
+      {n:'appointment_id',t:'UUID',fk:1,ref:'appointments.id'},
+      {n:'therapist_id',t:'UUID',fk:1,ref:'users.id',note:'nullable FK, added d6e7f8a9b0c1',mig:'d6e7f8a9b0c1'},
+      {n:'specialty',t:'specialty_type',nn:1},
+      {n:'diagnosis',t:'TEXT'},
+      {n:'is_reassessment',t:'BOOLEAN',nn:1,def:'FALSE'},
+      {n:'form_data',t:'JSONB',nn:1,def:"'{}'"},
+      {n:'finalized',t:'BOOLEAN',nn:1,def:'false',mig:'d6e7f8a9b0c1',note:'BOOL — added d6e7f8a9b0c1'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'patient_id',ref:'patients',rc:'id'},
+      {col:'appointment_id',ref:'appointments',rc:'id'},
+      {col:'therapist_id',ref:'users',rc:'id'},
+    ],
+    idxs:[{n:'ix_soap_specialty',u:0,c:'specialty'},{n:'ix_soap_therapist_id',u:0,c:'therapist_id',mig:'d6e7f8a9b0c1'}]},
+
+  prescriptions:{ico:'📄',g:'clinical',
+    desc:'Exercise prescription headers. physio_id refers to the prescribing therapist (users table).',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id',onDel:'CASCADE'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id',onDel:'CASCADE'},
+      {n:'physio_id',t:'UUID',fk:1,nn:1,ref:'users.id',onDel:'CASCADE'},
+      {n:'physio_notes',t:'TEXT'},
+      {n:'status',t:'VARCHAR(50)',nn:1,def:"'active'"},
+      {n:'pdf_key',t:'VARCHAR(255)'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id',onDel:'CASCADE'},
+      {col:'patient_id',ref:'patients',rc:'id',onDel:'CASCADE'},
+      {col:'physio_id',ref:'users',rc:'id',onDel:'CASCADE'},
+    ],idxs:[]},
+
+  prescription_items:{ico:'🔗',g:'clinical',
+    desc:'Individual exercise lines within a prescription. note column added in migration 17720d35ae64.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'prescription_id',t:'UUID',fk:1,nn:1,ref:'prescriptions.id',onDel:'CASCADE'},
+      {n:'exercise_id',t:'UUID',fk:1,nn:1,ref:'exercises.id',onDel:'CASCADE'},
+      {n:'sets',t:'INTEGER',nn:1,def:'1'},
+      {n:'reps',t:'INTEGER',nn:1,def:'10'},
+      {n:'hold',t:'INTEGER',nn:1,def:'0'},
+      {n:'frequency',t:'VARCHAR(100)',nn:1,def:"'Daily'"},
+      {n:'hold_angle',t:'INTEGER'},
+      {n:'note',t:'TEXT',mig:'17720d35ae64'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'prescription_id',ref:'prescriptions',rc:'id',onDel:'CASCADE'},
+      {col:'exercise_id',ref:'exercises',rc:'id',onDel:'CASCADE'},
+    ],idxs:[]},
+
+  posture_sessions:{ico:'🧍',g:'clinical',
+    desc:'Computer-vision posture analysis sessions. Image columns and overall_confidence added by migration 17720d35ae64.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id',onDel:'CASCADE'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id',onDel:'CASCADE'},
+      {n:'overall_confidence',t:'FLOAT',mig:'17720d35ae64'},
+      {n:'annotated_front_image',t:'VARCHAR(1024)',mig:'17720d35ae64'},
+      {n:'annotated_back_image',t:'VARCHAR(1024)',mig:'17720d35ae64'},
+      {n:'annotated_side_image',t:'VARCHAR(1024)',mig:'17720d35ae64'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id',onDel:'CASCADE'},
+      {col:'patient_id',ref:'patients',rc:'id',onDel:'CASCADE'},
+    ],idxs:[]},
+
+  posture_measurements:{ico:'📐',g:'clinical',
+    desc:'Anatomical angle/vector metrics from a posture session. severity and visibility added by migration 17720d35ae64.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'session_id',t:'UUID',fk:1,nn:1,ref:'posture_sessions.id',onDel:'CASCADE'},
+      {n:'metric_name',t:'VARCHAR(100)',nn:1},
+      {n:'value',t:'FLOAT',nn:1},
+      {n:'unit',t:'VARCHAR(50)'},
+      {n:'notes',t:'TEXT'},
+      {n:'severity',t:'VARCHAR(50)',mig:'17720d35ae64'},
+      {n:'visibility',t:'VARCHAR(50)',mig:'17720d35ae64'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[{col:'session_id',ref:'posture_sessions',rc:'id',onDel:'CASCADE'}],idxs:[]},
+
+  patient_documents:{ico:'📁',g:'clinical',
+    desc:'Patient file attachments. Linked optionally to a treatment session. Soft-deleted.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id'},
+      {n:'uploaded_by',t:'UUID',fk:1,ref:'users.id'},
+      {n:'treatment_id',t:'UUID',fk:1,ref:'treatment_sessions.id'},
+      {n:'file_url',t:'VARCHAR(1024)',nn:1},
+      {n:'file_type',t:'VARCHAR(100)',nn:1},
+      {n:'file_size',t:'INTEGER'},
+      {n:'label',t:'VARCHAR(255)',nn:1},
+      {n:'category',t:'document_category',nn:1,def:"'other'"},
+      {n:'notes',t:'TEXT'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'deleted_at',t:'TIMESTAMPTZ',note:'soft-delete'},
+      {n:'deleted_by',t:'UUID'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'patient_id',ref:'patients',rc:'id'},
+      {col:'uploaded_by',ref:'users',rc:'id'},
+      {col:'treatment_id',ref:'treatment_sessions',rc:'id'},
+    ],
+    idxs:[{n:'ix_pd_category',u:0,c:'category'},{n:'ix_pd_uploaded_by',u:0,c:'uploaded_by'}]},
+
+  packages:{ico:'📦',g:'billing',
+    desc:'Package catalog: named bundles of sessions offered by a clinic.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'name',t:'VARCHAR(255)',nn:1},
+      {n:'total_sessions',t:'INTEGER',nn:1},
+      {n:'price',t:'NUMERIC(10,2)',nn:1},
+      {n:'validity_days',t:'INTEGER',nn:1},
+      {n:'status',t:'package_status',nn:1,def:"'active'"},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[{col:'clinic_id',ref:'clinics',rc:'id'}],
+    idxs:[{n:'ix_packages_status',u:0,c:'status'}]},
+
+  patient_packages:{ico:'🎁',g:'billing',
+    desc:'Patient-purchased package instances. Tracks completed vs total sessions and expiry.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id'},
+      {n:'package_id',t:'UUID',fk:1,ref:'packages.id'},
+      {n:'package_name',t:'VARCHAR(255)',nn:1},
+      {n:'total_sessions',t:'INTEGER',nn:1},
+      {n:'completed_sessions',t:'INTEGER',nn:1,def:'0'},
+      {n:'price',t:'NUMERIC(10,2)',nn:1},
+      {n:'status',t:'package_status',nn:1,def:"'active'"},
+      {n:'purchased_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'expires_at',t:'TIMESTAMPTZ'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'patient_id',ref:'patients',rc:'id'},
+      {col:'package_id',ref:'packages',rc:'id'},
+    ],
+    idxs:[{n:'ix_pp_status',u:0,c:'status'}]},
+
+  invoices:{ico:'💰',g:'billing',
+    desc:'Financial billing invoices. HAS line_items JSONB — present in the actual migration 2bfb0d5801d5. Supports partial payments, discounts, taxes. Soft-deleted.',
+    note:"✅ line_items JSONB IS present — the backend schema.sql draft removed it but the actual Alembic migration kept it.",
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id'},
+      {n:'appointment_id',t:'UUID',fk:1,ref:'appointments.id'},
+      {n:'invoice_number',t:'VARCHAR(64)',nn:1},
+      {n:'issue_date',t:'TIMESTAMPTZ',nn:1},
+      {n:'due_date',t:'TIMESTAMPTZ'},
+      {n:'subtotal',t:'NUMERIC(10,2)',nn:1},
+      {n:'discount_amount',t:'NUMERIC(10,2)',nn:1,def:'0.00'},
+      {n:'tax_amount',t:'NUMERIC(10,2)',nn:1,def:'0.00'},
+      {n:'total_amount',t:'NUMERIC(10,2)',nn:1},
+      {n:'paid_amount',t:'NUMERIC(10,2)',nn:1,def:'0.00'},
+      {n:'status',t:'invoice_status',nn:1,def:"'issued'"},
+      {n:'line_items',t:'JSONB',nn:1,def:"'[]'",note:'⚠ present in migration, not in backend schema.sql draft'},
+      {n:'notes',t:'TEXT'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'deleted_at',t:'TIMESTAMPTZ',note:'soft-delete'},
+      {n:'deleted_by',t:'UUID'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'patient_id',ref:'patients',rc:'id'},
+      {col:'appointment_id',ref:'appointments',rc:'id'},
+    ],
+    idxs:[{n:'ix_inv_status',u:0,c:'status'},{n:'ix_inv_number',u:0,c:'invoice_number'}]},
+
+  invoice_items:{ico:'🧾',g:'billing',
+    desc:'Itemized line items within an invoice (service, product, session).',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'invoice_id',t:'UUID',fk:1,nn:1,ref:'invoices.id'},
+      {n:'description',t:'VARCHAR(255)',nn:1},
+      {n:'quantity',t:'INTEGER',nn:1,def:'1'},
+      {n:'unit_price',t:'NUMERIC(10,2)',nn:1},
+      {n:'total_price',t:'NUMERIC(10,2)',nn:1},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'invoice_id',ref:'invoices',rc:'id'},
+    ],
+    idxs:[{n:'ix_ii_invoice_id',u:0,c:'invoice_id'}]},
+
+  payments:{ico:'💳',g:'billing',
+    desc:'Payment transactions against invoices.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'invoice_id',t:'UUID',fk:1,nn:1,ref:'invoices.id'},
+      {n:'patient_id',t:'UUID',fk:1,nn:1,ref:'patients.id'},
+      {n:'amount',t:'NUMERIC(10,2)',nn:1},
+      {n:'payment_method',t:'payment_method',nn:1},
+      {n:'status',t:'payment_status',nn:1,def:"'completed'"},
+      {n:'payment_date',t:'TIMESTAMPTZ',nn:1},
+      {n:'transaction_reference',t:'VARCHAR(255)'},
+      {n:'idempotency_key',t:'VARCHAR(255)',note:'UNIQUE'},
+      {n:'notes',t:'TEXT'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'invoice_id',ref:'invoices',rc:'id'},
+      {col:'patient_id',ref:'patients',rc:'id'},
+    ],
+    idxs:[{n:'ix_pay_invoice_id',u:0,c:'invoice_id'}]},
+
+  leads:{ico:'🎯',g:'crm',
+    desc:'CRM lead pipeline: new → contacted → qualified → converted → lost. Convertible to patient.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'name',t:'VARCHAR(255)',nn:1},
+      {n:'phone',t:'VARCHAR(50)',nn:1},
+      {n:'email',t:'VARCHAR(255)'},
+      {n:'source',t:'lead_source_type'},
+      {n:'stage',t:'lead_stage',nn:1,def:"'new'"},
+      {n:'assigned_to',t:'UUID',fk:1,ref:'users.id'},
+      {n:'notes',t:'TEXT'},
+      {n:'converted_patient_id',t:'UUID',fk:1,ref:'patients.id'},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'updated_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+      {n:'deleted_at',t:'TIMESTAMPTZ',note:'soft-delete'},
+      {n:'deleted_by',t:'UUID'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'assigned_to',ref:'users',rc:'id'},
+      {col:'converted_patient_id',ref:'patients',rc:'id'},
+    ],
+    idxs:[{n:'ix_leads_stage',u:0,c:'stage'},{n:'ix_leads_phone',u:0,c:'phone'}]},
+
+  audit_logs:{ico:'📊',g:'audit',
+    desc:'Immutable audit trail. Records every create/update/delete with actor, entity type, and JSONB details.',
+    note:null,
+    cols:[
+      {n:'id',t:'UUID',pk:1,nn:1},
+      {n:'clinic_id',t:'UUID',fk:1,nn:1,ref:'clinics.id'},
+      {n:'user_id',t:'UUID',fk:1,ref:'users.id'},
+      {n:'action',t:'VARCHAR(100)',nn:1},
+      {n:'entity_type',t:'VARCHAR(100)',nn:1},
+      {n:'entity_id',t:'UUID'},
+      {n:'details',t:'JSONB',def:"'{}'"},
+      {n:'created_at',t:'TIMESTAMPTZ',nn:1,def:'now()'},
+    ],
+    fks:[
+      {col:'clinic_id',ref:'clinics',rc:'id'},
+      {col:'user_id',ref:'users',rc:'id'},
+    ],
+    idxs:[{n:'ix_al_action',u:0,c:'action'},{n:'ix_al_entity_type',u:0,c:'entity_type'},{n:'ix_al_created_at',u:0,c:'created_at'}]},
+};
+
+const SIDEBAR_GROUPS = [
+  {label:'Core', tables:['clinics','users','patients','exercises']},
+  {label:'Scheduling', tables:['appointment_requests','appointments']},
+  {label:'Clinical', tables:['treatment_sessions','soap_assessments','prescriptions','prescription_items','posture_sessions','posture_measurements','patient_documents']},
+  {label:'Packages', tables:['packages','patient_packages']},
+  {label:'Billing', tables:['invoices','invoice_items','payments']},
+  {label:'CRM & Audit', tables:['leads','audit_logs']},
+];
+
+const POSITIONS = {
+  clinics:{x:480,y:30},users:{x:820,y:30},
+  patients:{x:100,y:200},exercises:{x:1180,y:200},
+  appointment_requests:{x:480,y:310},appointments:{x:820,y:310},
+  treatment_sessions:{x:100,y:600},soap_assessments:{x:530,y:600},
+  prescriptions:{x:960,y:600},prescription_items:{x:1180,y:600},
+  posture_sessions:{x:100,y:900},posture_measurements:{x:100,y:1120},
+  patient_documents:{x:480,y:900},packages:{x:840,y:900},
+  patient_packages:{x:840,y:1100},invoices:{x:480,y:1100},
+  invoice_items:{x:480,y:1380},payments:{x:840,y:1380},
+  leads:{x:1180,y:900},audit_logs:{x:1180,y:1100}
+};
+
+// Only ACTUAL enum types still present in DB after all migrations
+const ENUMS = [
+  {n:'clinicplantier',v:['free','practice','clinical_pro'],src:'b4c6f9d3e2a8'},
+  {n:'patientstatus',v:['active','inactive','discharged'],src:'b4c6f9d3e2a8'},
+  {n:'appointment_request_status',v:['pending','approved','rejected'],src:'2bfb0d5801d5'},
+  {n:'package_status',v:['active','inactive','completed','expired','cancelled'],src:'2bfb0d5801d5'},
+  {n:'appointment_status',v:['scheduled','completed','cancelled','no_show'],src:'2bfb0d5801d5'},
+  {n:'appointment_source',v:['manual','public_booking'],src:'2bfb0d5801d5'},
+  {n:'lead_stage',v:['new','contacted','qualified','converted','lost'],src:'2bfb0d5801d5'},
+  {n:'invoice_status',v:['unpaid','paid','partial','draft','issued','cancelled','overdue'],src:'2bfb0d5801d5'},
+  {n:'document_category',v:['medical_report','prescription','lab_result','consent_form','x_ray_scan','id_proof','other'],src:'2bfb0d5801d5'},
+  {n:'payment_method',v:['cash','upi','card','bank_transfer','insurance','other'],src:'2bfb0d5801d5'},
+  {n:'payment_status',v:['pending','completed','voided','refunded'],src:'8f23ba07cc87'},
+  {n:'gender_type',v:['male','female','other'],src:'8f23ba07cc87'},
+  {n:'specialty_type',v:['physiotherapy','chiropractic','osteopathy','massage','acupuncture','other'],src:'8f23ba07cc87'},
+  {n:'lead_source_type',v:['website','referral','social_media','walk_in','advertisement','other'],src:'8f23ba07cc87'},
+];
+
+const MIGRATIONS = [
+  {rev:'0001',title:'Initial Schema',date:'2026-05-15',ico:'🏗',changes:[
+    '+ clinics table (id, name, timestamps)',
+    '+ users table (id, clinic_id, email, password_hash, role [userrole enum: admin|physio|patient], timestamps)',
+    '+ patients table (id, clinic_id, user_id, first_name, last_name, date_of_birth, phone, timestamps)',
+    '+ exercises table (id, clinic_id?, title, description, body_part, is_free, video_url, timestamps)',
+    '+ prescriptions table (id, clinic_id, patient_id, physio_id, physio_notes, status, pdf_key, timestamps)',
+    '+ prescription_items table (id, prescription_id, exercise_id, sets, reps, hold, frequency, hold_angle, timestamps)',
+    '+ posture_sessions table (id, clinic_id, patient_id, timestamps)',
+    '+ posture_measurements table (id, session_id, metric_name, value, unit, notes, timestamps)',
+  ]},
+  {rev:'22021104ec07',title:'Seed Exercises',date:'2026-05-15',ico:'🌱',changes:[
+    '+ Seeded exercise library data (no schema change)',
+  ]},
+  {rev:'17720d35ae64',title:'Extend Posture + Prescription',date:'2026-06-12',ico:'📐',changes:[
+    '+ posture_sessions: overall_confidence, annotated_front_image, annotated_back_image, annotated_side_image',
+    '+ posture_measurements: severity, visibility',
+    '+ prescription_items: note',
+  ]},
+  {rev:'9f3c7a21e6b4',title:'Add User Names',date:'2026-06-17',ico:'👤',changes:[
+    '+ users: first_name VARCHAR(100) NOT NULL',
+    '+ users: last_name VARCHAR(100) NOT NULL',
+    'ℹ Backfilled existing rows with placeholder "Admin User"',
+  ]},
+  {rev:'a3f5e8c2d1b7',title:'Add front_desk Role',date:'2026-07-23',ico:'🏢',changes:[
+    "ℹ ALTER TYPE userrole ADD VALUE 'front_desk'",
+    "ℹ Must run outside transaction block (autocommit_block)",
+  ]},
+  {rev:'b4c6f9d3e2a8',title:'Extend Clinics + Patients (CRM Fields)',date:'2026-07-23',ico:'🏥',changes:[
+    '+ clinics: branding_logo_url, branding_color, plan_tier (clinicplantier enum), is_partner_clinic',
+    '+ patients: age, gender, chief_complaint, referral_source, status (patientstatus enum), deleted_at',
+    '+ Created ENUMs: clinicplantier, patientstatus',
+  ]},
+  {rev:'2bfb0d5801d5',title:'Add CRM Tables (Big Migration)',date:'2026-07-23',ico:'🎯',changes:[
+    '+ appointment_requests table',
+    '+ packages table',
+    '+ audit_logs table',
+    '+ appointments table (clinic_id, patient_id, therapist_id, scheduled_at, duration_minutes, status, source, soft-delete)',
+    '+ leads table',
+    '+ patient_packages table',
+    '+ invoices table (WITH line_items JSONB)',
+    '+ soap_assessments table (clinic_id, patient_id, appointment_id, specialty, diagnosis, is_reassessment, form_data)',
+    '+ treatment_sessions table (clinic_id, patient_id, appointment_id, therapist_id, treatment_date, pain_score, treatment, home_advice, notes)',
+    '+ invoice_items table',
+    '+ patient_documents table',
+    '+ payments table (NO status column)',
+    '+ users: phone, is_active',
+    '+ Created ENUMs: appointment_request_status, package_status, appointment_status, appointment_source, lead_stage, invoice_status, document_category, payment_method',
+  ]},
+  {rev:'c5d8e9f4a1b2',title:'Convert users.role: Enum → VARCHAR+CHECK',date:'2026-07-25',ico:'🔄',changes:[
+    "ℹ ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(50)",
+    "ℹ UPDATE users SET role='therapist' WHERE role='physio' (renames legacy physio role)",
+    '+ CHECK constraint: ck_users_role (admin|therapist|front_desk|patient)',
+    '- DROP TYPE userrole (native enum removed)',
+  ]},
+  {rev:'d6e7f8a9b0c1',title:'Add therapist_id + finalized Fields',date:'2026-08-07',ico:'✅',changes:[
+    '+ soap_assessments: therapist_id UUID FK → users.id (nullable)',
+    '+ Index: ix_soap_assessments_therapist_id',
+    '+ soap_assessments: finalized BOOLEAN NOT NULL DEFAULT false',
+    '+ treatment_sessions: finalized BOOLEAN NOT NULL DEFAULT false',
+    '⚠ finalized is BOOLEAN — NOT a timestamp like finalized_at in backend schema.sql draft',
+  ]},
+];
+
+const RBAC = [
+  {role:'admin',cls:'r-admin',desc:'Full system access — manages clinic settings, users, all data.',perms:[
+    {r:'clinics',a:['read','write','create'],s:'Own Clinic'},
+    {r:'users',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'patients',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'appointments',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'appointment_requests',a:['read','write','delete'],s:'Own Clinic'},
+    {r:'treatment_sessions',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'soap_assessments',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'prescriptions',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'exercises',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'packages',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'patient_packages',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'invoices',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'payments',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'leads',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'patient_documents',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'posture_sessions',a:['read','write','create'],s:'Own Clinic'},
+    {r:'audit_logs',a:['read'],s:'Own Clinic'},
+  ]},
+  {role:'therapist',cls:'r-therapist',desc:'Clinical staff — own patients, sessions, SOAP notes, prescriptions.',perms:[
+    {r:'patients',a:['read','write','create'],s:'Own Clinic'},
+    {r:'appointments',a:['read','write'],s:'Assigned'},
+    {r:'appointment_requests',a:['read'],s:'Own Clinic'},
+    {r:'treatment_sessions',a:['read','write','create'],s:'Own Patients'},
+    {r:'soap_assessments',a:['read','write','create'],s:'Own Patients'},
+    {r:'prescriptions',a:['read','write','create'],s:'Own Patients'},
+    {r:'exercises',a:['read','write','create'],s:'Own Clinic'},
+    {r:'packages',a:['read'],s:'Own Clinic'},
+    {r:'patient_packages',a:['read','write'],s:'Own Patients'},
+    {r:'invoices',a:['read'],s:'Own Patients'},
+    {r:'payments',a:['read'],s:'Own Patients'},
+    {r:'leads',a:['read','write'],s:'Assigned'},
+    {r:'patient_documents',a:['read','write','create'],s:'Own Patients'},
+    {r:'posture_sessions',a:['read','write','create'],s:'Own Patients'},
+    {r:'users',a:['none'],s:'—'},
+    {r:'audit_logs',a:['none'],s:'—'},
+  ]},
+  {role:'front_desk',cls:'r-front_desk',desc:'Reception — scheduling, billing, leads.',perms:[
+    {r:'patients',a:['read','write','create'],s:'Own Clinic'},
+    {r:'appointments',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'appointment_requests',a:['read','write','delete'],s:'Own Clinic'},
+    {r:'invoices',a:['read','write','create'],s:'Own Clinic'},
+    {r:'payments',a:['read','write','create'],s:'Own Clinic'},
+    {r:'packages',a:['read','write','create'],s:'Own Clinic'},
+    {r:'patient_packages',a:['read','write','create'],s:'Own Clinic'},
+    {r:'leads',a:['read','write','create','delete'],s:'Own Clinic'},
+    {r:'treatment_sessions',a:['read'],s:'Own Clinic'},
+    {r:'prescriptions',a:['read'],s:'Own Clinic'},
+    {r:'exercises',a:['read'],s:'Own Clinic'},
+    {r:'patient_documents',a:['read','write','create'],s:'Own Clinic'},
+    {r:'posture_sessions',a:['read'],s:'Own Clinic'},
+    {r:'soap_assessments',a:['none'],s:'—'},
+    {r:'users',a:['none'],s:'—'},
+    {r:'audit_logs',a:['none'],s:'—'},
+  ]},
+  {role:'patient',cls:'r-patient',desc:'Portal-login patients only — read own data, submit booking requests.',perms:[
+    {r:'patients',a:['read'],s:'Own Profile'},
+    {r:'appointments',a:['read'],s:'Own'},
+    {r:'appointment_requests',a:['create'],s:'Own'},
+    {r:'prescriptions',a:['read'],s:'Own'},
+    {r:'exercises',a:['read'],s:'Free / Assigned'},
+    {r:'invoices',a:['read'],s:'Own'},
+    {r:'patient_packages',a:['read'],s:'Own'},
+    {r:'patient_documents',a:['read'],s:'Own'},
+    {r:'posture_sessions',a:['read'],s:'Own'},
+    {r:'treatment_sessions',a:['none'],s:'—'},
+    {r:'soap_assessments',a:['none'],s:'—'},
+    {r:'leads',a:['none'],s:'—'},
+    {r:'payments',a:['none'],s:'—'},
+    {r:'users',a:['none'],s:'—'},
+    {r:'audit_logs',a:['none'],s:'—'},
+  ]},
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let scale=0.72,panX=20,panY=20;
+let dragging=null,dox=0,doy=0;
+let panning=false,psx=0,psy=0,ppx=0,ppy=0;
+let cardEls={},cardPos={},selTable=null;
+
+window.addEventListener('DOMContentLoaded',()=>{
+  buildSidebar();
+  buildCards();
+  buildRBAC();
+  buildEnums();
+  buildMigrations();
+  applyTx();
+  setupEvents();
+  setTimeout(()=>{
+    const l=document.getElementById('loader');
+    l.style.opacity='0';
+    setTimeout(()=>l.remove(),400);
+  },500);
+});
+
+function buildSidebar(){
+  const sb=document.getElementById('sidebar');
+  for(const grp of SIDEBAR_GROUPS){
+    const sec=document.createElement('div');sec.className='sb-section';sec.textContent=grp.label;sb.appendChild(sec);
+    for(const tname of grp.tables){
+      const tbl=T[tname];
+      const item=document.createElement('div');item.className='sb-item';item.id='li-'+tname;
+      item.onclick=()=>focusTable(tname);
+      item.innerHTML=`<span class="sb-icon">${tbl.ico}</span>${tname}<span class="sb-count">${tbl.cols.length}</span>`;
+      sb.appendChild(item);
+    }
+    const div=document.createElement('div');div.className='sb-divider';sb.appendChild(div);
+  }
+}
+
+function buildCards(){
+  const canvas=document.getElementById('canvas');
+  for(const [name,tbl] of Object.entries(T)){
+    const pos=POSITIONS[name]||{x:60,y:60};
+    cardPos[name]={...pos};
+    const card=document.createElement('div');
+    card.className=`tcard g-${tbl.g}`;card.id='card-'+name;
+    card.style.left=pos.x+'px';card.style.top=pos.y+'px';
+    const head=document.createElement('div');head.className='thead';
+    head.innerHTML=`<span class="thead-ico">${tbl.ico}</span><span class="thead-name">${name}</span><span class="thead-cnt">${tbl.cols.length}c</span>`;
+    const keyCols=tbl.cols.filter(c=>c.pk||c.fk||(!c.n.endsWith('_at')&&c.n!=='updated_at'&&c.n!=='created_at'&&c.n!=='deleted_at'&&c.n!=='deleted_by'));
+    const showCols=keyCols.slice(0,9);
+    const colsDiv=document.createElement('div');colsDiv.className='tcols';
+    for(const col of showCols){
+      const row=document.createElement('div');row.className='tcol';
+      const badge=col.pk?'<span class="badge bpk">PK</span>':col.fk?'<span class="badge bfk">FK</span>':'<span class="badge bnn"></span>';
+      const nullMark=(!col.nn&&!col.pk)?'<span class="cnull">?</span>':'';
+      const migMark=col.mig?`<span style="color:var(--orange);font-size:8px;margin-left:2px">✦</span>`:'';
+      row.innerHTML=`${badge}<span class="cname">${col.n}</span>${migMark}<span class="ctype">${shortT(col.t)}</span>${nullMark}`;
+      colsDiv.appendChild(row);
+    }
+    if(tbl.cols.length>9){const more=document.createElement('div');more.className='tcol';more.style.cssText='color:var(--text-dim);font-size:10px;padding:3px 14px';more.textContent=`+${tbl.cols.length-9} more…`;colsDiv.appendChild(more);}
+    card.appendChild(head);card.appendChild(colsDiv);
+    card.addEventListener('click',e=>{e.stopPropagation();openDetail(name);});
+    head.addEventListener('mousedown',e=>{if(e.button!==0)return;e.stopPropagation();dragging=name;const rect=card.getBoundingClientRect();dox=e.clientX-rect.left;doy=e.clientY-rect.top;card.style.zIndex=30;card.style.transition='none';});
+    canvas.appendChild(card);cardEls[name]=card;
+  }
+  setTimeout(redrawLines,120);
+}
+
+function shortT(t){return t.replace('VARCHAR','VC').replace('TIMESTAMPTZ','TS').replace('NUMERIC','NUM').replace('INTEGER','INT').replace('BOOLEAN','BOOL').replace('FLOAT','FLT');}
+
+function redrawLines(){
+  const svg=document.getElementById('lines');svg.innerHTML='';
+  const NS='http://www.w3.org/2000/svg';
+  const defs=document.createElementNS(NS,'defs');
+  for(const [mid,col,oc] of [['arr','#6366f1','0.7'],['arr2','#f59e0b','0.6']]){
+    const m=document.createElementNS(NS,'marker');m.setAttribute('id',mid);m.setAttribute('markerWidth','8');m.setAttribute('markerHeight','8');m.setAttribute('refX','7');m.setAttribute('refY','3');m.setAttribute('orient','auto');
+    const p=document.createElementNS(NS,'path');p.setAttribute('d','M0,0 L0,6 L8,3 z');p.setAttribute('fill',col);p.setAttribute('opacity',oc);m.appendChild(p);defs.appendChild(m);
+  }
+  svg.appendChild(defs);
+  for(const [name,tbl] of Object.entries(T)){
+    for(const fk of tbl.fks){
+      const from=name,to=fk.ref;
+      if(!cardPos[from]||!cardPos[to])continue;
+      const fEl=cardEls[from],tEl=cardEls[to];if(!fEl||!tEl)continue;
+      const fw=fEl.offsetWidth||215,fh=fEl.offsetHeight||180;
+      const tw=tEl.offsetWidth||215,th=tEl.offsetHeight||180;
+      const fp=cardPos[from],tp=cardPos[to];
+      const fcx=fp.x+fw/2,fcy=fp.y+fh/2,tcx=tp.x+tw/2,tcy=tp.y+th/2;
+      const [sx,sy]=edgePt(fp.x,fp.y,fw,fh,fcx,fcy,tcx,tcy);
+      const [ex,ey]=edgePt(tp.x,tp.y,tw,th,tcx,tcy,fcx,fcy);
+      const cx1=sx+(ex-sx)*0.4,cy1=sy,cx2=sx+(ex-sx)*0.6,cy2=ey;
+      const isOpt=tbl.cols.find(c=>c.n===fk.col&&!c.nn&&!c.pk);
+      const path=document.createElementNS(NS,'path');
+      path.setAttribute('d',`M${sx},${sy} C${cx1},${cy1} ${cx2},${cy2} ${ex},${ey}`);
+      path.setAttribute('stroke',isOpt?'#f59e0b':'#6366f1');path.setAttribute('stroke-width','1.5');
+      path.setAttribute('fill','none');path.setAttribute('opacity','0.4');
+      if(isOpt)path.setAttribute('stroke-dasharray','6,4');
+      path.setAttribute('marker-end',isOpt?'url(#arr2)':'url(#arr)');
+      svg.appendChild(path);
+    }
+  }
+}
+
+function edgePt(bx,by,bw,bh,cx,cy,tx,ty){
+  const dx=tx-cx,dy=ty-cy,hw=bw/2,hh=bh/2;
+  if(Math.abs(dx)<0.001&&Math.abs(dy)<0.001)return[cx,cy];
+  const sx=dx>0?1:-1,sy=dy>0?1:-1;
+  const tx1=dx===0?Infinity:hw/Math.abs(dx),ty1=dy===0?Infinity:hh/Math.abs(dy);
+  if(tx1<ty1)return[cx+sx*hw,cy+sy*hw*Math.abs(dy/dx)];
+  return[cx+sx*ty1*Math.abs(dx/dy),cy+sy*hh];
+}
+
+function setupEvents(){
+  const wrap=document.querySelector('.canvas-wrap');
+  const canvas=document.getElementById('canvas');
+  wrap.addEventListener('mousedown',e=>{if(dragging)return;if(e.button!==0)return;panning=true;psx=e.clientX;psy=e.clientY;ppx=panX;ppy=panY;canvas.classList.add('grabbing');});
+  window.addEventListener('mousemove',e=>{
+    if(dragging){
+      const r=wrap.getBoundingClientRect();
+      const nx=(e.clientX-r.left-dox*scale)/scale,ny=(e.clientY-r.top-doy*scale)/scale;
+      cardPos[dragging]={x:nx,y:ny};cardEls[dragging].style.left=nx+'px';cardEls[dragging].style.top=ny+'px';redrawLines();
+    }else if(panning){panX=ppx+(e.clientX-psx);panY=ppy+(e.clientY-psy);applyTx();}
+  });
+  window.addEventListener('mouseup',()=>{if(dragging){cardEls[dragging].style.zIndex=10;dragging=null;}if(panning){panning=false;canvas.classList.remove('grabbing');}});
+  wrap.addEventListener('wheel',e=>{
+    e.preventDefault();const d=e.deltaY>0?0.9:1.11;
+    const r=wrap.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
+    panX=mx-(mx-panX)*d;panY=my-(my-panY)*d;scale=Math.min(2.5,Math.max(0.12,scale*d));applyTx();
+  },{passive:false});
+  canvas.addEventListener('click',e=>{if(e.target===canvas||e.target.tagName==='svg')deselect();});
+}
+
+function applyTx(){
+  document.getElementById('canvas').style.transform=`translate(${panX}px,${panY}px) scale(${scale})`;
+  document.getElementById('zoomDisp').textContent=Math.round(scale*100)+'%';
+}
+function zoomBy(f){const w=document.querySelector('.canvas-wrap');const cx=w.offsetWidth/2,cy=w.offsetHeight/2;panX=cx-(cx-panX)*f;panY=cy-(cy-panY)*f;scale=Math.min(2.5,Math.max(0.12,scale*f));applyTx();}
+function resetView(){scale=0.72;panX=20;panY=20;applyTx();}
+function fitAll(){
+  let mnx=Infinity,mny=Infinity,mxx=-Infinity,mxy=-Infinity;
+  for(const n of Object.keys(T)){const el=cardEls[n],p=cardPos[n];if(!el||!p)continue;mnx=Math.min(mnx,p.x);mny=Math.min(mny,p.y);mxx=Math.max(mxx,p.x+(el.offsetWidth||215));mxy=Math.max(mxy,p.y+(el.offsetHeight||180));}
+  const w=document.querySelector('.canvas-wrap');const ww=w.offsetWidth-60,wh=w.offsetHeight-60;
+  scale=Math.min(1.5,Math.min(ww/(mxx-mnx),wh/(mxy-mny)));panX=30-mnx*scale;panY=30-mny*scale;applyTx();
+}
+
+function focusTable(name){
+  openDetail(name);
+  const el=cardEls[name],pos=cardPos[name];if(!el||!pos)return;
+  const w=document.querySelector('.canvas-wrap');
+  panX=w.offsetWidth/2-(pos.x+(el.offsetWidth||215)/2)*scale;
+  panY=w.offsetHeight/2-(pos.y+(el.offsetHeight||180)/2)*scale;applyTx();
+}
+
+function deselect(){
+  document.querySelectorAll('.tcard.sel').forEach(c=>c.classList.remove('sel'));
+  document.querySelectorAll('.sb-item.active').forEach(i=>i.classList.remove('active'));
+  selTable=null;
+}
+
+function openDetail(name){
+  selTable=name;deselect();
+  const tbl=T[name];
+  const card=cardEls[name];if(card)card.classList.add('sel');
+  const li=document.getElementById('li-'+name);if(li)li.classList.add('active');
+  document.getElementById('dIco').textContent=tbl.ico;
+  document.getElementById('dName').textContent=name;
+  const body=document.getElementById('dbody');body.innerHTML='';
+
+  const ds=mkSec('Description');
+  ds.innerHTML+=`<p class="desc-txt">${tbl.desc}</p>`;
+  if(tbl.note){ds.innerHTML+=`<div class="note-box">${tbl.note}</div>`;}
+  body.appendChild(ds);
+
+  const cs=mkSec(`Columns (${tbl.cols.length}) — ✦ = added by migration`);
+  const t=document.createElement('table');t.className='ctbl';
+  t.innerHTML='<thead><tr><th>Column</th><th>Type</th><th>Null</th><th>Default</th></tr></thead>';
+  const tb=document.createElement('tbody');
+  for(const col of tbl.cols){
+    const tr=document.createElement('tr');
+    const badges=[];
+    if(col.pk)badges.push('<span class="cpk">PK</span>');
+    if(col.fk)badges.push('<span class="cfk">FK</span>');
+    const noteStr=col.note?` <span style="color:var(--orange);font-size:9px">(${col.note})</span>`:'';
+    const migStr=col.mig?`<span style="color:var(--orange);font-size:9px;margin-left:4px">✦${col.mig.slice(0,8)}</span>`:'';
+    tr.innerHTML=`<td style="font-weight:500;color:var(--text)">${badges.join(' ')} ${col.n}${noteStr}${migStr}</td><td style="color:var(--text-muted)">${col.t}</td><td>${(col.nn||col.pk)?'<span class="cnn">NOT NULL</span>':'<span class="cnullable">NULL</span>'}</td><td class="cdef">${col.def||'—'}</td>`;
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);cs.appendChild(t);body.appendChild(cs);
+
+  if(tbl.fks.length){
+    const fs=mkSec('Foreign Keys');
+    const fl=document.createElement('div');fl.className='fklist';
+    for(const fk of tbl.fks){
+      const item=document.createElement('div');item.className='fkitem';
+      item.innerHTML=`<span class="fkarrow">⇢</span><div class="fkdetail"><span class="fkcol">${fk.col}</span><span class="fkref">→ <b>${fk.ref}</b>.${fk.rc}${fk.onDel?' ON DELETE '+fk.onDel:''}</span></div>`;
+      item.addEventListener('click',()=>openDetail(fk.ref));
+      fl.appendChild(item);
+    }
+    fs.appendChild(fl);body.appendChild(fs);
+  }
+
+  if(tbl.idxs.length){
+    const is=mkSec('Indexes');
+    const il=document.createElement('div');il.className='idxlist';
+    for(const idx of tbl.idxs){
+      const item=document.createElement('div');item.className='idxitem';
+      const migBadge=idx.mig?`<span style="color:var(--orange);font-size:9px;margin-left:4px">✦${idx.mig.slice(0,8)}</span>`:'';
+      item.innerHTML=`<span class="idxt ${idx.u?'iuniq':'ireg'}">${idx.u?'UNIQUE':'IDX'}</span><span class="idxname">${idx.n}</span>${migBadge}<span style="color:var(--text-dim);font-size:10px;margin-left:auto">${idx.c}</span>`;
+      il.appendChild(item);
+    }
+    is.appendChild(il);body.appendChild(is);
+  }
+
+  document.getElementById('dpanel').classList.remove('hidden');
+}
+
+function closePanel(){document.getElementById('dpanel').classList.add('hidden');deselect();}
+function mkSec(title){const s=document.createElement('div');s.className='dsec';s.innerHTML=`<div class="dsec-title">${title}</div>`;return s;}
+
+function buildRBAC(){
+  const grid=document.getElementById('rbacGrid');
+  const cm={read:'pread',write:'pwrite',create:'pcreate',delete:'pdelete',none:'pnone'};
+  for(const r of RBAC){
+    const card=document.createElement('div');card.className='rcard';
+    card.innerHTML=`<div class="rcard-head"><span class="rbadge ${r.cls}">${r.role.replace('_',' ').toUpperCase()}</span><span class="rdesc">${r.desc}</span></div>`;
+    const tbl=document.createElement('table');tbl.className='ptbl';
+    tbl.innerHTML='<thead><tr><th>Resource</th><th>Actions</th><th>Scope</th></tr></thead>';
+    const tb=document.createElement('tbody');
+    for(const p of r.perms){
+      const tr=document.createElement('tr');
+      const chips=p.a.map(a=>`<span class="pchip ${cm[a]||''}">${a.toUpperCase()}</span>`).join('');
+      const scope=p.s!=='—'?`<span class="scope-tag">${p.s}</span>`:'<span style="color:var(--text-dim);font-size:10px">—</span>';
+      tr.innerHTML=`<td><span class="pres">${p.r}</span></td><td><div class="pacts">${chips}</div></td><td>${scope}</td>`;
+      tb.appendChild(tr);
+    }
+    tbl.appendChild(tb);card.appendChild(tbl);grid.appendChild(card);
+  }
+}
+
+function buildEnums(){
+  const grid=document.getElementById('enumGrid');
+  for(const e of ENUMS){
+    const card=document.createElement('div');card.className='ecard';
+    card.innerHTML=`<div class="ecard-head"><span class="ecard-name">${e.n}</span><span class="ecard-src">migration ${e.src.slice(0,8)}</span></div><div class="evals">${e.v.map(v=>`<span class="eval">'${v}'</span>`).join('')}</div>`;
+    grid.appendChild(card);
+  }
+}
+
+function buildMigrations(){
+  const tl=document.getElementById('migTimeline');
+  for(const m of MIGRATIONS){
+    const step=document.createElement('div');step.className='mig-step';
+    const changes=m.changes.map(c=>{
+      const plus=c.startsWith('+');const info=c.startsWith('ℹ');const minus=c.startsWith('-');const warn=c.startsWith('⚠');
+      const ic=plus?'<span class="mig-plus">+</span>':info?'<span class="mig-info">ℹ</span>':minus?'<span class="mig-plus" style="color:var(--red)">−</span>':'<span class="mig-info" style="color:var(--yellow)">⚠</span>';
+      return `<div class="mig-change">${ic}<span>${c.slice(c.startsWith('ℹ')?1:0).trim()}</span></div>`;
+    }).join('');
+    step.innerHTML=`<div class="mig-badge">${m.ico}</div><div class="mig-body"><div class="mig-rev">${m.rev}</div><div class="mig-title">${m.title}</div><div class="mig-date">${m.date}</div><div class="mig-changes">${changes}</div></div>`;
+    tl.appendChild(step);
+  }
+}
+
+function switchTab(tab){
+  ['schema','rbac','enums','mig'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('active',t===tab));
+  const sv=document.getElementById('schemaView');
+  const rv=document.getElementById('rbacView');
+  const ev=document.getElementById('enumsView');
+  const mv=document.getElementById('migView');
+  const ma=document.getElementById('mainArea');
+  sv.classList.toggle('hidden',tab!=='schema');
+  rv.classList.toggle('active',tab==='rbac');
+  ev.classList.toggle('active',tab==='enums');
+  mv.classList.toggle('active',tab==='mig');
+  ma.style.overflow=tab==='schema'?'hidden':'auto';
+  if(tab==='schema')setTimeout(redrawLines,50);
+}
+</script>
+</body>
+</html>

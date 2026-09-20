@@ -3,15 +3,19 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from app.core.dependencies import require_roles
-from app.enums.user import UserRole
-
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session, get_current_clinic
+from app.core.dependencies import (
+    get_async_session,
+    get_current_clinic,
+    get_current_user,
+    require_capability,
+)
 from app.enums.document import DocumentCategory
+from app.enums.permission import CapabilityScope
 from app.models.clinic import Clinic
+from app.models.user import User
 from app.repositories.document import PatientDocumentRepository
 from app.repositories.patient import PatientRepository
 from app.repositories.treatment import TreatmentSessionRepository
@@ -21,9 +25,22 @@ from app.schemas.document import (
     PatientDocumentResponse,
     PatientDocumentUpdate,
 )
-from app.services.document import DocumentNotFoundError, DocumentService, DocumentValidationError
+from app.services.document import (
+    DocumentNotFoundError,
+    DocumentService,
+    DocumentValidationError,
+)
 
-router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
+
+def check_documents_enabled(clinic: Clinic = Depends(get_current_clinic)) -> None:
+    if not clinic.is_documents_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Documents bucket is disabled for this clinic.",
+        )
+
+
+router = APIRouter(dependencies=[Depends(check_documents_enabled)])
 
 
 async def get_document_service(
@@ -40,37 +57,79 @@ async def get_document_service(
 
 DocumentServiceDep = Annotated[DocumentService, Depends(get_document_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
 # --- Patient Document Endpoints ---
 
-@router.post("/patients/{patient_id}/documents", response_model=PatientDocumentResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/patients/{patient_id}/documents",
+    response_model=PatientDocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def upload_patient_document(
     patient_id: UUID,
-    payload: PatientDocumentCreate,
     clinic: CurrentClinicDep,
     service: DocumentServiceDep,
+    label: Annotated[str, Form(min_length=1, max_length=255)],
+    category: Annotated[DocumentCategory, Form()],
+    notes: Annotated[str | None, Form(max_length=2000)] = None,
+    treatment_id: Annotated[UUID | None, Form()] = None,
+    file: UploadFile = File(...),
+    scope: CapabilityScope = Depends(require_capability("documents.upload")),
 ) -> PatientDocumentResponse:
-    """Register document metadata for a specific patient."""
-
-    if payload.patient_id != patient_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="patient_id in path does not match payload patient_id.",
-        )
+    """Upload and register a document for a specific patient."""
 
     try:
+        from app.core.storage import storage_client
+        import uuid
+
+        file_bytes = await file.read()
+        file_ext = (
+            file.filename.split(".")[-1]
+            if file.filename and "." in file.filename
+            else "bin"
+        )
+        path = f"{clinic.id}/{patient_id}/{uuid.uuid4()}.{file_ext}"
+
+        storage_client.upload_file(
+            path, file_bytes, file.content_type or "application/octet-stream"
+        )
+
+        payload = PatientDocumentCreate(
+            patient_id=patient_id,
+            label=label,
+            category=category,
+            notes=notes,
+            treatment_id=treatment_id,
+            file_url=path,
+            file_type=file.content_type or "application/octet-stream",
+            file_size=len(file_bytes),
+        )
+
         document = await service.create_document(clinic.id, payload)
         return PatientDocumentResponse.model_validate(document)
     except DocumentValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
+        ) from exc
 
 
-@router.post("/documents", response_model=PatientDocumentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/documents",
+    response_model=PatientDocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_document(
     payload: PatientDocumentCreate,
     clinic: CurrentClinicDep,
     service: DocumentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("documents.upload")),
 ) -> PatientDocumentResponse:
     """Register document metadata."""
 
@@ -78,10 +137,15 @@ async def create_document(
         document = await service.create_document(clinic.id, payload)
         return PatientDocumentResponse.model_validate(document)
     except DocumentValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.get("/patients/{patient_id}/documents", response_model=PatientDocumentListResponse)
+@router.get(
+    "/patients/{patient_id}/documents",
+    response_model=PatientDocumentListResponse,
+)
 async def list_patient_documents_by_patient(
     patient_id: UUID,
     clinic: CurrentClinicDep,
@@ -90,6 +154,7 @@ async def list_patient_documents_by_patient(
     category: Annotated[DocumentCategory | None, Query(alias="category")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    scope: CapabilityScope = Depends(require_capability("documents.view")),
 ) -> PatientDocumentListResponse:
     """List documents for a specific patient with optional filtering."""
 
@@ -102,7 +167,9 @@ async def list_patient_documents_by_patient(
         limit=limit,
     )
     items = [PatientDocumentResponse.model_validate(doc) for doc in documents]
-    return PatientDocumentListResponse(items=items, total=len(items), offset=offset, limit=limit)
+    return PatientDocumentListResponse(
+        items=items, total=len(items), offset=offset, limit=limit
+    )
 
 
 @router.get("/documents", response_model=PatientDocumentListResponse)
@@ -114,6 +181,7 @@ async def list_documents(
     category: Annotated[DocumentCategory | None, Query(alias="category")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    scope: CapabilityScope = Depends(require_capability("documents.view")),
 ) -> PatientDocumentListResponse:
     """List documents for the authenticated clinic with optional filtering."""
 
@@ -126,7 +194,9 @@ async def list_documents(
         limit=limit,
     )
     items = [PatientDocumentResponse.model_validate(doc) for doc in documents]
-    return PatientDocumentListResponse(items=items, total=len(items), offset=offset, limit=limit)
+    return PatientDocumentListResponse(
+        items=items, total=len(items), offset=offset, limit=limit
+    )
 
 
 @router.get("/documents/{id}", response_model=PatientDocumentResponse)
@@ -134,6 +204,7 @@ async def get_document(
     id: UUID,
     clinic: CurrentClinicDep,
     service: DocumentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("documents.view")),
 ) -> PatientDocumentResponse:
     """Retrieve document metadata by ID."""
 
@@ -141,7 +212,9 @@ async def get_document(
         document = await service.get_document(clinic.id, id)
         return PatientDocumentResponse.model_validate(document)
     except DocumentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get("/documents/{id}/download")
@@ -149,15 +222,42 @@ async def download_document(
     id: UUID,
     clinic: CurrentClinicDep,
     service: DocumentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("documents.view")),
 ) -> Response:
     """Download or retrieve private document location (authenticated, clinic-scoped)."""
 
     try:
         document = await service.get_document(clinic.id, id)
-        headers = {"Location": document.file_url}
-        return Response(status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers=headers)
+
+        # Determine URL
+        if document.file_url.startswith("http"):
+            url = document.file_url
+            headers = {"Location": url}
+            return Response(
+                status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers=headers
+            )
+        else:
+            from app.core.storage import storage_client
+
+            file_bytes = storage_client.download_file(document.file_url)
+
+            headers = {
+                "Content-Disposition": f'attachment; filename="{document.label}"',
+                "Access-Control-Expose-Headers": "Content-Disposition",
+            }
+            return Response(
+                content=file_bytes,
+                media_type=document.file_type or "application/octet-stream",
+                headers=headers,
+            )
     except DocumentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
+        ) from exc
 
 
 @router.patch("/documents/{id}", response_model=PatientDocumentResponse)
@@ -166,6 +266,7 @@ async def update_document(
     payload: PatientDocumentUpdate,
     clinic: CurrentClinicDep,
     service: DocumentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("documents.edit")),
 ) -> PatientDocumentResponse:
     """Update document metadata."""
 
@@ -173,20 +274,29 @@ async def update_document(
         document = await service.update_document(clinic.id, id, payload)
         return PatientDocumentResponse.model_validate(document)
     except DocumentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except DocumentValidationError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
 
-@router.delete("/documents/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/documents/{id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
+)
 async def delete_document(
     id: UUID,
     clinic: CurrentClinicDep,
     service: DocumentServiceDep,
+    scope: CapabilityScope = Depends(require_capability("documents.delete")),
 ) -> None:
     """Delete a patient document record."""
 
     try:
         await service.delete_document(clinic.id, id)
     except DocumentNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc

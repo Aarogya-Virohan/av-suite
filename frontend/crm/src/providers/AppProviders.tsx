@@ -1,20 +1,34 @@
 'use client';
 
-import React from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
-import { queryClient } from '@/lib/react-query';
+import { useAuthStore } from '../store';
 
-interface AppProvidersProps {
-  children: React.ReactNode;
-}
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 1000 * 60 * 5, // 5 mins
+            retry: 1,
+            refetchOnWindowFocus: false,
+          },
+        },
+      })
+  );
 
-export const AppProviders: React.FC<AppProvidersProps> = ({ children }) => {
+  const initializeFromStorage = useAuthStore((s) => s.initializeFromStorage);
+
+  useEffect(() => {
+    initializeFromStorage();
+  }, [initializeFromStorage]);
+
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <Toaster position="top-right" richColors closeButton duration={4000} />
+      <Toaster position="top-right" richColors />
     </QueryClientProvider>
   );
-};
-export default AppProviders;
+}
