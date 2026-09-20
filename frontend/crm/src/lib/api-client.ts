@@ -2,7 +2,8 @@ import axios, { AxiosError } from 'axios';
 import { getStoredToken, clearStoredTokens } from './auth';
 import { useAuthStore } from '../store';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 export const API_BASE_URL = `${BASE_URL}/api/v1`;
 
 export const apiClient = axios.create({

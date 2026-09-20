@@ -8,9 +8,6 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  "vars": {
-    "NEXT_PUBLIC_API_URL": "https://api.yourclinic.com"
-  },
   "observability": {
     "enabled": true
   }

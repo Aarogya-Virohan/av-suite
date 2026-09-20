@@ -207,7 +207,7 @@ export default function PatientWorkspacePage() {
               </button>
 
               <a
-                href={`http://localhost:3002/analyze?patient_id=${patient.id}`}
+                href={`${(process.env.NEXT_PUBLIC_POSTURE_APP_URL || 'http://localhost:3002').replace(/\/+$/, '')}/analyze?patient_id=${patient.id}`}
                 target="_blank"
                 rel="noreferrer"
                 className="ml-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
@@ -217,7 +217,7 @@ export default function PatientWorkspacePage() {
               </a>
 
               <a
-                href={`http://localhost:3001/prescribe?patient_id=${patient.id}`}
+                href={`${(process.env.NEXT_PUBLIC_EXERCISE_APP_URL || 'http://localhost:3001').replace(/\/+$/, '')}/prescribe?patient_id=${patient.id}`}
                 target="_blank"
                 rel="noreferrer"
                 className="ml-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs cursor-pointer"
