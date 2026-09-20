@@ -44,9 +44,9 @@ class Settings(BaseSettings):
     
     # CORS Configuration
     # CORS (Cross-Origin Resource Sharing) frontend requests ko allow karta hai
-    # Multiple origins comma-separated format mein define ho sakte hain
+    # Multiple origins comma-separated format mein define ho sakte hain (e.g. via .env)
     # Security important: only trusted origins ko allow karo
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001,https://av-suite-crm.coccoder999.workers.dev"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
     
     # Cloudflare Turnstile Configuration (Optional)
     TURNSTILE_SECRET_KEY: str | None = None

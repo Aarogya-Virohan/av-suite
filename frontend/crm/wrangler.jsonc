@@ -9,7 +9,7 @@
     "binding": "ASSETS"
   },
   "vars": {
-    "NEXT_PUBLIC_API_URL": "https://av-suite-backend.onrender.com"
+    "NEXT_PUBLIC_API_URL": "https://api.yourclinic.com"
   },
   "observability": {
     "enabled": true
