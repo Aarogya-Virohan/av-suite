@@ -78,7 +78,7 @@ class BookingService:
         if clinic is None:
             raise BookingNotFoundError(f"Clinic '{clinic_id}' does not exist.")
 
-        req_data = payload.model_dump()
+        req_data = payload.model_dump(exclude={"turnstile_token"})
         req_data.update(
             {
                 "clinic_id": clinic_id,

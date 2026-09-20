@@ -24,6 +24,8 @@ class AppointmentRequestBase(BaseModel):
 class AppointmentRequestCreate(AppointmentRequestBase):
     """Schema for submitting a public appointment request."""
 
+    turnstile_token: str | None = Field(default=None, description="Optional Cloudflare Turnstile token.")
+
 
 class AppointmentRequestUpdate(BaseModel):
     """Schema for updating an appointment request status or notes."""

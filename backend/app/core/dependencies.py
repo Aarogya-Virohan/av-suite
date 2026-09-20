@@ -6,9 +6,30 @@ from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+
+def get_client_ip(request: Request) -> str:
+    """
+    Extract the real client IP address from Cloudflare or reverse proxy headers.
+    Checks:
+    1. CF-Connecting-IP (injected by Cloudflare edge)
+    2. X-Forwarded-For (first IP in proxy chain)
+    3. request.client.host (direct connection fallback)
+    """
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip.strip()
+    
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        return xff.split(",")[0].strip()
+        
+    if request.client and request.client.host:
+        return request.client.host
+        
+    return "unknown"
 
 from app.core.database import get_db
 from app.core.rbac import resolve_capability_scope

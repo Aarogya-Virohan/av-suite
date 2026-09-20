@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import httpx
+import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.dependencies import (
     get_async_session,
+    get_client_ip,
     get_current_clinic,
     require_capability,
 )
@@ -34,6 +38,30 @@ from app.services.booking import (
 from app.schemas.envelope import ResponseEnvelope
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+async def verify_turnstile_token(token: str | None, client_ip: str | None) -> bool:
+    """Verify Cloudflare Turnstile token if TURNSTILE_SECRET_KEY is configured."""
+    if not settings.TURNSTILE_SECRET_KEY:
+        return True
+    if not token:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={
+                    "secret": settings.TURNSTILE_SECRET_KEY,
+                    "response": token,
+                    "remoteip": client_ip,
+                },
+            )
+            data = resp.json()
+            return bool(data.get("success", False))
+    except Exception as e:
+        logger.error(f"Cloudflare Turnstile verification failed with error: {e}")
+        return False
 
 
 async def get_booking_service(
@@ -83,10 +111,19 @@ async def get_public_clinic_branding(
 async def create_public_appointment_request(
     payload: AppointmentRequestCreate,
     service: BookingServiceDep,
+    request: Request,
     clinic_slug: Annotated[str | None, Query(alias="clinic_slug")] = None,
     clinic_id: Annotated[UUID | None, Query(alias="clinic_id")] = None,
 ) -> ResponseEnvelope[AppointmentRequestResponse]:
     """Public unauthenticated endpoint to submit an appointment request using clinic slug or clinic id."""
+
+    if settings.TURNSTILE_SECRET_KEY:
+        client_ip = get_client_ip(request)
+        if not await verify_turnstile_token(payload.turnstile_token, client_ip):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security check failed (Cloudflare Turnstile). Please try submitting again.",
+            )
 
     if clinic_slug is not None:
         try:

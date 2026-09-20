@@ -22,10 +22,47 @@ export default function PublicBookingPage() {
   const [chiefComplaint, setChiefComplaint] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  React.useEffect(() => {
+    if (!turnstileSiteKey || typeof window === 'undefined') return;
+
+    if (!document.getElementById('cf-turnstile-script')) {
+      const script = document.createElement('script');
+      script.id = 'cf-turnstile-script';
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+
+    const interval = setInterval(() => {
+      if ((window as any).turnstile) {
+        clearInterval(interval);
+        const container = document.getElementById('turnstile-container');
+        if (container && !container.hasChildNodes()) {
+          (window as any).turnstile.render('#turnstile-container', {
+            sitekey: turnstileSiteKey,
+            callback: (token: string) => {
+              setTurnstileToken(token);
+            },
+          });
+        }
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [turnstileSiteKey, step]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    if (turnstileSiteKey && !turnstileToken) {
+      toast.error('Please complete the security check');
+      return;
+    }
 
     if (!name || !phone || !chiefComplaint) {
       toast.error('Please fill in all required fields');
@@ -52,6 +89,7 @@ export default function PublicBookingPage() {
         preferred_date: preferredDate,
         preferred_slot: preferredSlot,
         notes: `Service Requested: ${service}`,
+        turnstile_token: turnstileToken || undefined,
       });
 
       setIsSuccess(true);
@@ -235,6 +273,10 @@ export default function PublicBookingPage() {
                   className={inputClasses}
                 />
               </div>
+
+              {turnstileSiteKey && (
+                <div id="turnstile-container" className="flex justify-center my-3 min-h-[65px]" />
+              )}
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700 mt-4">
                 <button type="button" onClick={() => setStep(2)} className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-medium">
