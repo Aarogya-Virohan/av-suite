@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
 import { usePatients } from '../../../features/patients/api';
 import { useAnalyticsOverview, useMyPerformance } from '../../../features/analytics/api';
 import { ActivitySquare, Stethoscope, ClipboardList } from 'lucide-react';
@@ -17,17 +16,21 @@ interface RunningCostItem {
   amount: number;
 }
 
+import { canAccessModule, hasCapability } from '../../../config/permissions';
+
 export default function AnalyticsPage() {
   const role = useAuthStore((s) => s.role);
   const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'year'>('month');
-  const { data: patientsResponse } = usePatients(undefined, 1, 5);
+
+  const canViewFinancials = hasCapability('analytics.clinic_financials');
+  const canViewMyPerf = hasCapability('analytics.my_performance');
+
+  const { data: patientsResponse } = usePatients(undefined, 1, 5, canViewFinancials);
   const patients = patientsResponse?.data || [];
 
-  // Therapist-scoped performance (RBAC Spec §4: therapist analytics = 'Own only')
-  const { data: myPerformance, isLoading: myPerfLoading } = useMyPerformance();
+  // Scoped performance query
+  const { data: myPerformance, isLoading: myPerfLoading } = useMyPerformance(canViewMyPerf);
   // Running costs state — editable by admin (Rent, Electricity, Supplies, Salaries)
-  // Note: Therapist Salaries is included as an editable line item.
-  // Phase 2: persist to backend via /api/v1/settings/running-costs
   const [runningCosts, setRunningCosts] = useState<RunningCostItem[]>([
     { id: '1', label: 'Rent', amount: 35000 },
     { id: '2', label: 'Electricity & Utilities', amount: 8000 },
@@ -37,7 +40,7 @@ export default function AnalyticsPage() {
 
   const totalMonthlyExpenses = runningCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
 
-  const { data: analyticsOverview } = useAnalyticsOverview();
+  const { data: analyticsOverview } = useAnalyticsOverview(canViewFinancials);
   const totalCollected = Number(analyticsOverview?.revenue?.revenue_this_month) || 0;
   const estimatedProfit = totalCollected - totalMonthlyExpenses;
 
@@ -55,12 +58,12 @@ export default function AnalyticsPage() {
     toast.warning('Running costs not saved — backend endpoint not yet wired. Changes have not been persisted.');
   };
 
-  if (!canAccessModule(role, 'analytics')) {
+  if (!canAccessModule('analytics')) {
     return <AccessRestricted message="Analytics access is restricted for your role." />;
   }
 
-  // RBAC Spec §4: Therapist sees own-only performance, not clinic financials
-  if (role === 'therapist') {
+  // If user only has personal performance permission, show personal performance
+  if (!canViewFinancials && canViewMyPerf) {
     const perf = myPerformance;
     return (
       <AppShell>

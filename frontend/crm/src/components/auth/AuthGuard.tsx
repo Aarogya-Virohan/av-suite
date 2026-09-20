@@ -12,7 +12,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [isChecking, setIsChecking] = useState(true);
 
-  const checkAuth = React.useCallback(() => {
+  const checkAuth = React.useCallback(async () => {
     const token = getStoredToken();
 
     if (!token || isTokenExpired(token)) {
@@ -23,6 +23,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     setToken(token);
+    await useAuthStore.getState().fetchMe();
     setIsChecking(false);
     return true;
   }, [router, setToken]);

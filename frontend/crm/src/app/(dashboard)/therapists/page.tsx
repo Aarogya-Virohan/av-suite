@@ -5,7 +5,7 @@ import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
+import { canAccessModule, hasCapability } from '../../../config/permissions';
 import { useUsers, useCreateUser } from '../../../features/users/api';
 import { User } from '../../../types/api';
 import { AlertCircle, Plus, Edit, DollarSign } from 'lucide-react';
@@ -13,8 +13,11 @@ import { toast } from 'sonner';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 export default function TherapistsPage() {
-  const role = useAuthStore((s) => s.role);
-  const { data: usersResponse, isLoading } = useUsers();
+  const hasAccess = canAccessModule('therapists');
+  const canCreateTherapist = hasCapability('users.create');
+  const canViewSalary = hasCapability('users.edit');
+
+  const { data: usersResponse, isLoading } = useUsers(hasAccess);
   const users = usersResponse || [];
   const therapists = users.filter((u: User) => u.role === 'therapist');
   const createUser = useCreateUser();
@@ -57,15 +60,19 @@ export default function TherapistsPage() {
     }
   };
 
-  if (!canAccessModule(role, 'therapists')) {
-    return <AccessRestricted message="Therapists directory and payroll is restricted to Administrators only." />;
+  if (!hasAccess) {
+    return (
+      <AppShell>
+        <AccessRestricted message="Therapists directory and payroll is restricted." />
+      </AppShell>
+    );
   }
 
   const columns: Column<User>[] = [
     { key: 'name', header: 'Therapist Name', render: (u) => <span className="font-bold">{u.first_name} {u.last_name}</span> },
     { key: 'email', header: 'Email' },
     { key: 'phone', header: 'Phone' },
-    { key: 'payroll', header: 'Monthly Salary', render: () => <span className="text-rose-600 font-bold">₹35,000 / mo</span> },
+    ...(canViewSalary ? [{ key: 'payroll', header: 'Monthly Salary', render: () => <span className="text-rose-600 font-bold">₹35,000 / mo</span> }] : []),
     { key: 'status', header: 'Status', render: (u) => (u.is_active ? <span className="text-emerald-600 font-bold text-xs">Active</span> : 'Inactive') },
   ];
 
@@ -75,18 +82,19 @@ export default function TherapistsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Therapists Directory & Payroll</h1>
-            <p className="text-sm text-slate-500">Manage clinic therapists & monthly compensation (Admin only)</p>
+            <p className="text-sm text-slate-500">Manage clinic therapists & monthly compensation</p>
           </div>
 
-          <button
-            onClick={() => setIsSlideOpen(true)}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Therapist</span>
-          </button>
+          {canCreateTherapist && (
+            <button
+              onClick={() => setIsSlideOpen(true)}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Therapist</span>
+            </button>
+          )}
         </div>
-
 
         <DataTable columns={columns} data={therapists} />
 

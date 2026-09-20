@@ -37,8 +37,16 @@ def test_default_role_permission_resolution() -> None:
     front_desk_scope = resolve_capability_scope(UserRole.FRONT_DESK, "analytics.my_performance")
 
     assert admin_scope == CapabilityScope.ALL
-    assert therapist_scope == CapabilityScope.OWN
+    assert therapist_scope == CapabilityScope.NONE
     assert front_desk_scope == CapabilityScope.NONE
+
+    # When explicit override is granted to therapist, it resolves to that override
+    therapist_granted_scope = resolve_capability_scope(
+        UserRole.THERAPIST,
+        "analytics.my_performance",
+        user_permissions={"analytics.my_performance": CapabilityScope.OWN},
+    )
+    assert therapist_granted_scope == CapabilityScope.OWN
 
 
 def test_explicit_none_override_denies_role_template_grant() -> None:

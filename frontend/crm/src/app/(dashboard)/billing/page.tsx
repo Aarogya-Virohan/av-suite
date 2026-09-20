@@ -12,14 +12,21 @@ import { Plus, Download, CreditCard, FileText, Package as PackageIcon, Eye, Prin
 import { toast } from 'sonner';
 import { usePatients } from '../../../features/patients/api';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
+import { canAccessModule, canPerformAction, hasCapability } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 type TabKey = 'invoices' | 'payments' | 'packages';
 
 export default function BillingPage() {
   const role = useAuthStore((s) => s.role);
-  const [activeTab, setActiveTab] = useState<TabKey>('invoices');
+  const isAllowed = canAccessModule('billing');
+  const canViewInvoices = hasCapability('invoices.view');
+  const canViewPayments = hasCapability('payments.view');
+  const canViewPackages = hasCapability('packages.view');
+
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    canViewInvoices ? 'invoices' : canViewPayments ? 'payments' : 'packages'
+  );
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
@@ -27,10 +34,10 @@ export default function BillingPage() {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [previewMode, setPreviewMode] = useState<'invoice' | 'receipt'>('invoice');
 
-  const { data: invoices = [], isLoading: isLoadingInvoices } = useInvoices();
-  const { data: payments = [], isLoading: isLoadingPayments } = usePayments();
-  const { data: packages = [], isLoading: isLoadingPackages } = usePackages();
-  const { data: patientsResponse, isLoading: isLoadingPatients } = usePatients(undefined, 1, 100);
+  const { data: invoices = [], isLoading: isLoadingInvoices } = useInvoices(canViewInvoices);
+  const { data: payments = [], isLoading: isLoadingPayments } = usePayments(canViewPayments);
+  const { data: packages = [], isLoading: isLoadingPackages } = usePackages(canViewPackages);
+  const { data: patientsResponse, isLoading: isLoadingPatients } = usePatients(undefined, 1, 100, isAllowed);
   const patients = patientsResponse?.data || [];
 
   const getPatientName = (patientId: string) => {
@@ -38,8 +45,8 @@ export default function BillingPage() {
     return p ? `${p.first_name} ${p.last_name}` : patientId;
   };
 
-  if (!canAccessModule(role, 'billing')) {
-    return <AccessRestricted message="Billing & invoices are restricted to Administrators and Front Desk staff only." />;
+  if (!isAllowed) {
+    return <AccessRestricted message="Billing & invoices access is restricted for your role." />;
   }
 
   const invoiceColumns: Column<Invoice>[] = [

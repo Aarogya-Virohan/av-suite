@@ -13,27 +13,27 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { apiClient } from '../../../lib/api-client';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
+import { canAccessModule, canPerformAction, hasCapability } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 interface BookingRequest {
   id: string;
   name: string;
   phone: string;
-  notes: string;
   preferred_date: string;
   preferred_slot: string;
   chief_complaint: string;
+  notes?: string;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
 }
-
 
 type SubTabKey = 'list' | 'requests' | 'bookingLink';
 
 export default function AppointmentsPage() {
   const role = useAuthStore((s) => s.role);
-  const { data: appointmentsResponse, isLoading } = useAppointments();
+  const isAllowed = canAccessModule('appointments');
+  const { data: appointmentsResponse, isLoading } = useAppointments(undefined, undefined, 1, 10, isAllowed);
   const appointments: Appointment[] = appointmentsResponse?.data || [];
   const updateStatus = useUpdateAppointmentStatus();
 
@@ -43,7 +43,7 @@ export default function AppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
   const [requests, setRequests] = useState<BookingRequest[]>([]);
 
-  const canViewBookingRequests = role === 'admin' || role === 'front_desk';
+  const canViewBookingRequests = hasCapability('booking.view');
 
   // Fetch pending appointment requests from backend on mount (only for authorized roles)
   React.useEffect(() => {
@@ -85,7 +85,7 @@ export default function AppointmentsPage() {
     return true;
   });
 
-  if (!canAccessModule(role, 'appointments')) {
+  if (!isAllowed) {
     return <AccessRestricted message="Appointments access is restricted for your role." />;
   }
 
@@ -147,13 +147,15 @@ export default function AppointmentsPage() {
             <p className="text-sm text-slate-500">Manage daily schedules & incoming public booking requests</p>
           </div>
 
-          <button
-            onClick={() => setIsAddOpen(true)}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Book Visit</span>
-          </button>
+          {canPerformAction('manageAppointments') && (
+            <button
+              onClick={() => setIsAddOpen(true)}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Book Visit</span>
+            </button>
+          )}
         </div>
 
         {/* Sub-Tabs */}

@@ -8,7 +8,7 @@ import { Lead, LeadStage } from '../../../types/api';
 import { Plus, UserCheck, Phone, Mail, Search, List, LayoutGrid, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
+import { canAccessModule, hasCapability } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 const STAGES: { key: LeadStage; label: string; color: string }[] = [
@@ -20,8 +20,12 @@ const STAGES: { key: LeadStage; label: string; color: string }[] = [
 ];
 
 export default function LeadsPage() {
-  const role = useAuthStore((s) => s.role);
-  const { data: leads = [], isLoading } = useLeads();
+  const hasAccess = canAccessModule('leads');
+  const canCreateLead = hasCapability('leads.create');
+  const canConvertLead = hasCapability('leads.convert');
+  const canEditLead = hasCapability('leads.edit');
+
+  const { data: leads = [], isLoading } = useLeads(undefined, hasAccess);
   const updateStage = useUpdateLeadStage();
   const convertLead = useConvertLead();
   
@@ -48,8 +52,12 @@ export default function LeadsPage() {
     }
   };
 
-  if (!canAccessModule(role, 'leads')) {
-    return <AccessRestricted message="Leads management is restricted to Administrators and Front Desk staff only." />;
+  if (!hasAccess) {
+    return (
+      <AppShell>
+        <AccessRestricted message="You do not have permission to view or manage leads." />
+      </AppShell>
+    );
   }
 
   const filteredLeads = leads.filter(lead => {
@@ -99,13 +107,15 @@ export default function LeadsPage() {
               </button>
             </div>
 
-            <button
-              onClick={() => setIsAddOpen(true)}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Lead</span>
-            </button>
+            {canCreateLead && (
+              <button
+                onClick={() => setIsAddOpen(true)}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Add Lead</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -190,7 +200,7 @@ export default function LeadsPage() {
                             <select
                               value={lead.stage}
                               onChange={(e) => handleStageChange(lead.id, e.target.value as LeadStage)}
-                              disabled={lead.stage === 'converted' || !!lead.converted_patient_id}
+                              disabled={!canEditLead || lead.stage === 'converted' || !!lead.converted_patient_id}
                               className="text-xs font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {STAGES.map((s) => (
@@ -202,13 +212,17 @@ export default function LeadsPage() {
                           </td>
                           <td className="px-6 py-4 text-right">
                             {lead.stage !== 'converted' && !lead.converted_patient_id ? (
-                              <button
-                                onClick={() => handleConvert(lead.id, lead.name)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
-                              >
-                                <UserCheck className="w-3.5 h-3.5" />
-                                <span>Convert</span>
-                              </button>
+                              canConvertLead ? (
+                                <button
+                                  onClick={() => handleConvert(lead.id, lead.name)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
+                                >
+                                  <UserCheck className="w-3.5 h-3.5" />
+                                  <span>Convert</span>
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">No convert permission</span>
+                              )
                             ) : (
                               <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-500 text-xs font-bold uppercase tracking-wider px-3 py-1.5">
                                 <UserCheck className="w-3.5 h-3.5" />
@@ -288,7 +302,7 @@ export default function LeadsPage() {
                             <select
                               value={lead.stage}
                               onChange={(e) => handleStageChange(lead.id, e.target.value as LeadStage)}
-                              disabled={lead.stage === 'converted' || !!lead.converted_patient_id}
+                              disabled={!canEditLead || lead.stage === 'converted' || !!lead.converted_patient_id}
                               className="flex-1 text-[11px] font-semibold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1.5 text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {STAGES.map((s) => (
@@ -298,7 +312,7 @@ export default function LeadsPage() {
                               ))}
                             </select>
 
-                            {lead.stage !== 'converted' && !lead.converted_patient_id && (
+                            {lead.stage !== 'converted' && !lead.converted_patient_id && canConvertLead && (
                               <button
                                 onClick={() => handleConvert(lead.id, lead.name)}
                                 className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-400 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors border border-emerald-200 dark:border-emerald-800/50"

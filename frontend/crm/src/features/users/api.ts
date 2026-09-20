@@ -4,7 +4,7 @@ import { User } from '../../types/api';
 
 export const USERS_QUERY_KEY = ['users'];
 
-export function useUsers() {
+export function useUsers(enabled = true) {
   return useQuery<User[]>({
     queryKey: USERS_QUERY_KEY,
     queryFn: async () => {
@@ -14,6 +14,7 @@ export function useUsers() {
       if (data && Array.isArray(data.items)) return data.items;
       return [];
     },
+    enabled,
   });
 }
 

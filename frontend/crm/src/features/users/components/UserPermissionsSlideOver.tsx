@@ -13,6 +13,8 @@ interface Props {
 
 import { CANONICAL_CAPABILITIES } from '../../../config/permissions';
 
+import { useAuthStore } from '../../../store';
+
 export function UserPermissionsSlideOver({ isOpen, onClose, user }: Props) {
   const { data: permissions, isLoading } = useUserPermissions(user?.id || '');
   const updatePermissions = useUpdateUserPermissions();
@@ -23,14 +25,25 @@ export function UserPermissionsSlideOver({ isOpen, onClose, user }: Props) {
   useEffect(() => {
     if (permissions && Array.isArray(permissions)) {
       const permsMap: Record<string, string> = {};
+      // Initialize with default for role (admin defaults to all/own, other roles default to none)
+      CANONICAL_CAPABILITIES.forEach((cap) => {
+        permsMap[cap.key] = user?.role === 'admin' ? (cap.allowedScopes.includes('all') ? 'all' : 'own') : 'none';
+      });
+      // Override with existing saved permissions from user_permissions table
       permissions.forEach((p: any) => {
         permsMap[p.capability_key] = p.scope;
+      });
+      setLocalPerms(permsMap);
+    } else if (user) {
+      const permsMap: Record<string, string> = {};
+      CANONICAL_CAPABILITIES.forEach((cap) => {
+        permsMap[cap.key] = user.role === 'admin' ? (cap.allowedScopes.includes('all') ? 'all' : 'own') : 'none';
       });
       setLocalPerms(permsMap);
     } else {
       setLocalPerms({});
     }
-  }, [permissions, isOpen]);
+  }, [permissions, isOpen, user]);
 
   const handleScopeChange = (key: string, scope: string) => {
     setLocalPerms((prev) => ({
@@ -42,10 +55,9 @@ export function UserPermissionsSlideOver({ isOpen, onClose, user }: Props) {
   const handleSave = async () => {
     if (!user) return;
     
-    // Filter out "none" or undefined to match backend expectation?
-    // Actually backend payload expects list of { capability_key, scope }
+    // Explicitly send all selected scopes including 'none'
     const payload = Object.entries(localPerms)
-      .filter(([_, scope]) => scope && scope !== 'none')
+      .filter(([_, scope]) => Boolean(scope))
       .map(([key, scope]) => ({
         capability_key: key,
         scope: scope,
@@ -56,6 +68,10 @@ export function UserPermissionsSlideOver({ isOpen, onClose, user }: Props) {
       {
         onSuccess: () => {
           toast.success('Permissions updated successfully!');
+          // If the edited user is the current logged-in user, refresh auth state
+          if (useAuthStore.getState().userId === user.id) {
+            useAuthStore.getState().fetchMe();
+          }
           onClose();
         },
         onError: (err: any) => {
@@ -82,7 +98,7 @@ export function UserPermissionsSlideOver({ isOpen, onClose, user }: Props) {
         <div className="space-y-6">
           <div className="p-3 bg-teal-50 dark:bg-teal-950/50 rounded-lg border border-teal-100 dark:border-teal-900">
             <p className="text-xs text-teal-800 dark:text-teal-200">
-              Note: This overrides the default role template. If set to <strong>None</strong>, the default template value for this user's role ({user.role}) will be applied.
+              Note: Explicitly configure capability scopes for this user. If set to <strong>None</strong>, access to that feature is completely blocked.
             </p>
           </div>
 

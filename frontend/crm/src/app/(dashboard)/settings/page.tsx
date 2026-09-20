@@ -8,7 +8,7 @@ import { AuditLog, User } from '../../../types/api';
 import { useUsers } from '../../../features/users/api';
 import { useAuditLogs } from '../../../features/audit/api';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
+import { canAccessModule, hasCapability } from '../../../config/permissions';
 import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Palette, Upload, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClinicSettings, useUpdateClinicSettings } from '../../../features/settings/api';
@@ -23,7 +23,31 @@ export default function SettingsPage() {
   const role = useAuthStore((s) => s.role);
   const userId = useAuthStore((s) => s.userId);
 
-  const [activeTab, setActiveTab] = useState<TabKey>('clinic');
+  const hasAccess = canAccessModule('settings');
+  const canViewClinic = hasCapability('settings.view');
+  const canEditClinic = hasCapability('settings.edit');
+  const canViewUsers = hasCapability('users.view');
+  const canCreateUser = hasCapability('users.create');
+  const canDeleteUser = hasCapability('users.delete');
+  const canEditPermissions = hasCapability('permissions.edit');
+  const canViewAudit = hasCapability('audit.view');
+
+  const defaultTab: TabKey = canViewClinic ? 'clinic' : canViewUsers ? 'users' : 'audit';
+  const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
+
+  React.useEffect(() => {
+    if (activeTab === 'clinic' && !canViewClinic) {
+      if (canViewUsers) setActiveTab('users');
+      else if (canViewAudit) setActiveTab('audit');
+    } else if (activeTab === 'users' && !canViewUsers) {
+      if (canViewClinic) setActiveTab('clinic');
+      else if (canViewAudit) setActiveTab('audit');
+    } else if (activeTab === 'audit' && !canViewAudit) {
+      if (canViewClinic) setActiveTab('clinic');
+      else if (canViewUsers) setActiveTab('users');
+    }
+  }, [canViewClinic, canViewUsers, canViewAudit, activeTab]);
+
   const [clinicName, setClinicName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -38,7 +62,7 @@ export default function SettingsPage() {
   const [auditPage, setAuditPage] = useState(1);
   const [selectedLogForDetails, setSelectedLogForDetails] = useState<AuditLog | null>(null);
 
-  const { data: clinicSettings, isLoading: isLoadingSettings } = useClinicSettings();
+  const { data: clinicSettings, isLoading: isLoadingSettings } = useClinicSettings(canViewClinic);
   const updateSettings = useUpdateClinicSettings();
   const deleteUser = useDeleteUser();
 
@@ -55,10 +79,10 @@ export default function SettingsPage() {
     }
   }, [clinicSettings]);
 
-  const { data: usersResponse, isLoading: isLoadingUsers } = useUsers();
+  const { data: usersResponse, isLoading: isLoadingUsers } = useUsers(canViewUsers);
   const users = usersResponse || [];
 
-  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(auditPage, 50, userId);
+  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(auditPage, 50, userId, canViewAudit);
   const auditLogs = auditResponse?.data || [];
   const auditTotal = auditResponse?.meta?.total || auditLogs.length;
 
@@ -88,6 +112,10 @@ export default function SettingsPage() {
 
   const handleSaveClinic = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEditClinic) {
+      toast.error('You do not have permission to edit clinic settings');
+      return;
+    }
     try {
       await updateSettings.mutateAsync({
         name: clinicName,
@@ -140,16 +168,18 @@ export default function SettingsPage() {
       header: 'Actions',
       render: (u) => (
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setSelectedUser(u);
-              setIsPermissionsOpen(true);
-            }}
-            className="text-xs px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 dark:text-indigo-300 font-semibold rounded-md transition-colors cursor-pointer"
-          >
-            Edit Permissions
-          </button>
-          {u.id !== userId && (
+          {canEditPermissions && (
+            <button
+              onClick={() => {
+                setSelectedUser(u);
+                setIsPermissionsOpen(true);
+              }}
+              className="text-xs px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 dark:text-indigo-300 font-semibold rounded-md transition-colors cursor-pointer"
+            >
+              Edit Permissions
+            </button>
+          )}
+          {canDeleteUser && u.id !== userId && (
             <button
               onClick={async () => {
                 if (window.confirm(`Are you sure you want to remove ${u.first_name} ${u.last_name}?`)) {
@@ -173,8 +203,12 @@ export default function SettingsPage() {
     },
   ];
 
-  if (!canAccessModule(role, 'settings')) {
-    return <AccessRestricted message="Clinic settings are restricted to Administrators only." />;
+  if (!hasAccess || (!canViewClinic && !canViewUsers && !canViewAudit)) {
+    return (
+      <AppShell>
+        <AccessRestricted message="Clinic settings are restricted." />
+      </AppShell>
+    );
   }
 
   return (
@@ -187,41 +221,47 @@ export default function SettingsPage() {
 
         {/* Tab Selection */}
         <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
-          <button
-            onClick={() => setActiveTab('clinic')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeTab === 'clinic'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <SettingsIcon className="w-4 h-4" />
-            <span>Clinic Settings & Branding</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeTab === 'users'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>User Management</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('audit')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeTab === 'audit'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Audit Log ({auditTotal})</span>
-          </button>
+          {canViewClinic && (
+            <button
+              onClick={() => setActiveTab('clinic')}
+              className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                activeTab === 'clinic'
+                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <SettingsIcon className="w-4 h-4" />
+              <span>Clinic Settings & Branding</span>
+            </button>
+          )}
+          {canViewUsers && (
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                activeTab === 'users'
+                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>User Management</span>
+            </button>
+          )}
+          {canViewAudit && (
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                activeTab === 'audit'
+                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Audit Log ({auditTotal})</span>
+            </button>
+          )}
 
-          {activeTab === 'users' && (
+          {activeTab === 'users' && canCreateUser && (
             <div className="ml-auto">
               <button
                 onClick={() => setIsAddUserOpen(true)}
@@ -248,7 +288,8 @@ export default function SettingsPage() {
                   type="text"
                   value={clinicName}
                   onChange={(e) => setClinicName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                  disabled={!canEditClinic}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -259,7 +300,8 @@ export default function SettingsPage() {
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                    disabled={!canEditClinic}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -270,7 +312,8 @@ export default function SettingsPage() {
                       type="color"
                       value={brandColor}
                       onChange={(e) => handleBrandColorChange(e.target.value)}
-                      className="w-10 h-9 p-0.5 rounded cursor-pointer border"
+                      disabled={!canEditClinic}
+                      className="w-10 h-9 p-0.5 rounded cursor-pointer border disabled:cursor-not-allowed disabled:opacity-60"
                     />
                     <span className="text-xs font-mono text-slate-500 uppercase">{brandColor}</span>
                   </div>
@@ -283,7 +326,8 @@ export default function SettingsPage() {
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                  disabled={!canEditClinic}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -294,7 +338,8 @@ export default function SettingsPage() {
                     type="text"
                     value={doctorName}
                     onChange={(e) => setDoctorName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                    disabled={!canEditClinic}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -304,7 +349,8 @@ export default function SettingsPage() {
                     type="text"
                     value={regNo}
                     onChange={(e) => setRegNo(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm"
+                    disabled={!canEditClinic}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -314,12 +360,14 @@ export default function SettingsPage() {
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Clinic Logo (For Invoices, Prescriptions & Booking Form, Max 200KB)
                 </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
-                />
+                {canEditClinic && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
+                  />
+                )}
                 {logoBase64 && (
                   <div className="mt-3 p-2 bg-slate-50 dark:bg-slate-950 rounded-lg border w-fit">
                     <img src={logoBase64} alt="Clinic Logo Preview" className="h-12 object-contain rounded" />
@@ -328,14 +376,16 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={updateSettings.isPending}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm"
-            >
-              {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              <span>Save Branding Settings</span>
-            </button>
+            {canEditClinic && (
+              <button
+                type="submit"
+                disabled={updateSettings.isPending}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>Save Branding Settings</span>
+              </button>
+            )}
           </form>
         )}
 

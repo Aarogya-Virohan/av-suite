@@ -5,7 +5,7 @@ import { LeadFormValues } from '../../lib/schemas';
 
 export const LEADS_QUERY_KEY = ['leads'];
 
-export function useLeads(stage?: LeadStage) {
+export function useLeads(stage?: LeadStage, enabled = true) {
   return useQuery<Lead[]>({
     queryKey: [...LEADS_QUERY_KEY, { stage }],
     queryFn: async () => {
@@ -20,6 +20,7 @@ export function useLeads(stage?: LeadStage) {
       }
       return [];
     },
+    enabled,
   });
 }
 

@@ -58,6 +58,7 @@ export default function LoginPage() {
 
       setStoredToken(token);
       setToken(token);
+      await useAuthStore.getState().fetchMe();
       toast.success('Successfully logged in');
       router.replace('/dashboard');
     } catch (err: unknown) {

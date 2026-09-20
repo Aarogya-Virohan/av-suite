@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
+import { canAccessModule, hasCapability } from '../../../config/permissions';
 import { Trash2, RotateCcw } from 'lucide-react';
 import { apiClient } from '../../../lib/api-client';
 import { toast } from 'sonner';
@@ -18,13 +18,15 @@ interface DeletedItem {
   deleted_by: string;
 }
 
-
 export default function RecycleBinPage() {
-  const role = useAuthStore((s) => s.role);
+  const hasAccess = canAccessModule('recycleBin');
+  const canRestore = hasCapability('recyclebin.restore');
+
   const [items, setItems] = useState<DeletedItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(hasAccess);
 
   React.useEffect(() => {
+    if (!hasAccess) return;
     const fetchDeletedItems = async () => {
       try {
         const res = await apiClient.get('/recycle-bin');
@@ -36,7 +38,7 @@ export default function RecycleBinPage() {
       }
     };
     fetchDeletedItems();
-  }, []);
+  }, [hasAccess]);
 
   const handleRestore = async (resource: string, id: string) => {
     try {
@@ -48,8 +50,12 @@ export default function RecycleBinPage() {
     }
   };
 
-  if (!canAccessModule(role, 'recycleBin')) {
-    return <AccessRestricted message="Recycle bin access is restricted to Administrators only." />;
+  if (!hasAccess) {
+    return (
+      <AppShell>
+        <AccessRestricted message="Recycle bin access is restricted." />
+      </AppShell>
+    );
   }
 
   const columns: Column<DeletedItem>[] = [
@@ -57,19 +63,23 @@ export default function RecycleBinPage() {
     { key: 'resource', header: 'Resource Type', render: (item) => <span className="uppercase text-xs font-semibold text-teal-600">{item.resource}</span> },
     { key: 'deleted_at', header: 'Deleted Date', render: (item) => new Date(item.deleted_at).toLocaleString() },
     { key: 'deleted_by', header: 'Deleted By' },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (item) => (
-        <button
-          onClick={() => handleRestore(item.resource, item.id)}
-          className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Restore</span>
-        </button>
-      ),
-    },
+    ...(canRestore
+      ? [
+          {
+            key: 'actions' as keyof DeletedItem,
+            header: 'Actions',
+            render: (item: DeletedItem) => (
+              <button
+                onClick={() => handleRestore(item.resource, item.id)}
+                className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restore</span>
+              </button>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (

@@ -10,7 +10,7 @@ import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
 import { Patient, PatientStatus } from '../../../types/api';
 import { Plus, Phone } from 'lucide-react';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
+import { canAccessModule, canPerformAction } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 export default function PatientsPage() {
@@ -18,7 +18,8 @@ export default function PatientsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: response, isLoading } = usePatients(searchTerm, page, 10);
+  const isAllowed = canAccessModule('patients');
+  const { data: response, isLoading } = usePatients(searchTerm, page, 10, isAllowed);
   const patients = response?.data || [];
   const meta = response?.meta;
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -29,7 +30,7 @@ export default function PatientsPage() {
     return p.status === statusFilter;
   });
 
-  if (!canAccessModule(role, 'patients')) {
+  if (!isAllowed) {
     return <AccessRestricted message="Patients directory access is restricted for your role." />;
   }
 
@@ -117,13 +118,15 @@ export default function PatientsPage() {
               <option value="discharged">Discharged</option>
             </select>
 
-            <button
-              onClick={() => setIsAddOpen(true)}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Patient</span>
-            </button>
+            {canPerformAction('createEditPatient') && (
+              <button
+                onClick={() => setIsAddOpen(true)}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Patient</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -25,7 +25,7 @@ from typing import Optional, List, Tuple
 from app.enums.permission import CapabilityScope
 from app.models.appointment import Appointment
 from app.models.treatment import TreatmentSession
-from sqlalchemy import exists, or_
+from sqlalchemy import exists, or_, false
 import logging
 import uuid
 
@@ -33,8 +33,12 @@ logger = logging.getLogger(__name__)
 
 
 def apply_patient_scope(query, scope: CapabilityScope, user_id: str):
-    if scope == CapabilityScope.OWN and user_id:
-        u_id = uuid.UUID(user_id)
+    if scope == CapabilityScope.NONE:
+        return query.where(false())
+    if scope == CapabilityScope.OWN:
+        if not user_id:
+            return query.where(false())
+        u_id = uuid.UUID(str(user_id))
         has_appointment = exists().where(
             Appointment.patient_id == Patient.id,
             Appointment.therapist_id == u_id

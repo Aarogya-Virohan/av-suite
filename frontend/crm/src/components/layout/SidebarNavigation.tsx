@@ -43,11 +43,13 @@ const NAV_ITEMS: NavItem[] = [
 export function SidebarNavigation() {
   const pathname = usePathname();
   const role = useAuthStore((s) => s.role);
+  const clinic = useAuthStore((s) => s.clinic);
   const logout = useAuthStore((s) => s.logout);
   const { isSidebarOpen, toggleSidebar } = useUiStore();
   const { data: clinicSettings } = useClinicSettings();
 
-  const visibleItems = NAV_ITEMS.filter((item) => canAccessModule(role, item.moduleKey));
+  const effectiveClinic = clinic || clinicSettings;
+  const visibleItems = NAV_ITEMS.filter((item) => canAccessModule(item.moduleKey));
 
   return (
     <aside
@@ -58,25 +60,25 @@ export function SidebarNavigation() {
       {/* Header / Logo */}
       <div className="flex h-16 items-center justify-between px-4 border-b border-white/10 overflow-hidden">
         {isSidebarOpen ? (
-          clinicSettings?.branding_logo_url ? (
-            <img src={clinicSettings.branding_logo_url} alt="Clinic Logo" className="max-h-8 max-w-[140px] object-contain" />
+          effectiveClinic?.branding_logo_url ? (
+            <img src={effectiveClinic.branding_logo_url} alt="Clinic Logo" className="max-h-8 max-w-[140px] object-contain" />
           ) : (
             <span className="text-lg font-bold tracking-tight text-white whitespace-nowrap overflow-hidden text-ellipsis">
-              {clinicSettings?.name || 'AV Suite CRM'}
+              {effectiveClinic?.name || 'AV Suite CRM'}
             </span>
           )
         ) : (
-          clinicSettings?.branding_logo_url ? (
-            <img src={clinicSettings.branding_logo_url} alt="Logo" className="w-8 h-8 object-contain" />
+          effectiveClinic?.branding_logo_url ? (
+            <img src={effectiveClinic.branding_logo_url} alt="Logo" className="w-8 h-8 object-contain" />
           ) : (
             <span className="text-lg font-bold text-teal-400">
-              {clinicSettings?.name?.[0]?.toUpperCase() || 'AV'}
+              {effectiveClinic?.name?.[0]?.toUpperCase() || 'AV'}
             </span>
           )
         )}
         <button
           onClick={toggleSidebar}
-          className="p-1 rounded text-slate-300 hover:text-white hover:bg-white/10"
+          className="p-1 rounded text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
           aria-label="Toggle Sidebar"
         >
           {isSidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}

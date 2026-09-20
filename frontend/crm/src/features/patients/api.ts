@@ -5,7 +5,7 @@ import { PatientFormValues } from '../../lib/schemas';
 
 export const PATIENTS_QUERY_KEY = ['patients'];
 
-export function usePatients(search?: string, page = 1, page_size = 10) {
+export function usePatients(search?: string, page = 1, page_size = 10, enabled = true) {
   return useQuery({
     queryKey: [...PATIENTS_QUERY_KEY, { search, page, page_size }],
     queryFn: async () => {
@@ -14,6 +14,7 @@ export function usePatients(search?: string, page = 1, page_size = 10) {
       });
       return res.data as { data: Patient[]; meta: { total: number; page: number; page_size: number } };
     },
+    enabled,
   });
 }
 

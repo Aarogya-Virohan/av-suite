@@ -4,7 +4,7 @@ import { AuditLog } from '../../types/api';
 
 export const AUDIT_LOGS_QUERY_KEY = ['audit-logs'];
 
-export function useAuditLogs(page = 1, page_size = 50, user_id?: string | null) {
+export function useAuditLogs(page = 1, page_size = 50, user_id?: string | null, enabled = true) {
   return useQuery({
     queryKey: [...AUDIT_LOGS_QUERY_KEY, { page, page_size, user_id }],
     queryFn: async () => {
@@ -16,5 +16,6 @@ export function useAuditLogs(page = 1, page_size = 50, user_id?: string | null) 
       });
       return res.data as { data: AuditLog[]; meta: any };
     },
+    enabled,
   });
 }

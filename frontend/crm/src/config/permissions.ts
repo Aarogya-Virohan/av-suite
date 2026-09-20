@@ -189,164 +189,72 @@ export const CANONICAL_CAPABILITIES: CapabilityMeta[] = [
 // ---------------------------------------------------------------------------
 // CANONICAL ROLE DEFAULT CAPABILITIES
 // Matches backend/app/core/rbac.py ROLE_TEMPLATES
+//
+// Default rule: by default, everything is set as NONE for every non-admin role
+// (therapist, front_desk) - only login works for them until an Admin explicitly
+// grants permissions in User Management.
+// Admin retains full permissions by default.
 // ---------------------------------------------------------------------------
+import { useAuthStore } from '../store';
+
 export const CANONICAL_ROLE_TEMPLATES: Record<UserRole, Partial<Record<CanonicalCapabilityKey, CapabilityScope>>> = {
   admin: Object.fromEntries(
     CANONICAL_CAPABILITIES.map((c) => [c.key, c.allowedScopes.includes('all') ? 'all' : 'own'])
   ) as Record<CanonicalCapabilityKey, CapabilityScope>,
-  therapist: {
-    'patients.view': 'own',
-    'patients.create': 'all',
-    'patients.edit': 'own',
-    'patients.delete': 'none',
-    'leads.view': 'none',
-    'leads.create': 'none',
-    'leads.edit': 'none',
-    'leads.delete': 'none',
-    'leads.convert': 'none',
-    'appointments.view': 'own',
-    'appointments.create': 'own',
-    'appointments.edit': 'own',
-    'appointments.delete': 'own',
-    'treatments.view': 'own',
-    'treatments.create': 'own',
-    'treatments.edit': 'own',
-    'treatments.delete': 'own',
-    'assessments.view': 'own',
-    'assessments.create': 'all',
-    'assessments.edit': 'own',
-    'assessments.delete': 'none',
-    'prescriptions.view': 'own',
-    'prescriptions.create': 'all',
-    'prescriptions.edit': 'own',
-    'prescriptions.delete': 'none',
-    'exercises.view': 'all',
-    'exercises.create': 'none',
-    'exercises.edit': 'none',
-    'exercises.delete': 'none',
-    'documents.view': 'own',
-    'documents.upload': 'all',
-    'documents.edit': 'own',
-    'documents.delete': 'none',
-    'invoices.view': 'none',
-    'invoices.create': 'none',
-    'invoices.edit': 'none',
-    'invoices.delete': 'none',
-    'payments.view': 'none',
-    'payments.record': 'none',
-    'payments.delete': 'none',
-    'packages.view': 'none',
-    'packages.create': 'none',
-    'packages.edit': 'none',
-    'packages.delete': 'none',
-    'packages.assign': 'none',
-    'booking.view': 'none',
-    'booking.approve': 'none',
-    'booking.edit': 'none',
-    'booking.delete': 'none',
-    'analytics.my_performance': 'own',
-    'analytics.clinic_financials': 'none',
-    'settings.view': 'none',
-    'settings.edit': 'none',
-    'users.view': 'none',
-    'users.create': 'none',
-    'users.edit': 'none',
-    'users.delete': 'none',
-    'permissions.view': 'none',
-    'permissions.edit': 'none',
-    'audit.view': 'none',
-    'recyclebin.view': 'none',
-    'recyclebin.restore': 'none',
-    'posture.view': 'own',
-    'posture.create': 'all',
-  },
-  front_desk: {
-    'patients.view': 'all',
-    'patients.create': 'all',
-    'patients.edit': 'all',
-    'patients.delete': 'none',
-    'leads.view': 'all',
-    'leads.create': 'all',
-    'leads.edit': 'all',
-    'leads.delete': 'none',
-    'leads.convert': 'all',
-    'appointments.view': 'all',
-    'appointments.create': 'all',
-    'appointments.edit': 'all',
-    'appointments.delete': 'all',
-    'treatments.view': 'none',
-    'treatments.create': 'none',
-    'treatments.edit': 'none',
-    'treatments.delete': 'none',
-    'assessments.view': 'none',
-    'assessments.create': 'none',
-    'assessments.edit': 'none',
-    'assessments.delete': 'none',
-    'prescriptions.view': 'none',
-    'prescriptions.create': 'none',
-    'prescriptions.edit': 'none',
-    'prescriptions.delete': 'none',
-    'exercises.view': 'all',
-    'exercises.create': 'none',
-    'exercises.edit': 'none',
-    'exercises.delete': 'none',
-    'documents.view': 'all',
-    'documents.upload': 'all',
-    'documents.edit': 'all',
-    'documents.delete': 'none',
-    'invoices.view': 'all',
-    'invoices.create': 'all',
-    'invoices.edit': 'none',
-    'invoices.delete': 'none',
-    'payments.view': 'all',
-    'payments.record': 'all',
-    'payments.delete': 'none',
-    'packages.view': 'all',
-    'packages.create': 'none',
-    'packages.edit': 'none',
-    'packages.delete': 'none',
-    'packages.assign': 'all',
-    'booking.view': 'all',
-    'booking.approve': 'all',
-    'booking.edit': 'all',
-    'booking.delete': 'none',
-    'analytics.my_performance': 'none',
-    'analytics.clinic_financials': 'none',
-    'settings.view': 'none',
-    'settings.edit': 'none',
-    'users.view': 'all',
-    'users.create': 'none',
-    'users.edit': 'none',
-    'users.delete': 'none',
-    'permissions.view': 'none',
-    'permissions.edit': 'none',
-    'audit.view': 'none',
-    'recyclebin.view': 'none',
-    'recyclebin.restore': 'none',
-    'posture.view': 'none',
-    'posture.create': 'none',
-  },
+  therapist: Object.fromEntries(
+    CANONICAL_CAPABILITIES.map((c) => [c.key, 'none'])
+  ) as Record<CanonicalCapabilityKey, CapabilityScope>,
+  front_desk: Object.fromEntries(
+    CANONICAL_CAPABILITIES.map((c) => [c.key, 'none'])
+  ) as Record<CanonicalCapabilityKey, CapabilityScope>,
   patient: {},
 };
 
 export function getCapabilityScope(
-  role: UserRole | null,
-  key: CanonicalCapabilityKey,
+  roleOrKey: UserRole | CanonicalCapabilityKey | null,
+  keyOrOverrides?: CanonicalCapabilityKey | Record<string, string> | null,
   userOverrides?: Record<string, string> | null
 ): CapabilityScope {
-  if (!role) return 'none';
-  if (userOverrides && key in userOverrides) {
-    return userOverrides[key] as CapabilityScope;
+  let key: CanonicalCapabilityKey;
+  let role: UserRole | null = null;
+  let overrides: Record<string, string> | null | undefined = userOverrides;
+
+  if (typeof keyOrOverrides === 'string') {
+    // Called as (role, key, overrides)
+    role = roleOrKey as UserRole | null;
+    key = keyOrOverrides as CanonicalCapabilityKey;
+  } else {
+    // Called as (key, overrides)
+    key = roleOrKey as CanonicalCapabilityKey;
+    overrides = keyOrOverrides as Record<string, string> | null | undefined;
+    role = useAuthStore.getState().role;
   }
-  return CANONICAL_ROLE_TEMPLATES[role]?.[key] || 'none';
+
+  if (!key) return 'none';
+
+  // 1. Explicit overrides passed directly (e.g. in SlideOver preview)
+  if (overrides && key in overrides) {
+    return overrides[key] as CapabilityScope;
+  }
+
+  // 2. Active capabilities from useAuthStore (loaded via /auth/me)
+  const storeCaps = useAuthStore.getState().capabilities;
+  if (storeCaps && key in storeCaps) {
+    return storeCaps[key] as CapabilityScope;
+  }
+
+  // 3. Fallback to role templates
+  const effectiveRole = role || useAuthStore.getState().role;
+  if (!effectiveRole) return 'none';
+  return CANONICAL_ROLE_TEMPLATES[effectiveRole]?.[key] || 'none';
 }
 
 export function hasCapability(
-  role: UserRole | null,
-  key: CanonicalCapabilityKey,
+  roleOrKey: UserRole | CanonicalCapabilityKey | null,
+  keyOrOverrides?: CanonicalCapabilityKey | Record<string, string> | null,
   userOverrides?: Record<string, string> | null
 ): boolean {
-  const scope = getCapabilityScope(role, key, userOverrides);
+  const scope = getCapabilityScope(roleOrKey, keyOrOverrides, userOverrides);
   return scope === 'own' || scope === 'all';
 }
 
@@ -369,7 +277,7 @@ export const BACKEND_PERMISSION_MAP: Record<string, UserRole[]> = {
   prescriptions: ['admin', 'therapist'],
   settings: ['admin'],
   packages: ['admin'],
-  clinic_admin: ['admin'], // Patched: [ADMIN] only (was allowing therapist/front_desk)
+  clinic_admin: ['admin'],
   booking: ['admin', 'therapist', 'front_desk'],
   appointment_requests: ['admin', 'therapist', 'front_desk'],
 };
@@ -422,152 +330,118 @@ export interface RolePermissions {
   actions: ActionPermissions;
 }
 
-export const PERMISSIONS_MATRIX: Record<UserRole, RolePermissions> = {
-  admin: {
-    sidebar: {
-      dashboard: true,
-      patients: true,
-      appointments: true,
-      analytics: true,
-      billing: true,
-      leads: true,
-      therapists: true,
-      recycleBin: true,
-      settings: true,
-    },
-    patientTabs: {
-      timeline: true,
-      documents: true,
-      treatments: true,
-      soapNotes: true,
-      assessments: true,
-      billing: true,
-    },
-    actions: {
-      createEditPatient: true,
-      deletePatient: true,
-      manageAppointments: true,
-      createEditSoapNote: true,
-      createInvoiceRecordPayment: true,
-      createSellPackage: true,
-      uploadDownloadDocuments: true,
-      restoreDeletedRecords: true,
-      manageUsersAndRoles: true,
-      updateClinicSettings: true,
-    },
-  },
-  therapist: {
-    sidebar: {
-      dashboard: true,
-      patients: hasCapability('therapist', 'patients.view'),
-      appointments: hasCapability('therapist', 'appointments.view'),
-      analytics: hasCapability('therapist', 'analytics.my_performance'),
-      billing: false,
-      leads: false,
-      therapists: false,
-      recycleBin: false,
-      settings: false,
-    },
-    patientTabs: {
-      timeline: true,
-      documents: hasCapability('therapist', 'documents.view'),
-      treatments: hasCapability('therapist', 'treatments.view'),
-      soapNotes: hasCapability('therapist', 'assessments.view'),
-      assessments: hasCapability('therapist', 'assessments.view'),
-      billing: false,
-    },
-    actions: {
-      createEditPatient: hasCapability('therapist', 'patients.create') || hasCapability('therapist', 'patients.edit'),
-      deletePatient: false,
-      manageAppointments: hasCapability('therapist', 'appointments.edit'),
-      createEditSoapNote: hasCapability('therapist', 'assessments.create') || hasCapability('therapist', 'assessments.edit'),
-      createInvoiceRecordPayment: false,
-      createSellPackage: false,
-      uploadDownloadDocuments: hasCapability('therapist', 'documents.upload'),
-      restoreDeletedRecords: false,
-      manageUsersAndRoles: false,
-      updateClinicSettings: false,
-    },
-  },
-  front_desk: {
-    sidebar: {
-      dashboard: true,
-      patients: hasCapability('front_desk', 'patients.view'),
-      appointments: hasCapability('front_desk', 'appointments.view'),
-      analytics: false,
-      billing: hasCapability('front_desk', 'invoices.view'),
-      leads: hasCapability('front_desk', 'leads.view'),
-      therapists: false,
-      recycleBin: false,
-      settings: false,
-    },
-    patientTabs: {
-      timeline: true,
-      documents: hasCapability('front_desk', 'documents.view'),
-      treatments: false,
-      soapNotes: false,
-      assessments: false,
-      billing: hasCapability('front_desk', 'invoices.view'),
-    },
-    actions: {
-      createEditPatient: hasCapability('front_desk', 'patients.create') || hasCapability('front_desk', 'patients.edit'),
-      deletePatient: false,
-      manageAppointments: hasCapability('front_desk', 'appointments.edit') || hasCapability('front_desk', 'appointments.create'),
-      createEditSoapNote: false,
-      createInvoiceRecordPayment: hasCapability('front_desk', 'invoices.create') || hasCapability('front_desk', 'payments.record'),
-      createSellPackage: hasCapability('front_desk', 'packages.assign'),
-      uploadDownloadDocuments: hasCapability('front_desk', 'documents.upload'),
-      restoreDeletedRecords: false,
-      manageUsersAndRoles: false,
-      updateClinicSettings: false,
-    },
-  },
-  patient: {
-    sidebar: {
-      dashboard: false,
-      patients: false,
-      appointments: false,
-      analytics: false,
-      billing: false,
-      leads: false,
-      therapists: false,
-      recycleBin: false,
-      settings: false,
-    },
-    patientTabs: {
-      timeline: false,
-      documents: false,
-      treatments: false,
-      soapNotes: false,
-      assessments: false,
-      billing: false,
-    },
-    actions: {
-      createEditPatient: false,
-      deletePatient: false,
-      manageAppointments: false,
-      createEditSoapNote: false,
-      createInvoiceRecordPayment: false,
-      createSellPackage: false,
-      uploadDownloadDocuments: false,
-      restoreDeletedRecords: false,
-      manageUsersAndRoles: false,
-      updateClinicSettings: false,
-    },
-  },
-};
+export function canAccessModule(
+  roleOrModule: UserRole | keyof ModuleVisibility | null,
+  module?: keyof ModuleVisibility
+): boolean {
+  const targetModule = (module || roleOrModule) as keyof ModuleVisibility;
+  if (!targetModule) return false;
 
-export function getPermissionsForRole(role: UserRole | null): RolePermissions {
-  if (!role) return PERMISSIONS_MATRIX.patient; // fail-closed (deny all)
-  return PERMISSIONS_MATRIX[role] || PERMISSIONS_MATRIX.patient;
+  switch (targetModule) {
+    case 'dashboard':
+      return true;
+    case 'patients':
+      return hasCapability('patients.view');
+    case 'appointments':
+      return hasCapability('appointments.view');
+    case 'analytics':
+      return hasCapability('analytics.my_performance') || hasCapability('analytics.clinic_financials');
+    case 'billing':
+      return (
+        hasCapability('invoices.view') ||
+        hasCapability('payments.view') ||
+        hasCapability('packages.view')
+      );
+    case 'leads':
+      return hasCapability('leads.view');
+    case 'therapists':
+      return hasCapability('users.view');
+    case 'recycleBin':
+      return hasCapability('recyclebin.view');
+    case 'settings':
+      return (
+        hasCapability('settings.view') ||
+        hasCapability('users.view') ||
+        hasCapability('audit.view')
+      );
+    default:
+      return false;
+  }
 }
 
-export function canAccessModule(role: UserRole | null, module: keyof ModuleVisibility): boolean {
-  if (!role) return false;
-  return getPermissionsForRole(role).sidebar[module];
+export function canPerformAction(
+  roleOrAction: UserRole | keyof ActionPermissions | null,
+  action?: keyof ActionPermissions
+): boolean {
+  const targetAction = (action || roleOrAction) as keyof ActionPermissions;
+  if (!targetAction) return false;
+
+  switch (targetAction) {
+    case 'createEditPatient':
+      return hasCapability('patients.create') || hasCapability('patients.edit');
+    case 'deletePatient':
+      return hasCapability('patients.delete');
+    case 'manageAppointments':
+      return hasCapability('appointments.create') || hasCapability('appointments.edit');
+    case 'createEditSoapNote':
+      return (
+        hasCapability('treatments.create') ||
+        hasCapability('assessments.create') ||
+        hasCapability('assessments.edit')
+      );
+    case 'createInvoiceRecordPayment':
+      return hasCapability('invoices.create') || hasCapability('payments.record');
+    case 'createSellPackage':
+      return hasCapability('packages.create') || hasCapability('packages.assign');
+    case 'uploadDownloadDocuments':
+      return hasCapability('documents.upload') || hasCapability('documents.view');
+    case 'restoreDeletedRecords':
+      return hasCapability('recyclebin.restore');
+    case 'manageUsersAndRoles':
+      return (
+        hasCapability('users.create') ||
+        hasCapability('users.edit') ||
+        hasCapability('permissions.edit')
+      );
+    case 'updateClinicSettings':
+      return hasCapability('settings.edit');
+    default:
+      return false;
+  }
 }
 
-export function canPerformAction(role: UserRole | null, action: keyof ActionPermissions): boolean {
-  if (!role) return false;
-  return getPermissionsForRole(role).actions[action];
+export function getPermissionsForRole(role?: UserRole | null): RolePermissions {
+  return {
+    sidebar: {
+      dashboard: canAccessModule('dashboard'),
+      patients: canAccessModule('patients'),
+      appointments: canAccessModule('appointments'),
+      analytics: canAccessModule('analytics'),
+      billing: canAccessModule('billing'),
+      leads: canAccessModule('leads'),
+      therapists: canAccessModule('therapists'),
+      recycleBin: canAccessModule('recycleBin'),
+      settings: canAccessModule('settings'),
+    },
+    patientTabs: {
+      timeline: true,
+      documents: hasCapability('documents.view'),
+      treatments: hasCapability('treatments.view'),
+      soapNotes: hasCapability('assessments.view'),
+      assessments: hasCapability('assessments.view'),
+      billing: hasCapability('invoices.view'),
+    },
+    actions: {
+      createEditPatient: canPerformAction('createEditPatient'),
+      deletePatient: canPerformAction('deletePatient'),
+      manageAppointments: canPerformAction('manageAppointments'),
+      createEditSoapNote: canPerformAction('createEditSoapNote'),
+      createInvoiceRecordPayment: canPerformAction('createInvoiceRecordPayment'),
+      createSellPackage: canPerformAction('createSellPackage'),
+      uploadDownloadDocuments: canPerformAction('uploadDownloadDocuments'),
+      restoreDeletedRecords: canPerformAction('restoreDeletedRecords'),
+      manageUsersAndRoles: canPerformAction('manageUsersAndRoles'),
+      updateClinicSettings: canPerformAction('updateClinicSettings'),
+    },
+  };
 }

@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { usePatient, useDeletePatient } from '../../../../features/patients/api';
 import { useAuthStore } from '../../../../store';
-import { getPermissionsForRole } from '../../../../config/permissions';
+import { getPermissionsForRole, canAccessModule } from '../../../../config/permissions';
+import { AccessRestricted } from '../../../../components/ui/AccessRestricted';
 import { TreatmentsTab } from '../../../../features/patients/components/TreatmentsTab';
 import { SoapNotesTab } from '../../../../features/patients/components/SoapNotesTab';
 import { DocumentsTab } from '../../../../features/patients/components/DocumentsTab';
@@ -36,6 +37,14 @@ export default function PatientWorkspacePage() {
   const generatePdf = useGeneratePrescriptionPdf();
 
   const permissions = getPermissionsForRole(role).patientTabs;
+
+  if (!canAccessModule('patients')) {
+    return (
+      <AppShell>
+        <AccessRestricted message="Patient workspace access is restricted for your role." />
+      </AppShell>
+    );
+  }
 
   if (isLoading) {
     return (

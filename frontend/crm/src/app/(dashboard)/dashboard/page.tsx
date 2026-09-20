@@ -8,32 +8,40 @@ import { useAppointments } from '../../../features/appointments/api';
 import { useLeads } from '../../../features/leads/api';
 import { usePatients } from '../../../features/patients/api';
 import { useAuthStore } from '../../../store';
-import { canAccessModule } from '../../../config/permissions';
+import { canAccessModule, hasCapability } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 export default function DashboardPage() {
   const role = useAuthStore((s) => s.role);
   
-  // Admin queries full clinic overview
-  const { data: overview, isLoading: isOverviewLoading, isError: isOverviewError, error: overviewError } = useAnalyticsOverview(role === 'admin');
+  const canViewFinancials = hasCapability('analytics.clinic_financials');
+  const canViewMyPerf = hasCapability('analytics.my_performance');
+  const canViewAppts = hasCapability('appointments.view');
+  const canViewLeads = hasCapability('leads.view');
+  const canViewPatients = hasCapability('patients.view');
+
+  const hasAnyDashboardView = canViewFinancials || canViewMyPerf || canViewAppts || canViewLeads || canViewPatients;
+
+  // Admin / financial overview query
+  const { data: overview, isLoading: isOverviewLoading, isError: isOverviewError, error: overviewError } = useAnalyticsOverview(canViewFinancials);
   
-  // Therapist queries personal clinical performance
-  const { data: myPerf, isLoading: isPerfLoading, isError: isPerfError } = useMyPerformance(role === 'therapist');
+  // Therapist personal clinical performance query
+  const { data: myPerf, isLoading: isPerfLoading } = useMyPerformance(canViewMyPerf);
 
-  // Front desk queries appointments & leads
-  const { data: appointmentsRes, isLoading: isApptsLoading } = useAppointments(undefined, undefined, 1, 50);
-  const { data: leads, isLoading: isLeadsLoading } = useLeads();
-  const { data: patientsRes, isLoading: isPatientsLoading } = usePatients(undefined, 1, 1);
+  // Operational queries
+  const { data: appointmentsRes, isLoading: isApptsLoading } = useAppointments(undefined, undefined, 1, 50, canViewAppts);
+  const { data: leads, isLoading: isLeadsLoading } = useLeads(undefined, canViewLeads);
+  const { data: patientsRes, isLoading: isPatientsLoading } = usePatients(undefined, 1, 1, canViewPatients);
 
-  if (!canAccessModule(role, 'dashboard')) {
+  if (!canAccessModule('dashboard')) {
     return <AccessRestricted message="Dashboard access is restricted." />;
   }
 
-  const isLoading = role === 'admin' 
+  const isLoading = canViewFinancials 
     ? isOverviewLoading 
-    : role === 'therapist' 
+    : canViewMyPerf 
     ? isPerfLoading 
-    : (isApptsLoading || isLeadsLoading || isPatientsLoading);
+    : ((canViewAppts && isApptsLoading) || (canViewLeads && isLeadsLoading) || (canViewPatients && isPatientsLoading));
 
   return (
     <AppShell>
@@ -45,11 +53,19 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {isLoading ? (
+        {!hasAnyDashboardView ? (
+          <div className="p-8 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-center space-y-3">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">No Module Permissions Assigned</h3>
+            <p className="text-sm text-slate-500 max-w-md mx-auto">
+              Your account currently has no active feature permissions. Please contact your clinic administrator to grant access to patients, appointments, analytics, or other clinic modules.
+            </p>
+          </div>
+        ) : isLoading ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
           </div>
-        ) : role === 'admin' ? (
+        ) : canViewFinancials ? (
+
           isOverviewError ? (
             <div className="bg-rose-50 text-rose-600 p-4 rounded-lg">
               Failed to load analytics: {(overviewError as any)?.message || 'Unknown error'}
@@ -98,8 +114,8 @@ export default function DashboardPage() {
               </div>
             </div>
           )
-        ) : role === 'therapist' ? (
-          /* Therapist Clinical KPI Cards */
+        ) : canViewMyPerf ? (
+          /* Personal Clinical KPI Cards */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between">

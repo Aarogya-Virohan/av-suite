@@ -5,7 +5,7 @@ import { InvoiceFormValues, PaymentFormValues } from '../../lib/schemas';
 
 export const BILLING_QUERY_KEY = ['billing'];
 
-export function useInvoices() {
+export function useInvoices(enabled = true) {
   return useQuery<Invoice[]>({
     queryKey: [...BILLING_QUERY_KEY, 'invoices'],
     queryFn: async () => {
@@ -15,10 +15,11 @@ export function useInvoices() {
       if (raw && Array.isArray(raw.items)) return raw.items;
       return [];
     },
+    enabled,
   });
 }
 
-export function usePayments() {
+export function usePayments(enabled = true) {
   return useQuery<Payment[]>({
     queryKey: [...BILLING_QUERY_KEY, 'payments'],
     queryFn: async () => {
@@ -28,10 +29,11 @@ export function usePayments() {
       if (raw && Array.isArray(raw.items)) return raw.items;
       return [];
     },
+    enabled,
   });
 }
 
-export function usePackages() {
+export function usePackages(enabled = true) {
   return useQuery<Package[]>({
     queryKey: [...BILLING_QUERY_KEY, 'packages'],
     queryFn: async () => {
@@ -41,6 +43,7 @@ export function usePackages() {
       if (raw && Array.isArray(raw.items)) return raw.items;
       return [];
     },
+    enabled,
   });
 }
 

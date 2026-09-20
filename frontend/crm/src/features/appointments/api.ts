@@ -5,7 +5,7 @@ import { AppointmentFormValues } from '../../lib/schemas';
 
 export const APPOINTMENTS_QUERY_KEY = ['appointments'];
 
-export function useAppointments(startDate?: string, endDate?: string, page = 1, page_size = 10) {
+export function useAppointments(startDate?: string, endDate?: string, page = 1, page_size = 10, enabled = true) {
   return useQuery({
     queryKey: [...APPOINTMENTS_QUERY_KEY, { startDate, endDate, page, page_size }],
     queryFn: async () => {
@@ -21,6 +21,7 @@ export function useAppointments(startDate?: string, endDate?: string, page = 1, 
       const data = res.data?.items || res.data?.data || [];
       return { data, meta: { total: res.data?.total || 0, page, page_size } };
     },
+    enabled,
   });
 }
 

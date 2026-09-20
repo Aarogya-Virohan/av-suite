@@ -18,13 +18,14 @@ export interface ClinicSettingsUpdate {
   branding_color?: string | null;
 }
 
-export const useClinicSettings = () => {
+export const useClinicSettings = (enabled = true) => {
   return useQuery({
     queryKey: ['clinic-settings'],
     queryFn: async () => {
       const res = await apiClient.get('/settings/clinic');
       return (res.data?.data || res.data) as ClinicSettings;
     },
+    enabled,
   });
 };
 

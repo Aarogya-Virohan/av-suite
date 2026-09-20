@@ -152,158 +152,24 @@ def _admin_template() -> Mapping[str, CapabilityScope]:
     )
 
 
+def _deny_all_template() -> Mapping[str, CapabilityScope]:
+    """Default deny-all template where every capability is set to NONE."""
+    return MappingProxyType({key: _NONE for key in CAPABILITY_REGISTRY})
+
+
 # ---------------------------------------------------------------------------
 # ROLE TEMPLATES
 #
-# These are DEFAULTS ONLY. An admin can override any capability per user in
-# the user_permissions table, and that override wins (see
-# resolve_capability_scope below).
-#
-# Source: the approved RBAC matrix issued to the frontend in Aug 2026.
-# Any key not listed for a role resolves to NONE.
-#
-# Adding a new role (for example Manager) means adding one entry here. No
-# other file should need to change.
+# Default rule: by default, everything is set as NONE for every non-admin role
+# (therapist, front_desk) - only login works for them until an Admin explicitly
+# grants permissions in User Management.
+# Admin retains full permissions by default.
 # ---------------------------------------------------------------------------
 ROLE_TEMPLATES: Mapping[UserRole, Mapping[str, CapabilityScope]] = MappingProxyType(
     {
         UserRole.ADMIN: _admin_template(),
-        UserRole.THERAPIST: MappingProxyType(
-            {
-                "patients.view": _OWN,
-                "patients.create": _ALL,
-                "patients.edit": _OWN,
-                "patients.delete": _NONE,
-                "leads.view": _NONE,
-                "leads.create": _NONE,
-                "leads.edit": _NONE,
-                "leads.delete": _NONE,
-                "leads.convert": _NONE,
-                "appointments.view": _OWN,
-                "appointments.create": _OWN,
-                "appointments.edit": _OWN,
-                "appointments.delete": _OWN,
-                "treatments.view": _OWN,
-                "treatments.create": _OWN,
-                "treatments.edit": _OWN,
-                "treatments.delete": _OWN,
-                "assessments.view": _OWN,
-                "assessments.create": _ALL,
-                "assessments.edit": _OWN,
-                "assessments.delete": _NONE,
-                "prescriptions.view": _OWN,
-                "prescriptions.create": _ALL,
-                "prescriptions.edit": _OWN,
-                "prescriptions.delete": _NONE,
-                "exercises.view": _ALL,
-                "exercises.create": _NONE,
-                "exercises.edit": _NONE,
-                "exercises.delete": _NONE,
-                "documents.view": _OWN,
-                "documents.upload": _ALL,
-                "documents.edit": _OWN,
-                "documents.delete": _NONE,
-                "invoices.view": _NONE,
-                "invoices.create": _NONE,
-                "invoices.edit": _NONE,
-                "invoices.delete": _NONE,
-                "payments.view": _NONE,
-                "payments.record": _NONE,
-                "payments.delete": _NONE,
-                "packages.view": _NONE,
-                "packages.create": _NONE,
-                "packages.edit": _NONE,
-                "packages.delete": _NONE,
-                "packages.assign": _NONE,
-                "booking.view": _NONE,
-                "booking.approve": _NONE,
-                "booking.edit": _NONE,
-                "booking.delete": _NONE,
-                "analytics.my_performance": _OWN,
-                "analytics.clinic_financials": _NONE,
-                "settings.view": _NONE,
-                "settings.edit": _NONE,
-                "users.view": _NONE,
-                "users.create": _NONE,
-                "users.edit": _NONE,
-                "users.delete": _NONE,
-                "permissions.view": _NONE,
-                "permissions.edit": _NONE,
-                "audit.view": _NONE,
-                "recyclebin.view": _NONE,
-                "recyclebin.restore": _NONE,
-                "posture.view": _OWN,
-                "posture.create": _ALL,
-            }
-        ),
-        UserRole.FRONT_DESK: MappingProxyType(
-            {
-                "patients.view": _ALL,
-                "patients.create": _ALL,
-                "patients.edit": _ALL,
-                "patients.delete": _NONE,
-                "leads.view": _ALL,
-                "leads.create": _ALL,
-                "leads.edit": _ALL,
-                "leads.delete": _NONE,
-                "leads.convert": _ALL,
-                "appointments.view": _ALL,
-                "appointments.create": _ALL,
-                "appointments.edit": _ALL,
-                "appointments.delete": _ALL,
-                "treatments.view": _NONE,
-                "treatments.create": _NONE,
-                "treatments.edit": _NONE,
-                "treatments.delete": _NONE,
-                "assessments.view": _NONE,
-                "assessments.create": _NONE,
-                "assessments.edit": _NONE,
-                "assessments.delete": _NONE,
-                "prescriptions.view": _NONE,
-                "prescriptions.create": _NONE,
-                "prescriptions.edit": _NONE,
-                "prescriptions.delete": _NONE,
-                "exercises.view": _ALL,
-                "exercises.create": _NONE,
-                "exercises.edit": _NONE,
-                "exercises.delete": _NONE,
-                "documents.view": _ALL,
-                "documents.upload": _ALL,
-                "documents.edit": _ALL,
-                "documents.delete": _NONE,
-                "invoices.view": _ALL,
-                "invoices.create": _ALL,
-                "invoices.edit": _NONE,
-                "invoices.delete": _NONE,
-                "payments.view": _ALL,
-                "payments.record": _ALL,
-                "payments.delete": _NONE,
-                "packages.view": _ALL,
-                "packages.create": _NONE,
-                "packages.edit": _NONE,
-                "packages.delete": _NONE,
-                "packages.assign": _ALL,
-                "booking.view": _ALL,
-                "booking.approve": _ALL,
-                "booking.edit": _ALL,
-                "booking.delete": _NONE,
-                "analytics.my_performance": _NONE,
-                "analytics.clinic_financials": _NONE,
-                "settings.view": _NONE,
-                "settings.edit": _NONE,
-                "users.view": _ALL,
-                "users.create": _NONE,
-                "users.edit": _NONE,
-                "users.delete": _NONE,
-                "permissions.view": _NONE,
-                "permissions.edit": _NONE,
-                "audit.view": _NONE,
-                "recyclebin.view": _NONE,
-                "recyclebin.restore": _NONE,
-                "posture.view": _NONE,
-                "posture.create": _NONE,
-            }
-        ),
+        UserRole.THERAPIST: _deny_all_template(),
+        UserRole.FRONT_DESK: _deny_all_template(),
     }
 )
 
