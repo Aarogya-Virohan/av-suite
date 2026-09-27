@@ -4,10 +4,11 @@ from collections.abc import Sequence
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Row, func, select
+from sqlalchemy import Row, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.appointment import AppointmentStatus
+from app.enums.analytics import PatientRevenueSort
 from app.enums.billing import InvoiceStatus, PaymentStatus
 from app.enums.booking import AppointmentRequestStatus
 from app.enums.lead import LeadStage
@@ -23,6 +24,7 @@ from app.schemas.analytics import (
     BookingAnalytics,
     LeadAnalytics,
     PatientAnalytics,
+    PatientRevenueAnalytics,
     RevenueAnalytics,
     TherapistPerformanceResponse,
 )
@@ -231,6 +233,112 @@ class AnalyticsRepository:
             partial_invoices_count=partial_count,
             total_outstanding_amount=Decimal(str(outstanding_amount)),
         )
+
+    async def get_patient_revenue(
+        self,
+        clinic_id: UUID,
+        period: DateRange,
+        *,
+        sort_by: PatientRevenueSort = PatientRevenueSort.COLLECTED_AMOUNT,
+        limit: int = 5,
+    ) -> list[PatientRevenueAnalytics]:
+        """Return selected-period patient financial totals in ranked order."""
+
+        billed_by_patient = (
+            select(
+                Invoice.patient_id.label("patient_id"),
+                func.sum(Invoice.total_amount).label("billed_amount"),
+            )
+            .where(
+                Invoice.clinic_id == clinic_id,
+                Invoice.issue_date >= period.start,
+                Invoice.issue_date < period.end,
+                Invoice.status.in_(
+                    [
+                        InvoiceStatus.UNPAID,
+                        InvoiceStatus.PAID,
+                        InvoiceStatus.PARTIAL,
+                        InvoiceStatus.ISSUED,
+                        InvoiceStatus.OVERDUE,
+                    ]
+                ),
+                Invoice.deleted_at.is_(None),
+            )
+            .group_by(Invoice.patient_id)
+            .subquery()
+        )
+        collected_by_patient = (
+            select(
+                Invoice.patient_id.label("patient_id"),
+                func.sum(Payment.amount).label("collected_amount"),
+            )
+            .join(Invoice, Payment.invoice_id == Invoice.id)
+            .where(
+                Payment.clinic_id == clinic_id,
+                Payment.payment_date >= period.start,
+                Payment.payment_date < period.end,
+                Payment.status == PaymentStatus.COMPLETED,
+                Invoice.clinic_id == clinic_id,
+                Invoice.deleted_at.is_(None),
+            )
+            .group_by(Invoice.patient_id)
+            .subquery()
+        )
+        billed_amount = func.coalesce(
+            billed_by_patient.c.billed_amount, Decimal("0.00")
+        )
+        collected_amount = func.coalesce(
+            collected_by_patient.c.collected_amount, Decimal("0.00")
+        )
+        ranking_amount = (
+            collected_amount
+            if sort_by == PatientRevenueSort.COLLECTED_AMOUNT
+            else billed_amount
+        )
+        secondary_amount = (
+            billed_amount
+            if sort_by == PatientRevenueSort.COLLECTED_AMOUNT
+            else collected_amount
+        )
+        statement = (
+            select(
+                Patient.id,
+                Patient.first_name,
+                Patient.last_name,
+                billed_amount.label("billed_amount"),
+                collected_amount.label("collected_amount"),
+            )
+            .outerjoin(
+                billed_by_patient, billed_by_patient.c.patient_id == Patient.id
+            )
+            .outerjoin(
+                collected_by_patient,
+                collected_by_patient.c.patient_id == Patient.id,
+            )
+            .where(
+                Patient.clinic_id == clinic_id,
+                Patient.deleted_at.is_(None),
+                or_(billed_amount > 0, collected_amount > 0),
+            )
+            .order_by(
+                desc(ranking_amount),
+                desc(secondary_amount),
+                Patient.first_name,
+                Patient.last_name,
+                Patient.id,
+            )
+            .limit(limit)
+        )
+        rows = (await self.session.execute(statement)).all()
+        return [
+            PatientRevenueAnalytics(
+                patient_id=row.id,
+                patient_name=f"{row.first_name} {row.last_name}".strip(),
+                billed_amount=Decimal(str(row.billed_amount)),
+                collected_amount=Decimal(str(row.collected_amount)),
+            )
+            for row in rows
+        ]
 
     async def get_lead_stats(self, clinic_id: UUID) -> LeadAnalytics:
         total_leads_stmt = select(func.count(Lead.id)).where(

@@ -10,3 +10,10 @@ class AnalyticsPeriod(StrEnum):
     WEEK = "week"
     MONTH = "month"
     YEAR = "year"
+
+
+class PatientRevenueSort(StrEnum):
+    """Financial measure used to order patient revenue analytics."""
+
+    COLLECTED_AMOUNT = "collected_amount"
+    BILLED_AMOUNT = "billed_amount"

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from app.enums.analytics import AnalyticsPeriod
+from app.enums.analytics import AnalyticsPeriod, PatientRevenueSort
 from app.schemas.analytics import (
     AnalyticsOverviewEnvelope,
     AnalyticsOverviewResponse,
@@ -27,7 +27,12 @@ class AnalyticsService:
         self.session = session
 
     async def get_overview(
-        self, clinic_id: UUID, period: AnalyticsPeriod = AnalyticsPeriod.MONTH
+        self,
+        clinic_id: UUID,
+        period: AnalyticsPeriod = AnalyticsPeriod.MONTH,
+        *,
+        patient_revenue_sort: PatientRevenueSort = PatientRevenueSort.COLLECTED_AMOUNT,
+        patient_revenue_limit: int = 5,
     ) -> AnalyticsOverviewEnvelope:
         """Compute all clinic-scoped analytics metrics using efficient SQL aggregations."""
 
@@ -50,6 +55,12 @@ class AnalyticsService:
         revenue_analytics = await repo.get_financial_stats(
             clinic_id, periods.this_month, selected_range
         )
+        patient_revenue = await repo.get_patient_revenue(
+            clinic_id,
+            selected_range,
+            sort_by=patient_revenue_sort,
+            limit=patient_revenue_limit,
+        )
 
         # 4. Lead metrics
         lead_analytics = await repo.get_lead_stats(clinic_id)
@@ -62,6 +73,8 @@ class AnalyticsService:
                 patients=patient_analytics,
                 appointments=appointment_analytics,
                 revenue=revenue_analytics,
+                patient_revenue=patient_revenue,
+                patient_revenue_sort=patient_revenue_sort,
                 leads=lead_analytics,
                 booking=booking_analytics,
             ),

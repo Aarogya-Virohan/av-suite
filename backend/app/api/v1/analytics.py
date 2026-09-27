@@ -14,7 +14,7 @@ from app.core.dependencies import (
 from app.enums.permission import CapabilityScope
 from app.models.clinic import Clinic
 from app.models.user import User
-from app.enums.analytics import AnalyticsPeriod
+from app.enums.analytics import AnalyticsPeriod, PatientRevenueSort
 from app.schemas.analytics import (
     AnalyticsOverviewEnvelope,
     TherapistPerformanceEnvelope,
@@ -53,6 +53,19 @@ async def get_analytics_overview(
             "and the end is exclusive. Defaults to month."
         ),
     ),
+    patient_revenue_sort: PatientRevenueSort = Query(
+        default=PatientRevenueSort.COLLECTED_AMOUNT,
+        description=(
+            "Financial metric used to rank the patient_revenue list: "
+            "collected_amount (default) or billed_amount."
+        ),
+    ),
+    patient_revenue_limit: int = Query(
+        default=5,
+        ge=1,
+        le=100,
+        description="Maximum patient_revenue results to return (1-100; default 5).",
+    ),
     _scope: CapabilityScope = Depends(
         require_capability("analytics.clinic_financials")
     ),
@@ -62,7 +75,12 @@ async def get_analytics_overview(
     Requires analytics.clinic_financials capability.
     """
 
-    return await service.get_overview(clinic.id, period)
+    return await service.get_overview(
+        clinic.id,
+        period,
+        patient_revenue_sort=patient_revenue_sort,
+        patient_revenue_limit=patient_revenue_limit,
+    )
 
 
 @router.get(

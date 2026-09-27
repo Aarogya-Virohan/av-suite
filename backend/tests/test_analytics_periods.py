@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.enums.appointment import AppointmentStatus
-from app.enums.analytics import AnalyticsPeriod
+from app.enums.analytics import AnalyticsPeriod, PatientRevenueSort
 from app.enums.billing import InvoiceStatus, PaymentMethod, PaymentStatus
 from app.enums.shared import Specialty
 from app.enums.user import UserRole
@@ -424,6 +424,233 @@ async def test_financial_metrics_use_half_open_invoice_and_payment_date_ranges(
 
 
 @pytest.mark.asyncio
+async def test_patient_revenue_is_empty_without_financial_activity(
+    db_session: AsyncSession,
+) -> None:
+    clinic, *_ = await _create_context(db_session)
+
+    result = await AnalyticsRepository(db_session).get_patient_revenue(
+        clinic.id, MONTH
+    )
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_patient_revenue_is_empty_when_clinic_has_no_patients(
+    db_session: AsyncSession,
+) -> None:
+    clinic = Clinic(name=f"Empty analytics clinic {uuid4()}")
+    db_session.add(clinic)
+    await db_session.flush()
+
+    result = await AnalyticsRepository(db_session).get_patient_revenue(
+        clinic.id, MONTH
+    )
+
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_patient_revenue_aggregates_ranks_and_excludes_deleted_or_other_clinic(
+    db_session: AsyncSession,
+) -> None:
+    clinic, other_clinic, _, _, _, patients, outside_patient = await _create_context(
+        db_session
+    )
+    paid_invoice = _invoice(
+        clinic.id,
+        patients[0].id,
+        MONTH.start,
+        Decimal("100.00"),
+        Decimal("20.00"),
+        InvoiceStatus.PARTIAL,
+    )
+    second_invoice = _invoice(
+        clinic.id,
+        patients[0].id,
+        MONTH.start,
+        Decimal("50.00"),
+        Decimal("5.00"),
+        InvoiceStatus.PARTIAL,
+    )
+    billed_only_invoice = _invoice(
+        clinic.id, patients[1].id, MONTH.start, Decimal("80.00")
+    )
+    collected_only_invoice = _invoice(
+        clinic.id,
+        patients[2].id,
+        MONTH.start - timedelta(days=1),
+        Decimal("40.00"),
+        Decimal("15.00"),
+        InvoiceStatus.PARTIAL,
+    )
+    deleted_invoice = _invoice(
+        clinic.id,
+        patients[3].id,
+        MONTH.start,
+        Decimal("900.00"),
+        Decimal("900.00"),
+        InvoiceStatus.PAID,
+        deleted_at=MONTH.start,
+    )
+    deleted_patient_invoice = _invoice(
+        clinic.id,
+        patients[4].id,
+        MONTH.start,
+        Decimal("700.00"),
+        Decimal("700.00"),
+        InvoiceStatus.PAID,
+    )
+    other_clinic_invoice = _invoice(
+        other_clinic.id,
+        outside_patient.id,
+        MONTH.start,
+        Decimal("800.00"),
+        Decimal("800.00"),
+        InvoiceStatus.PAID,
+    )
+    patients[4].deleted_at = MONTH.start
+    db_session.add_all(
+        [
+            paid_invoice,
+            second_invoice,
+            billed_only_invoice,
+            collected_only_invoice,
+            deleted_invoice,
+            deleted_patient_invoice,
+            other_clinic_invoice,
+        ]
+    )
+    await db_session.flush()
+    db_session.add_all(
+        [
+            _payment(paid_invoice, Decimal("10.00"), MONTH.start),
+            _payment(paid_invoice, Decimal("10.00"), MONTH.start),
+            _payment(second_invoice, Decimal("5.00"), MONTH.start),
+            _payment(
+                collected_only_invoice, Decimal("15.00"), MONTH.start
+            ),
+            _payment(deleted_invoice, Decimal("900.00"), MONTH.start),
+            _payment(deleted_patient_invoice, Decimal("700.00"), MONTH.start),
+            _payment(other_clinic_invoice, Decimal("800.00"), MONTH.start),
+        ]
+    )
+    await db_session.flush()
+
+    repository = AnalyticsRepository(db_session)
+    collected_ranked = await repository.get_patient_revenue(clinic.id, MONTH)
+    billed_ranked = await repository.get_patient_revenue(
+        clinic.id, MONTH, sort_by=PatientRevenueSort.BILLED_AMOUNT
+    )
+
+    assert [patient.patient_id for patient in collected_ranked] == [
+        patients[0].id,
+        patients[2].id,
+        patients[1].id,
+    ]
+    assert [patient.patient_name for patient in collected_ranked] == [
+        "Patient0 Test",
+        "Patient2 Test",
+        "Patient1 Test",
+    ]
+    assert [
+        (patient.billed_amount, patient.collected_amount)
+        for patient in collected_ranked
+    ] == [
+        (Decimal("150.00"), Decimal("25.00")),
+        (Decimal("0.00"), Decimal("15.00")),
+        (Decimal("80.00"), Decimal("0.00")),
+    ]
+    assert [patient.patient_id for patient in billed_ranked] == [
+        patients[0].id,
+        patients[1].id,
+        patients[2].id,
+    ]
+    limited = await repository.get_patient_revenue(clinic.id, MONTH, limit=1)
+    assert len(limited) == 1
+    assert limited[0].patient_id == patients[0].id
+
+
+@pytest.mark.asyncio
+async def test_patient_revenue_uses_independent_dates_and_half_open_boundaries(
+    db_session: AsyncSession,
+) -> None:
+    clinic, _, _, _, _, patients, _ = await _create_context(db_session)
+    billed_at_start = _invoice(
+        clinic.id, patients[0].id, MONTH.start, Decimal("10.00")
+    )
+    billed_before_start = _invoice(
+        clinic.id,
+        patients[1].id,
+        MONTH.start - timedelta(microseconds=1),
+        Decimal("20.00"),
+        Decimal("5.00"),
+        InvoiceStatus.PARTIAL,
+    )
+    billed_before_end = _invoice(
+        clinic.id,
+        patients[2].id,
+        MONTH.end - timedelta(microseconds=1),
+        Decimal("30.00"),
+    )
+    billed_at_end = _invoice(
+        clinic.id, patients[3].id, MONTH.end, Decimal("40.00")
+    )
+    invoice_for_payments = _invoice(
+        clinic.id,
+        patients[4].id,
+        MONTH.start - timedelta(days=2),
+        Decimal("50.00"),
+        Decimal("20.00"),
+        InvoiceStatus.PARTIAL,
+    )
+    db_session.add_all(
+        [
+            billed_at_start,
+            billed_before_start,
+            billed_before_end,
+            billed_at_end,
+            invoice_for_payments,
+        ]
+    )
+    await db_session.flush()
+    db_session.add_all(
+        [
+            _payment(
+                billed_at_start,
+                Decimal("1.00"),
+                MONTH.start - timedelta(microseconds=1),
+            ),
+            _payment(billed_before_start, Decimal("5.00"), MONTH.start),
+            _payment(billed_before_end, Decimal("3.00"), MONTH.end - timedelta(microseconds=1)),
+            _payment(billed_at_end, Decimal("4.00"), MONTH.end),
+            _payment(invoice_for_payments, Decimal("7.00"), MONTH.start),
+            _payment(
+                invoice_for_payments,
+                Decimal("8.00"),
+                MONTH.end + timedelta(microseconds=1),
+            ),
+        ]
+    )
+    await db_session.flush()
+
+    result = await AnalyticsRepository(db_session).get_patient_revenue(
+        clinic.id, MONTH
+    )
+    by_patient_id = {patient.patient_id: patient for patient in result}
+
+    assert by_patient_id[patients[0].id].billed_amount == Decimal("10.00")
+    assert by_patient_id[patients[0].id].collected_amount == Decimal("0.00")
+    assert by_patient_id[patients[1].id].billed_amount == Decimal("0.00")
+    assert by_patient_id[patients[1].id].collected_amount == Decimal("5.00")
+    assert by_patient_id[patients[2].id].billed_amount == Decimal("30.00")
+    assert patients[3].id not in by_patient_id
+    assert by_patient_id[patients[4].id].billed_amount == Decimal("0.00")
+    assert by_patient_id[patients[4].id].collected_amount == Decimal("7.00")
+
+
+@pytest.mark.asyncio
 async def test_personal_month_metrics_are_bounded_and_scoped(
     db_session: AsyncSession,
 ) -> None:
@@ -751,14 +978,19 @@ async def test_analytics_api_period_contract_and_scoping(
     await db_session.flush()
 
     expected = {
-        AnalyticsPeriod.TODAY: (2, 1, Decimal("100.00")),
-        AnalyticsPeriod.WEEK: (4, 3, Decimal("300.00")),
-        AnalyticsPeriod.MONTH: (6, 5, Decimal("500.00")),
-        AnalyticsPeriod.YEAR: (8, 7, Decimal("700.00")),
+        AnalyticsPeriod.TODAY: (2, 1, Decimal("100.00"), [3]),
+        AnalyticsPeriod.WEEK: (4, 3, Decimal("300.00"), [2, 3, 4]),
+        AnalyticsPeriod.MONTH: (6, 5, Decimal("500.00"), [1, 2, 3, 4, 5]),
+        AnalyticsPeriod.YEAR: (8, 7, Decimal("700.00"), [0, 1, 2, 3, 4, 5, 6]),
     }
-    for period, (appointment_count, patient_count, revenue) in expected.items():
+    for period, (
+        appointment_count,
+        patient_count,
+        revenue,
+        patient_revenue_indexes,
+    ) in expected.items():
         response = await client.get(
-            f"{settings.API_V1_PREFIX}/analytics/overview?period={period.value}",
+            f"{settings.API_V1_PREFIX}/analytics/overview?period={period.value}&patient_revenue_limit=100",
             headers=auth_headers,
         )
         assert response.status_code == 200
@@ -782,6 +1014,16 @@ async def test_analytics_api_period_contract_and_scoping(
         assert Decimal(str(financial_data["billed_amount_in_period"])) == revenue
         assert Decimal(str(financial_data["collected_amount_in_period"])) == revenue
         assert Decimal(str(financial_data["revenue_in_period"])) == revenue
+        patient_revenue = payload["data"]["patient_revenue"]
+        assert payload["data"]["patient_revenue_sort"] == "collected_amount"
+        assert {item["patient_id"] for item in patient_revenue} == {
+            str(patients[index].id) for index in patient_revenue_indexes
+        }
+        assert all(
+            Decimal(str(item["billed_amount"])) == Decimal("100.00")
+            and Decimal(str(item["collected_amount"])) == Decimal("100.00")
+            for item in patient_revenue
+        )
 
     default_response = await client.get(
         f"{settings.API_V1_PREFIX}/analytics/overview", headers=auth_headers
@@ -794,6 +1036,27 @@ async def test_analytics_api_period_contract_and_scoping(
     assert default_payload["data"]["revenue"]["revenue_in_period"] == "500.00"
     assert default_payload["data"]["revenue"]["billed_amount_in_period"] == "500.00"
     assert default_payload["data"]["revenue"]["collected_amount_in_period"] == "500.00"
+
+    ranked_patients_response = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/overview?period=month&patient_revenue_sort=billed_amount&patient_revenue_limit=1",
+        headers=auth_headers,
+    )
+    assert ranked_patients_response.status_code == 200
+    ranked_patients_payload = ranked_patients_response.json()["data"]
+    assert ranked_patients_payload["patient_revenue_sort"] == "billed_amount"
+    assert len(ranked_patients_payload["patient_revenue"]) == 1
+    assert set(ranked_patients_payload["patient_revenue"][0]) == {
+        "patient_id",
+        "patient_name",
+        "billed_amount",
+        "collected_amount",
+    }
+
+    excessive_limit_response = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/overview?patient_revenue_limit=101",
+        headers=auth_headers,
+    )
+    assert excessive_limit_response.status_code == 422
 
     today_performance = await client.get(
         f"{settings.API_V1_PREFIX}/analytics/my-performance?period=today",

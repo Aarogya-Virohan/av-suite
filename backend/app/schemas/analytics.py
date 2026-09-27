@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.enums.analytics import AnalyticsPeriod
+from app.enums.analytics import AnalyticsPeriod, PatientRevenueSort
 from app.schemas.envelope import ResponseEnvelope
 
 
@@ -85,6 +86,15 @@ class RevenueAnalytics(BaseModel):
     )
 
 
+class PatientRevenueAnalytics(BaseModel):
+    """Selected-period invoice and payment totals for a clinic patient."""
+
+    patient_id: UUID
+    patient_name: str
+    billed_amount: Decimal
+    collected_amount: Decimal
+
+
 class LeadAnalytics(BaseModel):
     """Analytics metrics for clinic prospective leads."""
 
@@ -107,6 +117,8 @@ class AnalyticsOverviewResponse(BaseModel):
     patients: PatientAnalytics
     appointments: AppointmentAnalytics
     revenue: RevenueAnalytics
+    patient_revenue: list[PatientRevenueAnalytics]
+    patient_revenue_sort: PatientRevenueSort
     leads: LeadAnalytics
     booking: BookingAnalytics
 
