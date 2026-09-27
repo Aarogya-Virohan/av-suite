@@ -5,8 +5,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
-from app.schemas.analytics import AnalyticsOverviewResponse, TherapistPerformanceResponse
+from app.schemas.analytics import (
+    AnalyticsOverviewResponse,
+    TherapistPerformanceResponse,
+)
 from app.repositories.analytics import AnalyticsRepository
+from app.utils.analytics_periods import AnalyticsPeriods
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -21,21 +25,20 @@ class AnalyticsService:
     async def get_overview(self, clinic_id: UUID) -> AnalyticsOverviewResponse:
         """Compute all clinic-scoped analytics metrics using efficient SQL aggregations."""
 
-        now = datetime.now(timezone.utc)
-        month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+        periods = AnalyticsPeriods.containing(datetime.now(timezone.utc))
 
         repo = AnalyticsRepository(self.session)
 
         # 1. Patient metrics
-        patient_analytics = await repo.get_patient_stats(clinic_id, month_start)
+        patient_analytics = await repo.get_patient_stats(clinic_id, periods.this_month)
 
         # 2. Appointment metrics
-        today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
-        today_end = datetime(now.year, now.month, now.day, 23, 59, 59, tzinfo=timezone.utc)
-        appointment_analytics = await repo.get_appointment_stats(clinic_id, today_start, today_end)
+        appointment_analytics = await repo.get_appointment_stats(
+            clinic_id, periods.today, periods.this_week
+        )
 
         # 3. Revenue metrics
-        revenue_analytics = await repo.get_revenue_stats(clinic_id, month_start)
+        revenue_analytics = await repo.get_revenue_stats(clinic_id, periods.this_month)
 
         # 4. Lead metrics
         lead_analytics = await repo.get_lead_stats(clinic_id)
@@ -51,7 +54,9 @@ class AnalyticsService:
             booking=booking_analytics,
         )
 
-    async def get_my_performance(self, clinic_id: UUID, therapist_id: UUID) -> TherapistPerformanceResponse:
+    async def get_my_performance(
+        self, clinic_id: UUID, therapist_id: UUID
+    ) -> TherapistPerformanceResponse:
         """
         Compute therapist-scoped 'own only' performance metrics.
 
@@ -60,17 +65,13 @@ class AnalyticsService:
         Only returns data belonging to the requesting therapist.
         """
 
-        now = datetime.now(timezone.utc)
-        month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
-        today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
-        today_end = datetime(now.year, now.month, now.day, 23, 59, 59, tzinfo=timezone.utc)
+        periods = AnalyticsPeriods.containing(datetime.now(timezone.utc))
 
         repo = AnalyticsRepository(self.session)
 
         return await repo.get_therapist_performance(
             clinic_id=clinic_id,
             therapist_id=therapist_id,
-            month_start=month_start,
-            today_start=today_start,
-            today_end=today_end,
+            month=periods.this_month,
+            today=periods.today,
         )
