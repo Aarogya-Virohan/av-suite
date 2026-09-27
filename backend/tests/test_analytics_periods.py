@@ -372,9 +372,7 @@ async def test_financial_totals_use_invoices_payments_statuses_and_clinic_scope(
     patient_revenue = await AnalyticsRepository(db_session).get_patient_revenue(
         clinic.id, MONTH, limit=100
     )
-    patient_revenue_by_id = {
-        patient.patient_id: patient for patient in patient_revenue
-    }
+    patient_revenue_by_id = {patient.patient_id: patient for patient in patient_revenue}
     assert patient_revenue_by_id[patients[3].id].billed_amount == Decimal("0.00")
     assert patient_revenue_by_id[patients[3].id].collected_amount == Decimal("7.00")
     assert patient_revenue_by_id[patients[4].id].billed_amount == Decimal("0.00")
@@ -738,9 +736,7 @@ async def test_patient_revenue_default_limit_and_ties_are_deterministic(
     )
     await db_session.flush()
 
-    result = await AnalyticsRepository(db_session).get_patient_revenue(
-        clinic.id, MONTH
-    )
+    result = await AnalyticsRepository(db_session).get_patient_revenue(clinic.id, MONTH)
 
     expected_top_five = [
         *sorted([patients[1].id, patients[2].id]),
