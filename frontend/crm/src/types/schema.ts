@@ -1632,7 +1632,11 @@ export interface paths {
     };
     "/api/v1/analytics/overview": {
         parameters: {
-            query?: never;
+            query?: {
+                period?: components["schemas"]["AnalyticsPeriod"];
+                patient_revenue_sort?: components["schemas"]["PatientRevenueSort"];
+                patient_revenue_limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1642,6 +1646,25 @@ export interface paths {
          * @description Retrieve clinic-scoped analytics dashboard metrics.
          */
         get: operations["get_analytics_overview_api_v1_analytics_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/my-performance": {
+        parameters: {
+            query?: {
+                period?: components["schemas"]["AnalyticsPeriod"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get My Performance */
+        get: operations["get_my_performance_api_v1_analytics_my_performance_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1699,8 +1722,23 @@ export interface components {
             patients: components["schemas"]["PatientAnalytics"];
             appointments: components["schemas"]["AppointmentAnalytics"];
             revenue: components["schemas"]["RevenueAnalytics"];
+            patient_revenue: components["schemas"]["PatientRevenueAnalytics"][];
+            patient_revenue_sort: components["schemas"]["PatientRevenueSort"];
             leads: components["schemas"]["LeadAnalytics"];
             booking: components["schemas"]["BookingAnalytics"];
+        };
+        /** AnalyticsOverviewEnvelope */
+        AnalyticsOverviewEnvelope: {
+            data?: components["schemas"]["AnalyticsOverviewResponse"] | null;
+            meta: components["schemas"]["AnalyticsPeriodMetadata"];
+        };
+        /** AnalyticsPeriod */
+        AnalyticsPeriod: "today" | "week" | "month" | "year";
+        /** AnalyticsPeriodMetadata */
+        AnalyticsPeriodMetadata: {
+            period: components["schemas"]["AnalyticsPeriod"];
+            start: string;
+            end: string;
         };
         /**
          * AppointmentAnalytics
@@ -1711,6 +1749,8 @@ export interface components {
             today_appointments: number;
             /** This Week Appointments */
             this_week_appointments: number;
+            /** Appointments In Period */
+            appointments_in_period: number;
             /** Completed Appointments */
             completed_appointments: number;
             /** Cancelled Appointments */
@@ -2736,6 +2776,37 @@ export interface components {
             active_patients: number;
             /** New Patients This Month */
             new_patients_this_month: number;
+            /** New Patients In Period */
+            new_patients_in_period: number;
+        };
+        /** PatientRevenueAnalytics */
+        PatientRevenueAnalytics: {
+            patient_id: string;
+            patient_name: string;
+            billed_amount: string;
+            collected_amount: string;
+        };
+        /** PatientRevenueSort */
+        PatientRevenueSort: "collected_amount" | "billed_amount";
+        /** TherapistPerformanceEnvelope */
+        TherapistPerformanceEnvelope: {
+            data?: components["schemas"]["TherapistPerformanceResponse"] | null;
+            meta: components["schemas"]["AnalyticsPeriodMetadata"];
+        };
+        /** TherapistPerformanceResponse */
+        TherapistPerformanceResponse: {
+            today_appointments: number;
+            appointments_in_period: number;
+            completed_appointments_this_month: number;
+            completed_appointments_in_period: number;
+            cancelled_appointments_this_month: number;
+            cancelled_appointments_in_period: number;
+            treatment_sessions_this_month: number;
+            treatment_sessions_in_period: number;
+            soap_notes_this_month: number;
+            soap_notes_in_period: number;
+            patients_seen_this_month: number;
+            patients_seen_in_period: number;
         };
         /** PatientCreate */
         PatientCreate: {
@@ -3360,12 +3431,6 @@ export interface components {
             /** Last Name */
             last_name: string;
         };
-        /** ResponseEnvelope[AnalyticsOverviewResponse] */
-        ResponseEnvelope_AnalyticsOverviewResponse_: {
-            data?: components["schemas"]["AnalyticsOverviewResponse"] | null;
-            /** Meta */
-            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | Record<string, never> | null;
-        };
         /** ResponseEnvelope[AppointmentRequestResponse] */
         ResponseEnvelope_AppointmentRequestResponse_: {
             data?: components["schemas"]["AppointmentRequestResponse"] | null;
@@ -3478,8 +3543,16 @@ export interface components {
          * @description Analytics metrics for clinic revenue and billing.
          */
         RevenueAnalytics: {
-            /** Revenue This Month */
+            /** Billed Amount In Period */
+            billed_amount_in_period: string;
+            /** Collected Amount In Period */
+            collected_amount_in_period: string;
+            /** Outstanding Amount */
+            outstanding_amount: string;
+            /** @deprecated Revenue This Month */
             revenue_this_month: string;
+            /** @deprecated Revenue In Period */
+            revenue_in_period: string;
             /** Paid Invoices Count */
             paid_invoices_count: number;
             /** Unpaid Invoices Count */
@@ -6592,7 +6665,11 @@ export interface operations {
     };
     get_analytics_overview_api_v1_analytics_overview_get: {
         parameters: {
-            query?: never;
+            query?: {
+                period?: components["schemas"]["AnalyticsPeriod"];
+                patient_revenue_sort?: components["schemas"]["PatientRevenueSort"];
+                patient_revenue_limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6605,7 +6682,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ResponseEnvelope_AnalyticsOverviewResponse_"];
+                    "application/json": components["schemas"]["AnalyticsOverviewEnvelope"];
+                };
+            };
+        };
+    };
+    get_my_performance_api_v1_analytics_my_performance_get: {
+        parameters: {
+            query?: {
+                period?: components["schemas"]["AnalyticsPeriod"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TherapistPerformanceEnvelope"];
                 };
             };
         };

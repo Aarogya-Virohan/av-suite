@@ -7,13 +7,11 @@ import { useAnalyticsOverview, useMyPerformance } from '../../../features/analyt
 import { useAppointments } from '../../../features/appointments/api';
 import { useLeads } from '../../../features/leads/api';
 import { usePatients } from '../../../features/patients/api';
-import { useAuthStore } from '../../../store';
 import { canAccessModule, hasCapability } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
+import { formatMoney } from '../../../lib/money';
 
 export default function DashboardPage() {
-  const role = useAuthStore((s) => s.role);
-  
   const canViewFinancials = hasCapability('analytics.clinic_financials');
   const canViewMyPerf = hasCapability('analytics.my_performance');
   const canViewAppts = hasCapability('appointments.view');
@@ -23,10 +21,13 @@ export default function DashboardPage() {
   const hasAnyDashboardView = canViewFinancials || canViewMyPerf || canViewAppts || canViewLeads || canViewPatients;
 
   // Admin / financial overview query
-  const { data: overview, isLoading: isOverviewLoading, isError: isOverviewError, error: overviewError } = useAnalyticsOverview(canViewFinancials);
+  const { data: overview, isLoading: isOverviewLoading, isError: isOverviewError, error: overviewError } =
+    useAnalyticsOverview({ enabled: canViewFinancials });
+  const overviewData = overview?.data;
   
   // Therapist personal clinical performance query
-  const { data: myPerf, isLoading: isPerfLoading } = useMyPerformance(canViewMyPerf);
+  const { data: myPerf, isLoading: isPerfLoading, isError: isPerfError } =
+    useMyPerformance('month', canViewMyPerf && !canViewFinancials);
 
   // Operational queries
   const { data: appointmentsRes, isLoading: isApptsLoading } = useAppointments(undefined, undefined, 1, 50, canViewAppts);
@@ -72,14 +73,14 @@ export default function DashboardPage() {
             </div>
           ) : (
             /* Admin KPI Cards */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase text-slate-400">Total Patients</span>
                   <Users className="w-5 h-5 text-teal-600" />
                 </div>
                 <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                  {overview?.patients?.total_patients || 0}
+                  {overviewData?.patients.total_patients ?? 0}
                 </p>
               </div>
 
@@ -89,33 +90,58 @@ export default function DashboardPage() {
                   <Calendar className="w-5 h-5 text-blue-600" />
                 </div>
                 <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                  {overview?.appointments?.today_appointments || 0}
+                  {overviewData?.appointments.today_appointments ?? 0}
                 </p>
               </div>
 
               <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase text-slate-400">Monthly Revenue</span>
+                  <span className="text-xs font-bold uppercase text-slate-400">Billed This Month</span>
                   <DollarSign className="w-5 h-5 text-emerald-600" />
                 </div>
                 <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                  ₹{(overview?.revenue?.revenue_this_month || 0).toLocaleString('en-IN')}
+                  {formatMoney(overviewData?.revenue.billed_amount_in_period)}
                 </p>
               </div>
 
               <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase text-slate-400">Pending Leads</span>
+                  <span className="text-xs font-bold uppercase text-slate-400">Collected This Month</span>
+                  <DollarSign className="w-5 h-5 text-teal-600" />
+                </div>
+                <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
+                  {formatMoney(overviewData?.revenue.collected_amount_in_period)}
+                </p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase text-slate-400">Outstanding (All Time)</span>
+                  <DollarSign className="w-5 h-5 text-rose-600" />
+                </div>
+                <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
+                  {formatMoney(overviewData?.revenue.outstanding_amount)}
+                </p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase text-slate-400">Total Leads</span>
                   <UserCheck className="w-5 h-5 text-amber-600" />
                 </div>
                 <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                  {overview?.leads?.total_leads || 0}
+                  {overviewData?.leads.total_leads ?? 0}
                 </p>
               </div>
             </div>
           )
         ) : canViewMyPerf ? (
           /* Personal Clinical KPI Cards */
+          isPerfError ? (
+            <div role="alert" className="bg-rose-50 text-rose-600 p-4 rounded-lg">
+              Failed to load your performance data.
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between">
@@ -123,7 +149,7 @@ export default function DashboardPage() {
                 <Calendar className="w-5 h-5 text-teal-600" />
               </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                {myPerf?.today_appointments ?? 0}
+                {myPerf?.data?.today_appointments ?? 0}
               </p>
             </div>
 
@@ -133,7 +159,7 @@ export default function DashboardPage() {
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                {myPerf?.completed_appointments_this_month ?? 0}
+                {myPerf?.data?.completed_appointments_in_period ?? 0}
               </p>
             </div>
 
@@ -143,7 +169,7 @@ export default function DashboardPage() {
                 <Stethoscope className="w-5 h-5 text-blue-600" />
               </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                {myPerf?.treatment_sessions_this_month ?? 0}
+                {myPerf?.data?.treatment_sessions_in_period ?? 0}
               </p>
             </div>
 
@@ -153,10 +179,11 @@ export default function DashboardPage() {
                 <Users className="w-5 h-5 text-purple-600" />
               </div>
               <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">
-                {myPerf?.patients_seen_this_month ?? 0}
+                {myPerf?.data?.patients_seen_in_period ?? 0}
               </p>
             </div>
           </div>
+          )
         ) : (
           /* Front Desk Operational KPI Cards */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

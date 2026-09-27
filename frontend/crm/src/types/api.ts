@@ -85,14 +85,11 @@ export type AuditLog = Omit<components['schemas']['AuditLogResponse'], 'details'
   user_name?: string | null;
 };
 
-export type AnalyticsOverview = {
-  total_patients: number;
-  active_appointments_today: number;
-  monthly_revenue: number;
-  pending_leads: number;
-  revenue_trend: Array<{ date: string; amount: number }>;
-  patients?: components['schemas']['AnalyticsOverviewResponse']['patients'];
-  appointments?: components['schemas']['AnalyticsOverviewResponse']['appointments'];
-  revenue?: components['schemas']['AnalyticsOverviewResponse']['revenue'];
-  leads?: components['schemas']['AnalyticsOverviewResponse']['leads'];
-};
+export type AnalyticsPeriod = components['schemas']['AnalyticsPeriod'];
+export type PatientRevenueSort = components['schemas']['PatientRevenueSort'];
+export type AnalyticsPeriodMetadata = components['schemas']['AnalyticsPeriodMetadata'];
+export type AnalyticsOverview = components['schemas']['AnalyticsOverviewResponse'];
+export type AnalyticsOverviewEnvelope = components['schemas']['AnalyticsOverviewEnvelope'];
+export type PatientRevenue = components['schemas']['PatientRevenueAnalytics'];
+export type TherapistPerformance = components['schemas']['TherapistPerformanceResponse'];
+export type TherapistPerformanceEnvelope = components['schemas']['TherapistPerformanceEnvelope'];
