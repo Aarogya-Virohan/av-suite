@@ -353,6 +353,8 @@ async def test_financial_totals_use_invoices_payments_statuses_and_clinic_scope(
             _payment(partial, Decimal("70.00"), MONTH.start, PaymentStatus.PENDING),
             _payment(partial, Decimal("50.00"), MONTH.start, PaymentStatus.VOIDED),
             _payment(partial, Decimal("40.00"), MONTH.start, PaymentStatus.REFUNDED),
+            _payment(draft, Decimal("7.00"), MONTH.start),
+            _payment(cancelled, Decimal("11.00"), MONTH.start),
             _payment(deleted, Decimal("25.00"), MONTH.start),
             _payment(outside, Decimal("900.00"), MONTH.start),
         ]
@@ -364,9 +366,71 @@ async def test_financial_totals_use_invoices_payments_statuses_and_clinic_scope(
     )
 
     assert result.billed_amount_in_period == Decimal("200.00")
-    assert result.collected_amount_in_period == Decimal("130.00")
+    assert result.collected_amount_in_period == Decimal("148.00")
     assert result.outstanding_amount == Decimal("70.00")
     assert result.total_outstanding_amount == Decimal("70.00")
+    patient_revenue = await AnalyticsRepository(db_session).get_patient_revenue(
+        clinic.id, MONTH, limit=100
+    )
+    patient_revenue_by_id = {
+        patient.patient_id: patient for patient in patient_revenue
+    }
+    assert patient_revenue_by_id[patients[3].id].billed_amount == Decimal("0.00")
+    assert patient_revenue_by_id[patients[3].id].collected_amount == Decimal("7.00")
+    assert patient_revenue_by_id[patients[4].id].billed_amount == Decimal("0.00")
+    assert patient_revenue_by_id[patients[4].id].collected_amount == Decimal("11.00")
+
+
+@pytest.mark.asyncio
+async def test_deprecated_revenue_fields_preserve_invoice_paid_amount_semantics(
+    db_session: AsyncSession,
+) -> None:
+    clinic, _, _, _, _, patients, _ = await _create_context(db_session)
+    draft = _invoice(
+        clinic.id,
+        patients[0].id,
+        MONTH.start,
+        Decimal("100.00"),
+        Decimal("35.00"),
+        InvoiceStatus.DRAFT,
+    )
+    cancelled = _invoice(
+        clinic.id,
+        patients[1].id,
+        MONTH.start,
+        Decimal("100.00"),
+        Decimal("40.00"),
+        InvoiceStatus.CANCELLED,
+    )
+    prior_invoice = _invoice(
+        clinic.id,
+        patients[2].id,
+        MONTH.start - timedelta(days=1),
+        Decimal("100.00"),
+        Decimal("60.00"),
+        InvoiceStatus.PAID,
+    )
+    deleted_invoice = _invoice(
+        clinic.id,
+        patients[3].id,
+        MONTH.start,
+        Decimal("100.00"),
+        Decimal("90.00"),
+        InvoiceStatus.PAID,
+        deleted_at=MONTH.start,
+    )
+    db_session.add_all([draft, cancelled, prior_invoice, deleted_invoice])
+    await db_session.flush()
+    db_session.add(_payment(prior_invoice, Decimal("7.00"), MONTH.start))
+    await db_session.flush()
+
+    result = await AnalyticsRepository(db_session).get_financial_stats(
+        clinic.id, MONTH, MONTH
+    )
+
+    assert result.revenue_this_month == Decimal("75.00")
+    assert result.revenue_in_period == Decimal("75.00")
+    assert result.collected_amount_in_period == Decimal("7.00")
 
 
 @pytest.mark.asyncio
@@ -638,6 +702,54 @@ async def test_patient_revenue_uses_independent_dates_and_half_open_boundaries(
     assert patients[3].id not in by_patient_id
     assert by_patient_id[patients[4].id].billed_amount == Decimal("0.00")
     assert by_patient_id[patients[4].id].collected_amount == Decimal("7.00")
+
+
+@pytest.mark.asyncio
+async def test_patient_revenue_default_limit_and_ties_are_deterministic(
+    db_session: AsyncSession,
+) -> None:
+    clinic, _, _, _, _, patients, _ = await _create_context(db_session)
+    names_and_totals = [
+        ("Zoe", "Patient", Decimal("100.00")),
+        ("Amy", "Patient", Decimal("100.00")),
+        ("Amy", "Patient", Decimal("100.00")),
+        ("Aaron", "Patient", Decimal("50.00")),
+        ("Benny", "Patient", Decimal("50.00")),
+        ("Other", "Patient", Decimal("40.00")),
+    ]
+    invoices = []
+    for patient, (first_name, last_name, total) in zip(patients, names_and_totals):
+        patient.first_name = first_name
+        patient.last_name = last_name
+        invoices.append(
+            _invoice(
+                clinic.id,
+                patient.id,
+                MONTH.start,
+                total,
+                Decimal("10.00"),
+                InvoiceStatus.PARTIAL,
+            )
+        )
+    db_session.add_all(invoices)
+    await db_session.flush()
+    db_session.add_all(
+        [_payment(invoice, Decimal("10.00"), MONTH.start) for invoice in invoices]
+    )
+    await db_session.flush()
+
+    result = await AnalyticsRepository(db_session).get_patient_revenue(
+        clinic.id, MONTH
+    )
+
+    expected_top_five = [
+        *sorted([patients[1].id, patients[2].id]),
+        patients[0].id,
+        patients[3].id,
+        patients[4].id,
+    ]
+    assert len(result) == 5
+    assert [patient.patient_id for patient in result] == expected_top_five
 
 
 @pytest.mark.asyncio
@@ -1027,6 +1139,15 @@ async def test_analytics_api_period_contract_and_scoping(
     assert default_payload["data"]["revenue"]["billed_amount_in_period"] == "500.00"
     assert default_payload["data"]["revenue"]["collected_amount_in_period"] == "500.00"
 
+    default_limit_response = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/overview?period=year",
+        headers=auth_headers,
+    )
+    default_limit_data = default_limit_response.json()["data"]
+    assert default_limit_response.status_code == 200
+    assert default_limit_data["patient_revenue_sort"] == "collected_amount"
+    assert len(default_limit_data["patient_revenue"]) == 5
+
     ranked_patients_response = await client.get(
         f"{settings.API_V1_PREFIX}/analytics/overview?period=month&patient_revenue_sort=billed_amount&patient_revenue_limit=1",
         headers=auth_headers,
@@ -1047,6 +1168,11 @@ async def test_analytics_api_period_contract_and_scoping(
         headers=auth_headers,
     )
     assert excessive_limit_response.status_code == 422
+    zero_limit_response = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/overview?patient_revenue_limit=0",
+        headers=auth_headers,
+    )
+    assert zero_limit_response.status_code == 422
 
     today_performance = await client.get(
         f"{settings.API_V1_PREFIX}/analytics/my-performance?period=today",
@@ -1056,15 +1182,40 @@ async def test_analytics_api_period_contract_and_scoping(
         f"{settings.API_V1_PREFIX}/analytics/my-performance?period=month",
         headers=auth_headers,
     )
-    assert today_performance.status_code == month_performance.status_code == 200
+    week_performance = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/my-performance?period=week",
+        headers=auth_headers,
+    )
+    year_performance = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/my-performance?period=year",
+        headers=auth_headers,
+    )
+    assert all(
+        response.status_code == 200
+        for response in (
+            today_performance,
+            week_performance,
+            month_performance,
+            year_performance,
+        )
+    )
     today_data = today_performance.json()["data"]
     month_data = month_performance.json()["data"]
+    week_data = week_performance.json()["data"]
+    year_data = year_performance.json()["data"]
     assert today_performance.json()["meta"]["period"] == "today"
     assert today_data["appointments_in_period"] == 1
     assert today_data["completed_appointments_in_period"] == 1
     assert today_data["treatment_sessions_in_period"] == 1
     assert today_data["soap_notes_in_period"] == 1
     assert today_data["patients_seen_in_period"] == 1
+    assert week_performance.json()["meta"]["period"] == "week"
+    assert week_data["appointments_in_period"] == 3
+    assert week_data["completed_appointments_in_period"] == 1
+    assert week_data["cancelled_appointments_in_period"] == 1
+    assert week_data["treatment_sessions_in_period"] == 2
+    assert week_data["soap_notes_in_period"] == 2
+    assert week_data["patients_seen_in_period"] == 1
     assert month_performance.json()["meta"]["period"] == "month"
     assert month_data["appointments_in_period"] == 5
     assert month_data["completed_appointments_in_period"] == 1
@@ -1072,6 +1223,18 @@ async def test_analytics_api_period_contract_and_scoping(
     assert month_data["treatment_sessions_in_period"] == 2
     assert month_data["soap_notes_in_period"] == 2
     assert month_data["patients_seen_in_period"] == 1
+    assert year_performance.json()["meta"]["period"] == "year"
+    assert year_data["appointments_in_period"] == 7
+    assert year_data["completed_appointments_in_period"] == 1
+    assert year_data["cancelled_appointments_in_period"] == 1
+    assert year_data["treatment_sessions_in_period"] == 2
+    assert year_data["soap_notes_in_period"] == 2
+    assert year_data["patients_seen_in_period"] == 1
+    invalid_performance_response = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/my-performance?period=decade",
+        headers=auth_headers,
+    )
+    assert invalid_performance_response.status_code == 422
 
     invalid_response = await client.get(
         f"{settings.API_V1_PREFIX}/analytics/overview?period=decade",

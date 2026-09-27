@@ -102,8 +102,8 @@ CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
         "booking.edit": CapabilityDefinition("booking.edit", _NA),
         "booking.delete": CapabilityDefinition("booking.delete", _NA),
         # --- analytics ----------------------------------------------------
-        # my_performance allows ALL so an admin can see clinic-wide figures
-        # on the same page a therapist sees only their own.
+        # The capability permits ALL, but /analytics/my-performance currently
+        # always filters to the authenticated user's own therapist ID.
         "analytics.my_performance": CapabilityDefinition(
             "analytics.my_performance", _NOA
         ),

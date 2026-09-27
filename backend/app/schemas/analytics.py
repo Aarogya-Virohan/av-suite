@@ -50,7 +50,8 @@ class RevenueAnalytics(BaseModel):
     collected_amount_in_period: Decimal = Field(
         description=(
             "Sum of completed payment amounts whose payment_date is within the "
-            "selected UTC period [start, end), linked to a non-deleted invoice."
+            "selected UTC period [start, end), linked to a non-deleted invoice. "
+            "The current invoice status does not reverse a completed payment."
         )
     )
     outstanding_amount: Decimal = Field(
@@ -63,20 +64,30 @@ class RevenueAnalytics(BaseModel):
     revenue_this_month: Decimal = Field(
         deprecated=True,
         description=(
-            "Compatibility alias for collected payment amounts whose payment_date "
-            "falls in the current UTC calendar month. Prefer explicit financial fields."
+            "Deprecated legacy metric: sum Invoice.paid_amount for non-deleted "
+            "invoices whose issue_date is in the current UTC calendar month. "
+            "No invoice-status filter is applied. This is not a cash-collected "
+            "payment-date metric; prefer collected_amount_in_period."
         ),
     )
     revenue_in_period: Decimal = Field(
         deprecated=True,
         description=(
-            "Compatibility alias for collected_amount_in_period. Prefer explicit "
-            "financial fields."
+            "Deprecated legacy metric: sum Invoice.paid_amount for non-deleted "
+            "invoices whose issue_date is within the selected UTC period "
+            "[start, end). No invoice-status filter is applied. This is not a "
+            "cash-collected payment-date metric."
         ),
     )
 
     paid_invoices_count: int
-    unpaid_invoices_count: int
+    unpaid_invoices_count: int = Field(
+        description=(
+            "All-time count of non-deleted invoices with exactly status 'unpaid'. "
+            "Invoices in 'issued' or 'overdue' status are excluded even though "
+            "their balances contribute to outstanding_amount."
+        )
+    )
     partial_invoices_count: int
     total_outstanding_amount: Decimal = Field(
         description=(
@@ -87,12 +98,24 @@ class RevenueAnalytics(BaseModel):
 
 
 class PatientRevenueAnalytics(BaseModel):
-    """Selected-period invoice and payment totals for a clinic patient."""
+    """Selected-period financial totals for a patient with activity in either measure."""
 
     patient_id: UUID
-    patient_name: str
-    billed_amount: Decimal
-    collected_amount: Decimal
+    patient_name: str = Field(description="Patient first and last name combined.")
+    billed_amount: Decimal = Field(
+        description=(
+            "Selected-period sum of eligible Invoice.total_amount values by "
+            "Invoice.issue_date; zero when the patient has no billed activity."
+        )
+    )
+    collected_amount: Decimal = Field(
+        description=(
+            "Selected-period sum of completed Payment.amount values by "
+            "Payment.payment_date through the linked invoice. Current draft or "
+            "cancelled invoice status does not reverse a completed payment; "
+            "soft-deleted invoices are excluded."
+        )
+    )
 
 
 class LeadAnalytics(BaseModel):

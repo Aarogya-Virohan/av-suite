@@ -157,6 +157,22 @@ class AnalyticsRepository:
             Invoice.status.in_(billed_statuses),
             Invoice.deleted_at.is_(None),
         )
+        legacy_month_revenue_stmt = select(
+            func.coalesce(func.sum(Invoice.paid_amount), Decimal("0.00"))
+        ).where(
+            Invoice.clinic_id == clinic_id,
+            Invoice.issue_date >= month.start,
+            Invoice.issue_date < month.end,
+            Invoice.deleted_at.is_(None),
+        )
+        legacy_period_revenue_stmt = select(
+            func.coalesce(func.sum(Invoice.paid_amount), Decimal("0.00"))
+        ).where(
+            Invoice.clinic_id == clinic_id,
+            Invoice.issue_date >= period.start,
+            Invoice.issue_date < period.end,
+            Invoice.deleted_at.is_(None),
+        )
         month_collected_stmt = (
             select(func.coalesce(func.sum(Payment.amount), Decimal("0.00")))
             .join(Invoice, Payment.invoice_id == Invoice.id)
@@ -215,6 +231,12 @@ class AnalyticsRepository:
         period_collected = (
             await self.session.scalar(period_collected_stmt)
         ) or Decimal("0.00")
+        legacy_month_revenue = (
+            await self.session.scalar(legacy_month_revenue_stmt)
+        ) or Decimal("0.00")
+        legacy_period_revenue = (
+            await self.session.scalar(legacy_period_revenue_stmt)
+        ) or Decimal("0.00")
         paid_count = (await self.session.scalar(paid_invoices_stmt)) or 0
         unpaid_count = (await self.session.scalar(unpaid_invoices_stmt)) or 0
         partial_count = (await self.session.scalar(partial_invoices_stmt)) or 0
@@ -226,8 +248,8 @@ class AnalyticsRepository:
             billed_amount_in_period=Decimal(str(period_billed)),
             collected_amount_in_period=Decimal(str(period_collected)),
             outstanding_amount=Decimal(str(outstanding_amount)),
-            revenue_this_month=Decimal(str(month_collected)),
-            revenue_in_period=Decimal(str(period_collected)),
+            revenue_this_month=Decimal(str(legacy_month_revenue)),
+            revenue_in_period=Decimal(str(legacy_period_revenue)),
             paid_invoices_count=paid_count,
             unpaid_invoices_count=unpaid_count,
             partial_invoices_count=partial_count,
