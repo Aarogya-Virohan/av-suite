@@ -311,9 +311,7 @@ async def test_financial_totals_use_invoices_payments_statuses_and_clinic_scope(
         Decimal("30.00"),
         InvoiceStatus.PARTIAL,
     )
-    issued = _invoice(
-        clinic.id, patients[2].id, MONTH.start, Decimal("20.00")
-    )
+    issued = _invoice(clinic.id, patients[2].id, MONTH.start, Decimal("20.00"))
     draft = _invoice(
         clinic.id,
         patients[3].id,
@@ -382,9 +380,7 @@ async def test_financial_metrics_use_half_open_invoice_and_payment_date_ranges(
         MONTH.start - timedelta(microseconds=1),
         Decimal("1.00"),
     )
-    at_start = _invoice(
-        clinic.id, patients[1].id, MONTH.start, Decimal("10.00")
-    )
+    at_start = _invoice(clinic.id, patients[1].id, MONTH.start, Decimal("10.00"))
     before_end = _invoice(
         clinic.id,
         patients[2].id,
@@ -402,7 +398,9 @@ async def test_financial_metrics_use_half_open_invoice_and_payment_date_ranges(
     await db_session.flush()
     db_session.add_all(
         [
-            _payment(at_start, Decimal("1.00"), MONTH.start - timedelta(microseconds=1)),
+            _payment(
+                at_start, Decimal("1.00"), MONTH.start - timedelta(microseconds=1)
+            ),
             _payment(at_start, Decimal("2.00"), MONTH.start),
             _payment(at_start, Decimal("3.00"), MONTH.end - timedelta(microseconds=1)),
             _payment(at_start, Decimal("4.00"), MONTH.end),
@@ -429,9 +427,7 @@ async def test_patient_revenue_is_empty_without_financial_activity(
 ) -> None:
     clinic, *_ = await _create_context(db_session)
 
-    result = await AnalyticsRepository(db_session).get_patient_revenue(
-        clinic.id, MONTH
-    )
+    result = await AnalyticsRepository(db_session).get_patient_revenue(clinic.id, MONTH)
 
     assert result == []
 
@@ -444,9 +440,7 @@ async def test_patient_revenue_is_empty_when_clinic_has_no_patients(
     db_session.add(clinic)
     await db_session.flush()
 
-    result = await AnalyticsRepository(db_session).get_patient_revenue(
-        clinic.id, MONTH
-    )
+    result = await AnalyticsRepository(db_session).get_patient_revenue(clinic.id, MONTH)
 
     assert result == []
 
@@ -528,9 +522,7 @@ async def test_patient_revenue_aggregates_ranks_and_excludes_deleted_or_other_cl
             _payment(paid_invoice, Decimal("10.00"), MONTH.start),
             _payment(paid_invoice, Decimal("10.00"), MONTH.start),
             _payment(second_invoice, Decimal("5.00"), MONTH.start),
-            _payment(
-                collected_only_invoice, Decimal("15.00"), MONTH.start
-            ),
+            _payment(collected_only_invoice, Decimal("15.00"), MONTH.start),
             _payment(deleted_invoice, Decimal("900.00"), MONTH.start),
             _payment(deleted_patient_invoice, Decimal("700.00"), MONTH.start),
             _payment(other_clinic_invoice, Decimal("800.00"), MONTH.start),
@@ -577,9 +569,7 @@ async def test_patient_revenue_uses_independent_dates_and_half_open_boundaries(
     db_session: AsyncSession,
 ) -> None:
     clinic, _, _, _, _, patients, _ = await _create_context(db_session)
-    billed_at_start = _invoice(
-        clinic.id, patients[0].id, MONTH.start, Decimal("10.00")
-    )
+    billed_at_start = _invoice(clinic.id, patients[0].id, MONTH.start, Decimal("10.00"))
     billed_before_start = _invoice(
         clinic.id,
         patients[1].id,
@@ -594,9 +584,7 @@ async def test_patient_revenue_uses_independent_dates_and_half_open_boundaries(
         MONTH.end - timedelta(microseconds=1),
         Decimal("30.00"),
     )
-    billed_at_end = _invoice(
-        clinic.id, patients[3].id, MONTH.end, Decimal("40.00")
-    )
+    billed_at_end = _invoice(clinic.id, patients[3].id, MONTH.end, Decimal("40.00"))
     invoice_for_payments = _invoice(
         clinic.id,
         patients[4].id,
@@ -623,7 +611,11 @@ async def test_patient_revenue_uses_independent_dates_and_half_open_boundaries(
                 MONTH.start - timedelta(microseconds=1),
             ),
             _payment(billed_before_start, Decimal("5.00"), MONTH.start),
-            _payment(billed_before_end, Decimal("3.00"), MONTH.end - timedelta(microseconds=1)),
+            _payment(
+                billed_before_end,
+                Decimal("3.00"),
+                MONTH.end - timedelta(microseconds=1),
+            ),
             _payment(billed_at_end, Decimal("4.00"), MONTH.end),
             _payment(invoice_for_payments, Decimal("7.00"), MONTH.start),
             _payment(
@@ -635,9 +627,7 @@ async def test_patient_revenue_uses_independent_dates_and_half_open_boundaries(
     )
     await db_session.flush()
 
-    result = await AnalyticsRepository(db_session).get_patient_revenue(
-        clinic.id, MONTH
-    )
+    result = await AnalyticsRepository(db_session).get_patient_revenue(clinic.id, MONTH)
     by_patient_id = {patient.patient_id: patient for patient in result}
 
     assert by_patient_id[patients[0].id].billed_amount == Decimal("10.00")

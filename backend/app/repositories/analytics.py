@@ -212,9 +212,9 @@ class AnalyticsRepository:
         month_collected = (await self.session.scalar(month_collected_stmt)) or Decimal(
             "0.00"
         )
-        period_collected = (await self.session.scalar(period_collected_stmt)) or Decimal(
-            "0.00"
-        )
+        period_collected = (
+            await self.session.scalar(period_collected_stmt)
+        ) or Decimal("0.00")
         paid_count = (await self.session.scalar(paid_invoices_stmt)) or 0
         unpaid_count = (await self.session.scalar(unpaid_invoices_stmt)) or 0
         partial_count = (await self.session.scalar(partial_invoices_stmt)) or 0
@@ -308,9 +308,7 @@ class AnalyticsRepository:
                 billed_amount.label("billed_amount"),
                 collected_amount.label("collected_amount"),
             )
-            .outerjoin(
-                billed_by_patient, billed_by_patient.c.patient_id == Patient.id
-            )
+            .outerjoin(billed_by_patient, billed_by_patient.c.patient_id == Patient.id)
             .outerjoin(
                 collected_by_patient,
                 collected_by_patient.c.patient_id == Patient.id,

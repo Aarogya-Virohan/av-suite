@@ -35,7 +35,6 @@ class PaymentMethod(StrEnum):
     OTHER = "other"
 
 
-
 class PackageStatus(StrEnum):
     """Status of patient treatment packages."""
 
