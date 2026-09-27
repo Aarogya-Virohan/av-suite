@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.enums.analytics import AnalyticsPeriod
 from app.schemas.envelope import ResponseEnvelope
@@ -38,14 +38,51 @@ class AppointmentAnalytics(BaseModel):
 
 
 class RevenueAnalytics(BaseModel):
-    """Analytics metrics for clinic revenue and billing."""
+    """Financial analytics with billed and actually collected amounts separated."""
 
-    revenue_this_month: Decimal
-    revenue_in_period: Decimal
+    billed_amount_in_period: Decimal = Field(
+        description=(
+            "Sum of non-draft, non-cancelled invoice total_amount values whose "
+            "issue_date is within the selected UTC period [start, end)."
+        )
+    )
+    collected_amount_in_period: Decimal = Field(
+        description=(
+            "Sum of completed payment amounts whose payment_date is within the "
+            "selected UTC period [start, end), linked to a non-deleted invoice."
+        )
+    )
+    outstanding_amount: Decimal = Field(
+        description=(
+            "Current all-time outstanding invoice balance: total_amount minus "
+            "paid_amount for non-deleted invoices in issued, unpaid, partial, or "
+            "overdue status. This is a balance snapshot, not a period flow."
+        )
+    )
+    revenue_this_month: Decimal = Field(
+        deprecated=True,
+        description=(
+            "Compatibility alias for collected payment amounts whose payment_date "
+            "falls in the current UTC calendar month. Prefer explicit financial fields."
+        ),
+    )
+    revenue_in_period: Decimal = Field(
+        deprecated=True,
+        description=(
+            "Compatibility alias for collected_amount_in_period. Prefer explicit "
+            "financial fields."
+        ),
+    )
+
     paid_invoices_count: int
     unpaid_invoices_count: int
     partial_invoices_count: int
-    total_outstanding_amount: Decimal
+    total_outstanding_amount: Decimal = Field(
+        description=(
+            "Legacy alias for outstanding_amount; retains the all-time status-based "
+            "invoice balance calculation."
+        )
+    )
 
 
 class LeadAnalytics(BaseModel):

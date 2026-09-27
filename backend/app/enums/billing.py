@@ -15,6 +15,15 @@ class InvoiceStatus(StrEnum):
     OVERDUE = "overdue"
 
 
+class PaymentStatus(StrEnum):
+    """Lifecycle states for recorded payment transactions."""
+
+    PENDING = "pending"
+    COMPLETED = "completed"
+    VOIDED = "voided"
+    REFUNDED = "refunded"
+
+
 class PaymentMethod(StrEnum):
     """Payment channels supported for billing settlement."""
 

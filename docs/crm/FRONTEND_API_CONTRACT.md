@@ -612,6 +612,8 @@ Both endpoints accept the optional `period` query parameter: `today`, `week`, `m
 
 Responses include `meta.period`, `meta.start`, and `meta.end` for the selected UTC range. Additive `*_in_period` fields use that range. Existing explicitly named month/today/week fields retain their fixed meaning, and overview appointment status totals, invoice status totals, and other unperiodized totals remain all-time. Clinic and authenticated-therapist scopes are unchanged.
 
+Financial overview metrics distinguish invoiced amounts from collected payments. `billed_amount_in_period` sums `Invoice.total_amount` for non-deleted invoices not in `draft` or `cancelled` status, using `Invoice.issue_date` within the selected UTC range. `collected_amount_in_period` sums `Payment.amount` for `completed` payments, using `Payment.payment_date` within the selected UTC range; pending, voided, and refunded payments are excluded. Both are restricted to the authenticated clinic. `outstanding_amount` is a current balance snapshot (not a period flow): for non-deleted invoices in `issued`, `unpaid`, `partial`, or `overdue` status it sums `total_amount - paid_amount`, matching the existing billing balance rule. The existing invoice status counts and `total_outstanding_amount` remain all-time. Legacy `revenue_this_month` and `revenue_in_period` remain as deprecated aliases for collected payment totals. Amounts use the invoice/payment numeric unit; the project does not define a currency code.
+
 #### `GET /analytics/overview`
 - **Purpose**: Clinic-wide dashboard KPIs for the selected period.
 - **Query**: `period` (optional enum: `today`, `week`, `month`, `year`; default `month`).
@@ -640,6 +642,9 @@ Responses include `meta.period`, `meta.start`, and `meta.end` for the selected U
         "no_show_appointments": 2
       },
       "revenue": {
+        "billed_amount_in_period": 142000.0,
+        "collected_amount_in_period": 126000.0,
+        "outstanding_amount": 14500.0,
         "revenue_this_month": 126000.0,
         "revenue_in_period": 126000.0,
         "paid_invoices_count": 84,

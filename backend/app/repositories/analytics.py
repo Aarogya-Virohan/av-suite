@@ -8,12 +8,12 @@ from sqlalchemy import Row, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.appointment import AppointmentStatus
-from app.enums.billing import InvoiceStatus
+from app.enums.billing import InvoiceStatus, PaymentStatus
 from app.enums.booking import AppointmentRequestStatus
 from app.enums.lead import LeadStage
 from app.enums.patient import PatientStatus
 from app.models.appointment import Appointment
-from app.models.billing import Invoice
+from app.models.billing import Invoice, Payment
 from app.models.booking import AppointmentRequest
 from app.models.lead import Lead
 from app.models.patient import Patient
@@ -130,24 +130,54 @@ class AnalyticsRepository:
             no_show_appointments=no_show_appts,
         )
 
-    async def get_revenue_stats(
+    async def get_financial_stats(
         self, clinic_id: UUID, month: DateRange, period: DateRange
     ) -> RevenueAnalytics:
-        month_revenue_stmt = select(
-            func.coalesce(func.sum(Invoice.paid_amount), Decimal("0.00"))
-        ).where(
-            Invoice.clinic_id == clinic_id,
-            Invoice.issue_date >= month.start,
-            Invoice.issue_date < month.end,
-            Invoice.deleted_at.is_(None),
-        )
-        period_revenue_stmt = select(
-            func.coalesce(func.sum(Invoice.paid_amount), Decimal("0.00"))
+        billed_statuses = [
+            InvoiceStatus.UNPAID,
+            InvoiceStatus.PAID,
+            InvoiceStatus.PARTIAL,
+            InvoiceStatus.ISSUED,
+            InvoiceStatus.OVERDUE,
+        ]
+        outstanding_statuses = [
+            InvoiceStatus.UNPAID,
+            InvoiceStatus.PARTIAL,
+            InvoiceStatus.ISSUED,
+            InvoiceStatus.OVERDUE,
+        ]
+        period_billed_stmt = select(
+            func.coalesce(func.sum(Invoice.total_amount), Decimal("0.00"))
         ).where(
             Invoice.clinic_id == clinic_id,
             Invoice.issue_date >= period.start,
             Invoice.issue_date < period.end,
+            Invoice.status.in_(billed_statuses),
             Invoice.deleted_at.is_(None),
+        )
+        month_collected_stmt = (
+            select(func.coalesce(func.sum(Payment.amount), Decimal("0.00")))
+            .join(Invoice, Payment.invoice_id == Invoice.id)
+            .where(
+                Payment.clinic_id == clinic_id,
+                Payment.payment_date >= month.start,
+                Payment.payment_date < month.end,
+                Payment.status == PaymentStatus.COMPLETED,
+                Invoice.clinic_id == clinic_id,
+                Invoice.deleted_at.is_(None),
+            )
+        )
+        period_collected_stmt = (
+            select(func.coalesce(func.sum(Payment.amount), Decimal("0.00")))
+            .join(Invoice, Payment.invoice_id == Invoice.id)
+            .where(
+                Payment.clinic_id == clinic_id,
+                Payment.payment_date >= period.start,
+                Payment.payment_date < period.end,
+                Payment.status == PaymentStatus.COMPLETED,
+                Invoice.clinic_id == clinic_id,
+                Invoice.deleted_at.is_(None),
+            )
         )
         paid_invoices_stmt = select(func.count(Invoice.id)).where(
             Invoice.clinic_id == clinic_id,
@@ -170,21 +200,17 @@ class AnalyticsRepository:
             )
         ).where(
             Invoice.clinic_id == clinic_id,
-            Invoice.status.in_(
-                [
-                    InvoiceStatus.UNPAID,
-                    InvoiceStatus.PARTIAL,
-                    InvoiceStatus.ISSUED,
-                    InvoiceStatus.OVERDUE,
-                ]
-            ),
+            Invoice.status.in_(outstanding_statuses),
             Invoice.deleted_at.is_(None),
         )
 
-        month_revenue = (await self.session.scalar(month_revenue_stmt)) or Decimal(
+        period_billed = (await self.session.scalar(period_billed_stmt)) or Decimal(
             "0.00"
         )
-        period_revenue = (await self.session.scalar(period_revenue_stmt)) or Decimal(
+        month_collected = (await self.session.scalar(month_collected_stmt)) or Decimal(
+            "0.00"
+        )
+        period_collected = (await self.session.scalar(period_collected_stmt)) or Decimal(
             "0.00"
         )
         paid_count = (await self.session.scalar(paid_invoices_stmt)) or 0
@@ -195,8 +221,11 @@ class AnalyticsRepository:
         )
 
         return RevenueAnalytics(
-            revenue_this_month=Decimal(str(month_revenue)),
-            revenue_in_period=Decimal(str(period_revenue)),
+            billed_amount_in_period=Decimal(str(period_billed)),
+            collected_amount_in_period=Decimal(str(period_collected)),
+            outstanding_amount=Decimal(str(outstanding_amount)),
+            revenue_this_month=Decimal(str(month_collected)),
+            revenue_in_period=Decimal(str(period_collected)),
             paid_invoices_count=paid_count,
             unpaid_invoices_count=unpaid_count,
             partial_invoices_count=partial_count,

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDMixin
-from app.enums.billing import InvoiceStatus, PaymentMethod
+from app.enums.billing import InvoiceStatus, PaymentMethod, PaymentStatus
 from app.enums.package import PackageStatus
 from app.models.appointment import Appointment
 from app.models.clinic import Clinic
@@ -27,6 +27,12 @@ def _invoice_status_values(enum_cls: type[InvoiceStatus]) -> list[str]:
 
 def _payment_method_values(enum_cls: type[PaymentMethod]) -> list[str]:
     """Return database enum values for payment method."""
+
+    return [member.value for member in enum_cls]
+
+
+def _payment_status_values(enum_cls: type[PaymentStatus]) -> list[str]:
+    """Return database enum values for payment status."""
 
     return [member.value for member in enum_cls]
 
@@ -272,6 +278,16 @@ class Payment(UUIDMixin, TimestampMixin, Base):
             values_callable=_payment_method_values,
         ),
         nullable=False,
+    )
+    status: Mapped[PaymentStatus] = mapped_column(
+        Enum(
+            PaymentStatus,
+            name="payment_status",
+            values_callable=_payment_status_values,
+        ),
+        nullable=False,
+        default=PaymentStatus.COMPLETED,
+        server_default=text("'completed'"),
     )
     payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     transaction_reference: Mapped[str | None] = mapped_column(String(length=255), nullable=True)

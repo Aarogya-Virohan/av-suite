@@ -47,7 +47,7 @@ class AnalyticsService:
         )
 
         # 3. Revenue metrics
-        revenue_analytics = await repo.get_revenue_stats(
+        revenue_analytics = await repo.get_financial_stats(
             clinic_id, periods.this_month, selected_range
         )
 
