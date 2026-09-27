@@ -36,7 +36,7 @@ class AnalyticsRepository:
         self.session = session
 
     async def get_patient_stats(
-        self, clinic_id: UUID, month: DateRange
+        self, clinic_id: UUID, month: DateRange, period: DateRange
     ) -> PatientAnalytics:
         total_patients_stmt = select(func.count(Patient.id)).where(
             Patient.clinic_id == clinic_id, Patient.deleted_at.is_(None)
@@ -52,19 +52,33 @@ class AnalyticsRepository:
             Patient.created_at < month.end,
             Patient.deleted_at.is_(None),
         )
+        new_patients_period_stmt = select(func.count(Patient.id)).where(
+            Patient.clinic_id == clinic_id,
+            Patient.created_at >= period.start,
+            Patient.created_at < period.end,
+            Patient.deleted_at.is_(None),
+        )
 
         total_patients = (await self.session.scalar(total_patients_stmt)) or 0
         active_patients = (await self.session.scalar(active_patients_stmt)) or 0
         new_patients = (await self.session.scalar(new_patients_stmt)) or 0
+        new_patients_in_period = (
+            await self.session.scalar(new_patients_period_stmt)
+        ) or 0
 
         return PatientAnalytics(
             total_patients=total_patients,
             active_patients=active_patients,
             new_patients_this_month=new_patients,
+            new_patients_in_period=new_patients_in_period,
         )
 
     async def get_appointment_stats(
-        self, clinic_id: UUID, today: DateRange, this_week: DateRange
+        self,
+        clinic_id: UUID,
+        today: DateRange,
+        this_week: DateRange,
+        period: DateRange,
     ) -> AppointmentAnalytics:
         today_appt_stmt = select(func.count(Appointment.id)).where(
             Appointment.clinic_id == clinic_id,
@@ -76,6 +90,12 @@ class AnalyticsRepository:
             Appointment.clinic_id == clinic_id,
             Appointment.scheduled_at >= this_week.start,
             Appointment.scheduled_at < this_week.end,
+            Appointment.deleted_at.is_(None),
+        )
+        period_appt_stmt = select(func.count(Appointment.id)).where(
+            Appointment.clinic_id == clinic_id,
+            Appointment.scheduled_at >= period.start,
+            Appointment.scheduled_at < period.end,
             Appointment.deleted_at.is_(None),
         )
         completed_stmt = select(func.count(Appointment.id)).where(
@@ -96,6 +116,7 @@ class AnalyticsRepository:
 
         today_appts = (await self.session.scalar(today_appt_stmt)) or 0
         week_appts = (await self.session.scalar(week_appt_stmt)) or 0
+        period_appts = (await self.session.scalar(period_appt_stmt)) or 0
         completed_appts = (await self.session.scalar(completed_stmt)) or 0
         cancelled_appts = (await self.session.scalar(cancelled_stmt)) or 0
         no_show_appts = (await self.session.scalar(no_show_stmt)) or 0
@@ -103,13 +124,14 @@ class AnalyticsRepository:
         return AppointmentAnalytics(
             today_appointments=today_appts,
             this_week_appointments=week_appts,
+            appointments_in_period=period_appts,
             completed_appointments=completed_appts,
             cancelled_appointments=cancelled_appts,
             no_show_appointments=no_show_appts,
         )
 
     async def get_revenue_stats(
-        self, clinic_id: UUID, month: DateRange
+        self, clinic_id: UUID, month: DateRange, period: DateRange
     ) -> RevenueAnalytics:
         month_revenue_stmt = select(
             func.coalesce(func.sum(Invoice.paid_amount), Decimal("0.00"))
@@ -117,6 +139,14 @@ class AnalyticsRepository:
             Invoice.clinic_id == clinic_id,
             Invoice.issue_date >= month.start,
             Invoice.issue_date < month.end,
+            Invoice.deleted_at.is_(None),
+        )
+        period_revenue_stmt = select(
+            func.coalesce(func.sum(Invoice.paid_amount), Decimal("0.00"))
+        ).where(
+            Invoice.clinic_id == clinic_id,
+            Invoice.issue_date >= period.start,
+            Invoice.issue_date < period.end,
             Invoice.deleted_at.is_(None),
         )
         paid_invoices_stmt = select(func.count(Invoice.id)).where(
@@ -154,6 +184,9 @@ class AnalyticsRepository:
         month_revenue = (await self.session.scalar(month_revenue_stmt)) or Decimal(
             "0.00"
         )
+        period_revenue = (await self.session.scalar(period_revenue_stmt)) or Decimal(
+            "0.00"
+        )
         paid_count = (await self.session.scalar(paid_invoices_stmt)) or 0
         unpaid_count = (await self.session.scalar(unpaid_invoices_stmt)) or 0
         partial_count = (await self.session.scalar(partial_invoices_stmt)) or 0
@@ -163,6 +196,7 @@ class AnalyticsRepository:
 
         return RevenueAnalytics(
             revenue_this_month=Decimal(str(month_revenue)),
+            revenue_in_period=Decimal(str(period_revenue)),
             paid_invoices_count=paid_count,
             unpaid_invoices_count=unpaid_count,
             partial_invoices_count=partial_count,
@@ -225,7 +259,12 @@ class AnalyticsRepository:
         )
 
     async def get_therapist_performance(
-        self, clinic_id: UUID, therapist_id: UUID, month: DateRange, today: DateRange
+        self,
+        clinic_id: UUID,
+        therapist_id: UUID,
+        month: DateRange,
+        today: DateRange,
+        period: DateRange,
     ) -> TherapistPerformanceResponse:
         """
         Compute therapist-scoped performance metrics.
@@ -242,6 +281,13 @@ class AnalyticsRepository:
             Appointment.scheduled_at < today.end,
             Appointment.deleted_at.is_(None),
         )
+        period_appts_stmt = select(func.count(Appointment.id)).where(
+            Appointment.clinic_id == clinic_id,
+            Appointment.therapist_id == therapist_id,
+            Appointment.scheduled_at >= period.start,
+            Appointment.scheduled_at < period.end,
+            Appointment.deleted_at.is_(None),
+        )
 
         # Completed this month for this therapist
         completed_stmt = select(func.count(Appointment.id)).where(
@@ -250,6 +296,14 @@ class AnalyticsRepository:
             Appointment.status == AppointmentStatus.COMPLETED,
             Appointment.scheduled_at >= month.start,
             Appointment.scheduled_at < month.end,
+            Appointment.deleted_at.is_(None),
+        )
+        completed_period_stmt = select(func.count(Appointment.id)).where(
+            Appointment.clinic_id == clinic_id,
+            Appointment.therapist_id == therapist_id,
+            Appointment.status == AppointmentStatus.COMPLETED,
+            Appointment.scheduled_at >= period.start,
+            Appointment.scheduled_at < period.end,
             Appointment.deleted_at.is_(None),
         )
 
@@ -262,6 +316,14 @@ class AnalyticsRepository:
             Appointment.scheduled_at < month.end,
             Appointment.deleted_at.is_(None),
         )
+        cancelled_period_stmt = select(func.count(Appointment.id)).where(
+            Appointment.clinic_id == clinic_id,
+            Appointment.therapist_id == therapist_id,
+            Appointment.status == AppointmentStatus.CANCELLED,
+            Appointment.scheduled_at >= period.start,
+            Appointment.scheduled_at < period.end,
+            Appointment.deleted_at.is_(None),
+        )
 
         # Treatment sessions logged this month by this therapist
         sessions_stmt = select(func.count(TreatmentSession.id)).where(
@@ -270,6 +332,12 @@ class AnalyticsRepository:
             TreatmentSession.treatment_date >= month.start,
             TreatmentSession.treatment_date < month.end,
         )
+        sessions_period_stmt = select(func.count(TreatmentSession.id)).where(
+            TreatmentSession.clinic_id == clinic_id,
+            TreatmentSession.therapist_id == therapist_id,
+            TreatmentSession.treatment_date >= period.start,
+            TreatmentSession.treatment_date < period.end,
+        )
 
         # SOAP notes authored by this therapist this month
         soap_stmt = select(func.count(SoapAssessment.id)).where(
@@ -277,6 +345,12 @@ class AnalyticsRepository:
             SoapAssessment.therapist_id == therapist_id,
             SoapAssessment.created_at >= month.start,
             SoapAssessment.created_at < month.end,
+        )
+        soap_period_stmt = select(func.count(SoapAssessment.id)).where(
+            SoapAssessment.clinic_id == clinic_id,
+            SoapAssessment.therapist_id == therapist_id,
+            SoapAssessment.created_at >= period.start,
+            SoapAssessment.created_at < period.end,
         )
 
         # Distinct patients seen by this therapist this month
@@ -294,19 +368,47 @@ class AnalyticsRepository:
                 Patient.deleted_at.is_(None),
             )
         )
+        patients_seen_period_stmt = (
+            select(func.count(func.distinct(Appointment.patient_id)))
+            .join(Patient, Patient.id == Appointment.patient_id)
+            .where(
+                Appointment.clinic_id == clinic_id,
+                Appointment.therapist_id == therapist_id,
+                Appointment.status == AppointmentStatus.COMPLETED,
+                Appointment.scheduled_at >= period.start,
+                Appointment.scheduled_at < period.end,
+                Appointment.deleted_at.is_(None),
+                Patient.clinic_id == clinic_id,
+                Patient.deleted_at.is_(None),
+            )
+        )
 
         today_appts = (await self.session.scalar(today_appts_stmt)) or 0
+        period_appts = (await self.session.scalar(period_appts_stmt)) or 0
         completed = (await self.session.scalar(completed_stmt)) or 0
+        completed_period = (await self.session.scalar(completed_period_stmt)) or 0
         cancelled = (await self.session.scalar(cancelled_stmt)) or 0
+        cancelled_period = (await self.session.scalar(cancelled_period_stmt)) or 0
         sessions = (await self.session.scalar(sessions_stmt)) or 0
+        sessions_period = (await self.session.scalar(sessions_period_stmt)) or 0
         soap_notes = (await self.session.scalar(soap_stmt)) or 0
+        soap_notes_period = (await self.session.scalar(soap_period_stmt)) or 0
         patients_seen = (await self.session.scalar(patients_seen_stmt)) or 0
+        patients_seen_period = (
+            await self.session.scalar(patients_seen_period_stmt)
+        ) or 0
 
         return TherapistPerformanceResponse(
             today_appointments=today_appts,
+            appointments_in_period=period_appts,
             completed_appointments_this_month=completed,
+            completed_appointments_in_period=completed_period,
             cancelled_appointments_this_month=cancelled,
+            cancelled_appointments_in_period=cancelled_period,
             treatment_sessions_this_month=sessions,
+            treatment_sessions_in_period=sessions_period,
             soap_notes_this_month=soap_notes,
+            soap_notes_in_period=soap_notes_period,
             patients_seen_this_month=patients_seen,
+            patients_seen_in_period=patients_seen_period,
         )

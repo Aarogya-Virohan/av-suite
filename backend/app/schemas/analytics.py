@@ -1,8 +1,20 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
+
+from app.enums.analytics import AnalyticsPeriod
+from app.schemas.envelope import ResponseEnvelope
+
+
+class AnalyticsPeriodMetadata(BaseModel):
+    """Selected UTC calendar range; ``start`` is inclusive and ``end`` exclusive."""
+
+    period: AnalyticsPeriod
+    start: datetime
+    end: datetime
 
 
 class PatientAnalytics(BaseModel):
@@ -11,6 +23,7 @@ class PatientAnalytics(BaseModel):
     total_patients: int
     active_patients: int
     new_patients_this_month: int
+    new_patients_in_period: int
 
 
 class AppointmentAnalytics(BaseModel):
@@ -18,6 +31,7 @@ class AppointmentAnalytics(BaseModel):
 
     today_appointments: int
     this_week_appointments: int
+    appointments_in_period: int
     completed_appointments: int
     cancelled_appointments: int
     no_show_appointments: int
@@ -27,6 +41,7 @@ class RevenueAnalytics(BaseModel):
     """Analytics metrics for clinic revenue and billing."""
 
     revenue_this_month: Decimal
+    revenue_in_period: Decimal
     paid_invoices_count: int
     unpaid_invoices_count: int
     partial_invoices_count: int
@@ -59,6 +74,12 @@ class AnalyticsOverviewResponse(BaseModel):
     booking: BookingAnalytics
 
 
+class AnalyticsOverviewEnvelope(ResponseEnvelope[AnalyticsOverviewResponse]):
+    """Overview envelope with metadata describing the selected report period."""
+
+    meta: AnalyticsPeriodMetadata
+
+
 class TherapistPerformanceResponse(BaseModel):
     """
     Therapist-scoped performance metrics for /analytics/my-performance.
@@ -70,14 +91,26 @@ class TherapistPerformanceResponse(BaseModel):
 
     # Appointment counts (scoped to this therapist)
     today_appointments: int
+    appointments_in_period: int
     completed_appointments_this_month: int
+    completed_appointments_in_period: int
     cancelled_appointments_this_month: int
+    cancelled_appointments_in_period: int
 
     # Treatment sessions logged by this therapist this month
     treatment_sessions_this_month: int
+    treatment_sessions_in_period: int
 
     # SOAP notes authored by this therapist
     soap_notes_this_month: int
+    soap_notes_in_period: int
 
     # Patient count assigned to this therapist (via appointments this month)
     patients_seen_this_month: int
+    patients_seen_in_period: int
+
+
+class TherapistPerformanceEnvelope(ResponseEnvelope[TherapistPerformanceResponse]):
+    """Therapist performance envelope with selected-period metadata."""
+
+    meta: AnalyticsPeriodMetadata

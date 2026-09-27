@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -14,9 +14,12 @@ from app.core.dependencies import (
 from app.enums.permission import CapabilityScope
 from app.models.clinic import Clinic
 from app.models.user import User
-from app.schemas.analytics import AnalyticsOverviewResponse, TherapistPerformanceResponse
+from app.enums.analytics import AnalyticsPeriod
+from app.schemas.analytics import (
+    AnalyticsOverviewEnvelope,
+    TherapistPerformanceEnvelope,
+)
 from app.services.analytics import AnalyticsService
-from app.schemas.envelope import ResponseEnvelope
 
 router = APIRouter()
 
@@ -34,32 +37,56 @@ CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
 
-@router.get("/analytics/overview", response_model=ResponseEnvelope[AnalyticsOverviewResponse])
+@router.get(
+    "/analytics/overview",
+    response_model=AnalyticsOverviewEnvelope,
+)
 async def get_analytics_overview(
     clinic: CurrentClinicDep,
     service: AnalyticsServiceDep,
-    _scope: CapabilityScope = Depends(require_capability("analytics.clinic_financials")),
-) -> ResponseEnvelope[AnalyticsOverviewResponse]:
+    period: AnalyticsPeriod = Query(
+        default=AnalyticsPeriod.MONTH,
+        description=(
+            "UTC calendar reporting period: today (current UTC day), week "
+            "(current Monday-based calendar week), month (current UTC calendar "
+            "month), or year (current UTC calendar year). The start is inclusive "
+            "and the end is exclusive. Defaults to month."
+        ),
+    ),
+    _scope: CapabilityScope = Depends(
+        require_capability("analytics.clinic_financials")
+    ),
+) -> AnalyticsOverviewEnvelope:
     """
     Retrieve clinic-wide analytics metrics.
     Requires analytics.clinic_financials capability.
     """
 
-    result = await service.get_overview(clinic.id)
-    return ResponseEnvelope(data=result)
+    return await service.get_overview(clinic.id, period)
 
 
-@router.get("/analytics/my-performance", response_model=ResponseEnvelope[TherapistPerformanceResponse])
+@router.get(
+    "/analytics/my-performance",
+    response_model=TherapistPerformanceEnvelope,
+)
 async def get_my_performance(
     clinic: CurrentClinicDep,
     current_user: CurrentUserDep,
     service: AnalyticsServiceDep,
+    period: AnalyticsPeriod = Query(
+        default=AnalyticsPeriod.MONTH,
+        description=(
+            "UTC calendar reporting period: today (current UTC day), week "
+            "(current Monday-based calendar week), month (current UTC calendar "
+            "month), or year (current UTC calendar year). The start is inclusive "
+            "and the end is exclusive. Defaults to month."
+        ),
+    ),
     _scope: CapabilityScope = Depends(require_capability("analytics.my_performance")),
-) -> ResponseEnvelope[TherapistPerformanceResponse]:
+) -> TherapistPerformanceEnvelope:
     """
     Retrieve therapist-scoped performance metrics.
     Requires analytics.my_performance capability.
     """
 
-    result = await service.get_my_performance(clinic.id, current_user.id)
-    return ResponseEnvelope(data=result)
+    return await service.get_my_performance(clinic.id, current_user.id, period)

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from app.enums.analytics import AnalyticsPeriod
+
 
 @dataclass(frozen=True)
 class DateRange:
@@ -20,6 +22,16 @@ class AnalyticsPeriods:
     this_week: DateRange
     this_month: DateRange
     this_year: DateRange
+
+    def for_period(self, period: AnalyticsPeriod) -> DateRange:
+        """Return the shared UTC date range selected by the API period value."""
+
+        return {
+            AnalyticsPeriod.TODAY: self.today,
+            AnalyticsPeriod.WEEK: self.this_week,
+            AnalyticsPeriod.MONTH: self.this_month,
+            AnalyticsPeriod.YEAR: self.this_year,
+        }[period]
 
     @classmethod
     def containing(cls, now: datetime) -> AnalyticsPeriods:

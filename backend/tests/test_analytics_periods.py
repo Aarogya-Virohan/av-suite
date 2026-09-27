@@ -4,10 +4,14 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
 
+from httpx import AsyncClient
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.enums.appointment import AppointmentStatus
+from app.enums.analytics import AnalyticsPeriod
 from app.enums.billing import InvoiceStatus
 from app.enums.shared import Specialty
 from app.enums.user import UserRole
@@ -18,12 +22,25 @@ from app.models.patient import Patient
 from app.models.treatment import SoapAssessment, TreatmentSession
 from app.models.user import User
 from app.repositories.analytics import AnalyticsRepository
+from app.services import analytics as analytics_service_module
 from app.utils.analytics_periods import AnalyticsPeriods
+from app.main import app
 
 UTC = timezone.utc
+FROZEN_NOW = datetime(2024, 3, 6, 12, tzinfo=UTC)
 MONTH = AnalyticsPeriods.containing(datetime(2024, 3, 6, 12, tzinfo=UTC)).this_month
 TODAY = AnalyticsPeriods.containing(datetime(2024, 3, 6, 12, tzinfo=UTC)).today
 WEEK = AnalyticsPeriods.containing(datetime(2024, 3, 6, 12, tzinfo=UTC)).this_week
+
+
+class FrozenDateTime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return (
+            FROZEN_NOW.astimezone(tz)
+            if tz is not None
+            else FROZEN_NOW.replace(tzinfo=None)
+        )
 
 
 def test_analytics_periods_are_utc_calendar_ranges() -> None:
@@ -196,9 +213,11 @@ async def test_overview_uses_today_week_and_month_ranges_and_clinic_scope(
     await db_session.flush()
 
     repository = AnalyticsRepository(db_session)
-    appointments_result = await repository.get_appointment_stats(clinic.id, TODAY, WEEK)
-    patients_result = await repository.get_patient_stats(clinic.id, MONTH)
-    revenue_result = await repository.get_revenue_stats(clinic.id, MONTH)
+    appointments_result = await repository.get_appointment_stats(
+        clinic.id, TODAY, WEEK, MONTH
+    )
+    patients_result = await repository.get_patient_stats(clinic.id, MONTH, MONTH)
+    revenue_result = await repository.get_revenue_stats(clinic.id, MONTH, MONTH)
 
     assert appointments_result.today_appointments == 1
     assert appointments_result.this_week_appointments == 4
@@ -363,7 +382,7 @@ async def test_personal_month_metrics_are_bounded_and_scoped(
     await db_session.flush()
 
     result = await AnalyticsRepository(db_session).get_therapist_performance(
-        clinic.id, therapist.id, MONTH, TODAY
+        clinic.id, therapist.id, MONTH, TODAY, MONTH
     )
 
     assert result.today_appointments == 1
@@ -372,3 +391,245 @@ async def test_personal_month_metrics_are_bounded_and_scoped(
     assert result.treatment_sessions_this_month == 1
     assert result.soap_notes_this_month == 1
     assert result.patients_seen_this_month == 1
+
+
+@pytest.mark.asyncio
+async def test_analytics_api_period_contract_and_scoping(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(analytics_service_module, "datetime", FrozenDateTime)
+
+    clinic = await db_session.scalar(
+        select(Clinic).where(Clinic.name == "Aarogya Seeded Test Clinic")
+    )
+    admin = await db_session.scalar(
+        select(User).where(User.email == "admin@avtest.com")
+    )
+    other_therapist = await db_session.scalar(
+        select(User).where(User.email == "therapist@avtest.com")
+    )
+    assert clinic is not None and admin is not None and other_therapist is not None
+
+    other_clinic = Clinic(name=f"Analytics API clinic {uuid4()}")
+    db_session.add(other_clinic)
+    await db_session.flush()
+    outside_user = User(
+        clinic_id=other_clinic.id,
+        email=f"outside-{uuid4()}@analytics.test",
+        password_hash="not-used",
+        role=UserRole.THERAPIST,
+        first_name="Outside",
+        last_name="Therapist",
+    )
+    db_session.add(outside_user)
+    await db_session.flush()
+
+    event_dates = [
+        datetime(2024, 1, 1, 0, tzinfo=UTC),
+        datetime(2024, 3, 1, 0, tzinfo=UTC),
+        datetime(2024, 3, 4, 0, tzinfo=UTC),
+        datetime(2024, 3, 6, 0, tzinfo=UTC),
+        datetime(2024, 3, 7, 0, tzinfo=UTC),
+        datetime(2024, 3, 11, 0, tzinfo=UTC),
+        datetime(2024, 4, 1, 0, tzinfo=UTC),
+        datetime(2025, 1, 1, 0, tzinfo=UTC),
+        datetime(2023, 12, 31, 12, tzinfo=UTC),
+    ]
+    patients = [
+        Patient(
+            clinic_id=clinic.id,
+            first_name=f"API{i}",
+            last_name="Patient",
+            created_at=event_date,
+        )
+        for i, event_date in enumerate(event_dates)
+    ]
+    outside_patient = Patient(
+        clinic_id=other_clinic.id,
+        first_name="Outside",
+        last_name="Patient",
+        created_at=event_dates[3],
+    )
+    db_session.add_all([*patients, outside_patient])
+    await db_session.flush()
+
+    appointments = [
+        _appointment(
+            clinic.id,
+            admin.id,
+            patient.id,
+            event_date,
+            (
+                AppointmentStatus.CANCELLED
+                if index == 2
+                else (
+                    AppointmentStatus.COMPLETED
+                    if index == 3
+                    else AppointmentStatus.SCHEDULED
+                )
+            ),
+        )
+        for index, (patient, event_date) in enumerate(zip(patients, event_dates))
+    ]
+    appointments.extend(
+        [
+            _appointment(
+                clinic.id,
+                other_therapist.id,
+                patients[3].id,
+                event_dates[3],
+                AppointmentStatus.COMPLETED,
+            ),
+            _appointment(
+                other_clinic.id,
+                outside_user.id,
+                outside_patient.id,
+                event_dates[3],
+                AppointmentStatus.COMPLETED,
+            ),
+        ]
+    )
+    invoices = [
+        Invoice(
+            clinic_id=clinic.id,
+            patient_id=patient.id,
+            invoice_number=f"API-{uuid4()}",
+            issue_date=event_date,
+            subtotal=Decimal("100.00"),
+            total_amount=Decimal("100.00"),
+            paid_amount=Decimal("100.00"),
+            status=InvoiceStatus.PAID,
+        )
+        for patient, event_date in zip(patients, event_dates)
+    ]
+    outside_invoice = Invoice(
+        clinic_id=other_clinic.id,
+        patient_id=outside_patient.id,
+        invoice_number=f"API-{uuid4()}",
+        issue_date=event_dates[3],
+        subtotal=Decimal("900.00"),
+        total_amount=Decimal("900.00"),
+        paid_amount=Decimal("900.00"),
+        status=InvoiceStatus.PAID,
+    )
+    treatments = [
+        TreatmentSession(
+            clinic_id=clinic.id,
+            patient_id=patients[3].id,
+            therapist_id=admin.id,
+            treatment_date=event_dates[3],
+            treatment="Selected day",
+        ),
+        TreatmentSession(
+            clinic_id=clinic.id,
+            patient_id=patients[4].id,
+            therapist_id=admin.id,
+            treatment_date=event_dates[4],
+            treatment="At day end",
+        ),
+    ]
+    soap_notes = [
+        SoapAssessment(
+            clinic_id=clinic.id,
+            patient_id=patients[index].id,
+            therapist_id=admin.id,
+            specialty=Specialty.PHYSIOTHERAPY,
+            created_at=event_dates[index],
+            form_data={},
+        )
+        for index in (3, 4)
+    ]
+    db_session.add_all(
+        [*appointments, *invoices, outside_invoice, *treatments, *soap_notes]
+    )
+    await db_session.flush()
+
+    expected = {
+        AnalyticsPeriod.TODAY: (2, 1, Decimal("100.00")),
+        AnalyticsPeriod.WEEK: (4, 3, Decimal("300.00")),
+        AnalyticsPeriod.MONTH: (6, 5, Decimal("500.00")),
+        AnalyticsPeriod.YEAR: (8, 7, Decimal("700.00")),
+    }
+    for period, (appointment_count, patient_count, revenue) in expected.items():
+        response = await client.get(
+            f"{settings.API_V1_PREFIX}/analytics/overview?period={period.value}",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["meta"]["period"] == period.value
+        selected_range = AnalyticsPeriods.containing(FROZEN_NOW).for_period(period)
+        assert (
+            datetime.fromisoformat(payload["meta"]["start"].replace("Z", "+00:00"))
+            == selected_range.start
+        )
+        assert (
+            datetime.fromisoformat(payload["meta"]["end"].replace("Z", "+00:00"))
+            == selected_range.end
+        )
+        assert (
+            payload["data"]["appointments"]["appointments_in_period"]
+            == appointment_count
+        )
+        assert payload["data"]["patients"]["new_patients_in_period"] == patient_count
+        assert Decimal(str(payload["data"]["revenue"]["revenue_in_period"])) == revenue
+
+    default_response = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/overview", headers=auth_headers
+    )
+    default_payload = default_response.json()
+    assert default_payload["meta"]["period"] == AnalyticsPeriod.MONTH.value
+    assert default_payload["data"]["patients"]["new_patients_this_month"] == 5
+    assert default_payload["data"]["patients"]["new_patients_in_period"] == 5
+    assert default_payload["data"]["revenue"]["revenue_this_month"] == "500.00"
+    assert default_payload["data"]["revenue"]["revenue_in_period"] == "500.00"
+
+    today_performance = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/my-performance?period=today",
+        headers=auth_headers,
+    )
+    month_performance = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/my-performance?period=month",
+        headers=auth_headers,
+    )
+    assert today_performance.status_code == month_performance.status_code == 200
+    today_data = today_performance.json()["data"]
+    month_data = month_performance.json()["data"]
+    assert today_performance.json()["meta"]["period"] == "today"
+    assert today_data["appointments_in_period"] == 1
+    assert today_data["completed_appointments_in_period"] == 1
+    assert today_data["treatment_sessions_in_period"] == 1
+    assert today_data["soap_notes_in_period"] == 1
+    assert today_data["patients_seen_in_period"] == 1
+    assert month_performance.json()["meta"]["period"] == "month"
+    assert month_data["appointments_in_period"] == 5
+    assert month_data["completed_appointments_in_period"] == 1
+    assert month_data["cancelled_appointments_in_period"] == 1
+    assert month_data["treatment_sessions_in_period"] == 2
+    assert month_data["soap_notes_in_period"] == 2
+    assert month_data["patients_seen_in_period"] == 1
+
+    invalid_response = await client.get(
+        f"{settings.API_V1_PREFIX}/analytics/overview?period=decade",
+        headers=auth_headers,
+    )
+    assert invalid_response.status_code == 422
+
+    openapi = app.openapi()
+    overview_parameters = openapi["paths"]["/api/v1/analytics/overview"]["get"][
+        "parameters"
+    ]
+    period_parameter = next(
+        item for item in overview_parameters if item["name"] == "period"
+    )
+    period_schema_ref = period_parameter["schema"]["$ref"].rsplit("/", 1)[-1]
+    assert openapi["components"]["schemas"][period_schema_ref]["enum"] == [
+        "today",
+        "week",
+        "month",
+        "year",
+    ]
+    assert period_parameter["schema"]["default"] == "month"
