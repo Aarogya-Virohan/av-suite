@@ -7,16 +7,28 @@ import { useAnalyticsOverview, useMyPerformance } from '../../../features/analyt
 import { useAppointments } from '../../../features/appointments/api';
 import { useLeads } from '../../../features/leads/api';
 import { usePatients } from '../../../features/patients/api';
+import { useAuthStore } from '../../../store';
 import { canAccessModule, hasCapability } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { formatMoney } from '../../../lib/money';
 
 export default function DashboardPage() {
-  const canViewFinancials = hasCapability('analytics.clinic_financials');
-  const canViewMyPerf = hasCapability('analytics.my_performance');
-  const canViewAppts = hasCapability('appointments.view');
-  const canViewLeads = hasCapability('leads.view');
-  const canViewPatients = hasCapability('patients.view');
+  const capabilities = useAuthStore((state) => state.capabilities);
+  const canViewFinancials =
+    Object.prototype.hasOwnProperty.call(capabilities, 'analytics.clinic_financials') &&
+    hasCapability('analytics.clinic_financials');
+  const canViewMyPerf =
+    Object.prototype.hasOwnProperty.call(capabilities, 'analytics.my_performance') &&
+    hasCapability('analytics.my_performance');
+  const canViewAppts =
+    Object.prototype.hasOwnProperty.call(capabilities, 'appointments.view') &&
+    hasCapability('appointments.view');
+  const canViewLeads =
+    Object.prototype.hasOwnProperty.call(capabilities, 'leads.view') &&
+    hasCapability('leads.view');
+  const canViewPatients =
+    Object.prototype.hasOwnProperty.call(capabilities, 'patients.view') &&
+    hasCapability('patients.view');
 
   const hasAnyDashboardView = canViewFinancials || canViewMyPerf || canViewAppts || canViewLeads || canViewPatients;
 

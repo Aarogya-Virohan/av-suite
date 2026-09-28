@@ -6,15 +6,21 @@ import { useAnalyticsOverview, useMyPerformance } from '../../../features/analyt
 import { ActivitySquare, Stethoscope, ClipboardList, TrendingUp, Users, Calendar, DollarSign, ArrowDownRight } from 'lucide-react';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { formatMoney } from '../../../lib/money';
+import { useAuthStore } from '../../../store';
 import type { AnalyticsPeriod, PatientRevenueSort } from '../../../types/api';
 import { canAccessModule, hasCapability } from '../../../config/permissions';
 
 export default function AnalyticsPage() {
+  const capabilities = useAuthStore((state) => state.capabilities);
   const [period, setPeriod] = useState<AnalyticsPeriod>('month');
   const [patientRevenueSort, setPatientRevenueSort] = useState<PatientRevenueSort>('collected_amount');
 
-  const canViewFinancials = hasCapability('analytics.clinic_financials');
-  const canViewMyPerf = hasCapability('analytics.my_performance');
+  const clinicFinancialsKeyPresent = Object.prototype.hasOwnProperty.call(capabilities, 'analytics.clinic_financials');
+  const myPerformanceKeyPresent = Object.prototype.hasOwnProperty.call(capabilities, 'analytics.my_performance');
+  const canViewFinancials =
+    clinicFinancialsKeyPresent && hasCapability('analytics.clinic_financials');
+  const canViewMyPerf =
+    myPerformanceKeyPresent && hasCapability('analytics.my_performance');
 
   const { data: performanceEnvelope, isLoading: myPerfLoading, isError: myPerfError } =
     useMyPerformance(period, canViewMyPerf && !canViewFinancials);

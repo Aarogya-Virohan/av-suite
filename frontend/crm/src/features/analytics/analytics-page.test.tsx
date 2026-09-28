@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AnalyticsPage from '../../app/(dashboard)/analytics/page';
 import { apiClient } from '../../lib/api-client';
 import { canAccessModule, hasCapability } from '../../config/permissions';
+import { useAuthStore } from '../../store';
 import { analyticsKeys } from './api';
 import type {
   AnalyticsOverviewEnvelope,
@@ -115,6 +116,12 @@ function renderPage() {
 function allowClinicAnalytics() {
   mockedCanAccessModule.mockReturnValue(true);
   mockedHasCapability.mockImplementation((capability) => capability === 'analytics.clinic_financials');
+  useAuthStore.setState({
+    capabilities: {
+      'analytics.clinic_financials': 'all',
+      'analytics.my_performance': 'all',
+    },
+  });
 }
 
 describe('AnalyticsPage API integration', () => {
@@ -140,6 +147,29 @@ describe('AnalyticsPage API integration', () => {
       },
     });
     expect(screen.getByRole('button', { name: 'month' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('waits for the analytics capability to hydrate before requesting, then reacts to it', async () => {
+    useAuthStore.setState({ capabilities: {} });
+    renderPage();
+
+    expect(mockedGet).not.toHaveBeenCalled();
+
+    useAuthStore.setState({
+      capabilities: {
+        'analytics.clinic_financials': 'all',
+        'analytics.my_performance': 'all',
+      },
+    });
+
+    expect((await screen.findAllByText('₹1,250.50')).length).toBeGreaterThan(0);
+    expect(mockedGet).toHaveBeenCalledWith('/analytics/overview', {
+      params: {
+        period: 'month',
+        patient_revenue_sort: 'collected_amount',
+        patient_revenue_limit: 5,
+      },
+    });
   });
 
   it.each(['today', 'week', 'month', 'year'] as const)(
@@ -240,6 +270,7 @@ describe('AnalyticsPage API integration', () => {
   it('preserves permission-based access restrictions', () => {
     mockedCanAccessModule.mockReturnValue(false);
     mockedHasCapability.mockReturnValue(false);
+    useAuthStore.setState({ capabilities: {} });
     renderPage();
 
     expect(screen.getByText('Analytics access is restricted for your role.')).toBeTruthy();
