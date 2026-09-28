@@ -51,7 +51,9 @@ class LeadService:
 
         lead_data = payload.model_dump()
         lead_data["clinic_id"] = clinic_id
-        return await self.lead_repository.create(lead_data)
+        lead = await self.lead_repository.create(lead_data)
+        await self.lead_repository.session.commit()
+        return lead
 
     async def get_lead(self, clinic_id: UUID, lead_id: UUID) -> Lead:
         """Retrieve a lead ensuring clinic scoping."""
@@ -100,7 +102,9 @@ class LeadService:
         if not update_data:
             return lead
 
-        return await self.lead_repository.update(lead, update_data)
+        updated = await self.lead_repository.update(lead, update_data)
+        await self.lead_repository.session.commit()
+        return updated
 
     async def convert_lead_to_patient(self, clinic_id: UUID, lead_id: UUID) -> tuple[Lead, Patient]:
         """Convert a lead into an active patient record in the service layer."""
@@ -124,6 +128,7 @@ class LeadService:
                 "converted_patient_id": patient.id,
             },
         )
+        await self.lead_repository.session.commit()
 
         return updated_lead, patient
 
@@ -132,3 +137,4 @@ class LeadService:
 
         lead = await self.get_lead(clinic_id, lead_id)
         await self.lead_repository.delete(lead)
+        await self.lead_repository.session.commit()

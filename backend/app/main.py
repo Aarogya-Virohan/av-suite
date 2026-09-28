@@ -26,6 +26,7 @@ Configuration Sources:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.rbac import validate_role_templates
 from app.middleware.clinic_gate import ClinicGateMiddleware
 from app.api.v1.router import api_router
 from app.api.v1.posture import router as posture_router
@@ -33,9 +34,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+validate_role_templates()
+
+
 # FastAPI Application Instance
 # Title aur version OpenAPI documentation mein display hote hain
 # Swagger UI: http://localhost:8000/docs
+from app.exceptions import BaseAppException, app_exception_handler
+
 app = FastAPI(
     title="AV Suite Backend Foundation",
     version="0.1.0",
@@ -43,6 +49,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Register central exception handler for custom application errors
+app.add_exception_handler(BaseAppException, app_exception_handler)
 
 import os
 

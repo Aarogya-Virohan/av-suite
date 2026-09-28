@@ -58,7 +58,9 @@ class AppointmentService:
 
         obj_in = payload.model_dump()
         obj_in["clinic_id"] = clinic_id
-        return await self.appointment_repository.create(obj_in)
+        appointment = await self.appointment_repository.create(obj_in)
+        await self.appointment_repository.session.commit()
+        return appointment
 
     async def get_appointment(self, clinic_id: UUID, appointment_id: UUID) -> Appointment:
         """Retrieve an appointment by ID ensuring strict clinic scoping."""
@@ -128,10 +130,14 @@ class AppointmentService:
         if not update_data:
             return appointment
 
-        return await self.appointment_repository.update(appointment, update_data)
+        updated = await self.appointment_repository.update(appointment, update_data)
+        await self.appointment_repository.session.commit()
+        return updated
 
     async def soft_cancel(self, clinic_id: UUID, appointment_id: UUID) -> Appointment:
         """Soft-cancel an appointment for a clinic."""
 
         appointment = await self.get_appointment(clinic_id, appointment_id)
-        return await self.appointment_repository.soft_cancel(appointment)
+        canceled = await self.appointment_repository.soft_cancel(appointment)
+        await self.appointment_repository.session.commit()
+        return canceled

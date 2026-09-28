@@ -9,7 +9,11 @@ from app.models.prescription import Prescription
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
 from app.repositories.prescription import PrescriptionRepository
 from app.utils.whatsapp import build_whatsapp_link
-from weasyprint import HTML
+
+try:
+    from weasyprint import HTML
+except (ImportError, OSError):
+    HTML = None
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +63,7 @@ async def get_prescription_by_id(
 async def get_prescriptions(
     db: AsyncSession,
     clinic_id: uuid.UUID,
+    physio_id: Optional[uuid.UUID] = None,
     patient_id: Optional[uuid.UUID] = None,
     search: Optional[str] = None,
     page: int = 1,
@@ -72,7 +77,7 @@ async def get_prescriptions(
 
         repo = PrescriptionRepository(db)
         return await repo.get_prescriptions(
-            clinic_id, patient_id, search, page, page_size
+            clinic_id, physio_id, patient_id, search, page, page_size
         )
     except Exception as e:
         logger.error(f"Error listing prescriptions: {str(e)}")
@@ -470,6 +475,10 @@ async def generate_prescription_pdf(
         """
 
         # Generate PDF using WeasyPrint
+        if HTML is None:
+            raise RuntimeError(
+                "PDF generation requires WeasyPrint and native GTK/Pango libraries to be installed on the system."
+            )
         HTML(string=html_content).write_pdf(pdf_path)
 
         # Save pdf key back to the database

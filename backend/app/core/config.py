@@ -44,9 +44,12 @@ class Settings(BaseSettings):
     
     # CORS Configuration
     # CORS (Cross-Origin Resource Sharing) frontend requests ko allow karta hai
-    # Multiple origins comma-separated format mein define ho sakte hain
+    # Multiple origins comma-separated format mein define ho sakte hain (e.g. via .env)
     # Security important: only trusted origins ko allow karo
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+    
+    # Cloudflare Turnstile Configuration (Optional)
+    TURNSTILE_SECRET_KEY: str | None = None
     
     # Database Configuration
     # DATABASE_URL: PostgreSQL async connection string
@@ -54,6 +57,7 @@ class Settings(BaseSettings):
     # Supabase Session Pooler use karta hai IPv4 compatibility ke liye
     # Yeh required field hai - .env mein must set hona chahiye
     DATABASE_URL: str
+    TEST_DATABASE_URL: str | None = None
     
     # JWT (JSON Web Token) Configuration
     # JWT authentication stateless authentication provide karta hai
@@ -66,15 +70,20 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     
     # JWT_EXPIRE_MINUTES: Token validity period
-    # 1440 = 24 hours (default)
+    # 15 = 15 minutes (default for short-lived access tokens)
     # Shorter period = better security, longer period = better UX
-    JWT_EXPIRE_MINUTES: int = 1440
+    JWT_EXPIRE_MINUTES: int = 15
     
     # Redis Configuration (Optional)
     # Redis caching aur session management ke liye use hota hai
     # Default: localhost:6379 (local development ke liye)
     # Production mein proper Redis instance use karo
     REDIS_URL: str = "redis://localhost:6379"
+    
+    # Supabase Configuration
+    SUPABASE_URL: str
+    SUPABASE_SECRET_KEY: str
+    SUPABASE_BUCKET_NAME: str = "documents"
 
     # Pydantic Model Configuration
     # Configuration dikhaata hai Pydantic ko kaise settings load karne hain

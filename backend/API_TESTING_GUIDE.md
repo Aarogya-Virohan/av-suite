@@ -25,7 +25,7 @@
 
 ```bash
 # Terminal 1: Navigate to backend directory
-cd /home/shit/DFQ/av-suite/backend
+cd /home/tarun/projects/av-suite/backend
 
 # Start development server
 python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -76,22 +76,20 @@ touch /tmp/test_tokens.txt
 ```bash
 # Test Data
 CLINIC_NAME="Test Clinic Delhi"
-CLINIC_EMAIL="admin@testclinic.com"
-CLINIC_PHONE="9876543210"
-ADMIN_EMAIL="admin@testclinic.com"
-ADMIN_PASSWORD="AdminTest@123"
-ADMIN_NAME="Amit Kumar"
+EMAIL="admin@testclinic.com"
+PASSWORD="AdminTest@123"
+FIRST_NAME="Amit"
+LAST_NAME="Kumar"
 
 # cURL Command
 curl -X POST http://localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "clinic_name": "'"$CLINIC_NAME"'",
-    "clinic_email": "'"$CLINIC_EMAIL"'",
-    "clinic_phone": "'"$CLINIC_PHONE"'",
-    "admin_email": "'"$ADMIN_EMAIL"'",
-    "admin_password": "'"$ADMIN_PASSWORD"'",
-    "admin_name": "'"$ADMIN_NAME"'"
+    "email": "'"$EMAIL"'",
+    "password": "'"$PASSWORD"'",
+    "first_name": "'"$FIRST_NAME"'",
+    "last_name": "'"$LAST_NAME"'"
   }'
 ```
 
@@ -232,12 +230,11 @@ echo "Clinic ID: $CLINIC_ID"
 # Test Data
 PATIENT_FIRST_NAME="Rajesh"
 PATIENT_LAST_NAME="Verma"
-PATIENT_EMAIL="rajesh@example.com"
 PATIENT_PHONE="9123456789"
 PATIENT_DOB="1990-05-15"
 PATIENT_GENDER="male"
-PATIENT_HEIGHT=180
-PATIENT_WEIGHT=75
+PATIENT_STATUS="active"
+PATIENT_CHIEF_COMPLAINT="Lower back pain"
 
 # cURL Command
 curl -X POST http://localhost:8000/api/v1/patients \
@@ -246,12 +243,11 @@ curl -X POST http://localhost:8000/api/v1/patients \
   -d '{
     "first_name": "'"$PATIENT_FIRST_NAME"'",
     "last_name": "'"$PATIENT_LAST_NAME"'",
-    "email": "'"$PATIENT_EMAIL"'",
     "phone": "'"$PATIENT_PHONE"'",
     "date_of_birth": "'"$PATIENT_DOB"'",
     "gender": "'"$PATIENT_GENDER"'",
-    "height_cm": '"$PATIENT_HEIGHT"',
-    "weight_kg": '"$PATIENT_WEIGHT"'
+    "status": "'"$PATIENT_STATUS"'",
+    "chief_complaint": "'"$PATIENT_CHIEF_COMPLAINT"'"
   }'
 ```
 
@@ -262,12 +258,11 @@ curl -X POST http://localhost:8000/api/v1/patients \
   "clinic_id": "uuid-from-token",
   "first_name": "Rajesh",
   "last_name": "Verma",
-  "email": "rajesh@example.com",
   "phone": "9123456789",
   "date_of_birth": "1990-05-15",
   "gender": "male",
-  "height_cm": 180,
-  "weight_kg": 75,
+  "status": "active",
+  "chief_complaint": "Lower back pain",
   "created_at": "2026-05-18T08:10:13",
   "updated_at": "2026-05-18T08:10:13"
 }
@@ -351,12 +346,11 @@ curl -X GET "http://localhost:8000/api/v1/patients/$PATIENT_ID" \
   "clinic_id": "uuid-from-token",
   "first_name": "Rajesh",
   "last_name": "Verma",
-  "email": "rajesh@example.com",
   "phone": "9123456789",
   "date_of_birth": "1990-05-15",
   "gender": "male",
-  "height_cm": 180,
-  "weight_kg": 75,
+  "status": "active",
+  "chief_complaint": "Lower back pain",
   "created_at": "2026-05-18T08:10:13",
   "updated_at": "2026-05-18T08:10:13"
 }
@@ -501,15 +495,12 @@ curl -X GET "http://localhost:8000/api/v1/exercises" \
   "data": [
     {
       "id": "uuid-here",
-      "clinic_id": "null",
-      "name": "Neck Rotation",
+      "clinic_id": null,
+      "title": "Neck Rotation",
       "body_part": "neck",
       "description": "Rotate head slowly in circular motion",
-      "recommended_reps": 10,
-      "recommended_sets": 3,
-      "duration_seconds": 60,
+      "video_url": "https://example.com/videos/neck-rotation.mp4",
       "is_free": true,
-      "is_custom_to_clinic": false,
       "created_at": "2026-05-18T08:10:13",
       "updated_at": "2026-05-18T08:10:13"
     }
@@ -607,7 +598,7 @@ curl -X POST http://localhost:8000/api/v1/patients \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
     "last_name": "Verma",
-    "email": "test@example.com"
+    "phone": "9123456789"
   }'
 ```
 
@@ -633,19 +624,16 @@ curl -X POST http://localhost:8000/api/v1/patients \
 ```bash
 source /tmp/test_tokens.txt
 
-# height_cm should be number, not string
+# phone should be exactly 10 digits
 curl -X POST http://localhost:8000/api/v1/patients \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
     "first_name": "Test",
     "last_name": "User",
-    "email": "test@example.com",
-    "phone": "9876543210",
+    "phone": "987",
     "date_of_birth": "1990-05-15",
-    "gender": "male",
-    "height_cm": "invalid_number",
-    "weight_kg": 75
+    "gender": "male"
   }'
 ```
 
@@ -654,9 +642,9 @@ curl -X POST http://localhost:8000/api/v1/patients \
 {
   "detail": [
     {
-      "loc": ["body", "height_cm"],
-      "msg": "value is not a valid integer",
-      "type": "type_error.integer"
+      "loc": ["body", "phone"],
+      "msg": "Value error, Phone number must be exactly 10 digits",
+      "type": "value_error"
     }
   ]
 }
@@ -673,11 +661,10 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "clinic_name": "Test Clinic",
-    "clinic_email": "invalid-email",
-    "clinic_phone": "9876543210",
-    "admin_email": "invalid-email",
-    "admin_password": "Password@123",
-    "admin_name": "Admin Name"
+    "email": "invalid-email",
+    "password": "Password@123",
+    "first_name": "Test",
+    "last_name": "User"
   }'
 ```
 
@@ -686,7 +673,7 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
 {
   "detail": [
     {
-      "loc": ["body", "admin_email"],
+      "loc": ["body", "email"],
       "msg": "invalid email format",
       "type": "value_error.email"
     }
@@ -706,11 +693,10 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "clinic_name": "Clinic A",
-    "clinic_email": "clinica@test.com",
-    "clinic_phone": "9876543210",
-    "admin_email": "admin@clinica.com",
-    "admin_password": "Password@123",
-    "admin_name": "Admin Name"
+    "email": "admin@clinica.com",
+    "password": "Password@123",
+    "first_name": "Admin",
+    "last_name": "User"
   }'
 
 # Second registration with same email (should fail)
@@ -718,11 +704,10 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "clinic_name": "Clinic B",
-    "clinic_email": "clinicb@test.com",
-    "clinic_phone": "9876543211",
-    "admin_email": "admin@clinica.com",
-    "admin_password": "Password@123",
-    "admin_name": "Admin Name"
+    "email": "admin@clinica.com",
+    "password": "Password@123",
+    "first_name": "Admin",
+    "last_name": "User"
   }'
 ```
 
@@ -967,9 +952,91 @@ Once all tests pass, you should:
 
 ---
 
-**End of API Testing Guide**
 
-Questions? Refer to:
-- API_DOCUMENTATION.md - API reference
-- SETUP_GUIDE.md - Development setup
-- DEPLOYMENT_GUIDE.md - Production deployment
+## 📈 LEADS & CRM ENDPOINTS TESTING
+
+### Test 21: Create a Lead
+
+**Purpose**: Test adding a new lead to the CRM.
+
+```bash
+# Test Data
+LEAD_NAME="Test Lead"
+LEAD_PHONE="9988776655"
+LEAD_SOURCE="website"
+
+# cURL Command
+curl -X POST http://localhost:8000/api/v1/leads \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "name": "'"$LEAD_NAME"'",
+    "phone": "'"$LEAD_PHONE"'",
+    "source": "'"$LEAD_SOURCE"'",
+    "stage": "new"
+  }'
+```
+
+**Save Lead ID:**
+```bash
+LEAD_ID="uuid-from-response"
+echo "LEAD_ID=$LEAD_ID" >> /tmp/test_tokens.txt
+```
+
+### Test 22: Convert Lead to Patient
+
+**Purpose**: Convert a lead into an active patient.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/leads/$LEAD_ID/convert \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+
+## 📁 PATIENT DOCUMENTS (SUPABASE BUCKET) TESTING
+
+### Setup: Toggle Documents Bucket
+
+**Purpose**: Enable documents for the clinic (Required for next tests).
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/settings/clinic \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "is_documents_enabled": true
+  }'
+```
+
+### Test 23: Upload a Document (via Seed script context)
+
+**Note**: Since document upload uses Supabase storage directly for now, run `python tests/seed.py` to auto-populate documents.
+Then fetch the list of documents for a patient:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/documents?patient_id=$PATIENT_ID" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Test 24: Get Document Download URL
+
+**Purpose**: Get a signed URL to securely download a file.
+
+```bash
+# Get DOC_ID from previous request
+DOC_ID="uuid-from-response"
+
+curl -X GET "http://localhost:8000/api/v1/documents/$DOC_ID/download" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## 🧹 DATABASE AND BUCKET WIPING
+
+**Purpose**: Clean up the database and the Supabase bucket files.
+
+```bash
+cd /home/tarun/projects/av-suite/backend
+python tests/wipe_db.py
+```
+*(This drops the schema, recreates it, and deletes all linked files in the `documents` bucket!)*
+
