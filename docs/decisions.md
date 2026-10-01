@@ -139,16 +139,61 @@ warnings to 27 passed clean.
 
 ---
 
+## 1 October 2026
+
+Posture tool, same branch. Taken by Onkar after measuring the calibration
+constant on our own photographs. This moves a number every patient sees, so
+it is FOR REVIEW, but it corrects an error rather than choosing a band.
+
+### Millimetre calibration constant measured, 0.97 replaced with 0.8134
+FOR REVIEW. `estimate_pixels_per_cm` divided the nose-to-ankle pixel span
+by 0.97 to estimate full stature, on the assumption that the span is 97
+percent of height. It is not. Measured on seven team members photographed
+front, side and back, with heights taken by tape to the top of the skull,
+the front-view figure is 0.8134, n=6, sd 0.0100, se 0.0041. One front photo
+was dropped because the feet touched the frame edge.
+
+The old value inflated every millimetre reading by 19 percent. A reading
+that printed 14.31 mm now prints 12.00 mm.
+
+Front view because that is the view the visibility guard actually lets
+through. Across the same seven subjects every side view and two of the
+seven back views fail the guard on ankle visibility, so in practice
+calibration runs on the front photograph.
+
+The back view measured 0.8349, about 2.6 percent higher. Three separate
+explanations for that gap were tested against the data and none held up, so
+it is recorded rather than corrected. A per-view constant was considered and
+rejected: the gap between any defensible candidate here is under 1.5
+percent, against the 19 percent error being removed, and splitting the
+constant would bake an unexplained difference into the code.
+
+Two things this number is not. Stature was measured from the pose
+segmentation mask, whose top edge sits at the top of the hair rather than
+the skull, so 0.8134 is likely half a percent low; it is not adjusted,
+because that correction would be an estimate and this is a measurement.
+And the subjects are seven young adults from one team, not a clinic
+population.
+
+Three things were considered and left alone. The landmark choice: nose was
+tested against shoulder and hip, and nose is the most stable of the three
+across subjects, coefficient of variation 1.2 percent versus 2.1 and 8.3.
+The visibility guard, which behaved correctly throughout. And the call
+sites, which need no change since the constant stays single.
+
+Effect measured end to end on all seven subjects: 8 of 31 millimetre grades
+change, roughly one in four, and every one of them moves down a tier. The
+earlier estimate of one in five came from a single sample report and is
+superseded by this. Reports generated before today overstated every
+millimetre finding, which makes flagging them as superseded more urgent,
+not less.
+
+---
+
 ## Not decided, still blocked
 
 These were looked at today and deliberately left alone.
 
-- **Millimetre calibration constant.** `calculator.py` divides the
-  nose-to-ankle span by 0.97 to estimate stature. Standard anthropometry
-  puts that span nearer 0.84, which would mean every millimetre value is
-  roughly 15 percent too high. The corrected figure is itself an estimate
-  from general tables and must be measured on our own photographs before
-  the constant is touched. Swapping one guess for another is not a fix.
 - **PT-A08 elbow carrying angle.** The cliff at -1.5 degrees and the rule
   grading any varus as SEVERE regardless of magnitude both still stand.
   Needs founder bands. Separately, the carrying angle is defined with the
