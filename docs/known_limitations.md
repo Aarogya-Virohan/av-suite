@@ -66,3 +66,34 @@ the two above.
   CDSS-intake path as above), or a fundamentally different vision
   approach (e.g. a foot-only photo from below/behind with a navicular
   marker) — not a fix to the existing whole-body Pose pipeline.
+
+## Measured but not comparable to published norms
+
+### PT-L05 Forward Trunk Lean, 1 October 2026
+
+The parameter stays on the report. It is repeatable: the same photograph
+re-encoded at 100, 85 and 70 percent scale moves the reported angle by
+0.43 degrees on average and 0.72 at worst, against reported values of 0.9
+to 3.5 degrees on the same six subjects. The measurement is not noise.
+
+What the absolute number cannot do is be read against a published normal.
+All seven subjects returned a backward lean and none returned forward.
+MediaPipe gives joint centres, not bony landmarks. On a lateral view the
+shoulder centre falls toward the back of the shoulder, and the hip
+landmark sits at roughly waistband height rather than on the greater
+trochanter, which is visible in the annotated photographs. Both push the
+shoulder posterior to the hip before any real posture is involved.
+
+The shift is not a constant that could be subtracted. Expressed as a
+fraction of each subject's own shoulder-to-hip vertical distance the
+offset ran 0.0158 to 0.0610, mean 0.0395, cv 0.426 across six subjects.
+One subject, po-7, was excluded: its side-view detection is visibly wrong
+in the annotated image, with the trunk axis leaving the body and the
+shoulder point landing at the neck.
+
+This is the same class of problem as the craniovertebral angle's
+ear-to-shoulder substitution, which is already documented. The difference
+is that nothing recorded it here, and the report prints a direction and a
+severity with no caveat. Within-patient tracking is not established either:
+that needs the same person photographed on different days, which we do not
+have.

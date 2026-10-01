@@ -287,6 +287,39 @@ One incidental finding, not acted on. `detector.py` runs MediaPipe at
 correctly placed ankle. Raising it would cost analysis time on every
 request and has not been measured, so it is noted rather than changed.
 
+### PT-L05 kept, with its limits recorded
+The open question from the last session was whether every subject reading
+backward meant the parameter was broken. It does not.
+
+Two things were measured. First, stability: the same photograph re-encoded
+at three scales moved the angle by 0.43 degrees mean, 0.72 worst, against
+reported values of 0.9 to 3.5. Second, whether the backward reading is one
+constant offset that could be corrected away: it is not, the offset as a
+fraction of each subject's trunk length ran 0.0158 to 0.0610 across six
+subjects.
+
+So the parameter measures something real and repeatable, and the absolute
+value carries a systematic shift that cannot be subtracted out. It stays on
+the report; the limit is written into known_limitations.md.
+
+A verdict was reached earlier in this session that PT-L05 should be
+withdrawn like PT-P03 and PT-P05. That was wrong and is recorded here so
+it is not repeated. It compared the left-right shoulder gap against the
+lean offset and called the gap measurement error, without ever measuring
+the error. When the error was actually measured it was small. The two
+withdrawn parameters had a landmark that is not observed and a published
+error larger than the whole band range; neither applies here.
+
+po-7 is excluded from the six. Its side-view detection is visibly wrong in
+the annotated photograph, the same subject whose ankle landed above its own
+knee and triggered check_limb_order.
+
+### analysisVersion moved to 2026-10-01
+Mechanical. The stamp exists so reports from different versions are not
+compared. The calibration constant changed today and two parameters left
+the report today, so the old 2026-09-18 stamp would have let a pre-change
+report sit beside a post-change one as if they matched.
+
 ---
 
 ## Not decided, still blocked
