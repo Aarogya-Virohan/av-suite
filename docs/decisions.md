@@ -251,6 +251,42 @@ and two correct photographs scored 0.073 and 0.077. There is no line
 between them, so no check was added. Recorded in known_limitations.md so
 the next person does not spend the same afternoon on it.
 
+### A leg whose joints are not stacked like a standing leg is now rejected
+One subject's side view reported Knee Flexion of 156.77 degrees, graded
+NONE. A standing person cannot bend a knee that far, and the grade was
+NONE because the bands only cover the hyperextension side, so the report
+printed an impossible number and called it normal.
+
+The landmarks were not collapsed and the photograph was fine. The model
+had placed that ankle higher in the frame than its own knee, with
+visibility 0.84, well above our 0.65 threshold. That makes the
+hip-knee-ankle angle about 23 degrees, and 180 minus 23 is the number
+that reached the report.
+
+Unlike the ankle-to-heel ratio tried earlier the same day, a check here
+does separate good from bad. In image coordinates y increases downward,
+so on anyone standing the hip sits above the knee and the knee above the
+ankle. Measured across 42 legs, seven subjects, three views each: 41
+passed and the one that failed is the one that produced the 156 degrees.
+No false positives.
+
+This is gravity, not clinical judgement. There is no threshold in it, no
+reference range, and nothing for a clinician to sign off. `check_limb_order`
+sits beside `check_visibility` in detector.py and raises a new
+`ImplausibleLandmarkError`, wired into PT-L06 on the side view and
+PT-A05/PT-A06 on the front. A rejected leg reports as not measured, the
+same as a missing landmark, because to the reader both mean the same
+thing. Five tests pin it, including one asserting that visibility is not
+consulted either way.
+
+Scope is deliberately narrow. It catches this failure, not every
+misplaced landmark, and the general problem recorded above stands.
+
+One incidental finding, not acted on. `detector.py` runs MediaPipe at
+`model_complexity=1`. At complexity 2 the same photograph returns a
+correctly placed ankle. Raising it would cost analysis time on every
+request and has not been measured, so it is noted rather than changed.
+
 ---
 
 ## Not decided, still blocked

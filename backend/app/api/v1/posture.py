@@ -13,9 +13,13 @@ from pathlib import Path
 from app.services.posture.detector import (
     detect_pose_full,
     check_visibility,
+    check_limb_order,
     get_image_dimensions,
 )
-from app.services.posture.exceptions import InsufficientVisibilityError
+from app.services.posture.exceptions import (
+    ImplausibleLandmarkError,
+    InsufficientVisibilityError,
+)
 from app.services.posture.pdf_service import generate_posture_pdf
 
 from app.services.posture.calculator import (
@@ -264,6 +268,7 @@ async def analyze_posture(
             side_landmarks,
             [hip_idx_lat, knee_idx_lat, ankle_idx_lat, ear_idx, shoulder_idx_lat],
         )
+        check_limb_order(side_landmarks, hip_idx_lat, knee_idx_lat, ankle_idx_lat)
 
         knee_sagittal = calc_knee_hyperextension(side_geo, side=lateral_side)
         severity = classify("PT-L06", knee_sagittal)
@@ -279,7 +284,11 @@ async def analyze_posture(
             )
         )
 
-    except InsufficientVisibilityError:
+    except (InsufficientVisibilityError, ImplausibleLandmarkError):
+        # Implausible geometry reports the same way as a missing
+        # landmark, because to the clinician both mean the same thing:
+        # this was not measured. A 156 degree knee flexion printed as
+        # NONE is worse than a blank row.
         side_measurements.append(
             measurement(
                 "PT-L06", KNEE_SAGITTAL_LABEL, None, "\u00b0", "insufficient_data"
@@ -392,6 +401,7 @@ async def analyze_posture(
     ]:
         try:
             check_visibility(front_landmarks, [hip_i, knee_i, ankle_i])
+            check_limb_order(front_landmarks, hip_i, knee_i, ankle_i)
 
             side_key = "left" if side_label == "Left" else "right"
             deviation, direction = calc_knee_frontal_deviation(front_geo, side_key)
@@ -410,7 +420,7 @@ async def analyze_posture(
                 )
             )
 
-        except InsufficientVisibilityError:
+        except (InsufficientVisibilityError, ImplausibleLandmarkError):
             front_measurements.append(
                 measurement(
                     "PT-A05",
