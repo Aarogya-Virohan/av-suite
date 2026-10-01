@@ -203,6 +203,54 @@ bug, so it was worth confirming separately.
 No code change beyond replacing that note with what the review found. The
 direction convention stands.
 
+### PT-P03 and PT-P05 withdrawn from the report
+Running the full pipeline on all seven subjects produced two results that
+cannot be true of seven healthy young adults. Rearfoot alignment returned
+varus on 14 of 14 legs, 12 of them SEVERE, against a published healthy
+population mean of 6.07 degrees of valgus. Toe angle asymmetry returned
+SEVERE on two subjects with no foot complaint.
+
+Looking at the annotated photographs rather than the numbers showed why.
+On the back view the foot index landmark sits almost on top of the ankle:
+18 to 133 pixels apart against 304 to 395 on the front view of the same
+person, on every leg. The toe is hidden behind the leg from behind, so the
+model places it by inference. PT-P05 was grading an angle between two
+points, one of which the camera never sees.
+
+PT-P03 failed differently. Its heel landmark is real and lands on the heel
+in most photographs. The problem is the method: published mean absolute
+error for rearfoot eversion from a phone camera is 8.2 degrees against a
+clinically meaningful threshold near 3, because pose models infer eversion
+from heel position rather than calcaneal motion. Our whole band range sits
+inside that error, which is consistent with getting the opposite of the
+population on every subject.
+
+Both are withdrawn rather than deleted. The functions and bands stay in
+the source with nothing calling them, so they can return if we ever train
+our own landmark model. Their muscle and exercise mappings are removed
+with them, since a mapping fires on a grade that will no longer exist.
+
+This is not recorded as a founder question. The toe landmark is not
+observed, which is an engineering fact and the same reason the seven
+parameters in known_limitations.md are blocked and the same reason PT-L08
+was removed in June. The rearfoot case rests on published error figures
+and our own measurements, not on a clinical preference. If Daman or
+Shivank want either back, the evidence is in known_limitations.md.
+
+### MediaPipe visibility does not detect a misplaced landmark
+Not a decision, a finding that changes how much the existing guards are
+worth. On one subject's back view every lower-limb landmark collapsed onto
+the floor between the feet, hundreds of pixels from any foot, and the
+ankle and heel still reported 0.80 and 0.83 against our 0.65 threshold.
+The score means the model thinks the point is in frame, not that it is in
+the right place.
+
+A geometric check was tried: ankle-to-heel distance over knee-to-ankle
+distance, measured on all 42 legs. The collapsed photograph scored 0.068
+and two correct photographs scored 0.073 and 0.077. There is no line
+between them, so no check was added. Recorded in known_limitations.md so
+the next person does not spend the same afternoon on it.
+
 ---
 
 ## Not decided, still blocked

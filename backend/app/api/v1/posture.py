@@ -40,9 +40,7 @@ from app.services.posture.calculator import (
     calc_trunk_lateral_shift_mm,
     calc_trunk_lateral_deviation_mm,
     calc_scapular_height_asymmetry_mm,
-    calc_heel_valgus,
     calc_pelvic_rotation,
-    calc_bilateral_toe_asymmetry,
     calc_detection_confidence,
     NOSE,
     LEFT_EAR,
@@ -59,10 +57,6 @@ from app.services.posture.calculator import (
     RIGHT_KNEE,
     LEFT_ANKLE,
     RIGHT_ANKLE,
-    LEFT_HEEL,
-    RIGHT_HEEL,
-    LEFT_FOOT_INDEX,
-    RIGHT_FOOT_INDEX,
 )
 
 from app.services.posture.classifier import classify
@@ -117,7 +111,12 @@ P01_LABEL = "Trunk Lateral Deviation (Posterior)"
 
 
 def _rearfoot_label(value: float, side_label: str) -> str:
-    """PT-P03 is signed, so the row name follows the direction."""
+    """
+    PT-P03 is signed, so the row name follows the direction.
+
+    Unused since PT-P03 was withdrawn from the report on 1 October 2026.
+    Kept with the calculation it labels.
+    """
 
     if value < 0:
         return f"Rearfoot Varus ({side_label})"
@@ -651,26 +650,10 @@ async def analyze_posture(
             measurement("PT-P02", "Scapular Height Asymmetry", None, "mm", "insufficient_data")
         )
 
-    # PT-P03 — Rearfoot / calcaneal alignment (bilateral, signed)
-    for side_label, knee_i, ankle_i, heel_i, side_key in [
-        ("Left", LEFT_KNEE, LEFT_ANKLE, LEFT_HEEL, "left"),
-        ("Right", RIGHT_KNEE, RIGHT_ANKLE, RIGHT_HEEL, "right"),
-    ]:
-        try:
-            check_visibility(back_landmarks, [knee_i, ankle_i, heel_i])
-
-            heel_valgus = calc_heel_valgus(back_geo, side_key)
-            severity = classify("PT-P03", heel_valgus)
-            findings[f"PT-P03_{side_key}"] = severity
-
-            back_measurements.append(
-                measurement("PT-P03", _rearfoot_label(heel_valgus, side_label), heel_valgus, "\u00b0", severity)
-            )
-
-        except InsufficientVisibilityError:
-            back_measurements.append(
-                measurement("PT-P03", f"Rearfoot Alignment ({side_label})", None, "\u00b0", "insufficient_data")
-            )
+    # PT-P03 — Rearfoot / calcaneal alignment. Withdrawn from the report
+    # on 1 October 2026 after testing against real photographs. The
+    # calculation and its bands are left in place; nothing calls them.
+    # See docs/known_limitations.md for the evidence.
 
     # PT-P04 — Pelvic Rotation
     try:
@@ -689,22 +672,11 @@ async def analyze_posture(
             measurement("PT-P04", "Pelvic Rotation", None, "\u00b0", "insufficient_data")
         )
 
-    # PT-P05 — Bilateral Toe Angle Asymmetry
-    try:
-        check_visibility(back_landmarks, [LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX])
-
-        toe_asymmetry = calc_bilateral_toe_asymmetry(back_geo)
-        severity = classify("PT-P05", toe_asymmetry)
-        findings["PT-P05"] = severity
-
-        back_measurements.append(
-            measurement("PT-P05", "Bilateral Toe Angle Asymmetry", toe_asymmetry, "\u00b0", severity)
-        )
-
-    except InsufficientVisibilityError:
-        back_measurements.append(
-            measurement("PT-P05", "Bilateral Toe Angle Asymmetry", None, "\u00b0", "insufficient_data")
-        )
+    # PT-P05 — Bilateral Toe Angle Asymmetry. Withdrawn from the report
+    # on 1 October 2026. The foot-index landmark it rests on is not
+    # observed from behind; on seven subjects the ankle-to-toe distance
+    # measured 18 to 133 pixels on the back view against 304 to 395 on
+    # the front. See docs/known_limitations.md.
 
     back_photo_url = _annotate_or_blank(
         back_bytes,

@@ -115,15 +115,9 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
             {"exercise": "Scapular Wall Slides", "dosage": "3x12"},
         ],
     },
-    {
-        # PT-P03 — Rearfoot / Calcaneal Alignment
-        "param_id": "PT-P03",
-        "hypertonic": ["Peroneals"],
-        "inhibited": ["Tibialis Posterior"],
-        "corrective": [
-            {"exercise": "Heel Raises with Inward Press", "dosage": "3x15"},
-        ],
-    },
+    # PT-P03 and PT-P05 had entries here. Both parameters were withdrawn
+    # from the report on 1 October 2026, so their muscle and exercise
+    # mappings are removed with them. See docs/known_limitations.md.
     {
         # PT-P04 — Pelvic Rotation (Axial)
         "param_id": "PT-P04",
@@ -131,15 +125,6 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
         "inhibited": ["Gluteus Medius", "Deep Core Stabilisers"],
         "corrective": [
             {"exercise": "Pelvic Rotation Control Drills", "dosage": "3x10 each side"},
-        ],
-    },
-    {
-        # PT-P05 — Bilateral Toe Angle Asymmetry
-        "param_id": "PT-P05",
-        "hypertonic": ["Piriformis (one side)"],
-        "inhibited": ["Hip Internal Rotators"],
-        "corrective": [
-            {"exercise": "Hip Internal/External Rotation Stretch", "dosage": "3x30s each side"},
         ],
     },
     {
