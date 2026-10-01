@@ -188,6 +188,21 @@ superseded by this. Reports generated before today overstated every
 millimetre finding, which makes flagging them as superseded more urgent,
 not less.
 
+### Knee direction logic reviewed against real photographs, and left alone
+The source carried a note asking for `calc_knee_frontal_deviation` to be
+checked against real photographs before clinical use. Done, on the same
+seven subjects, front view, fourteen legs.
+
+The direction the function returns was compared against the knee's position
+relative to the body midline, a quantity the function does not use. The two
+agreed on all fourteen legs. The one subject with visibly bow legs came out
+varus on both sides. MediaPipe's anatomical left appeared on the image right
+in every photograph, which is the same confusion that caused the elbow sign
+bug, so it was worth confirming separately.
+
+No code change beyond replacing that note with what the review found. The
+direction convention stands.
+
 ---
 
 ## Not decided, still blocked
@@ -208,9 +223,19 @@ These were looked at today and deliberately left alone.
   report label still say rotation. Whether to rename it, and whether it
   should exist separately from PT-A04 at all given it reduces to the same
   quantity when the shoulders are level, is a founder decision.
-- **PT-A05 and PT-A06 knee bands.** Asymmetric with each other, no female
-  band on varus, and the direction logic has never been checked against
-  real photographs. Needs photos before anything is changed.
+- **PT-A05 and PT-A06 knee bands.** The direction logic is now verified,
+  see 1 October above. Two things remain, both clinical. The bands are
+  asymmetric, normal up to 5 degrees of valgus against 3 of varus, with a
+  female allowance on valgus and none on varus. On one of the seven
+  subjects this produced a smaller deviation on the right leg carrying a
+  worse grade than the larger deviation on the left, 3.15 degrees MILD
+  against 3.77 degrees NONE. Separately the neutral gate of 0.5 degrees
+  fired on only two of fourteen legs, so a straight leg is almost always
+  pushed into valgus or varus on an offset of a few thousandths of a unit,
+  and which side it lands on then decides which band grades it. Whether
+  valgus and varus should share a ceiling is a clinical question, not an
+  engineering one: the asymmetry looks deliberate rather than accidental,
+  given the female allowance exists on one and not the other.
 - **Severity tiers themselves.** Whether the product should assign
   none/mild/moderate/severe at all, or move to a normal-range presentation,
   is the question that dissolves roughly half of the above. Unanswered

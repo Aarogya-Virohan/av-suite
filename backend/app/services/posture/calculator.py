@@ -505,9 +505,22 @@ def calc_knee_frontal_deviation(
         (deviation in degrees from a straight hip-knee-ankle line,
          direction of deviation)
 
-    Note: direction is an approximation based on the knee's horizontal
-    offset from the expected straight hip-ankle line. Should be reviewed
-    against real photos before clinical use.
+    Direction was reviewed against real photographs on 1 October 2026, as
+    the previous note here asked for. Seven subjects, front view, fourteen
+    legs. The label this function returns was compared against the knee's
+    position relative to the body midline, which this function does not
+    use, and the two agreed on all fourteen. The one subject with
+    visibly bow legs graded varus on both sides. MediaPipe's anatomical
+    left appeared on the image right in every photograph, so the side
+    branch below is reading the correct leg.
+
+    Two things that review did not fix, both outside this function. The
+    neutral gate of 0.5 degrees fired on only two of fourteen legs, so a
+    straight leg is nearly always labelled one way or the other on an
+    offset of a few thousandths of a unit. And PT-A05 and PT-A06 carry
+    different normal ceilings, 5 degrees against 3, so the same patient
+    can show a smaller deviation on one leg and a worse grade. Both are
+    recorded in docs/decisions.md and need a clinical answer.
     """
 
     hip = landmarks[LEFT_HIP if side == "left" else RIGHT_HIP]
