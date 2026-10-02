@@ -379,3 +379,92 @@ Which of the three. The unit change in particular should not be made
 quietly, because it changes what every one of these four rows reports
 and would make old reports non-comparable, the same way the calibration
 change did.
+
+---
+
+## MediaPipe model complexity, 1 or 2
+
+Measured on the seven test photographs, 2 October 2026. This started as a
+speed question and turned into a different one.
+
+### The question
+
+detector.py builds its Pose estimator at model_complexity=1, as a module
+level singleton at line 16. It was noted on 1 October that at complexity
+2 the po-7 ankle lands correctly, where at complexity 1 the model put
+that ankle above its own knee and the report printed Knee Flexion of
+156.77 degrees graded NONE. Raising it was never measured, so it was
+left alone.
+
+### Speed, which turns out not to be the issue
+
+Per photograph, warm, median of three runs, 21 photographs across three
+resolutions:
+
+    complexity 1   39.2 ms mean, 35.5 ms median
+    complexity 2   76.6 ms mean, 73.4 ms median
+
+An assessment is three photographs, so complexity 2 costs about 0.11
+seconds more per assessment. Constructing the estimator costs 3 ms at
+either setting once the model file is cached, and the lazy load on the
+first inference is 74 ms against 125 ms, once per process. The 6.9
+seconds seen on the first run of this benchmark was the heavy model
+downloading, not loading, and is not a recurring cost.
+
+Speed is not a reason to stay at complexity 1.
+
+### What the measurement actually found
+
+Complexity 2 fixes the po-7 ankle, as expected. The right ankle moves
+from above its own knee to correctly stacked.
+
+The unexpected part is the visibility scores. On the same po-7 side view,
+the left leg is the far leg and is hidden behind the near one. Complexity
+1 reports that hidden ankle at 0.96 visibility. Complexity 2 reports the
+same point at 0.15. Complexity 2 is telling the truth about a point it
+cannot see, and complexity 1 is not.
+
+Across all 21 photographs, counting every landmark against our 0.65
+visibility threshold: 402 unchanged, 6 newly pass, and 33 newly fail.
+
+The 33 are not scattered. Whole regions move together:
+
+    po-6 back    both knees, both ankles, both heels, both feet
+                 0.95 down to 0.57 and below
+    po-2 back    both knees, both ankles, both heels, one foot
+    po-7 side    left knee, ankle, heel and foot, the occluded leg
+
+So on complexity 2, the posterior view's lower body stops computing
+entirely on two of seven subjects, and the occluded leg on a side view
+stops computing where it previously produced numbers.
+
+### Conclusion
+
+Complexity 2 is the better model on both counts that matter. It places
+landmarks more accurately and it reports honest confidence on points it
+cannot see. The cost is 0.11 seconds per assessment, which is nothing.
+
+This connects directly to something already in known_limitations.md.
+po-1's back view has every lower limb landmark collapsed onto the floor
+between the feet while reporting visibility of 0.80 to 0.83, and the
+note records that no threshold on that score would have caught it. Part
+of the reason is that complexity 1's score is not a reliable statement
+about whether the point is in the right place. Complexity 2 does not
+solve that problem, but it is less wrong about it.
+
+### Still a founder call
+
+Not the model choice. The consequence.
+
+Moving to complexity 2 means a clinic that sees a full report today will
+start seeing rows marked as not measured, and on some patients that is
+most of the posterior lower body. That is the correct behaviour, because
+those rows were being produced from landmarks the camera could not see.
+But it changes what the report looks like, and how much the report should
+say versus stay silent is the same judgement as question 1 on severity
+tiers.
+
+Recommend holding this until question 1 is answered, then taking both
+together. Nothing is urgent: the specific failure that prompted it, the
+po-7 ankle, is already caught by check_limb_order and reported as not
+measured.
