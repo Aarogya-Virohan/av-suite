@@ -124,9 +124,14 @@ but if the founders are slow there is no reason to hold it.
   direction) and line 568 (elbow sign convention). The elbow one becomes
   irrelevant if PT-A08 is withdrawn. The knee equivalent was done on
   1 October and the same method works for these.
-- detector.py runs MediaPipe at model_complexity=1. At complexity 2 the
-  po-7 ankle lands correctly. The cost per request has never been
-  measured. Self-contained work that needs nobody's permission.
+- detector.py runs MediaPipe at model_complexity=1. Measured on
+  2 October: complexity 2 costs 0.11 seconds more per assessment and
+  places landmarks better, but it also reports honest visibility on
+  occluded points, so 33 landmarks across the seven subjects stop
+  passing the 0.65 guard and whole posterior lower bodies go to not
+  measured. The model choice is clear; the consequence is tied to
+  question 1. Written up in open_questions_research.md, held until
+  that is answered.
 
 ---
 
