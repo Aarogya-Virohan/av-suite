@@ -48,6 +48,16 @@ between them. This is recorded here because the obvious fix has already
 been tried and failed, and because it affects every parameter, not only
 the two above.
 
+## Withdrawn because it measures nothing of its own, 2 October 2026
+
+| Param ID | Name | Reason withdrawn |
+|---|---|---|
+| PT-P04 | Pelvic Rotation | It has no quantity of its own. The function takes the shoulder line angle and subtracts the hip line angle. With the shoulder line forced level it returns exactly PT-A04 (Pelvic Obliquity), verified to within 0.01 degrees on all seven test subjects. When the shoulders are not level the difference is shoulder tilt added into a row about the pelvis: on one subject the hip line was 1.89 degrees, which is normal, the shoulder line was 3.30, and the parameter reported 5.19 and would have graded it MILD on a normal pelvis. The two parameters also disagreed with each other, because their bands were never harmonised: the same hip value of 4.2 degrees grades MILD as PT-A04 and NONE as PT-P04, and PT-P04 is one tier softer across the whole range. Nothing is lost by removing it, since the quantity it reduces to is already reported from the front view on tighter bands. The name also claimed axial rotation, which no single 2D photograph can see. |
+
+Withdrawn, not deleted, on the same terms as PT-P03 and PT-P05. The
+calculation and its bands stay in the source with nothing calling them.
+Its muscle and exercise mapping is removed.
+
 ## If priorities change
 
 - **PT-A09** becomes feasible if/when the MediaPipe Hands pipeline

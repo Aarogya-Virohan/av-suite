@@ -117,16 +117,10 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
     },
     # PT-P03 and PT-P05 had entries here. Both parameters were withdrawn
     # from the report on 1 October 2026, so their muscle and exercise
-    # mappings are removed with them. See docs/known_limitations.md.
-    {
-        # PT-P04 — Pelvic Rotation (Axial)
-        "param_id": "PT-P04",
-        "hypertonic": ["Piriformis"],
-        "inhibited": ["Gluteus Medius", "Deep Core Stabilisers"],
-        "corrective": [
-            {"exercise": "Pelvic Rotation Control Drills", "dosage": "3x10 each side"},
-        ],
-    },
+    # mappings are removed with them. PT-P04 was withdrawn the same way on
+    # 2 October 2026 and its entry is removed for the same reason: a
+    # mapping fires on a grade that no longer exists.
+    # See docs/known_limitations.md.
     {
         # PT-L06 — Knee Hyperextension (Genu Recurvatum)
         "param_id": "PT-L06",

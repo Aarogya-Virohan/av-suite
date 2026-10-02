@@ -322,6 +322,45 @@ report sit beside a post-change one as if they matched.
 
 ---
 
+## 2 October 2026
+
+Posture tool, branch `dev`. Taken by Onkar while going back through every
+open founder question to work out which ones did not need a founder.
+
+### PT-P04 withdrawn from the report
+It measures no quantity of its own. The function takes the shoulder line
+angle and subtracts the hip line angle. With the shoulder line forced
+level it returns exactly PT-A04, verified to within 0.01 degrees on all
+seven test subjects. When the shoulders are not level, the difference is
+shoulder tilt written onto a row about the pelvis: on one subject the hip
+line was 1.89 degrees, the shoulder line 3.30, and the parameter reported
+5.19, which its own bands grade MILD on a pelvis that is fine.
+
+The two also contradicted each other, because their bands were never
+harmonised. A hip value of 4.2 degrees grades MILD as PT-A04 and NONE as
+PT-P04, and PT-P04 is one tier softer across the whole range. That is the
+same defect C4 fixed for the front and back trunk shift parameters, which
+nobody had checked for the pelvis.
+
+Not recorded as a founder question, on the same basis as PT-P03 and
+PT-P05. The quantity it reduces to is already on the report from the
+front view, so nothing is lost by removing it, and the name claimed axial
+rotation, which no single 2D photograph can produce.
+
+Withdrawn, not deleted. The calculation and its bands stay in the source
+with nothing calling them. The muscle and exercise mapping is removed.
+Verified after the change: route imports clean, no live call to the
+calculation or its classifier entry, mapping table down to 13 parameters
+with PT-P03, PT-P04 and PT-P05 all absent, suite 32 passed.
+
+One consequence worth naming. The posterior view now has two rows,
+PT-P01 and PT-P02, and PT-P02 is the same calculation as PT-A02 on the
+front view. Whether a back photograph still earns its place is a product
+question rather than a measurement one, and it is flagged in the
+2 October decisions document rather than decided here.
+
+---
+
 ## Not decided, still blocked
 
 These were looked at today and deliberately left alone.
@@ -335,11 +374,10 @@ These were looked at today and deliberately left alone.
 - **PT-L06 flexion bands.** The label now follows the sign, but any
   non-negative value still grades NONE, so a 40 degree flexion contracture
   reads as normal. Needs clinician-supplied flexion bands.
-- **PT-P04 naming.** The docstring was corrected to stop claiming axial
-  rotation, which the calculation cannot produce. The function name and the
-  report label still say rotation. Whether to rename it, and whether it
-  should exist separately from PT-A04 at all given it reduces to the same
-  quantity when the shoulders are level, is a founder decision.
+- **PT-P04 naming.** Settled on 2 October, and not by renaming it. The
+  parameter was withdrawn from the report, because it reduces to PT-A04
+  exactly when the shoulders are level and contaminates the pelvic row
+  with shoulder tilt when they are not. See the 2 October section above.
 - **PT-A05 and PT-A06 knee bands.** The direction logic is now verified,
   see 1 October above. Two things remain, both clinical. The bands are
   asymmetric, normal up to 5 degrees of valgus against 3 of varus, with a
@@ -347,11 +385,12 @@ These were looked at today and deliberately left alone.
   subjects this produced a smaller deviation on the right leg carrying a
   worse grade than the larger deviation on the left, 3.15 degrees MILD
   against 3.77 degrees NONE. Separately the neutral gate of 0.5 degrees
-  fired on only two of fourteen legs, so a straight leg is almost always
-  pushed into valgus or varus on an offset of a few thousandths of a unit,
-  and which side it lands on then decides which band grades it. Whether
-  valgus and varus should share a ceiling is a clinical question, not an
-  engineering one: the asymmetry looks deliberate rather than accidental,
+  fired on three of fourteen legs when re-measured on 2 October, and our
+  own scale-only noise on that measurement averages 0.84 degrees, so the
+  gate sits inside the measurement error and a straight leg is pushed
+  to one side or the other by noise, and which side it lands on then
+  decides which band grades it. Whether valgus and varus should share a
+  ceiling is a clinical question, not an engineering one: the asymmetry looks deliberate rather than accidental,
   given the female allowance exists on one and not the other.
 - **Severity tiers themselves.** Whether the product should assign
   none/mild/moderate/severe at all, or move to a normal-range presentation,

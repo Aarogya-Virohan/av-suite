@@ -44,7 +44,6 @@ from app.services.posture.calculator import (
     calc_trunk_lateral_shift_mm,
     calc_trunk_lateral_deviation_mm,
     calc_scapular_height_asymmetry_mm,
-    calc_pelvic_rotation,
     calc_detection_confidence,
     NOSE,
     LEFT_EAR,
@@ -665,22 +664,12 @@ async def analyze_posture(
     # calculation and its bands are left in place; nothing calls them.
     # See docs/known_limitations.md for the evidence.
 
-    # PT-P04 — Pelvic Rotation
-    try:
-        check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP])
-
-        pelvic_rotation = calc_pelvic_rotation(back_geo)
-        severity = classify("PT-P04", pelvic_rotation)
-        findings["PT-P04"] = severity
-
-        back_measurements.append(
-            measurement("PT-P04", "Pelvic Rotation", pelvic_rotation, "\u00b0", severity)
-        )
-
-    except InsufficientVisibilityError:
-        back_measurements.append(
-            measurement("PT-P04", "Pelvic Rotation", None, "\u00b0", "insufficient_data")
-        )
+    # PT-P04 — Pelvic Rotation. Withdrawn from the report on 2 October
+    # 2026. With the shoulder line level it returns exactly PT-A04,
+    # verified on all seven test subjects; when the shoulders are not
+    # level it adds shoulder tilt into a pelvic row. The calculation and
+    # its bands are left in place; nothing calls them.
+    # See docs/known_limitations.md for the evidence.
 
     # PT-P05 — Bilateral Toe Angle Asymmetry. Withdrawn from the report
     # on 1 October 2026. The foot-index landmark it rests on is not
