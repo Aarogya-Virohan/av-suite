@@ -96,24 +96,28 @@ verbally.
 
 ---
 
-## 4. Not blocked, can be done now
+## 4. Done on 2 October, after the founder document went out
 
-Withdraw PT-A08 (elbow carrying angle) and PT-P04 (pelvic rotation).
-Both are engineering facts in the same class as PT-P03 and PT-P05, both
-have their evidence in open_questions_research.md, and the founder
-document states that they are being removed unless objected to. Follow
-the PT-P05 pattern: function and bands stay in the source with nothing
-calling them, muscle and exercise mappings removed,
-known_limitations.md updated.
+PT-A08 (elbow carrying angle) and PT-P04 (pelvic rotation) are withdrawn
+from the report, on the same terms as PT-P03 and PT-P05: calculations
+and bands left in the source with nothing calling them, muscle and
+exercise mappings removed. Commits 16ae06d and a944514.
 
-Removing PT-A08 also retires two live patient-facing defects, the rule
-grading any varus elbow as SEVERE regardless of size, and the cliff at
-minus 1.5 degrees.
+Two live patient-facing defects went with PT-A08, the rule grading any
+varus elbow as SEVERE regardless of size and the cliff at minus 1.5
+degrees. Both had been waiting on founder bands and now need none. The
+only TODO in the posture code went with them.
 
-Worth a short wait so it does not land the same day the document does,
-but if the founders are slow there is no reason to hold it.
+The synthesizer mapping table is down to 12 parameters, and a guard test
+now pins that none of the four withdrawn parameters maps anything.
 
----
+The posterior view is left with two rows, PT-P01 and PT-P02, and PT-P02
+is the same calculation as PT-A02 on the front view. Whether a back
+photograph still earns its place is raised in the founder document with
+no tick box, as a product question.
+
+Nothing else is unblocked. The remaining code work in section 5 either
+depends on question 1 or has not been scoped.
 
 ## 5. Not started
 
