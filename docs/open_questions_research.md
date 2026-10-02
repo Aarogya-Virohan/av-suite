@@ -310,3 +310,72 @@ with Daman and Shivank.
 
 The gate width goes with it, since a sensible gate depends on where the
 first band boundary sits.
+
+---
+
+## The millimetre parameters: PT-A02, PT-P02, PT-A03, PT-P01
+
+Searched 2 October 2026. The finding is an absence, and it is a more
+useful absence than expected.
+
+### The question
+
+Four parameters are graded in millimetres with no recorded source.
+PT-A02 and PT-P02 are shoulder level asymmetry, front and back, byte
+identical to each other. PT-A03 and PT-P01 are trunk lateral shift, front
+and back, also identical, and brought onto one threshold set on 18
+September. Earlier attempts to source these failed: the audit attributed
+them to Kendall (2005), and Kendall is a posture assessment text that
+publishes no millimetre severity bands for shoulder height difference.
+
+### What the search found
+
+No published millimetre severity bands for shoulder height difference or
+trunk lateral offset. That was the expected result.
+
+The unexpected part is what the normative literature does use. Postural
+studies report these quantities in degrees, not millimetres. A digital
+postural study of 100 healthy adults, 50 male and 50 female, reports
+shoulder alignment at 1.5 degrees plus or minus 1.2, and cites an earlier
+sample at 1 plus or minus 0.97. A study of 800 symptom-free adults aged
+21 to 60 reports its shoulder and pelvis parameters in degrees, with most
+spine, shoulder and pelvis parameters falling within plus or minus 2
+degrees.
+
+### Conclusion
+
+The reason no source has ever been found for these bands is not that the
+search was not thorough enough. These four parameters are expressed in a
+unit the field does not use for them. A millimetre band for shoulder
+height difference cannot be sourced because the normative work reports an
+angle.
+
+There is a second cost to the unit choice, and our own work already
+demonstrated it. Millimetre values depend on the calibration constant,
+which was wrong by 19 percent until 1 October and whose corrected value
+is measured on seven team members rather than a clinic population. An
+angle needs no calibration at all. Every millimetre reading on every
+report carries that dependency; the angle parameters do not.
+
+Three ways forward, and only the first is ours.
+
+One. Convert these parameters to angles, which would let them be read
+against published normative data and would remove their dependence on
+the calibration constant. This is buildable and it is an engineering
+change, but it is not a free one: it is a new definition, so grades will
+move and the bands would have to be set again from scratch.
+
+Two. Keep millimetres and derive ranges from our own clinic population,
+which was the original plan recorded in the August competitor review and
+is the one thing none of the three competitors claims to have done.
+
+Three. If D1 moves the product to a normal range presentation, this
+question shrinks on its own, from three cut-offs per parameter to one
+range, and the unit question stays but gets smaller.
+
+### Still a founder call
+
+Which of the three. The unit change in particular should not be made
+quietly, because it changes what every one of these four rows reports
+and would make old reports non-comparable, the same way the calibration
+change did.
