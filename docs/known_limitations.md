@@ -48,6 +48,32 @@ between them. This is recorded here because the obvious fix has already
 been tried and failed, and because it affects every parameter, not only
 the two above.
 
+## Withdrawn because the capture position is wrong, 2 October 2026
+
+| Param ID | Name | Reason withdrawn |
+|---|---|---|
+| PT-A08 | Elbow Carrying Angle | The carrying angle is defined, in every source found including all three Indian normative studies we cite, as measured with the elbow fully extended and the forearm fully supinated. A standing posture photograph has the arms hanging with the forearm neutral or pronated, and anatomy texts describe the angle as masked by pronation of the extended forearm. No correction is possible: no peer-reviewed study measures the surface carrying angle across forearm positions in the same subjects, and the sources that touch it disagree on direction, since 3D CT shows the ulna rotating into valgus with pronation while the anatomy texts describe the visible angle shrinking. The widely repeated figure of a 5 to 10 degree reduction traces to a yoga anatomy website with no study behind it. Meanwhile a universal goniometer in the correct position carries a maximal error of plus or minus 6.5 degrees, the only photograph-based validation reports 4.8 degrees mean absolute error, and general pose-estimation joint angle error runs 7 to 9 degrees, against a normal band 5 to 10 degrees wide. It is also not a postural parameter: the carrying angle is a fixed feature of bone alignment used after supracondylar and lateral condyle fractures, in throwing athletes and in anthropometric sex estimation, and it does not change with postural correction or exercise. Validated photogrammetric posture protocols do not include it; one positions the elbows at 20 to 30 degrees of flexion for the photograph, which is the opposite of the required position. |
+
+Withdrawn, not deleted, on the same terms as the others. The calculation
+and its bands stay in the source with nothing calling them. Its muscle
+and exercise mapping is removed.
+
+Removing it also retired two live defects that had been waiting on
+founder bands: a hardcoded rule in posture.py that graded any negative
+carrying angle as SEVERE regardless of magnitude, so a 2 degree and a 20
+degree varus read the same, and a discontinuity at exactly minus 1.5
+degrees where a change of 0.02 degrees moved a patient from NONE to
+SEVERE. Both sat outside the THRESHOLDS table, so no threshold review
+would have reached them.
+
+If the parameter is ever wanted, it needs its own capture step with the
+palms forward and the elbows locked straight, gated by a check that the
+palm actually faces the camera, and even then it should report only a
+left to right difference above roughly 6 to 7 degrees or frank varus
+below 0, with bands from the Indian goniometric studies rather than from
+the 5 to 10 and 10 to 15 textbook convention, which is a convention and
+not a figure derived from data.
+
 ## Withdrawn because it measures nothing of its own, 2 October 2026
 
 | Param ID | Name | Reason withdrawn |

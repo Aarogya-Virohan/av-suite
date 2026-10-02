@@ -359,18 +359,78 @@ front view. Whether a back photograph still earns its place is a product
 question rather than a measurement one, and it is flagged in the
 2 October decisions document rather than decided here.
 
+### PT-A08 withdrawn from the report
+The carrying angle is defined with the elbow fully extended and the
+forearm fully supinated. Every source checked says so, including all
+three Indian normative studies we cite, and anatomy texts add that the
+angle is masked by pronation of the extended forearm. A standing posture
+photograph has the arms hanging with the forearm neutral or pronated, so
+the tool was not measuring the quantity its reference values describe.
+
+The reason this is a withdrawal rather than a recalibration is that no
+correction factor exists to apply. No peer-reviewed study measures the
+surface carrying angle across forearm positions in the same subjects,
+and the sources that touch the question disagree about direction: 3D CT
+shows the ulna rotating into valgus with pronation while the anatomy
+texts describe the visible angle shrinking. The 5 to 10 degree reduction
+that circulates online traces to a yoga anatomy page with no study
+behind it. Retuning bands against an unmeasured shift of unknown sign
+would make a measurement of the wrong thing look respectable.
+
+The error budget settles it independently. A goniometer in the correct
+position carries a maximal error of plus or minus 6.5 degrees, the one
+photograph-based validation reports 4.8 degrees mean absolute error, and
+general pose-estimation joint angle error runs 7 to 9 degrees, against a
+normal band 5 to 10 degrees wide.
+
+It is also not a postural parameter. The carrying angle is a fixed
+feature of bone alignment, used after supracondylar and lateral condyle
+fractures, in throwing athletes, and in anthropometric sex estimation.
+It does not change with postural correction or exercise, so there is
+nothing for a physiotherapy report to track.
+
+Not recorded as a founder question, on the same basis as PT-P03, PT-P05
+and PT-P04. The 2 October decisions document states plainly that it is
+being removed, with the reasoning, so it can be reversed on request.
+
+Two live defects went with it, both of which had been sitting in the
+still-blocked list waiting for founder bands. A hardcoded rule in
+posture.py graded any negative carrying angle as SEVERE regardless of
+magnitude, so a 2 degree and a 20 degree varus read the same. And a
+discontinuity at exactly minus 1.5 degrees moved a patient from NONE to
+SEVERE on a change of 0.02 degrees, far inside the model's own error.
+Both sat outside THRESHOLDS, so no threshold review would have reached
+them. The TODO(clinical) comment that marked them is gone with the code.
+
+`_EXTRA_BOUNDARIES` in classifier.py is now empty. It is kept rather
+than deleted, with a comment saying why: it exists for severity rules
+written outside THRESHOLDS, whose boundaries the borderline scan cannot
+otherwise see, and that situation can recur.
+
+The synthesizer test that asserted PT-A08's muscle mapping fires was
+rewritten rather than deleted. It now asserts that none of the four
+withdrawn parameters maps anything, which also closes a gap from
+1 October, when PT-P03 and PT-P05 were withdrawn with no test pinning
+it. The guard was checked against a live parameter to make sure it is
+not vacuous.
+
+Verified after the change: route imports clean, no live call to the
+calculation, no classify call, no TODO, mapping table down to 12
+parameters with all four withdrawn ones absent, PT-A08 bands still
+present in THRESHOLDS and unused, suite 32 passed.
+
 ---
 
 ## Not decided, still blocked
 
 These were looked at today and deliberately left alone.
 
-- **PT-A08 elbow carrying angle.** The cliff at -1.5 degrees and the rule
-  grading any varus as SEVERE regardless of magnitude both still stand.
-  Needs founder bands. Separately, the carrying angle is defined with the
-  elbow extended and the forearm supinated, which a standing posture
-  photograph cannot reproduce, so retuning the bands would make a
-  measurement of the wrong thing look normal.
+- **PT-A08 elbow carrying angle.** Settled on 2 October by withdrawing
+  the parameter, which was the second half of what this entry said: a
+  standing photograph cannot reproduce the position the measurement is
+  defined in, so no band would have fixed it. The cliff at -1.5 degrees
+  and the varus-is-always-SEVERE rule went with the code, so neither
+  needs founder bands any more. See the 2 October section above.
 - **PT-L06 flexion bands.** The label now follows the sign, but any
   non-negative value still grades NONE, so a 40 degree flexion contracture
   reads as normal. Needs clinician-supplied flexion bands.
@@ -390,8 +450,9 @@ These were looked at today and deliberately left alone.
   gate sits inside the measurement error and a straight leg is pushed
   to one side or the other by noise, and which side it lands on then
   decides which band grades it. Whether valgus and varus should share a
-  ceiling is a clinical question, not an engineering one: the asymmetry looks deliberate rather than accidental,
-  given the female allowance exists on one and not the other.
+  ceiling is a clinical question, not an engineering one: the asymmetry
+  looks deliberate rather than accidental, given the female allowance
+  exists on one and not the other.
 - **Severity tiers themselves.** Whether the product should assign
   none/mild/moderate/severe at all, or move to a normal-range presentation,
   is the question that dissolves roughly half of the above. Unanswered

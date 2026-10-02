@@ -37,7 +37,6 @@ from app.services.posture.calculator import (
     calc_pelvic_obliquity,
     calc_knee_frontal_deviation,
     calc_knee_hyperextension,
-    calc_elbow_carrying_angle,
     estimate_pixels_per_cm,
     calc_shoulder_asymmetry_mm,
     calc_ear_level_asymmetry_mm,
@@ -430,60 +429,15 @@ async def analyze_posture(
                 )
             )
 
-    # PT-A08 — Elbow Carrying Angle (bilateral)
-
-    for side_label, shoulder_i, elbow_i, wrist_i, side_key in [
-        ("Left", LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST, "left"),
-        ("Right", RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST, "right"),
-    ]:
-        try:
-            check_visibility(front_landmarks, [shoulder_i, elbow_i, wrist_i])
-
-            carrying_angle = calc_elbow_carrying_angle(front_geo, side_key)
-
-            if abs(carrying_angle) < 1.5:
-                # Near-zero deviation is measurement noise on an
-                # essentially straight arm, not a clinical finding -
-                # same "neutral" treatment as calc_knee_frontal_deviation
-                # (PT-A05/A06).
-                severity = "none"
-            elif carrying_angle < 0:
-                # TODO(clinical): this grades any varus as severe without
-                # looking at magnitude, so a 2 degree and a 20 degree varus
-                # read the same. It also sits outside the THRESHOLDS table
-                # in classifier.py, so a threshold review will not see it.
-                # Cubitus varus needs its own bands from the founders.
-                # Until 2026-09-10 the sign convention in
-                # calc_elbow_carrying_angle was inverted, so every normally
-                # standing patient hit this branch and both elbows printed
-                # SEVERE. That is fixed; this branch now only fires on a
-                # genuine varus, where it still over-grades.
-                severity = "severe"
-            else:
-                severity = classify("PT-A08", carrying_angle, gender=gender)
-
-            findings[f"PT-A08_{side_key}"] = severity
-
-            front_measurements.append(
-                measurement(
-                    "PT-A08",
-                    f"Elbow Carrying Angle ({side_label})",
-                    carrying_angle,
-                    "\u00b0",
-                    severity,
-                )
-            )
-
-        except InsufficientVisibilityError:
-            front_measurements.append(
-                measurement(
-                    "PT-A08",
-                    f"Elbow Carrying Angle ({side_label})",
-                    None,
-                    "\u00b0",
-                    "insufficient_data",
-                )
-            )
+    # PT-A08 — Elbow Carrying Angle. Withdrawn from the report on
+    # 2 October 2026. The carrying angle is defined with the elbow fully
+    # extended and the forearm fully supinated, which a standing posture
+    # photograph does not reproduce, and no published study measures how
+    # far the surface angle shifts between that position and a hanging
+    # arm. The calculation and its bands are left in place; nothing calls
+    # them. Removing this also retires the hardcoded varus-is-severe rule
+    # and its discontinuity at -1.5 degrees, which used to live here.
+    # See docs/known_limitations.md for the evidence.
 
     # PT-A02 / PT-A03 / PT-A10 — millimetre measurements (need patient height for calibration)
 

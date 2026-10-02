@@ -130,17 +130,9 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
             {"exercise": "Terminal Knee Extension Control", "dosage": "3x15"},
         ],
     },
-    {
-        # PT-A08 — Elbow Carrying Angle
-        # Low clinical confidence (geometric approximation) — flagged
-        # for clinician review; kept generic until validated.
-        "param_id": "PT-A08",
-        "hypertonic": ["Forearm Flexors"],
-        "inhibited": ["Forearm Extensors"],
-        "corrective": [
-            {"exercise": "Forearm Stretch & Strengthen", "dosage": "3x15"},
-        ],
-    },
+    # PT-A08 had an entry here. The parameter was withdrawn from the
+    # report on 2 October 2026, so its muscle and exercise mapping is
+    # removed with it. See docs/known_limitations.md.
 ]
 
 

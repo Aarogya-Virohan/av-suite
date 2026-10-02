@@ -38,14 +38,22 @@ def test_synthesis_pt_l06_knee_hyperextension():
     )
 
 
-def test_synthesis_pt_a08_elbow_carrying_angle():
+def test_withdrawn_parameters_trigger_nothing():
 
-    findings = {"PT-A08_left": "severe"}
+    # PT-P03 and PT-P05 were withdrawn on 1 October 2026, PT-A08 and
+    # PT-P04 on 2 October. Their calculations and bands are deliberately
+    # left in the source, so the only thing stopping them reaching a
+    # patient is that nothing calls them and nothing maps them. This
+    # pins the second half: if a mapping is ever added back without the
+    # parameter being deliberately reinstated, this fails.
 
-    result = generate_synthesis(findings)
+    for param in ("PT-A08_left", "PT-A08_right", "PT-P03_left", "PT-P04", "PT-P05"):
 
-    assert "Forearm Flexors" in result["hypertonic"]
-    assert "Forearm Extensors" in result["inhibited"]
+        result = generate_synthesis({param: "severe"})
+
+        assert result["hypertonic"] == [], f"{param} still maps hypertonic muscles"
+        assert result["inhibited"] == [], f"{param} still maps inhibited muscles"
+        assert result["correctiveProtocol"] == [], f"{param} still maps an exercise"
 
 
 def test_synthesis_three_part_key_does_not_crash():

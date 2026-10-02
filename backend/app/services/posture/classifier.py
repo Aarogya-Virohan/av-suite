@@ -180,9 +180,11 @@ THRESHOLDS: dict[str, dict] = {
         "moderate_min": -15,
     },
     # A separate hardcoded rule outside this table grades any negative
-    # carrying angle as SEVERE with a discontinuity at -1.5 degrees. That
-    # rule is not reachable from here, and the parameter's validity from a
-    # standing photograph is with the founders.
+    # Retained but unused. PT-A08 was withdrawn from the report on
+    # 2 October 2026 because a standing photograph cannot reproduce the
+    # position the carrying angle is defined in. Nothing classifies
+    # against these bands. The hardcoded varus rule that used to sit
+    # outside this table went with it.
     "PT-A08": {
         "direction": "higher_worse",
         "none_max": 10,
@@ -229,10 +231,12 @@ BORDERLINE_MARGIN_OVERRIDES_DEGREES: dict[str, float] = {
 # not a substitute for moving the rule into THRESHOLDS, it only makes sure
 # the value nearest that hardcoded cliff still gets flagged as provisional.
 _EXTRA_BOUNDARIES: dict[str, list[float]] = {
-    # posture.py grades any carrying angle at or below -1.5 degrees as
-    # SEVERE outright, and anything with |value| < 1.5 as NONE. -1.5 is
-    # therefore a hard decision point this table has no key for.
-    "PT-A08": [-1.5, 1.5],
+    # Empty by design, not by oversight. Its only entry was PT-A08's
+    # hardcoded -1.5 cliff in posture.py, and that rule was removed with
+    # the parameter on 2 October 2026. The mechanism stays because the
+    # situation it covers can recur: any severity rule written outside
+    # THRESHOLDS has boundaries the scan below cannot see, and they
+    # belong here.
 }
 
 # Any rule key ending in one of these is a severity boundary. Collected by
@@ -305,8 +309,9 @@ def classify(
 
     gender:
         Patient gender, only used for parameters with gender-dependent
-        normal ranges (currently PT-A05 Knee Valgus and PT-A08 Elbow
-        Carrying Angle, which has separate female bands in THRESHOLDS).
+        normal ranges (currently PT-A05 Knee Valgus. PT-A08 also has
+        female bands in THRESHOLDS but is no longer classified against
+        them, see the note on that entry).
 
     Returns
     -------
