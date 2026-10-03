@@ -1,6 +1,7 @@
 # Posture Tool, current state
 
-Written 2 October 2026, by reading and running, not from memory.
+Written 2 October 2026, updated 3 October, by reading and running,
+not from memory.
 
 This file replaces posture_tool_FULL_STORY_17Sep2026.md and
 posture_tool_handoff_01Oct2026.md as the thing to read first. Both are
@@ -35,23 +36,34 @@ starting.
 
 ## 1. Where the code is
 
-Branch dev, HEAD 591ecab, pushed, local and origin in step.
+Branch dev. Do not trust a commit hash written in this file, including
+in the list below: this file is itself committed, so any hash it names is
+one commit behind the moment it is written. That is how the previous
+version of this section came to name a HEAD three commits stale. Run
+`git log --oneline -5` instead.
 
-fix/posture-gsi-and-labels still exists at 097595b and is now behind dev.
-All of its work is merged. Nothing needs doing with it.
+As of this update dev is NOT pushed. origin/dev is behind. Push before
+relying on this from another machine.
 
-Test suite: 32 passed, run 2 October in the real clone. Verified here,
-not carried over from a handoff.
+work/capture-flow-03Oct is the branch the 3 October work was done on and
+is merged into dev by fast-forward. fix/posture-gsi-and-labels still
+exists at 097595b and is behind dev. Neither needs anything doing.
+
+Test suite: 34 passed, run 3 October in the real clone. Verified here, not
+carried over. The two new ones are in test_report_builder.py, which did
+not exist before 3 October.
 
 Recent commits, subjects as they actually read:
 
+    1e18ee3  posture: close the PT-L06 facing direction review, use the shared reference
+    c9a2d43  posture: record whether each photograph was captured in-app or uploaded
+    b6daa1d  capture: write PNG, not JPEG at quality 95
+    ac32619  docs: re-measure the 1 October figures, correct three that do not reproduce
+    519be8f  docs: the two withdrawals are done, not pending
+    a944514  posture: withdraw PT-A08 from the report
+    16ae06d  posture: withdraw PT-P04 from the report
+    3260edc  docs: current state file, read this one first
     591ecab  docs: millimetre parameters have no sourceable bands, and the unit is why
-    83bdaba  docs: research notes on PT-A08, PT-P04, PT-A05/A06
-    097595b  PT-L05 kept with limits recorded, analysisVersion to 2026-10-01
-    ac0c33c  posture: reject a leg whose joints are not stacked like a standing leg
-    38dc5e5  posture: withdraw PT-P03 and PT-P05 from the report
-    f3020b3  posture: record the knee direction review the source asked for
-    36ed10e  posture: measure the stature calibration constant instead of assuming it
 
 ---
 
@@ -119,15 +131,62 @@ no tick box, as a product question.
 Nothing else is unblocked. The remaining code work in section 5 either
 depends on question 1 or has not been scoped.
 
+## 4b. Done on 3 October
+
+Four commits, all engineering, none touching a clinical decision. Full
+reasoning in the 3 October section of decisions.md.
+
+**The 1 October figures were re-measured and three do not reproduce.**
+po-1's back view was never collapsed; that evidence was wrong and the
+photograph predates the commit describing it. PT-P05's pixel ranges and
+PT-P03's varus counts are both off. Every conclusion from that day
+survives, including both withdrawals. Only the counts under them were
+wrong. The calibration constant 0.8134 could not be verified either way,
+because reproducing it needs the crown of the head and the floor and no
+landmark gives either. Treat it as unconfirmed, not as wrong.
+
+**Capture now writes PNG, not JPEG at quality 95.** Measured: a single
+re-encode at q95 changed direction or severity on 4 of 14 legs, mean shift
+0.396 degrees. q100 gave 3 of 14 for double the size. PNG gave 0 of 14.
+Cost is upload, about 26 MB for three views against 4.3.
+
+**Every view records captureSource**, camera, upload or unknown, defaulting
+to unknown. The capture screen applies a protocol and the file input
+beside it applies none, and until now the two were indistinguishable once
+the file reached the server. The field is recorded, not printed; putting
+it on the report is presentation and belongs with question 6.
+
+**PT-L06's facing-direction note is closed.** It was deciding facing from
+its own ear-shoulder offset while PT-L01 and PT-L05 use
+facing_direction(), which uses the nose for a documented reason. The two
+agreed on all seven subjects, so no behaviour change, but the ear offset
+sits about twice as close to flipping. PT-L06 now calls the shared
+function.
+
+**What was scoped and deliberately not built: a capture-time photograph
+check.** Backend-side, reusing detect_pose_full, so one model and one
+truth; in-browser MediaPipe was rejected because it would be a different
+measurement from the pipeline's model_complexity=1. Detection costs 0.03
+to 0.05 seconds on this laptop, so compute is not the constraint; upload
+is. The reason it was not built: of the two known bad photographs, the
+existing guards already catch po-7's side view and nothing catches the
+other, so the check would ship at half coverage. Whether it should warn or
+block is answered by precedent, the tilt check warns.
+
 ## 5. Not started
 
 - PDF report content and design pass.
-- Frontend capture flow and report UI pass.
-- Two "Should be reviewed against real photographs" notes still live in
-  calculator.py, confirmed present on 2 October at line 373 (facing
-  direction) and line 568 (elbow sign convention). The elbow one becomes
-  irrelevant if PT-A08 is withdrawn. The knee equivalent was done on
-  1 October and the same method works for these.
+- Report UI pass. The capture half of the frontend was worked on
+  3 October, see section 4b; the report half was not.
+- One "Should be reviewed against real photographs" note is still live, in
+  calc_elbow_carrying_angle around line 568. It is moot, since PT-A08 was
+  withdrawn on 2 October. Left in place deliberately. The facing-direction
+  note at line 373 was closed on 3 October.
+- The upload path has no check of any kind. A clinician can choose any
+  file, including a screenshot or a photo of a screen, and it is measured
+  as if it were a guided capture. 3 October added wording to the upload
+  card and recorded the source in the report, but nothing gates it. A
+  capture-time check was scoped and not built: see section 4b.
 - detector.py runs MediaPipe at model_complexity=1. Measured on
   2 October: complexity 2 costs 0.11 seconds more per assessment and
   places landmarks better, but it also reports honest visibility on
@@ -143,9 +202,14 @@ depends on question 1 or has not been scoped.
 
 /Users/onkardureja/Downloads/Posture-test/, folders po-1 to po-7, each
 with front, side and back, plus subjects.csv. Heights were tape measured
-to the top of the skull. po-3 is bow-legged, po-5 wore slippers, po-7's
-side view detection is visibly wrong, and po-1's back view has the lower
-limb landmarks collapsed onto the floor.
+to the top of the skull. po-3 is bow-legged, po-5 wore slippers, and
+po-7's side view detection is visibly wrong, with the right ankle placed
+above its own knee.
+
+This file previously said po-1's back view has its lower-limb landmarks
+collapsed onto the floor. It does not, and never did. Re-measured and the
+annotated image inspected on 3 October: the landmarks are correctly
+placed. See the 3 October section of decisions.md.
 
 These are the basis for the calibration constant, the knee direction
 review, the PT-P03 and PT-P05 withdrawals, and the PT-A05/A06 noise
