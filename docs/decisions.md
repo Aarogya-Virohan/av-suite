@@ -239,17 +239,29 @@ Shivank want either back, the evidence is in known_limitations.md.
 
 ### MediaPipe visibility does not detect a misplaced landmark
 Not a decision, a finding that changes how much the existing guards are
-worth. On one subject's back view every lower-limb landmark collapsed onto
-the floor between the feet, hundreds of pixels from any foot, and the
-ankle and heel still reported 0.80 and 0.83 against our 0.65 threshold.
-The score means the model thinks the point is in frame, not that it is in
-the right place.
+worth. On po-7's side view the model placed the right ankle above its own
+knee and the leg still passed the 0.65 visibility threshold, producing a
+156 degree knee flexion. The score means the model thinks the point is in
+frame, not that it is in the right place.
 
 A geometric check was tried: ankle-to-heel distance over knee-to-ankle
-distance, measured on all 42 legs. The collapsed photograph scored 0.068
-and two correct photographs scored 0.073 and 0.077. There is no line
-between them, so no check was added. Recorded in known_limitations.md so
-the next person does not spend the same afternoon on it.
+distance, measured on all 42 legs. No threshold separates a misplaced
+landmark from a correct one, so no check was added. Recorded in
+known_limitations.md so the next person does not spend the same afternoon
+on it.
+
+Corrected 3 October 2026. This entry originally said that on one subject's
+back view every lower-limb landmark collapsed onto the floor between the
+feet with ankle and heel visibility of 0.80 and 0.83, and that the
+geometric check scored 0.068 against 0.073 and 0.077 on two correct
+photographs. Neither reproduces. po-1's back view, the photograph meant,
+returns correctly placed landmarks with heel visibility 0.68 and 0.66, and
+the annotated image confirms it; the file predates this entry by ninety
+minutes and the detection path has not changed since. On the geometric
+check the lowest ratio in the set is 0.031 on a correct detection and the
+next values are 0.070 and 0.071, also correct, which is why no line can be
+drawn. Both conclusions above are unchanged. Only the evidence under them
+was wrong, and the real evidence for the first one is po-7's side view.
 
 ### A leg whose joints are not stacked like a standing leg is now rejected
 One subject's side view reported Knee Flexion of 156.77 degrees, graded
@@ -418,6 +430,66 @@ Verified after the change: route imports clean, no live call to the
 calculation, no classify call, no TODO, mapping table down to 12
 parameters with all four withdrawn ones absent, PT-A08 bands still
 present in THRESHOLDS and unused, suite 32 passed.
+
+---
+
+## 3 October 2026
+
+### The 1 October figures were re-measured, and three of them were wrong
+Not a decision. A correction, and a note on how it happened.
+
+While working out what a capture-time photograph check could catch, the
+documented failure it was meant to catch was re-run: po-1's back view,
+recorded on 1 October as having every lower-limb landmark collapsed onto
+the floor. It does not. The landmarks sit correctly, the annotated image
+confirms it, the photograph's mtime is ninety minutes before the commit
+that described it, and the detection path has not changed since. The event
+did not happen.
+
+That prompted re-measuring the rest of the 1 October work against the same
+seven subjects. Results:
+
+- PT-P05 ankle-to-toe ranges, recorded as 18 to 133 on the back and 304 to
+  395 on the front: actual 26.5 to 272.1 and 96.8 to 364.6. The ranges
+  overlap because the set spans three resolutions. The within-subject
+  finding holds on all 14 legs and the withdrawal stands.
+- PT-P03 varus counts, recorded as 14 of 14 legs and 12 SEVERE: actual 13
+  of 14 and 10. The withdrawal stands on the published 8.2 degree error and
+  on 13 legs reading opposite to the population mean.
+- The geometric check figures 0.068, 0.073 and 0.077: do not reproduce. The
+  real lowest value is 0.031 on a correct detection. The conclusion, that
+  the quantity cannot separate good from bad, is unchanged.
+- Knee direction review: holds. Confirmed against knee separation over
+  ankle separation, a quantity the function does not use. The bow-legged
+  subject grades varus on both sides and MediaPipe's anatomical left sits
+  on the image right in 7 of 7 photographs.
+- Neutral gate: 3 of 14 on the pipeline path, which matches what the
+  2 October re-measurement already records here. No correction needed.
+- PT-L05 trunk lean, recorded as 0.9 to 3.5 degrees on six subjects, all
+  backward: exact match.
+- The calibration constant 0.8134 could not be verified. Reproducing it
+  needs the pixel position of the crown of the head and the floor, and no
+  landmark gives either. It is neither confirmed nor contradicted here, and
+  the method used on 1 October was not recorded.
+
+No withdrawal, threshold or decision changes as a result. Every conclusion
+from 1 October survived. What failed were the counts written underneath
+them, and one piece of evidence that described something that never
+occurred.
+
+The cause is worth recording, because it also caught this session out five
+times in a row. A measurement computed alongside the pipeline is not the
+pipeline's measurement. Passing raw landmarks to a function that posture.py
+feeds from to_geometric_space roughly doubles a trunk lean and halves a
+knee deviation; using to_geometric_space output for a pixel distance
+returns tenths of a pixel; recovering a constant from the function that
+divides by it returns the constant. Each of those produced a confident
+wrong number in this session before being caught. The rule that follows:
+import and call what posture.py calls, the way it calls it.
+
+Documents corrected: known_limitations.md, three places; this file, the
+1 October visibility entry. Correction notes left in place rather than
+rewriting history, so the next reader can see what changed.
 
 ---
 

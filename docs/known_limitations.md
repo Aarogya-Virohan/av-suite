@@ -27,26 +27,42 @@ is ever solved.
 
 | Param ID | Name | Reason withdrawn |
 |---|---|---|
-| PT-P05 | Bilateral Toe Angle Asymmetry | The foot-index landmark is not observed from behind. Across seven subjects, ankle-to-toe distance measured 18 to 133 pixels on the back view against 304 to 395 on the front view of the same person, on all 14 legs. The model places the toe point by inference when the foot is hidden behind the leg, which is every posterior photograph. Google's own issue tracker carries a report of heel and toe keypoints landing in the wrong place on the occluded leg. The parameter was grading an angle between two points, one of which is not seen. On the sample set it returned 21.5 and 14.5 degrees SEVERE on subjects with no foot complaint. |
-| PT-P03 | Rearfoot / Calcaneal Alignment | The heel landmark is visible from behind and lands on the heel in most photographs, so this one failed differently. Published error for rearfoot eversion angle from a phone camera is 8.2 degrees mean absolute, against a clinically meaningful threshold of about 3 degrees, because pose models infer eversion from heel position rather than from calcaneal motion and assume a rigid foot. Our entire band range sits inside that error. On our own seven subjects the parameter returned varus on 14 of 14 legs, 12 of them SEVERE, against a published healthy population mean of 6.07 degrees of valgus. A result that is the opposite of the population on every subject is not a band problem. |
+| PT-P05 | Bilateral Toe Angle Asymmetry | The foot-index landmark is not observed from behind. Across seven subjects, ankle-to-toe distance was shorter on the back view than on the front view of the same person on all 14 legs, 26.5 to 272.1 pixels against 96.8 to 364.6. The two ranges overlap because the set spans three image resolutions, so the comparison that carries the finding is the within-subject one, leg by leg, not the ranges. Re-measured 3 October 2026; the figures previously recorded here, 18 to 133 and 304 to 395, do not reproduce. The model places the toe point by inference when the foot is hidden behind the leg, which is every posterior photograph. Google's own issue tracker carries a report of heel and toe keypoints landing in the wrong place on the occluded leg. The parameter was grading an angle between two points, one of which is not seen. On the sample set it returned 21.5 and 14.5 degrees SEVERE on subjects with no foot complaint. |
+| PT-P03 | Rearfoot / Calcaneal Alignment | The heel landmark is visible from behind and lands on the heel in most photographs, so this one failed differently. Published error for rearfoot eversion angle from a phone camera is 8.2 degrees mean absolute, against a clinically meaningful threshold of about 3 degrees, because pose models infer eversion from heel position rather than from calcaneal motion and assume a rigid foot. Our entire band range sits inside that error. On our own seven subjects the parameter returned varus on 13 of 14 legs, 10 of them SEVERE and several between 20 and 32 degrees, against a published healthy population mean of 6.07 degrees of valgus. A result that is the opposite of the population on all but one leg is not a band problem. Re-measured 3 October 2026; the figures previously recorded here, 14 of 14 and 12 SEVERE, do not reproduce. |
 
 ### A third finding, which is not parameter-specific
 
-MediaPipe's visibility score does not detect a misplaced landmark. On one
-of the seven subjects every lower-limb landmark on the back view collapsed
-onto the floor between the feet, several hundred pixels from any foot, and
-the ankle and heel still reported visibility of 0.80 and 0.83, above our
-0.65 threshold. The score expresses confidence that a point is within the
-frame, not that it is in the right place, so no threshold on it would have
-caught this.
+MediaPipe's visibility score does not detect a misplaced landmark. On
+po-7's side view the model placed the right ankle above its own knee, and
+the leg still passed the 0.65 visibility threshold; the resulting 156
+degree knee flexion is what prompted check_limb_order. The score expresses
+confidence that a point is within the frame, not that it is in the right
+place, so no threshold on it would have caught this.
+
+Correction, 3 October 2026. This section previously said that on one
+subject every lower-limb landmark on the back view collapsed onto the floor
+between the feet, several hundred pixels from any foot, with ankle and heel
+visibility of 0.80 and 0.83. That did not happen. po-1's back view, the
+photograph the description was attached to, returns hips, knees and ankles
+in their correct positions with the two legs at separate x; heel visibility
+reads 0.68 and 0.66. The annotated image was inspected and the skeleton sits
+correctly on the subject. The photograph has an mtime of 1 October 15:35 and
+the paragraph was committed at 17:05 the same day, and the detection path
+has not changed since, so the file being described is the file that is here
+now. The point the paragraph makes is still correct. The evidence under it
+was not.
 
 A geometric check was attempted and does not work. The ankle-to-heel
 distance as a fraction of knee-to-ankle distance was measured on all 42
-legs in the sample. The collapsed photograph scored 0.068 while two
-correct photographs scored 0.073 and 0.077, so there is no line to draw
-between them. This is recorded here because the obvious fix has already
-been tried and failed, and because it affects every parameter, not only
-the two above.
+legs in the sample. Re-measured 3 October 2026, the values 0.068, 0.073 and
+0.077 recorded here do not reproduce either. What the measurement actually
+shows is that the lowest ratio in the set, 0.031, belongs to po-1's back
+view left leg, which is a correct detection, while the next lowest values
+sit at 0.070 and 0.071 on front views that are also correct. A threshold
+drawn anywhere between them rejects a good photograph. The conclusion
+stands: this quantity cannot separate a misplaced landmark from a correct
+one. It is recorded because the obvious fix has already been tried and
+failed, and because it affects every parameter, not only the two above.
 
 ## Withdrawn because the capture position is wrong, 2 October 2026
 
