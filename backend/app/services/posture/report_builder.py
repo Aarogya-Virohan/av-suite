@@ -70,6 +70,7 @@ def build_side_view_result(
     measurements: list[dict[str, Any]],
     photo_url: str,
     accuracy: float = 0.0,
+    capture_source: str = "unknown",
 ) -> dict[str, Any]:
 
     severe_findings = [
@@ -88,6 +89,7 @@ def build_side_view_result(
         "accuracy": round(accuracy, 4),
         "measurements": measurements,
         "interpretation": interpretation,
+        "captureSource": capture_source,
     }
 
 

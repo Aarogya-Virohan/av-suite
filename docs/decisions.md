@@ -518,6 +518,34 @@ which is further evidence that the gate sits inside the measurement noise.
 That is already recorded under the knee bands and is a founder question.
 Nothing was changed about it here.
 
+### The report now records whether each photograph was captured or uploaded
+Every view carries a `captureSource` of `camera`, `upload` or `unknown`.
+
+The capture screen applies a protocol: tripod at about half patient height,
+a fixed distance held across visits, framing lines for head and feet, a
+tilt check, and now lossless encoding. The file input next to it applies
+none of that, and once the file reaches the server the two are
+indistinguishable. A measurement from an unguided photograph is not
+comparable with a guided one of the same patient, and until now nothing
+recorded which had happened.
+
+The default is `unknown`, not `camera`. A client that does not send the
+field has not told us the photograph was guided, and assuming it was would
+overstate provenance on exactly the reports where it is least safe.
+
+Scope kept deliberately narrow. This records the fact; it does not print
+it. Putting it on the patient-facing report is presentation and belongs
+with founder question 6, so nothing was added to the PDF.
+
+Two tests pin it, including one asserting the default is not `camera`,
+because the whole value of the field is lost if a future change makes the
+unguided path claim to be guided. report_builder.py had no test file at
+all before this.
+
+The upload card also now carries the capture protocol in text, so a
+clinician choosing an existing photo can at least see what the measurement
+assumes. Wording only, no gate on the upload.
+
 ---
 
 ## Not decided, still blocked

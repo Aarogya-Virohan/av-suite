@@ -11,6 +11,7 @@ interface UploadZoneProps {
   view: CaptureView
   setImage: (image: string) => void
   setImageFile: (file: File) => void
+  setSource: (source: "camera" | "upload") => void
 }
 
 export default function UploadZone({
@@ -18,9 +19,12 @@ export default function UploadZone({
   view,
   setImage,
   setImageFile,
+  setSource,
 }: UploadZoneProps) {
   const [cameraOpen, setCameraOpen] = useState(false)
   const [thumb, setThumb] = useState<string | null>(null)
+  const [source, setLocalSource] = useState<"camera" | "upload" | null>(null)
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
 
@@ -32,6 +36,9 @@ export default function UploadZone({
     setImage(url)
 
     setImageFile(file)
+
+    setLocalSource("upload")
+    setSource("upload")
   }
 
   return (
@@ -51,6 +58,16 @@ export default function UploadZone({
         <p className="text-sm text-slate-500">
           Capture with the camera for the most reliable result, or upload an
           existing photo.
+        </p>
+
+        <p className="mt-2 text-xs leading-snug text-slate-500">
+          An uploaded photo is measured the same way but cannot be checked
+          against the capture protocol. For it to be comparable with the
+          patient&apos;s other visits it needs the whole body in frame from
+          head to feet, the camera level and at about half the
+          patient&apos;s height, the same distance each visit, and clothing
+          that leaves the shoulders, hips, knees and ankles visible. A
+          screenshot or a photo of a screen will not measure correctly.
         </p>
       </div>
 
@@ -80,7 +97,7 @@ export default function UploadZone({
             className="h-14 w-14 rounded object-cover"
           />
           <span className="text-sm font-medium text-emerald-800">
-            Captured
+            {source === "upload" ? "Uploaded" : "Captured"}
           </span>
         </div>
       )}
@@ -109,6 +126,8 @@ export default function UploadZone({
             setThumb(previewUrl)
             setImage(previewUrl)
             setImageFile(file)
+            setLocalSource("camera")
+            setSource("camera")
           }}
           onClose={() => setCameraOpen(false)}
         />

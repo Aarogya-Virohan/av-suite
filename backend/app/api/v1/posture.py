@@ -161,6 +161,12 @@ async def analyze_posture(
     case_ref: str = Form(...),
     patient_height_cm: float = Form(...),
     clinician_name: str = Form(""),
+    # Whether each photograph came from the in-app capture screen or from
+    # an existing file. Defaulted rather than required so an older client
+    # keeps working; "unknown" is honest about not knowing.
+    front_source: str = Form("unknown"),
+    side_source: str = Form("unknown"),
+    back_source: str = Form("unknown"),
 ):
 
     # ---------------------------------
@@ -315,6 +321,7 @@ async def analyze_posture(
         measurements=side_measurements,
         photo_url=side_photo_url,
         accuracy=calc_detection_confidence(side_landmarks),
+        capture_source=side_source,
     )
 
     # =========================================================================
@@ -532,6 +539,7 @@ async def analyze_posture(
         measurements=front_measurements,
         photo_url=front_photo_url,
         accuracy=calc_detection_confidence(front_landmarks),
+        capture_source=front_source,
     )
 
     # =========================================================================
@@ -643,6 +651,7 @@ async def analyze_posture(
         measurements=back_measurements,
         photo_url=back_photo_url,
         accuracy=calc_detection_confidence(back_landmarks),
+        capture_source=back_source,
     )
 
     # ---------------------------------

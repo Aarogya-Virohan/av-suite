@@ -41,6 +41,21 @@ useState<File | null>(null)
 const [backFile, setBackFile] =
 useState<File | null>(null)
 
+// Whether each photograph came from the in-app capture screen or from an
+// existing file. An uploaded photo skips the tripod, framing and encoding
+// protocol, so a measurement taken from one is not comparable with a
+// guided capture of the same patient. The report records which it was.
+type CaptureSource = "camera" | "upload" | "unknown"
+
+const [frontSource, setFrontSource] =
+useState<CaptureSource>("unknown")
+
+const [sideSource, setSideSource] =
+useState<CaptureSource>("unknown")
+
+const [backSource, setBackSource] =
+useState<CaptureSource>("unknown")
+
 const [patientName, setPatientName] =
 useState("")
 
@@ -105,6 +120,9 @@ try {
          caseRef,
          patientHeightCm,
          clinicianName,
+         frontSource,
+         sideSource,
+         backSource,
        }
     )
 
@@ -258,6 +276,9 @@ return ( <div className="min-h-screen bg-slate-100">
                 setImageFile={
                   setFrontFile
                 }
+                setSource={
+                  setFrontSource
+                }
               />
 
               <UploadZone
@@ -269,6 +290,9 @@ return ( <div className="min-h-screen bg-slate-100">
                 setImageFile={
                   setSideFile
                 }
+                setSource={
+                  setSideSource
+                }
               />
 
               <UploadZone
@@ -279,6 +303,9 @@ return ( <div className="min-h-screen bg-slate-100">
                 }
                 setImageFile={
                   setBackFile
+                }
+                setSource={
+                  setBackSource
                 }
               />
 
@@ -409,6 +436,10 @@ return ( <div className="min-h-screen bg-slate-100">
                 setBackFile(
                   null
                 )
+
+                setFrontSource("unknown")
+                setSideSource("unknown")
+                setBackSource("unknown")
 
                 setPatientName("")
                 setAge("")

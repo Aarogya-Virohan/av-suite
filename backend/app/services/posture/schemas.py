@@ -36,3 +36,11 @@ class ViewResult:
     accuracy: float
     measurements: list[Measurement]
     interpretation: str
+
+    # "camera" when the photograph was taken through the in-app capture
+    # screen, which applies the tripod and framing protocol and encodes
+    # losslessly, "upload" when an existing file was chosen, "unknown" when
+    # the client did not say. A measurement from an unguided photograph is
+    # not comparable to a guided one, and without this the two are
+    # indistinguishable once the file reaches the server.
+    captureSource: str
