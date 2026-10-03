@@ -546,6 +546,37 @@ The upload card also now carries the capture protocol in text, so a
 clinician choosing an existing photo can at least see what the measurement
 assumes. Wording only, no gate on the upload.
 
+### PT-L06 facing direction reviewed, and moved onto the shared reference
+The source carried a note asking for `calc_knee_hyperextension`'s sign
+convention to be checked against real photographs before clinical use.
+Done, on the seven side views.
+
+The review found the function deciding which way the subject faces from
+its own inline `ear.x - shoulder.x`, while PT-L01 and PT-L05 both call
+`facing_direction()`, which uses the nose. That function's docstring
+already gives the reason to prefer the nose: in forward head posture the
+ear translates anteriorly, so an ear-based reference is weakest in exactly
+the case these lateral parameters exist to measure.
+
+On our seven subjects the two references agree on the sign for all seven,
+including po-4, who faces the other way, so this is not a behaviour change
+on our data. Verified: PT-L06 returns identical values before and after.
+What the numbers do show is margin. The ear offset ran 0.024 to 0.044
+while the nose offset ran 0.073 to 0.092, so the ear-based test sits about
+twice as close to flipping on every subject.
+
+`calc_knee_hyperextension` now calls `facing_direction()`. One definition
+of facing, and the more robust one.
+
+Three tests in test_calculator.py were asserting against the ear reference
+with the nose left blank, so they failed on the change. They were rewritten
+onto the nose, not reverted. Flipping a reference back to clear a red suite
+is how the elbow sign bug would have returned, and the same reasoning
+applies here. Suite 34 passed.
+
+The second such note, on `calc_elbow_carrying_angle` around line 568, is
+moot since PT-A08 was withdrawn on 2 October. Left in place, not reviewed.
+
 ---
 
 ## Not decided, still blocked

@@ -175,9 +175,11 @@ def test_calc_knee_hyperextension_flexion_is_positive() -> None:
 
     points = _blank_landmarks()
 
-    # Facing direction: ear.x > shoulder.x -> facing toward +x.
+    # Facing direction is taken from the nose against the shoulder, not
+    # the ear: see facing_direction(). nose.x > shoulder.x -> facing +x.
     _set(points, RIGHT_SHOULDER, 0.5, 0.3)
-    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR
+    _set(points, 0, 0.65, 0.25)  # NOSE
+    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR, no longer used for facing
 
     # Hip directly above ankle (straight vertical reference line).
     _set(points, 24, 0.5, 0.5)  # RIGHT_HIP
@@ -195,9 +197,11 @@ def test_calc_knee_hyperextension_posterior_is_negative() -> None:
 
     points = _blank_landmarks()
 
-    # Facing direction: ear.x > shoulder.x -> facing toward +x.
+    # Facing direction is taken from the nose against the shoulder, not
+    # the ear: see facing_direction(). nose.x > shoulder.x -> facing +x.
     _set(points, RIGHT_SHOULDER, 0.5, 0.3)
-    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR
+    _set(points, 0, 0.65, 0.25)  # NOSE
+    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR, no longer used for facing
 
     # Hip directly above ankle (straight vertical reference line).
     _set(points, 24, 0.5, 0.5)  # RIGHT_HIP
@@ -216,7 +220,8 @@ def test_calc_knee_hyperextension_straight_leg_is_zero() -> None:
     points = _blank_landmarks()
 
     _set(points, RIGHT_SHOULDER, 0.5, 0.3)
-    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR
+    _set(points, 0, 0.65, 0.25)  # NOSE
+    _set(points, 8, 0.6, 0.3)  # RIGHT_EAR, no longer used for facing
 
     _set(points, 24, 0.5, 0.5)  # RIGHT_HIP
     _set(points, 26, 0.5, 0.75)  # RIGHT_KNEE, on the hip-ankle line

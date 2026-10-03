@@ -368,18 +368,28 @@ def calc_knee_hyperextension(
     negative = knee hyperextended (posterior to the hip-ankle line),
     relative to the direction the subject is facing (ear-shoulder line).
 
-    Note: sign convention is a geometric approximation based on the
-    knee's horizontal offset from the expected straight hip-ankle line
-    and the subject's facing direction. Should be reviewed against real
-    photos before clinical use (same caveat as
-    calc_knee_frontal_deviation).
+    Sign convention reviewed against real photographs on 3 October 2026,
+    as the previous note here asked for. Seven subjects, side view.
+
+    The review found this function deciding facing direction from its own
+    inline ear-minus-shoulder offset while PT-L01 and PT-L05 use
+    facing_direction(), which takes nose minus shoulder and whose docstring
+    gives the reason: in forward head posture the ear itself translates
+    anteriorly, so an ear-based reference is weakest in exactly the case
+    these lateral parameters exist to measure.
+
+    On the seven subjects the two references agreed on the sign for all
+    seven, including po-4, who faces the other way. So this is not a
+    behaviour change on our data. But the ear offset was consistently about
+    half the nose offset, 0.024 to 0.044 against 0.073 to 0.092, which puts
+    the ear-based test nearer the sign flip on every subject. The function
+    now calls facing_direction() so there is one definition of facing and
+    the more robust one.
     """
 
     hip = landmarks[LEFT_HIP if side == "left" else RIGHT_HIP]
     knee = landmarks[LEFT_KNEE if side == "left" else RIGHT_KNEE]
     ankle = landmarks[LEFT_ANKLE if side == "left" else RIGHT_ANKLE]
-    ear = landmarks[LEFT_EAR if side == "left" else RIGHT_EAR]
-    shoulder = landmarks[LEFT_SHOULDER if side == "left" else RIGHT_SHOULDER]
 
     raw_angle = angle_between_points(
         (hip.x, hip.y),
@@ -397,7 +407,7 @@ def calc_knee_hyperextension(
     expected_x = hip.x + t * (ankle.x - hip.x)
     offset = knee.x - expected_x
 
-    facing_dx = ear.x - shoulder.x
+    facing_dx = facing_direction(landmarks, side)
 
     # Knee anterior (toward the facing direction) = flexion/normal,
     # positive. Knee posterior (away from facing direction) =
