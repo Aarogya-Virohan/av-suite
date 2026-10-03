@@ -152,16 +152,26 @@ export default function CameraCapture({
 
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-    // Quality is deliberately high. Heavy JPEG compression degrades
-    // landmark accuracy enough to move a borderline measurement across
-    // a severity threshold, which is the whole reason for capturing
-    // in-app rather than accepting a forwarded photo.
+    // PNG, not JPEG, because JPEG is lossy at any quality setting and the
+    // loss is large enough to move a grade. Measured 3 October 2026 on the
+    // seven test subjects: re-encoding a front view once at quality 95
+    // shifted knee deviation by 0.40 degrees on average and 1.19 at worst,
+    // and changed the reported direction or severity on 4 of 14 legs. One
+    // leg went from 0.356 to 1.358 degrees and flipped from neutral to
+    // varus. Quality 100 was no better, 3 of 14, for twice the file size.
+    // PNG changed nothing at all, 0 of 14, 0.000 degrees.
+    //
+    // The cost is size: roughly 8.7 MB a photo against 1.4, so about 26 MB
+    // for the three views instead of 4.3. That is a slower upload on a
+    // clinic connection, and it is the right trade, because the whole point
+    // of capturing in-app rather than accepting a forwarded photo is that
+    // we control what reaches the model.
     canvas.toBlob(
       (blob) => {
         if (!blob) return
 
-        const file = new File([blob], `posture-${view}-${Date.now()}.jpg`, {
-          type: "image/jpeg",
+        const file = new File([blob], `posture-${view}-${Date.now()}.png`, {
+          type: "image/png",
         })
 
         onCapture(file, URL.createObjectURL(blob))
@@ -173,8 +183,7 @@ export default function CameraCapture({
         // nothing.
         window.history.back()
       },
-      "image/jpeg",
-      0.95,
+      "image/png",
     )
   }, [view, onCapture, onClose])
 

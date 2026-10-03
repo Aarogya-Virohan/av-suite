@@ -491,6 +491,33 @@ Documents corrected: known_limitations.md, three places; this file, the
 1 October visibility entry. Correction notes left in place rather than
 rewriting history, so the next reader can see what changed.
 
+### In-app capture now writes PNG instead of JPEG at quality 95
+The camera component encoded every capture through
+`canvas.toBlob(..., "image/jpeg", 0.95)`. JPEG is lossy at every quality
+setting, and the loss is big enough to move a grade.
+
+Measured on the seven front views, re-encoding the original once and
+running both through the pipeline:
+
+    variant   changed   mean shift   worst   MB/photo   MB/assessment
+    q95       4 of 14       0.396    1.187       1.42            4.26
+    q100      3 of 14       0.406    1.197       2.71            8.14
+    png       0 of 14       0.000    0.000       8.74           26.21
+
+One leg moved from 0.356 to 1.358 degrees and flipped neutral to varus,
+which reproduces the observation already in the working rules. Quality 100
+buys almost nothing for double the size, so there is no middle option: the
+choice is lossless or accept the shift.
+
+PNG, at roughly six times the upload. The cost is real on a clinic
+connection and is accepted, because capturing in-app instead of taking a
+forwarded photo is only worth doing if we control what reaches the model.
+
+Three of the four changed legs flipped across the 0.5 degree neutral gate,
+which is further evidence that the gate sits inside the measurement noise.
+That is already recorded under the knee bands and is a founder question.
+Nothing was changed about it here.
+
 ---
 
 ## Not decided, still blocked
