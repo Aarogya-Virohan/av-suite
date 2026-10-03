@@ -5,6 +5,9 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.core.dependencies import require_roles
+from app.enums.user import UserRole
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_async_session, get_current_clinic
@@ -25,7 +28,7 @@ from app.services.treatment import (
     TreatmentValidationError,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))])
 
 
 async def get_treatment_service(

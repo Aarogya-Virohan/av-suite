@@ -25,6 +25,7 @@ from app.schemas.billing import (
     PatientPackageUpdate,
     PaymentCreate,
 )
+from app.utils.whatsapp import build_whatsapp_link
 
 
 class BillingValidationError(Exception):
@@ -429,6 +430,38 @@ class BillingService:
             f"Total: {invoice.total_amount}\n"
         ).encode("utf-8")
         return pdf_content
+
+    @staticmethod
+    def _build_invoice_message(patient_name: str, pdf_url: str) -> str:
+        """Format the WhatsApp message that accompanies an invoice download."""
+
+        return (
+            f"Hello {patient_name},\n\n"
+            "Thank you for visiting.\n\n"
+            "You can download your invoice here:\n\n"
+            f"{pdf_url}"
+        )
+
+    async def generate_invoice_pdf_response(self, clinic_id: UUID, invoice_id: UUID) -> dict[str, object]:
+        """Generate an invoice PDF and return the download link plus WhatsApp deep link."""
+
+        invoice = await self.get_invoice(clinic_id, invoice_id)
+        patient = await self.patient_repository.get_by_patient_id(invoice.patient_id, clinic_id=clinic_id)
+        if patient is None:
+            raise BillingNotFoundError(f"Patient '{invoice.patient_id}' not found for clinic '{clinic_id}'.")
+
+        pdf_url = f"/api/v1/billing/invoices/{invoice_id}/pdf/download"
+        _ = await self.generate_invoice_pdf(clinic_id, invoice_id)
+
+        patient_name = getattr(patient, "full_name", "Patient")
+        whatsapp_link = build_whatsapp_link(patient.phone or "", self._build_invoice_message(patient_name, pdf_url))
+
+        return {
+            "invoice_id": str(invoice.id),
+            "status": "generated",
+            "download_url": pdf_url,
+            "whatsapp_link": whatsapp_link,
+        }
 
     async def get_outstanding_balance(self, clinic_id: UUID, patient_id: UUID | None = None) -> Decimal:
         """Calculate total outstanding unpaid balance for a patient or clinic."""

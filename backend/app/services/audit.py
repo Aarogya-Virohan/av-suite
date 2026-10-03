@@ -70,3 +70,35 @@ class AuditLogService:
             offset=offset,
             limit=limit,
         )
+
+    async def get_log(self, clinic_id: UUID, log_id: UUID) -> AuditLog | None:
+        """Fetch one clinic-scoped audit log by ID."""
+
+        return await self.audit_repository.get_log_by_id(clinic_id, log_id)
+
+    async def list_logs_paginated(
+        self,
+        clinic_id: UUID,
+        *,
+        entity_type: str | None = None,
+        action: str | None = None,
+        user_id: UUID | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[AuditLog], int]:
+        """Query audit logs with pagination metadata and optional search."""
+
+        return await self.audit_repository.list_logs_paginated(
+            clinic_id=clinic_id,
+            entity_type=entity_type,
+            action=action,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            search=search,
+            offset=offset,
+            limit=limit,
+        )

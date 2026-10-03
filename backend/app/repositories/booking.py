@@ -47,3 +47,27 @@ class AppointmentRequestRepository(BaseRepository[AppointmentRequest]):
         statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())
+
+    async def update_request_by_id(
+        self,
+        *,
+        clinic_id: UUID,
+        request_id: UUID,
+        update_data: dict[str, object],
+    ) -> AppointmentRequest | None:
+        """Update an appointment request by ID inside clinic scope."""
+
+        request_obj = await self.get_by_id(request_id, clinic_id=clinic_id)
+        if request_obj is None:
+            return None
+
+        updated = await self.update(request_obj, update_data)
+        await self.session.commit()
+        await self.session.refresh(updated)
+        return updated
+
+    async def delete_request(self, request_obj: AppointmentRequest) -> None:
+        """Delete an appointment request using repository deletion strategy."""
+
+        await self.delete(request_obj)
+        await self.session.commit()

@@ -194,7 +194,7 @@ class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     line_items: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON().with_variant(JSONB(), "postgresql"),
         nullable=False,
-        server_default=text("'[]'::jsonb"),
+        server_default=text("'[]'"),
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -5,8 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session, get_current_clinic, get_current_user
-from app.enums.user import UserRole, normalize_user_role
+from app.core.dependencies import get_async_session, get_current_clinic, get_current_user, require_admin
+from app.enums.user import UserRole
 from app.models.clinic import Clinic
 from app.models.user import User
 from app.repositories.audit import AuditLogRepository
@@ -33,6 +33,7 @@ async def get_settings_service(
 SettingsServiceDep = Annotated[ClinicSettingsService, Depends(get_settings_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
+AdminUserDep = Annotated[User, Depends(require_admin)]
 
 
 @router.get("/settings/clinic", response_model=ClinicSettingsResponse)
@@ -53,17 +54,12 @@ async def get_clinic_settings(
 async def update_clinic_settings(
     payload: ClinicSettingsUpdate,
     clinic: CurrentClinicDep,
-    user: CurrentUserDep,
+    user: AdminUserDep,
     service: SettingsServiceDep,
 ) -> ClinicSettingsResponse:
     """Update clinic branding settings (admin only)."""
 
-    user_role = normalize_user_role(user.role)
-    if user_role != UserRole.ADMIN:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only clinic administrators may update clinic settings.",
-        )
+
 
     try:
         updated_clinic = await service.update_settings(clinic.id, user.id, payload)

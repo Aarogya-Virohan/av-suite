@@ -6,7 +6,12 @@ import logging
 from app.enums.user import UserRole
 
 from app.core.database import get_db
-from app.schemas.prescription import PrescriptionCreate, PrescriptionRead, PrescriptionPatch
+from app.core.dependencies import require_roles
+from app.schemas.prescription import (
+    PrescriptionCreate,
+    PrescriptionRead,
+    PrescriptionPatch,
+)
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
@@ -18,34 +23,30 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 @router.post(
     "",
     response_model=ResponseEnvelope[PrescriptionRead],
     status_code=201,
-    tags=["Prescriptions"]
+    tags=["Prescriptions"],
 )
 async def create_prescription(
     request: Request,
     prescription_in: PrescriptionCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST)),
 ):
     """
     Creates a new exercise prescription for a patient.
     Strictly scoped to the clinician's clinic_id and logged-in user_id.
     """
-    logger.info(f"Received create prescription request for patient {prescription_in.patient_id}")
+    logger.info(
+        f"Received create prescription request for patient {prescription_in.patient_id}"
+    )
     try:
         clinic_id = request.state.clinic_id
         physio_id = request.state.user_id
-        
-        # Verify role is admin or physio/therapist (though gate handles basic auth)
-        role = request.state.role
-        if role not in {UserRole.ADMIN, UserRole.THERAPIST}:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only therapists or admins can prescribe exercises"
-            )
-            
+
         prescription = await prescription_service.create_prescription(
             db, uuid.UUID(clinic_id), uuid.UUID(physio_id), prescription_in
         )
@@ -56,16 +57,18 @@ async def create_prescription(
         logger.error(f"Error creating prescription: {str(e)}")
         raise
 
+
 @router.get(
-    "",
-    response_model=ResponseEnvelope[List[PrescriptionRead]],
-    tags=["Prescriptions"]
+    "", response_model=ResponseEnvelope[List[PrescriptionRead]], tags=["Prescriptions"]
 )
 async def list_prescriptions(
     request: Request,
     patient_id: Optional[uuid.UUID] = Query(None, description="Filter by patient ID"),
+    search: Optional[str] = Query(
+        None, description="Search by patient name, exercise title, or related fields"
+    ),
     pagination: PaginationParams = Depends(get_pagination_params),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     List prescriptions in a clinic, optionally filtered by patient.
@@ -74,27 +77,27 @@ async def list_prescriptions(
     try:
         clinic_id = request.state.clinic_id
         prescriptions, total = await prescription_service.get_prescriptions(
-            db, uuid.UUID(clinic_id), patient_id, pagination.page, pagination.page_size
+            db,
+            uuid.UUID(clinic_id),
+            patient_id,
+            search,
+            pagination.page,
+            pagination.page_size,
         )
         meta = MetaPagination(
-            total=total,
-            page=pagination.page,
-            page_size=pagination.page_size
+            total=total, page=pagination.page, page_size=pagination.page_size
         )
         return ResponseEnvelope(data=prescriptions, meta=meta)
     except Exception as e:
         logger.error(f"Error listing prescriptions: {str(e)}")
         raise
 
+
 @router.get(
-    "/{id}",
-    response_model=ResponseEnvelope[PrescriptionRead],
-    tags=["Prescriptions"]
+    "/{id}", response_model=ResponseEnvelope[PrescriptionRead], tags=["Prescriptions"]
 )
 async def get_prescription(
-    request: Request,
-    id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
+    request: Request, id: uuid.UUID, db: AsyncSession = Depends(get_db)
 ):
     """
     Fetches a specific prescription by ID.
@@ -108,7 +111,7 @@ async def get_prescription(
         if not prescription:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Prescription not found or not in user's clinic"
+                detail="Prescription not found or not in user's clinic",
             )
         return ResponseEnvelope(data=prescription)
     except HTTPException:
@@ -117,16 +120,16 @@ async def get_prescription(
         logger.error(f"Error getting prescription {id}: {str(e)}")
         raise
 
+
 @router.patch(
-    "/{id}",
-    response_model=ResponseEnvelope[PrescriptionRead],
-    tags=["Prescriptions"]
+    "/{id}", response_model=ResponseEnvelope[PrescriptionRead], tags=["Prescriptions"]
 )
 async def update_prescription(
     request: Request,
     id: uuid.UUID,
     patch_in: PrescriptionPatch,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST)),
 ):
     """
     Patches/updates prescription details.
@@ -135,20 +138,13 @@ async def update_prescription(
     try:
         clinic_id = request.state.clinic_id
 
-        role = request.state.role
-        if role not in {UserRole.ADMIN, UserRole.THERAPIST}:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only therapists or admins can update prescriptions"
-            )
-
         prescription = await prescription_service.patch_prescription(
             db, uuid.UUID(clinic_id), id, patch_in
         )
         if not prescription:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Prescription not found or not in user's clinic"
+                detail="Prescription not found or not in user's clinic",
             )
         return ResponseEnvelope(data=prescription)
     except HTTPException:
@@ -157,15 +153,31 @@ async def update_prescription(
         logger.error(f"Error updating prescription {id}: {str(e)}")
         raise
 
-@router.post(
-    "/{id}/pdf",
-    response_model=ResponseEnvelope[dict],
-    tags=["Prescriptions"]
-)
-async def generate_pdf(
+
+@router.delete("/{id}", response_model=ResponseEnvelope[dict], tags=["Prescriptions"])
+async def delete_prescription(
     request: Request,
     id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST)),
+):
+    """Deletes a prescription by ID in clinic scope."""
+
+    clinic_id = request.state.clinic_id
+    deleted = await prescription_service.delete_prescription(
+        db, uuid.UUID(clinic_id), id
+    )
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Prescription not found or not in user's clinic",
+        )
+    return ResponseEnvelope(data={"message": "Prescription deleted successfully."})
+
+
+@router.post("/{id}/pdf", response_model=ResponseEnvelope[dict], tags=["Prescriptions"])
+async def generate_pdf(
+    request: Request, id: uuid.UUID, db: AsyncSession = Depends(get_db)
 ):
     """
     Generates a PDF for the prescription and returns the static file URL.
@@ -173,28 +185,20 @@ async def generate_pdf(
     logger.info(f"Generating PDF for prescription: {id}")
     try:
         clinic_id = request.state.clinic_id
-        pdf_url = await prescription_service.generate_prescription_pdf(
+        response = await prescription_service.generate_prescription_pdf_response(
             db, uuid.UUID(clinic_id), id
         )
-        return ResponseEnvelope(data={"pdf_url": pdf_url})
+        return ResponseEnvelope(data=response)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Error generating PDF for prescription {id}: {str(e)}")
         raise
 
 
-@router.get(
-    "/{id}/pdf/download",
-    tags=["Prescriptions"]
-)
+@router.get("/{id}/pdf/download", tags=["Prescriptions"])
 async def download_pdf(
-    request: Request,
-    id: uuid.UUID,
-    db: AsyncSession = Depends(get_db)
+    request: Request, id: uuid.UUID, db: AsyncSession = Depends(get_db)
 ):
     """
     Securely streams the prescription PDF, scoped to the requester's clinic.

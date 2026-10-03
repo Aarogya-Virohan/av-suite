@@ -13,6 +13,13 @@ class ExerciseBase(BaseModel):
 class ExerciseCreate(ExerciseBase):
     pass
 
+class ExerciseUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    body_part: Optional[str] = None
+    is_free: Optional[bool] = None
+    video_url: Optional[str] = None
+
 class ExerciseRead(ExerciseBase):
     id: uuid.UUID
     clinic_id: Optional[uuid.UUID]

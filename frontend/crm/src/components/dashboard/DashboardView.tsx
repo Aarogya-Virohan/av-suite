@@ -256,11 +256,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="space-y-3">
-            <EmptyState
-              title="Coming Soon"
-              description="Audit logs backend integration is pending."
-              hideAction
-            />
+            {auditLogs.slice(0, 5).map((log) => (
+              <div
+                key={log.id}
+                className="flex items-start justify-between border-b border-[var(--border)] pb-2 text-xs"
+              >
+                <div>
+                  <p className="font-semibold text-[var(--text)]">{log.description}</p>
+                  <p className="text-[var(--text-light)] uppercase tracking-wider text-[10px] mt-0.5">
+                    {log.action}
+                  </p>
+                </div>
+                <span className="text-[var(--text-light)] shrink-0 ml-2">
+                  {new Date(log.createdAt).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
