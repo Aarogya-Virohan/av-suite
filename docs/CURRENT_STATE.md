@@ -42,8 +42,7 @@ one commit behind the moment it is written. That is how the previous
 version of this section came to name a HEAD three commits stale. Run
 `git log --oneline -5` instead.
 
-As of this update dev is NOT pushed. origin/dev is behind. Push before
-relying on this from another machine.
+dev is pushed and origin is in step as of 3 October.
 
 work/capture-flow-03Oct is the branch the 3 October work was done on and
 is merged into dev by fast-forward. fix/posture-gsi-and-labels still
