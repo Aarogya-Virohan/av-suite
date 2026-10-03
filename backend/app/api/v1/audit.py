@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_capability
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +16,7 @@ from app.schemas.audit import AuditLogResponse
 from app.services.audit import AuditLogService
 from app.schemas.envelope import ResponseEnvelope
 
-router = APIRouter(dependencies=[Depends(require_admin)])
+router = APIRouter(dependencies=[Depends(require_capability("audit.view"))])
 
 
 async def get_audit_log_service(
@@ -58,7 +58,11 @@ async def list_audit_logs(
     items = [AuditLogResponse.model_validate(log) for log in logs]
     return ResponseEnvelope(
         data=items,
-        meta={"total": len(logs) if len(logs) < limit else len(items) + offset, "offset": offset, "limit": limit}
+        meta={
+            "total": len(logs) if len(logs) < limit else len(items) + offset,
+            "offset": offset,
+            "limit": limit,
+        },
     )
 
 
@@ -89,7 +93,9 @@ async def list_audit(
         limit=limit,
     )
     items = [AuditLogResponse.model_validate(log) for log in logs]
-    return ResponseEnvelope(data=items, meta={"total": total, "offset": offset, "limit": limit})
+    return ResponseEnvelope(
+        data=items, meta={"total": total, "offset": offset, "limit": limit}
+    )
 
 
 @router.get("/audit/{id}", response_model=ResponseEnvelope[AuditLogResponse])
@@ -102,6 +108,8 @@ async def get_audit(
 
     log = await service.get_log(clinic.id, id)
     if log is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit log not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Audit log not found"
+        )
 
     return ResponseEnvelope(data=AuditLogResponse.model_validate(log))
