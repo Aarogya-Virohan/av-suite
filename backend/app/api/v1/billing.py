@@ -5,15 +5,19 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from app.core.dependencies import require_roles
-from app.enums.user import UserRole
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session, get_current_clinic
+from app.core.dependencies import (
+    get_async_session,
+    get_current_clinic,
+    require_capability,
+)
+from app.enums.permission import CapabilityScope
 from app.enums.billing import InvoiceStatus
 from app.enums.package import PackageStatus
 from app.models.clinic import Clinic
+from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.billing import (
     InvoiceItemRepository,
@@ -47,9 +51,7 @@ from app.services.billing import (
     BillingValidationError,
 )
 
-router = APIRouter(
-    dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.THERAPIST))]
-)
+router = APIRouter()
 
 
 async def get_billing_service(
@@ -70,8 +72,6 @@ async def get_billing_service(
 
 BillingServiceDep = Annotated[BillingService, Depends(get_billing_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
-
-
 # --- Package Catalog Endpoints ---
 
 
@@ -82,6 +82,7 @@ async def create_package(
     payload: PackageCreate,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.create")),
 ) -> PackageResponse:
     """Create a new package in the clinic catalogue."""
 
@@ -94,10 +95,15 @@ async def create_package(
         ) from exc
 
 
-@router.get("/packages", response_model=PackageListResponse)
+@router.get(
+    "/packages",
+    response_model=PackageListResponse,
+    dependencies=[Depends(require_capability("packages.view"))],
+)
 async def list_packages(
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.view")),
     status_filter: Annotated[PackageStatus | None, Query(alias="status")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
@@ -113,11 +119,16 @@ async def list_packages(
     )
 
 
-@router.get("/packages/{id}", response_model=PackageResponse)
+@router.get(
+    "/packages/{id}",
+    response_model=PackageResponse,
+    dependencies=[Depends(require_capability("packages.view"))],
+)
 async def get_package(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.view")),
 ) -> PackageResponse:
     """Retrieve a single package catalogue item by ID."""
 
@@ -136,6 +147,7 @@ async def update_package(
     payload: PackageUpdate,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.edit")),
 ) -> PackageResponse:
     """Update a package catalogue item for the authenticated clinic."""
 
@@ -159,6 +171,7 @@ async def delete_package(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.delete")),
 ) -> None:
     """Delete a package catalogue item for the authenticated clinic."""
 
@@ -183,6 +196,7 @@ async def sell_patient_package(
     payload: PatientPackageCreate,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.assign")),
 ) -> PatientPackageResponse:
     """Sell or assign a treatment package to a patient."""
 
@@ -208,6 +222,7 @@ async def list_patient_packages_by_patient(
     patient_id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.view")),
     package_id: Annotated[UUID | None, Query(alias="package")] = None,
     status_filter: Annotated[PackageStatus | None, Query(alias="status")] = None,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -234,6 +249,7 @@ async def get_patient_package(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.view")),
 ) -> PatientPackageResponse:
     """Retrieve a single patient package by ID."""
 
@@ -252,6 +268,7 @@ async def update_patient_package(
     payload: PatientPackageUpdate,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.assign")),
 ) -> PatientPackageResponse:
     """Update a patient package record."""
 
@@ -277,6 +294,7 @@ async def delete_patient_package(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("packages.delete")),
 ) -> None:
     """Delete a patient package record."""
 
@@ -298,6 +316,7 @@ async def create_invoice(
     payload: InvoiceCreate,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("invoices.create")),
 ) -> InvoiceResponse:
     """Create a new invoice with line items for the clinic."""
 
@@ -314,6 +333,7 @@ async def create_invoice(
 async def get_outstanding_balance(
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("invoices.view")),
     patient_id: Annotated[UUID | None, Query(alias="patient_id")] = None,
 ) -> dict[str, str]:
     """Retrieve total outstanding unpaid invoice balance."""
@@ -326,6 +346,7 @@ async def get_outstanding_balance(
 async def list_invoices(
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("invoices.view")),
     patient_id: Annotated[UUID | None, Query(alias="patient_id")] = None,
     status_filter: Annotated[InvoiceStatus | None, Query(alias="status")] = None,
     start_date: Annotated[date | None, Query(alias="start_date")] = None,
@@ -355,6 +376,7 @@ async def get_invoice(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("invoices.view")),
 ) -> InvoiceResponse:
     """Retrieve an invoice by ID."""
 
@@ -373,6 +395,7 @@ async def update_invoice(
     payload: InvoiceUpdate,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("invoices.edit")),
 ) -> InvoiceResponse:
     """Update an existing invoice for the clinic."""
 
@@ -396,6 +419,7 @@ async def delete_invoice(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("invoices.delete")),
 ) -> None:
     """Delete or soft-cancel an invoice."""
 
@@ -412,7 +436,8 @@ async def generate_invoice_pdf_endpoint(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
-) -> InvoicePdfResponse:
+    scope: CapabilityScope = Depends(require_capability("invoices.view")),
+) -> dict[str, object]:
     """Trigger PDF generation for an invoice."""
 
     try:
@@ -429,6 +454,7 @@ async def download_invoice_pdf_endpoint(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("invoices.view")),
 ) -> Response:
     """Download PDF for an invoice (authenticated, clinic-scoped)."""
 
@@ -457,6 +483,7 @@ async def record_payment_for_invoice(
     payload: PaymentCreate,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("payments.record")),
 ) -> PaymentResponse:
     """Record a payment against a specific invoice."""
 
@@ -486,6 +513,7 @@ async def record_payment(
     payload: PaymentCreate,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("payments.record")),
 ) -> PaymentResponse:
     """Record a payment against an invoice."""
 
@@ -506,6 +534,7 @@ async def record_payment(
 async def list_payments(
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("payments.view")),
     invoice_id: Annotated[UUID | None, Query(alias="invoice_id")] = None,
     patient_id: Annotated[UUID | None, Query(alias="patient_id")] = None,
     start_date: Annotated[date | None, Query(alias="start_date")] = None,
@@ -535,6 +564,7 @@ async def get_payment(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("payments.view")),
 ) -> PaymentResponse:
     """Retrieve a single payment record by ID."""
 
@@ -554,6 +584,7 @@ async def delete_payment(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    scope: CapabilityScope = Depends(require_capability("payments.delete")),
 ) -> None:
     """Delete a payment record."""
 

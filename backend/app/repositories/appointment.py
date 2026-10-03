@@ -4,6 +4,7 @@ from datetime import date, datetime, time, timezone
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.appointment import AppointmentStatus
@@ -19,6 +20,18 @@ class AppointmentRepository(BaseRepository[Appointment]):
 
         super().__init__(session, Appointment)
 
+    async def get_by_id(self, id: UUID, **kwargs) -> Appointment | None:
+        statement = select(Appointment).options(
+            joinedload(Appointment.patient),
+            joinedload(Appointment.therapist)
+        ).where(Appointment.id == id)
+        
+        for key, value in kwargs.items():
+            statement = statement.where(getattr(Appointment, key) == value)
+            
+        result = await self.session.scalars(statement)
+        return result.first()
+
     async def list_appointments(
         self,
         *,
@@ -33,7 +46,10 @@ class AppointmentRepository(BaseRepository[Appointment]):
         """Return clinic-scoped appointments with optional date, patient, therapist, and status filters."""
 
         effective_limit = min(limit, 500)
-        statement = select(Appointment)
+        statement = select(Appointment).options(
+            joinedload(Appointment.patient),
+            joinedload(Appointment.therapist)
+        )
 
         if scheduled_date is not None:
             start_dt = datetime.combine(scheduled_date, time.min, tzinfo=timezone.utc)

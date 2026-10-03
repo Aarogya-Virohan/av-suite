@@ -78,14 +78,28 @@ class BookingService:
         if clinic is None:
             raise BookingNotFoundError(f"Clinic '{clinic_id}' does not exist.")
 
-        req_data = payload.model_dump()
+        req_data = payload.model_dump(exclude={"turnstile_token"})
         req_data.update(
             {
                 "clinic_id": clinic_id,
                 "status": AppointmentRequestStatus.PENDING,
             }
         )
-        return await self.request_repository.create(req_data)
+        req = await self.request_repository.create(req_data)
+        await self.request_repository.session.commit()
+        return req
+
+    async def create_request_by_slug(
+        self, clinic_slug: str, payload: AppointmentRequestCreate
+    ) -> AppointmentRequest:
+        """Create a new public appointment request using clinic slug."""
+
+        clinic = await self.clinic_repository.get_by_slug(clinic_slug)
+        if clinic is None:
+            raise BookingNotFoundError(f"Clinic with slug '{clinic_slug}' not found.")
+
+        return await self.create_request(clinic.id, payload)
+
 
     async def get_request(
         self, clinic_id: UUID, request_id: UUID
@@ -198,6 +212,7 @@ class BookingService:
             req,
             {"status": AppointmentRequestStatus.APPROVED},
         )
+        await self.request_repository.session.commit()
 
         patient_name = getattr(patient, "full_name", req.name)
         whatsapp_link = build_whatsapp_link(
@@ -227,7 +242,9 @@ class BookingService:
                 f"{req.notes or ''}\nRejection notes: {notes}".strip()
             )
 
-        return await self.request_repository.update(req, update_data)
+        updated = await self.request_repository.update(req, update_data)
+        await self.request_repository.session.commit()
+        return updated
 
     async def update_request(
         self,
@@ -252,6 +269,7 @@ class BookingService:
                 f"Appointment request '{request_id}' not found for clinic '{clinic_id}'."
             )
 
+        await self.request_repository.session.commit()
         return updated
 
     async def delete_request(self, clinic_id: UUID, request_id: UUID) -> None:
@@ -259,3 +277,4 @@ class BookingService:
 
         request_obj = await self.get_request(clinic_id, request_id)
         await self.request_repository.delete_request(request_obj)
+        await self.request_repository.session.commit()

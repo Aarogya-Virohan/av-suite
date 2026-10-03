@@ -73,7 +73,9 @@ class TreatmentSessionService:
 
         obj_in = payload.model_dump()
         obj_in["clinic_id"] = clinic_id
-        return await self.repository.create(obj_in)
+        result = await self.repository.create(obj_in)
+        await self.repository.session.commit()
+        return result
 
     async def get_session(self, clinic_id: UUID, session_id: UUID) -> TreatmentSession:
         """Retrieve a treatment session ensuring clinic scoping."""
@@ -114,9 +116,12 @@ class TreatmentSessionService:
     async def update_session(
         self, clinic_id: UUID, session_id: UUID, payload: TreatmentSessionUpdate
     ) -> TreatmentSession:
-        """Update a clinic-scoped treatment session."""
+        """Update a clinic-scoped treatment session (only if not finalized)."""
 
         session = await self.get_session(clinic_id, session_id)
+        if session.finalized:
+            raise TreatmentValidationError("Finalized treatment session cannot be edited.")
+
         update_data = payload.model_dump(exclude_unset=True)
 
         if payload.pain_score is not None and not (0 <= payload.pain_score <= 10):
@@ -139,13 +144,16 @@ class TreatmentSessionService:
         if not update_data:
             return session
 
-        return await self.repository.update(session, update_data)
+        result = await self.repository.update(session, update_data)
+        await self.repository.session.commit()
+        return result
 
     async def delete_session(self, clinic_id: UUID, session_id: UUID) -> None:
         """Delete a treatment session ensuring clinic scoping."""
 
         session = await self.get_session(clinic_id, session_id)
         await self.repository.delete(session)
+        await self.repository.session.commit()
 
 
 class SoapAssessmentService:
@@ -154,18 +162,21 @@ class SoapAssessmentService:
     repository: SoapAssessmentRepository
     patient_repository: PatientRepository
     appointment_repository: AppointmentRepository
+    user_repository: UserRepository | None
 
     def __init__(
         self,
         repository: SoapAssessmentRepository,
         patient_repository: PatientRepository,
         appointment_repository: AppointmentRepository,
+        user_repository: UserRepository | None = None,
     ) -> None:
         """Inject repository dependencies."""
 
         self.repository = repository
         self.patient_repository = patient_repository
         self.appointment_repository = appointment_repository
+        self.user_repository = user_repository
 
     async def create_assessment(self, clinic_id: UUID, payload: SoapAssessmentCreate) -> SoapAssessment:
         """Validate dependencies and create a clinic-scoped SOAP assessment."""
@@ -183,9 +194,18 @@ class SoapAssessmentService:
                     f"Appointment '{payload.appointment_id}' does not exist or does not belong to clinic '{clinic_id}'."
                 )
 
+        if payload.therapist_id is not None and self.user_repository is not None:
+            therapist = await self.user_repository.get_by_id(payload.therapist_id, clinic_id=clinic_id)
+            if therapist is None:
+                raise TreatmentValidationError(
+                    f"Therapist '{payload.therapist_id}' does not exist or does not belong to clinic '{clinic_id}'."
+                )
+
         obj_in = payload.model_dump()
         obj_in["clinic_id"] = clinic_id
-        return await self.repository.create(obj_in)
+        result = await self.repository.create(obj_in)
+        await self.repository.session.commit()
+        return result
 
     async def get_assessment(self, clinic_id: UUID, assessment_id: UUID) -> SoapAssessment:
         """Retrieve a SOAP assessment ensuring clinic scoping."""
@@ -204,6 +224,7 @@ class SoapAssessmentService:
         *,
         patient_id: UUID | None = None,
         appointment_id: UUID | None = None,
+        therapist_id: UUID | None = None,
         specialty: str | None = None,
         is_reassessment: bool | None = None,
         offset: int = 0,
@@ -215,6 +236,7 @@ class SoapAssessmentService:
             clinic_id=clinic_id,
             patient_id=patient_id,
             appointment_id=appointment_id,
+            therapist_id=therapist_id,
             specialty=specialty,
             is_reassessment=is_reassessment,
             offset=offset,
@@ -224,9 +246,12 @@ class SoapAssessmentService:
     async def update_assessment(
         self, clinic_id: UUID, assessment_id: UUID, payload: SoapAssessmentUpdate
     ) -> SoapAssessment:
-        """Update a clinic-scoped SOAP assessment."""
+        """Update a clinic-scoped SOAP assessment (only if not finalized)."""
 
         assessment = await self.get_assessment(clinic_id, assessment_id)
+        if assessment.finalized:
+            raise TreatmentValidationError("Finalized SOAP assessment cannot be edited.")
+
         update_data = payload.model_dump(exclude_unset=True)
 
         if payload.appointment_id is not None:
@@ -236,7 +261,16 @@ class SoapAssessmentService:
                     f"Appointment '{payload.appointment_id}' does not exist or does not belong to clinic '{clinic_id}'."
                 )
 
+        if payload.therapist_id is not None and self.user_repository is not None:
+            therapist = await self.user_repository.get_by_id(payload.therapist_id, clinic_id=clinic_id)
+            if therapist is None:
+                raise TreatmentValidationError(
+                    f"Therapist '{payload.therapist_id}' does not exist or does not belong to clinic '{clinic_id}'."
+                )
+
         if not update_data:
             return assessment
 
-        return await self.repository.update(assessment, update_data)
+        result = await self.repository.update(assessment, update_data)
+        await self.repository.session.commit()
+        return result
