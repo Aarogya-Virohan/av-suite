@@ -25,6 +25,7 @@ from app.models.user import User
 from app.enums.user import UserRole
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from app.core.security import get_password_hash, verify_password, create_access_token
+from app.services.product_entitlements import ensure_crm_entitlement
 import logging
 import uuid
 
@@ -126,6 +127,7 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
             user_id=new_user.id, clinic_id=new_clinic.id, role=UserRole.ADMIN
         )
         db.add(membership)
+        await ensure_crm_entitlement(db, new_clinic.id)
 
         # commit() transaction finalize karte hain
         # Database mein permanent add hota hai clinic aur user

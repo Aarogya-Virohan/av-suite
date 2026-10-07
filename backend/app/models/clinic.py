@@ -44,3 +44,6 @@ class Clinic(Base, TimestampMixin):
     user_permissions = relationship(
         "UserPermission", back_populates="clinic", cascade="all, delete-orphan"
     )
+    workspace_products = relationship(
+        "WorkspaceProduct", back_populates="clinic", cascade="all, delete-orphan"
+    )

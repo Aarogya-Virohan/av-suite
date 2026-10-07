@@ -36,12 +36,16 @@ def get_client_ip(request: Request) -> str:
 from sqlalchemy import select
 
 from app.core.database import get_db
+from app.core.products import product_for_capability
 from app.core.rbac import resolve_capability_scope
 from app.core.security import decode_token
 from app.enums.permission import CapabilityScope
+from app.enums.product import EntitlementStatus
+from app.exceptions import ProductNotEntitledError
 from app.models.clinic import Clinic
 from app.enums.user import UserRole, normalize_user_role
 from app.models.membership import Membership
+from app.models.product import WorkspaceProduct
 from app.models.user import User
 from app.models.user_permission import UserPermission
 
@@ -85,6 +89,7 @@ class PermissionContext:
     clinic: Clinic
     membership: Membership | None = None
     overrides: dict[str, CapabilityScope] | None = None
+    enabled_product_ids: set[str] | None = None
 
     def effective_scope(self, capability_key: str) -> CapabilityScope:
         """Resolve the effective scope for a capability using cached overrides."""
@@ -96,6 +101,10 @@ class PermissionContext:
             capability_key=capability_key,
             user_permissions=self.overrides or {},
         )
+
+    def is_product_entitled(self, product_id: str) -> bool:
+        """Return whether the active workspace has an enabled product entitlement."""
+        return product_id in (self.enabled_product_ids or set())
 
 
 def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User:
@@ -196,11 +205,21 @@ async def get_permission_context(
     result = await session.execute(stmt)
     overrides = {p.capability_key: p.scope for p in result.scalars()}
 
+    product_stmt = select(WorkspaceProduct).where(
+        WorkspaceProduct.clinic_id == auth_context.clinic.id,
+        WorkspaceProduct.status == EntitlementStatus.ENABLED,
+    )
+    product_result = await session.execute(product_stmt)
+    enabled_product_ids = {
+        entitlement.product_id for entitlement in product_result.scalars()
+    }
+
     return PermissionContext(
         user=auth_context.user,
         clinic=auth_context.clinic,
         membership=auth_context.membership,
         overrides=overrides,
+        enabled_product_ids=enabled_product_ids,
     )
 
 
@@ -211,6 +230,10 @@ def require_capability(capability_key: str) -> Callable[..., CapabilityScope]:
     """Dependency that enforces a capability check using the request context."""
 
     def dependency(perm_ctx: PermissionContextDep) -> CapabilityScope:
+        product_id = product_for_capability(capability_key)
+        if product_id is not None and not perm_ctx.is_product_entitled(product_id):
+            raise ProductNotEntitledError(capability_key, product_id)
+
         scope = perm_ctx.effective_scope(capability_key)
         if scope == CapabilityScope.NONE:
             raise HTTPException(

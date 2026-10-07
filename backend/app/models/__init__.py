@@ -3,6 +3,12 @@ from app.models.clinic import Clinic, ClinicPlanTier
 from app.models.user import User
 from app.models.membership import Membership
 from app.models.user_permission import UserPermission
+from app.models.product import (
+    PlatformBundle,
+    PlatformBundleProduct,
+    Product,
+    WorkspaceProduct,
+)
 from app.models.patient import Patient, PatientStatus
 from app.models.exercise import Exercise
 from app.models.prescription import Prescription, PrescriptionItem
@@ -27,6 +33,10 @@ __all__ = [
     "User",
     "Membership",
     "UserPermission",
+    "Product",
+    "PlatformBundle",
+    "PlatformBundleProduct",
+    "WorkspaceProduct",
     "Patient",
     "PatientStatus",
     "Exercise",

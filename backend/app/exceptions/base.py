@@ -45,6 +45,18 @@ class PermissionDeniedError(BaseAppException):
         super().__init__(message=message, code="FORBIDDEN", status_code=403)
 
 
+class ProductNotEntitledError(BaseAppException):
+    """Raised when a workspace is not entitled to the product for a capability."""
+
+    def __init__(self, capability_key: str, product_id: str):
+        super().__init__(
+            message=f"Product entitlement is required for capability: {capability_key}",
+            code="PRODUCT_NOT_ENTITLED",
+            status_code=403,
+            details={"capability_key": capability_key, "product_id": product_id},
+        )
+
+
 class ConflictError(BaseAppException):
     """Raised when an operation conflicts with existing state (e.g., unique key violation)."""
 

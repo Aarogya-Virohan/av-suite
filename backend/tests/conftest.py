@@ -24,6 +24,7 @@ from app.models.membership import Membership
 from app.models.user import User
 from app.enums.user import UserRole
 from app.core.security import create_access_token
+from app.services.product_entitlements import ensure_crm_entitlement
 
 TEST_DATABASE_URL = settings.TEST_DATABASE_URL or settings.DATABASE_URL
 
@@ -107,6 +108,7 @@ async def setup_db(engine, sessionmaker):
         ]
 
         session.add_all([admin_user, frontdesk_user, therapist_user, *memberships])
+        await ensure_crm_entitlement(session, clinic_id)
         await session.commit()
 
     yield

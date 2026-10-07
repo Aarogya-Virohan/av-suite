@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+from types import MappingProxyType
+from typing import Mapping
+
+
+CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
+    {
+        "id": "crm",
+        "slug": "crm",
+        "name": "CRM",
+        "description": "Patient management, scheduling and clinic operations.",
+        "category": "Patient Management",
+    },
+    {
+        "id": "exercise-library",
+        "slug": "exercise-library",
+        "name": "Exercise Library",
+        "description": "Clinical exercise resources and structured exercise programs.",
+        "category": "Clinical",
+    },
+    {
+        "id": "exercise-prescription",
+        "slug": "exercise-prescription",
+        "name": "Exercise Prescription",
+        "description": "Build and manage personalized exercise programs.",
+        "category": "Clinical",
+    },
+    {
+        "id": "posture-tool",
+        "slug": "posture-tool",
+        "name": "Posture Tool",
+        "description": "Posture assessment and movement analysis.",
+        "category": "Clinical",
+    },
+    {
+        "id": "clinical-decision-support",
+        "slug": "clinical-decision-support",
+        "name": "Clinical Decision Support",
+        "description": "Structured clinical insights for better decision-making.",
+        "category": "Clinical",
+    },
+    {
+        "id": "psycho-social-screening",
+        "slug": "psycho-social-screening",
+        "name": "Psycho-social Screening",
+        "description": "Screening and tracking for psycho-social factors.",
+        "category": "Clinical",
+    },
+    {
+        "id": "analytics",
+        "slug": "analytics",
+        "name": "Analytics",
+        "description": "Clinical and operational insights for your workspace.",
+        "category": "Analytics",
+    },
+)
+
+
+CRM_CAPABILITY_PREFIXES: tuple[str, ...] = (
+    "patients.",
+    "leads.",
+    "appointments.",
+    "treatments.",
+    "assessments.",
+    "documents.",
+    "invoices.",
+    "payments.",
+    "packages.",
+    "booking.",
+    "settings.",
+    "users.",
+    "permissions.",
+    "audit.",
+    "recyclebin.",
+)
+
+
+def _capabilities_for_prefix(prefix: str) -> tuple[str, ...]:
+    from app.core.rbac import CAPABILITY_REGISTRY
+
+    return tuple(key for key in CAPABILITY_REGISTRY if key.startswith(prefix))
+
+
+CAPABILITY_PRODUCT_MAP: Mapping[str, str] = MappingProxyType(
+    {
+        # Keep this first entitlement pass intentionally scoped to CRM-owned
+        # backend capabilities. Capabilities omitted from this map use the
+        # existing RBAC behavior unchanged.
+        **{
+            capability_key: "crm"
+            for prefix in CRM_CAPABILITY_PREFIXES
+            for capability_key in _capabilities_for_prefix(prefix)
+        }
+    }
+)
+
+
+def product_for_capability(capability_key: str) -> str | None:
+    return CAPABILITY_PRODUCT_MAP.get(capability_key)
