@@ -49,17 +49,22 @@ async def get_me(
     Accessible to any active authenticated user.
     """
     capabilities = {
-        key: perm_ctx.effective_scope(key).value
-        for key in CAPABILITY_REGISTRY
+        key: perm_ctx.effective_scope(key).value for key in CAPABILITY_REGISTRY
     }
+
+    active_role = (
+        perm_ctx.membership.role
+        if perm_ctx.membership is not None
+        else perm_ctx.user.role
+    )
 
     user_info = UserInfoResponse(
         id=perm_ctx.user.id,
-        clinic_id=perm_ctx.user.clinic_id,
+        clinic_id=perm_ctx.clinic.id,
         email=perm_ctx.user.email,
         first_name=perm_ctx.user.first_name,
         last_name=perm_ctx.user.last_name,
-        role=str(perm_ctx.user.role),
+        role=str(active_role),
         is_active=perm_ctx.user.is_active,
     )
 
@@ -79,17 +84,13 @@ async def get_me(
     )
 
 
-
 @router.post(
     "/register",
     response_model=ResponseEnvelope[TokenResponse],
     status_code=201,
-    tags=["Authentication"]
+    tags=["Authentication"],
 )
-async def register(
-    request: RegisterRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
     Endpoint ka purpose: New user aur clinic ko register karna signup flow mein
     Yeh endpoint signup process handle karta hai jo:
@@ -145,19 +146,19 @@ async def register(
         "clinic_name": "City Medical Clinic"
       }'
     """
-    
+
     logger.info(f"Registration request received for email: {request.email}")
-    
+
     try:
         # Service layer ko call karte hain registration logic ke liye
         # Service database operations handle karta hai
         token_response = await auth_service.register_user(db, request)
-        
+
         # ResponseEnvelope mein wrap karte hain consistent format ke liye
         # All API responses same structure follow karte hain
         logger.info(f"User registered successfully: {request.email}")
         return ResponseEnvelope(data=token_response)
-        
+
     except Exception as e:
         # Exceptions service layer se propagate hote hain
         # FastAPI automatically error responses generate karta hai
@@ -166,14 +167,9 @@ async def register(
 
 
 @router.post(
-    "/login",
-    response_model=ResponseEnvelope[TokenResponse],
-    tags=["Authentication"]
+    "/login", response_model=ResponseEnvelope[TokenResponse], tags=["Authentication"]
 )
-async def login(
-    request: LoginRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Endpoint ka purpose: Existing user ko authenticate karna login flow mein
     Yeh endpoint login process handle karta hai jo:
@@ -237,21 +233,20 @@ async def login(
     curl -X GET http://localhost:8000/api/v1/patients \\
       -H "Authorization: Bearer eyJhbGc..."
     """
-    
+
     logger.info(f"Login request received for email: {request.email}")
-    
+
     try:
         # Service layer ko call karte hain authentication logic ke liye
         # Service password verification aur token generation handle karta hai
         token_response = await auth_service.login_user(db, request)
-        
+
         # ResponseEnvelope mein wrap karte hain consistent format ke liye
         logger.info(f"User logged in successfully: {request.email}")
         return ResponseEnvelope(data=token_response)
-        
+
     except Exception as e:
         # Exceptions service layer se propagate hote hain
         # FastAPI automatically error responses generate karta hai
         logger.error(f"Login failed: {str(e)}")
         raise
-

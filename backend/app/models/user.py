@@ -9,8 +9,12 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    clinic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinics.id", ondelete="CASCADE"))
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    clinic_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("clinics.id", ondelete="CASCADE"), nullable=True
+    )
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
         Enum(
@@ -27,7 +31,13 @@ class User(Base, TimestampMixin):
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    clinic = relationship("Clinic", back_populates="users")
+    clinic = relationship("Clinic", back_populates="users", foreign_keys=[clinic_id])
+    memberships = relationship(
+        "Membership",
+        back_populates="user",
+        foreign_keys="Membership.user_id",
+        cascade="all, delete-orphan",
+    )
     patient_profile = relationship("Patient", back_populates="user", uselist=False)
     prescriptions_given = relationship("Prescription", back_populates="physio")
     permission_overrides = relationship(
