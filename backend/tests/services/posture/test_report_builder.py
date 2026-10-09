@@ -39,3 +39,16 @@ def test_severity_labels_describe_the_deviation_not_the_patient():
     assert SEVERITY_LABELS["none"] == "NORMAL"
     for grade in ("mild", "moderate", "severe"):
         assert SEVERITY_LABELS[grade] == f"{grade.upper()} DEVIATION"
+
+
+def test_report_carries_no_global_score():
+
+    # Founders, 10 October 2026: the single Global Stability Index is
+    # removed from the report. If it is ever reinstated, that should be a
+    # deliberate decision, and this test is where it will surface.
+    from app.services.posture.report_builder import build_report_response
+
+    report = build_report_response(
+        patient={}, side_view={}, front_view={}, back_view={}, synthesis={}
+    )
+    assert "globalIndex" not in report

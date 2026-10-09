@@ -68,15 +68,6 @@ export interface PostureReport {
   // the September threshold work.
   analysisVersion?: string
 
-  globalIndex: {
-    // Null when no parameter produced a grade. The backend used to send 100
-    // with "Optimal Alignment" in that case; it now sends null and
-    // "Not assessable", so this must stay nullable.
-    score: number | null
-    descriptor: string
-    // How many parameters the score rests on, and how many rows the report
-    // printed.
-    graded?: number
-    attempted?: number
-  }
+  // globalIndex removed 10 October 2026, founders' Q5. Reports saved
+  // before then still carry it; nothing reads it.
 }

@@ -221,31 +221,17 @@ def build_report_html(report: dict) -> str:
 
     patient = report.get("patient") or {}
     views = report.get("views") or {}
-    global_index = report.get("globalIndex") or {}
 
     # Stamped so two reports for the same patient are only compared when
     # they came from the same analysis code. Grades move when thresholds,
     # sign conventions or calibration change.
     analysis_version = report.get("analysisVersion")
 
-    score = global_index.get("score")
-    # The index stands alone with no finding column beside it, so a bare
-    # dash would read as empty rather than as unavailable.
-    score_text = f"{score}%" if score is not None else "Not available"
-
-    # The index has been computable from a different number of parameters
-    # for every patient, and two patients with identical severe findings
-    # could get very different scores depending on how much else happened
-    # to be measurable from their photos. The score without this count is
-    # not comparable across patients or across visits. Not shown when
-    # attempted is 0 or missing, since there is nothing to qualify then.
-    graded = global_index.get("graded")
-    attempted = global_index.get("attempted")
-    basis_text = (
-        f"Based on {graded} of {attempted} parameters"
-        if attempted
-        else None
-    )
+    # Global Stability Index removed from the report on 10 October 2026 by the founders (Q5): a single
+    # score masks a localised finding behind an average, and its weights were
+    # never sourced. calculate_global_index stays in scoring.py with nothing
+    # calling it. The founders' replacement, a regional profile, is not built
+    # yet. See docs/decisions.md, 10 October.
 
     return f"""
 <!DOCTYPE html>
@@ -591,13 +577,6 @@ def build_report_html(report: dict) -> str:
 {_view_section("Posterior (Back) Plane", views.get("back") or {})}
 
 {_synthesis_section(report.get("synthesis") or {})}
-
-<div class="index-block">
-    <p class="label">Global Stability Index</p>
-    <p class="score">{score_text}</p>
-    <p class="descriptor">{_esc(global_index.get('descriptor'))}</p>
-    {f'<p class="index-basis">{_esc(basis_text)}</p>' if basis_text else ''}
-</div>
 
 <table class="signature">
     <tr>

@@ -725,6 +725,25 @@ The longer label wrapped onto two lines in the PDF, so the value column went
 from 24 to 16 percent of the table. Checked on a rendered PDF of one test
 subject, both pages. Suite 38 passed.
 
+### Global Stability Index removed from the report
+The founders' Q5 answer, first half. The score is no longer computed by the
+route, no longer in the report payload, and no longer printed on the PDF or
+the frontend. Removed from the payload and not only hidden, because a
+number still in the payload is one template edit away from a screen, and
+the founders said it does not belong on the clinical side. The
+GlobalIndex.tsx component is deleted; calculate_global_index stays in
+scoring.py with its tests and nothing calling it, the same way withdrawn
+parameters keep their calculations. Reports saved before today still carry
+globalIndex in their JSON; nothing reads it.
+
+Not built yet: the founders' replacement, a regional profile ("Biomechanical
+Signature"). It needs a decision on which parameter belongs to which region,
+and the thoracic region they named has no parameter, because no spinal
+landmark exists. Held for the report design pass.
+
+Verified: tsc --noEmit clean, rendered PDF page 2 checked, a test pins that
+the payload carries no globalIndex, suite 39 passed.
+
 ---
 
 ## Not decided, still blocked

@@ -65,7 +65,6 @@ from app.services.posture.annotator import annotate_pose
 
 from app.services.posture.synthesizer import generate_synthesis
 
-from app.services.posture.scoring import calculate_global_index
 
 from app.services.posture.report_builder import (
     build_side_view_result,
@@ -637,18 +636,11 @@ async def analyze_posture(
 
     synthesis = generate_synthesis(findings)
 
-    # ---------------------------------
-    # Global Stability Index
-    # ---------------------------------
-
-    # attempted is every row the report will print, graded or not, so the
-    # payload records how much of the assessment the score rests on.
-    global_index = calculate_global_index(
-        findings.values(),
-        attempted=len(side_measurements)
-        + len(front_measurements)
-        + len(back_measurements),
-    )
+    # Global Stability Index removed from the report on 10 October 2026 by the founders (Q5): a single
+    # score masks a localised finding behind an average, and its weights were
+    # never sourced. calculate_global_index stays in scoring.py with nothing
+    # calling it. The founders' replacement, a regional profile, is not built
+    # yet. See docs/decisions.md, 10 October.
 
     # ---------------------------------
     # Patient
@@ -673,7 +665,6 @@ async def analyze_posture(
         front_view=front_view,
         back_view=back_view,
         synthesis=synthesis,
-        global_index=global_index,
     )
 
     reports_dir = Path("data/reports")

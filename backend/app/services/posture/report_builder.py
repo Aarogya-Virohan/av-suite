@@ -120,8 +120,13 @@ def build_report_response(
     front_view: dict[str, Any],
     back_view: dict[str, Any],
     synthesis: dict[str, Any],
-    global_index: dict[str, Any],
 ) -> dict[str, Any]:
+    # globalIndex is no longer in the payload: Global Stability Index
+    # removed from the report on 10 October 2026 by the founders (Q5): a single
+    # score masks a localised finding behind an average, and its weights were
+    # never sourced. calculate_global_index stays in scoring.py with nothing
+    # calling it. The founders' replacement, a regional profile, is not built
+    # yet. See docs/decisions.md, 10 October.
 
     return {
         "patient": patient,
@@ -132,5 +137,4 @@ def build_report_response(
             "back": back_view,
         },
         "synthesis": synthesis,
-        "globalIndex": global_index,
     }

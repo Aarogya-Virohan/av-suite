@@ -1,7 +1,6 @@
 import ReportHeader from "./ReportHeader"
 import ViewSection from "./ViewSection"
 import SynthesisPanel from "./SynthesisPanel"
-import GlobalIndex from "./GlobalIndex"
 
 import { PostureReport } from "@/types/posture"
 
@@ -33,13 +32,6 @@ export default function ReportCard({
       />
 
       <SynthesisPanel data={data.synthesis} />
-
-      <GlobalIndex
-        score={data.globalIndex.score}
-        descriptor={data.globalIndex.descriptor}
-        graded={data.globalIndex.graded}
-        attempted={data.globalIndex.attempted}
-      />
 
     </div>
   )
