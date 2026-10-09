@@ -15,6 +15,11 @@ from types import SimpleNamespace
 from mediapipe.framework.formats import landmark_pb2
 
 from app.services.posture.schemas import Landmark
+from app.services.posture.review import (
+    make_detection_token,
+    point_name,
+    review_indices,
+)
 
 from app.services.posture.detector import (
     detect_pose_full,
@@ -783,6 +788,97 @@ def _report_from_points(
         )
 
     return report
+
+
+# =============================================================================
+# LANDMARK REVIEW, STEP ONE: DETECT
+# =============================================================================
+# Founders' Q6, 10 October 2026: the clinician checks and corrects the points
+# before any report exists. This endpoint runs detection only and returns the
+# points to review, with a signed token carrying the model's own points.
+# Nothing is measured or graded here, and no photograph is kept: the browser
+# already holds the photographs and draws the points on them.
+
+
+def _review_view_payload(view: str, detected: "DetectedView", lateral_side: str | None) -> dict:
+    points = [
+        {
+            "index": i,
+            "name": point_name(view, i),
+            "x": detected.landmarks[i].x,
+            "y": detected.landmarks[i].y,
+            "visibility": detected.landmarks[i].visibility,
+        }
+        for i in review_indices(view, lateral_side)
+    ]
+
+    payload = {
+        "widthPx": detected.width_px,
+        "heightPx": detected.height_px,
+        "points": points,
+    }
+
+    if view == "side":
+        payload["lateralSide"] = lateral_side
+
+    if view == "front":
+        # Normalised like the pose points, image-left pupil first.
+        payload["iris"] = (
+            [
+                {"name": name, "x": x / detected.width_px, "y": y / detected.height_px}
+                for name, (x, y) in zip(
+                    ("Pupil, image left", "Pupil, image right"), detected.iris
+                )
+            ]
+            if detected.iris
+            else None
+        )
+
+    return payload
+
+
+@router.post("/detect")
+async def detect_for_review(
+    front_image: UploadFile = File(...),
+    side_image: UploadFile = File(...),
+    back_image: UploadFile = File(...),
+):
+    side = _detect_view("Side", await side_image.read())
+    front = _detect_view("Front", await front_image.read(), with_iris=True)
+    back = _detect_view("Back", await back_image.read())
+
+    lateral_side = get_lateral_side(side.landmarks)
+
+    token = make_detection_token(
+        {
+            "side": {
+                "landmarks": side.landmarks,
+                "width_px": side.width_px,
+                "height_px": side.height_px,
+                "lateral_side": lateral_side,
+            },
+            "front": {
+                "landmarks": front.landmarks,
+                "width_px": front.width_px,
+                "height_px": front.height_px,
+                "iris": front.iris,
+            },
+            "back": {
+                "landmarks": back.landmarks,
+                "width_px": back.width_px,
+                "height_px": back.height_px,
+            },
+        }
+    )
+
+    return {
+        "detectionToken": token,
+        "views": {
+            "side": _review_view_payload("side", side, lateral_side),
+            "front": _review_view_payload("front", front, None),
+            "back": _review_view_payload("back", back, None),
+        },
+    }
 
 
 # =============================================================================
