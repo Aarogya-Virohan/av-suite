@@ -279,6 +279,47 @@ a { color: inherit; text-decoration: none; }
 .related-product-copy > span { overflow: hidden; color: #88958d; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
 .related-arrow { flex: 0 0 auto; color: #8a9c8f; }
 
+.platform-state { display: grid; min-height: 270px; justify-items: start; align-content: center; gap: 8px; padding: 28px; border: 1px solid var(--av-line); border-radius: 8px; background: rgba(255,255,255,.78); }
+.platform-state h1 { margin: 0; color: var(--av-ink); font-family: 'Newsreader',Georgia,serif; font-size: 25px; font-weight: 500; }
+.platform-state p { max-width: 520px; margin: 0 0 5px; color: var(--av-muted); font-size: 10px; }
+.state-indicator { width: 21px; height: 21px; border: 2px solid #dbe8de; border-top-color: var(--av-green); border-radius: 50%; animation: av-spin .8s linear infinite; }
+@keyframes av-spin { to { transform: rotate(360deg); } }
+.workspace-static { display: flex; min-width: 0; max-width: 250px; align-items: center; gap: 8px; margin: 0 auto; padding: 0 10px; color: #53675b; font-size: 10px; font-weight: 600; }
+.workspace-option { justify-content: space-between; gap: 9px; }
+.workspace-option > span { display: grid; min-width: 0; gap: 2px; }
+.workspace-option strong { overflow: hidden; color: #53675b; font-size: 9px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-option small { color: #8b9990; font-size: 8px; }
+.workspace-option-active { background: #f0f5f1; }
+.workspace-option-active > svg { flex: 0 0 auto; color: var(--av-green); }
+.rail-popover button { display: flex; min-height: 32px; align-items: center; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #5d6f64; cursor: pointer; font-size: 9px; font-weight: 600; }
+.rail-popover button:hover { background: #f0f5f1; color: var(--av-green-deep); }
+.status-disabled { background: #f5eee4; color: #8a6c3c; }
+.product-status-disabled { color: #8a6c3c; }
+.product-status-disabled > span { background: #b18c4d; }
+.button-detail-primary:disabled,.button-detail-secondary:disabled { cursor: not-allowed; opacity: .6; }
+.form-error { margin: 7px 0 0; color: #a0443a; font-size: 9px; }
+.action-success { margin: 7px 0 0; color: #477858; font-size: 9px; }
+.detail-empty,.capability-more { margin: 7px 0 0; color: #829087; font-size: 8px; }
+
+.login-page { display: grid; min-height: min(70vh,620px); place-items: center; }
+.login-panel { width: min(100%,390px); padding: 27px; border: 1px solid var(--av-line); border-radius: 8px; background: #fff; box-shadow: var(--av-shadow-soft); }
+.login-mark { display: grid; width: 39px; height: 39px; place-items: center; margin-bottom: 17px; border-radius: 12px 12px 12px 4px; background: var(--av-green); color: #fff; font-size: 11px; font-weight: 700; }
+.login-panel h1 { margin: 5px 0 0; color: var(--av-ink); font-family: 'Newsreader',Georgia,serif; font-size: 25px; font-weight: 500; }
+.login-copy { margin: 5px 0 18px; color: var(--av-muted); font-size: 10px; }
+.login-form { display: grid; gap: 12px; }
+.login-form label { display: grid; gap: 5px; color: #627369; font-size: 9px; font-weight: 600; }
+.login-form input { width: 100%; height: 37px; padding: 0 9px; border: 1px solid #dfe8e2; border-radius: 5px; background: #fff; color: var(--av-ink); font-size: 10px; }
+.login-form input:focus { border-color: #a8c9b6; outline: 0; box-shadow: 0 0 0 3px rgba(54,122,99,.08); }
+.login-submit { width: 100%; margin-top: 4px; cursor: pointer; }
+.login-submit:disabled { cursor: wait; opacity: .7; }
+
+@media (max-width: 780px) {
+  .workspace-static { max-width: 180px; margin-right: 0; padding: 0 6px; font-size: 8px; }
+  .platform-state { min-height: 220px; padding: 20px; }
+  .login-page { min-height: 60vh; }
+  .login-panel { padding: 21px; }
+}
+
 .marketplace-banner { position: relative; display: grid; grid-template-columns: 43px minmax(180px,.8fr) minmax(180px,1fr) 34px; align-items: center; gap: 14px; margin-top: 22px; padding: 15px 17px; overflow: hidden; border: 1px solid #e2e8df; border-radius: 7px; background: linear-gradient(108deg,#f3f6ef 0%,#f9f8f2 58%,#f7eee5 100%); }
 .marketplace-emblem { position: relative; width: 38px; height: 38px; border: 1px solid #d8e5dc; border-radius: 11px 11px 11px 4px; background: #eaf2eb; }
 .marketplace-emblem span { position: absolute; display: block; width: 7px; height: 7px; border-radius: 50%; }
