@@ -33,11 +33,15 @@ SEVERITY_STYLES: dict[str, tuple[str, str]] = {
     "not_available": ("#64748b", "#f8fafc"),
 }
 
-# Wording supplied by the founders (clinical sign-off), lightly adjusted for
-# grammar only. Do not reword without going back to them.
+# Wording supplied by the founders, verbatim, 10 October 2026 (Q6), for the
+# dashboard and the patient PDF. The frontend carries the same text in
+# ReportCard.tsx. Do not reword without going back to them.
 DISCLAIMER = (
-    "<strong>This report is intended for subjective examination and screening "
-    "purposes only. Please correlate clinically.</strong>"
+    "<strong>This structural screening report is generated via automated 2D "
+    "optical tracking. It highlights static biomechanical asymmetries to "
+    "predict localized tissue loading. It is not a standalone clinical "
+    "diagnosis and must be correlated with patient symptoms and functional "
+    "movement by a licensed physiotherapist.</strong>"
 )
 
 # Separate from DISCLAIMER above, which carries the founders' sign-off and is

@@ -782,6 +782,20 @@ with it is open.
 Verified: annotated crops inspected, route run on all seven, suite 40
 passed (one new test for angle and side).
 
+### New disclaimer, on the PDF and the frontend report
+The founders' Q6 wording, verbatim, replaces the earlier disclaimer on the
+PDF, and is added to the frontend report, which had none; the founders
+asked for it on both the dashboard and the patient PDF. The two copies are
+checked identical by script. One thing worth their eye: the wording says
+the report highlights asymmetries "to predict localized tissue loading".
+The tool measures landmark positions and angles; it does not estimate or
+validate any tissue load. Kept verbatim because it is their wording.
+
+The landmark review step from the same answer is not built yet.
+
+Verified: rendered PDF page 2 checked, still two pages, tsc clean, suite 40
+passed.
+
 ---
 
 ## Not decided, still blocked
