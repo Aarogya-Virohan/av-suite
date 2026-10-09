@@ -80,32 +80,29 @@ Recent commits, subjects as they actually read:
 
 ---
 
-## 3. Blocked on the founders
+## 3. Founder answers, received 10 October
 
-AV_Posture_Tool_Decisions_Required_02Oct2026.pdf went to Daman and
-Shivank on 2 October. It supersedes the 13 September review request and
-Section D of the 15 September status document. Six questions, each with
-options and a recommendation:
+The 2 October decisions PDF had seven questions (this section used to say
+six). The founders answered all seven on 10 October, in a document
+recorded in full in the 10 October section of decisions.md, including
+which of its evidence holds up and which does not.
 
-1. Severity tiers or a normal range presentation. Answer first, it
-   changes the shape of 3, 4 and 5.
-2. CVA bands, 50/45/40 or 50/30, and the ear-to-shoulder substitution.
-3. Knee valgus and varus band asymmetry and the female allowance. The
-   neutral gate width rides along with this.
-4. The millimetre parameters: convert to angles, set ranges from our own
-   patients, or leave as is.
-5. Global Stability Index: remove, reweight, or keep.
-6. Clinician landmark review step, plumb line and grid, height and age
-   and gender on the report, and the stronger disclaimer.
+Applied 10 October: Q1 deviation labels, Q2 CVA bands 50/45/35, Q4
+shoulder bands (already matched), Q5 global score removed, Q6 disclaimer,
+Q7 one view per metric, head tilt from the pupillary line.
 
-Twelve questions became six because the rest were researched, measured,
-or had stopped existing. The working is in open_questions_research.md.
+Still open, blocked on the founders:
+- Q3 knee. They answered with the Q-angle, which needs landmarks the
+  model does not return. Limits for the hip-knee-ankle angle we measure
+  are still owed.
+- Not answered at all: PT-L06 flexion bands, the PT-P01 rename and
+  Schroth removal, trunk shift bands, the PT-A01 bands for the new
+  quantity, the mapping moves of 10 October (all FOR REVIEW).
+- PT-A10 ear level: its landmarks sit on the cheeks, and it measures the
+  same head roll as PT-A01. Keep or withdraw is theirs.
 
-Nothing here should be started before its question is answered, and an
-answer means the exact option named, not a paraphrase of something said
-verbally.
-
----
+Not built yet, not blocked: the Q6 landmark review step, and the Q5
+regional profile that replaces the global score.
 
 ## 4. Done on 2 October, after the founder document went out
 
@@ -171,6 +168,17 @@ is. The reason it was not built: of the two known bad photographs, the
 existing guards already catch po-7's side view and nothing catches the
 other, so the check would ship at half coverage. Whether it should warn or
 block is answered by precedent, the tilt check warns.
+
+## 4c. Done on 10 October
+
+Eight commits, see the 10 October section of decisions.md. Suite 40
+passed on the real clone. analysisVersion is now 2026-10-10.
+
+Two findings that change how far the report can be trusted, both in
+known_limitations.md or decisions.md: front and back photographs name
+opposite shoulders as higher on six of seven subjects, and Pose's face
+points are too coarse for angles (PT-A01 now uses Face Mesh for that
+reason).
 
 ## 5. Not started
 
