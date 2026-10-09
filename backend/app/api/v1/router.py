@@ -23,6 +23,7 @@ from app.api.v1 import (
     analytics,
     users,
     marketplace,
+    me,
     # memory,
 )
 import logging
@@ -62,6 +63,7 @@ api_router.include_router(analytics.router, tags=["Analytics"])
 api_router.include_router(
     marketplace.router, prefix="/marketplace", tags=["Marketplace"]
 )
+api_router.include_router(me.router, tags=["Platform Context"])
 # api_router.include_router(memory.router, prefix="/memory", tags=["Memory"])
 
 logger.info("All API v1 routers registered (existing + CRM)")
