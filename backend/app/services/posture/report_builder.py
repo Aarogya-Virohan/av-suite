@@ -111,7 +111,11 @@ def build_side_view_result(
 # every millimetre value by roughly 15 percent, and must be measured on
 # our own photographs before it is changed), and any threshold the
 # founders set from their own reference ranges.
-ANALYSIS_VERSION = "2026-10-01"
+# 2026-10-10: founder answers applied (CVA bands, head tilt from the
+# pupillary line, shoulder level and trunk shift from the back view only,
+# deviation labels, no global score). Also covers the 3 October PNG capture
+# and captureSource, which changed what reaches the model without a bump.
+ANALYSIS_VERSION = "2026-10-10"
 
 
 def build_report_response(

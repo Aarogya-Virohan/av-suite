@@ -796,6 +796,14 @@ The landmark review step from the same answer is not built yet.
 Verified: rendered PDF page 2 checked, still two pages, tsc clean, suite 40
 passed.
 
+### analysisVersion moved to 2026-10-10
+Mechanical, same reason as on 1 October. Today's changes move grades and
+replace what two rows measure, so a report from today must not sit beside
+one from before as if comparable. The bump also covers the 3 October PNG
+capture and captureSource, which changed what reaches the model and were
+not stamped at the time; the founder prep file of 7 October flagged that
+as undecided.
+
 ---
 
 ## Not decided, still blocked
