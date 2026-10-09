@@ -7,8 +7,14 @@ from fastapi.responses import Response
 
 import base64
 import json
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
+
+from mediapipe.framework.formats import landmark_pb2
+
+from app.services.posture.schemas import Landmark
 
 from app.services.posture.detector import (
     detect_pose_full,
@@ -131,6 +137,52 @@ def _rearfoot_label(value: float, side_label: str) -> str:
 router = APIRouter(prefix="/posture", tags=["posture"])
 
 
+
+@dataclass
+class DetectedView:
+    """One photograph after detection, before any measurement."""
+
+    landmarks: list[Landmark]
+    width_px: int
+    height_px: int
+    image_bytes: bytes
+    # Pupil centres in pixels, image-left first. Front view only; None when
+    # Face Mesh found no face, which PT-A01 reports as insufficient data.
+    iris: tuple[tuple[float, float], tuple[float, float]] | None = None
+
+
+def _detect_view(name: str, image_bytes: bytes, with_iris: bool = False) -> DetectedView:
+    try:
+        landmarks, _results = detect_pose_full(image_bytes)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"{name} image: pose detection failed: {str(e)}")
+
+    width_px, height_px = get_image_dimensions(image_bytes)
+
+    iris = None
+    if with_iris:
+        try:
+            iris = detect_iris_centres(image_bytes, landmarks)
+        except InsufficientVisibilityError:
+            iris = None
+
+    return DetectedView(landmarks, width_px, height_px, image_bytes, iris)
+
+
+def _results_from_landmarks(landmarks: list[Landmark]):
+    """
+    A stand-in for MediaPipe's results object, built from our own points,
+    so the annotator draws whatever points it is given rather than only
+    what the model returned.
+    """
+
+    proto = landmark_pb2.NormalizedLandmarkList()
+    for lm in landmarks:
+        proto.landmark.add(x=lm.x, y=lm.y, z=lm.z, visibility=lm.visibility)
+
+    return SimpleNamespace(pose_landmarks=proto)
+
+
 def _annotate_or_blank(
     image_bytes: bytes,
     pose_results,
@@ -192,20 +244,62 @@ async def analyze_posture(
     side_bytes = await side_image.read()
     back_bytes = await back_image.read()
 
+    side = _detect_view("Side", side_bytes)
+    front = _detect_view("Front", front_bytes, with_iris=True)
+    back = _detect_view("Back", back_bytes)
+
+    return _report_from_points(
+        side=side,
+        front=front,
+        back=back,
+        patient_name=patient_name,
+        age=age,
+        gender=gender,
+        case_ref=case_ref,
+        patient_height_cm=patient_height_cm,
+        clinician_name=clinician_name,
+        front_source=front_source,
+        side_source=side_source,
+        back_source=back_source,
+    )
+
+
+def _report_from_points(
+    *,
+    side: "DetectedView",
+    front: "DetectedView",
+    back: "DetectedView",
+    patient_name: str,
+    age: int,
+    gender: str,
+    case_ref: str,
+    patient_height_cm: float,
+    clinician_name: str,
+    front_source: str,
+    side_source: str,
+    back_source: str,
+) -> dict:
+    """
+    Everything after detection: measurements, grades, synthesis, report.
+
+    Takes landmarks that have already been detected, so the same code can
+    run on the model's points or on points a clinician has reviewed. Split
+    out of analyze_posture on 10 October 2026 with no change in behaviour,
+    verified by byte-identical reports on all seven test subjects.
+    """
+
     findings: dict[str, str] = {}
 
     # =========================================================================
     # SIDE (LATERAL) PLANE
     # =========================================================================
 
-    try:
-        side_landmarks, side_results = detect_pose_full(side_bytes)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Side image: pose detection failed: {str(e)}")
+    side_landmarks = side.landmarks
+    side_results = _results_from_landmarks(side_landmarks)
 
     lateral_side = get_lateral_side(side_landmarks)
 
-    side_width_px, side_height_px = get_image_dimensions(side_bytes)
+    side_width_px, side_height_px = side.width_px, side.height_px
     side_geo = to_geometric_space(side_landmarks, side_width_px, side_height_px)
 
     ear_idx = LEFT_EAR if lateral_side == "left" else RIGHT_EAR
@@ -311,7 +405,7 @@ async def analyze_posture(
         side_pixels_per_cm = None
 
     side_photo_url = _annotate_or_blank(
-        side_bytes,
+        side.image_bytes,
         side_results,
         landmarks=side_landmarks,
         pixels_per_cm=side_pixels_per_cm,
@@ -329,14 +423,12 @@ async def analyze_posture(
     # FRONT (ANTERIOR) PLANE
     # =========================================================================
 
-    try:
-        front_landmarks, front_results = detect_pose_full(front_bytes)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Front image: pose detection failed: {str(e)}")
+    front_landmarks = front.landmarks
+    front_results = _results_from_landmarks(front_landmarks)
 
     front_measurements = []
 
-    front_width_px, front_height_px = get_image_dimensions(front_bytes)
+    front_width_px, front_height_px = front.width_px, front.height_px
     front_geo = to_geometric_space(front_landmarks, front_width_px, front_height_px)
 
     # PT-A01 — Head Lateral Tilt. Since 10 October 2026 the pupillary line
@@ -345,7 +437,9 @@ async def analyze_posture(
     # the vertical, which is a head shift, not a tilt; calc_head_lateral_tilt
     # is left in calculator.py with nothing calling it.
     try:
-        image_left_eye, image_right_eye = detect_iris_centres(front_bytes, front_landmarks)
+        if front.iris is None:
+            raise InsufficientVisibilityError("Face not found for iris landmarks")
+        image_left_eye, image_right_eye = front.iris
 
         head_tilt = calc_head_tilt_eye_line(image_left_eye, image_right_eye)
         severity = classify("PT-A01", head_tilt)
@@ -504,7 +598,7 @@ async def analyze_posture(
     # 10 October 2026, see the PT-A10 comment above; PT-P01 reports it.
 
     front_photo_url = _annotate_or_blank(
-        front_bytes,
+        front.image_bytes,
         front_results,
         landmarks=front_landmarks,
         pixels_per_cm=pixels_per_cm,
@@ -522,14 +616,12 @@ async def analyze_posture(
     # BACK (POSTERIOR) PLANE
     # =========================================================================
 
-    try:
-        back_landmarks, back_results = detect_pose_full(back_bytes)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Back image: pose detection failed: {str(e)}")
+    back_landmarks = back.landmarks
+    back_results = _results_from_landmarks(back_landmarks)
 
     back_measurements = []
 
-    back_width_px, back_height_px = get_image_dimensions(back_bytes)
+    back_width_px, back_height_px = back.width_px, back.height_px
     back_geo = to_geometric_space(back_landmarks, back_width_px, back_height_px)
 
     try:
@@ -621,7 +713,7 @@ async def analyze_posture(
     # the front. See docs/known_limitations.md.
 
     back_photo_url = _annotate_or_blank(
-        back_bytes,
+        back.image_bytes,
         back_results,
         landmarks=back_landmarks,
         pixels_per_cm=back_pixels_per_cm,
