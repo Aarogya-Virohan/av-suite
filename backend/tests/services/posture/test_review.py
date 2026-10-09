@@ -51,3 +51,66 @@ def test_review_covers_every_point_a_measurement_reads():
     # Side: nose plus the facing side only.
     assert set(review_indices("side", "left")) == {0, 7, 11, 23, 25, 27}
     assert set(review_indices("side", "right")) == {0, 8, 12, 24, 26, 28}
+
+
+def _token_view(view, lateral_side=None, vis=0.4, iris=None):
+    lm = [Landmark(index=i, x=0.5, y=i / 40, z=0.0, visibility=vis) for i in range(33)]
+    token = make_detection_token(
+        {view: {"landmarks": lm, "width_px": 1000, "height_px": 2000,
+                "lateral_side": lateral_side, "iris": iris}}
+    )
+    return read_detection_token(token)[view]
+
+
+def _all_points(view, lateral_side=None, **extra):
+    return {"points": [{"index": i, "x": 0.5, "y": i / 40, **extra} for i in review_indices(view, lateral_side)]}
+
+
+def test_confirmed_points_pass_the_visibility_guard_and_unreviewed_keep_model_values():
+    from app.services.posture.exceptions import VISIBILITY_THRESHOLD
+    from app.services.posture.review import apply_review
+
+    tv = _token_view("back", vis=0.4)
+    landmarks, _, audit = apply_review("back", tv, _all_points("back"))
+
+    for i in review_indices("back"):
+        assert landmarks[i].visibility == VISIBILITY_THRESHOLD
+    assert landmarks[5].visibility == 0.4  # not reviewed, model value kept
+    assert all(p["movedPx"] == 0.0 for p in audit["points"])
+
+
+def test_not_visible_point_is_zeroed():
+    from app.services.posture.review import apply_review
+
+    sub = _all_points("back")
+    sub["points"][0]["notVisible"] = True
+    landmarks, _, _ = apply_review("back", _token_view("back", vis=0.99), sub)
+    assert landmarks[sub["points"][0]["index"]].visibility == 0.0
+
+
+def test_incomplete_review_is_rejected():
+    from app.services.posture.review import ReviewRejected, apply_review
+
+    sub = _all_points("front")
+    sub["points"].pop()
+    with pytest.raises(ReviewRejected):
+        apply_review("front", _token_view("front"), sub)
+
+
+def test_side_review_cannot_flip_the_facing_side():
+    from app.services.posture.calculator import get_lateral_side
+    from app.services.posture.review import apply_review
+
+    # The model chose "right"; only the right side is reviewed, so raising
+    # visibility can only strengthen that choice.
+    tv = _token_view("side", lateral_side="right", vis=0.3)
+    landmarks, _, _ = apply_review("side", tv, _all_points("side", "right"))
+    assert get_lateral_side(landmarks) == "right"
+
+
+def test_pupils_must_be_reviewed_when_the_model_found_them():
+    from app.services.posture.review import ReviewRejected, apply_review
+
+    tv = _token_view("front", iris=((100.0, 200.0), (300.0, 210.0)))
+    with pytest.raises(ReviewRejected):
+        apply_review("front", tv, _all_points("front"))

@@ -13,6 +13,7 @@ JWT secret, so the report can state what the model placed and what the
 clinician confirmed without trusting the client for the first half.
 """
 
+import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -150,3 +151,116 @@ def read_detection_token(token: str) -> dict[str, Any]:
         raise InvalidDetectionToken("Not a posture detection token")
 
     return payload["views"]
+
+
+class ReviewRejected(Exception):
+    """The submitted review is incomplete or malformed; no report is made."""
+
+
+def _in_unit_range(value: Any) -> bool:
+    return isinstance(value, (int, float)) and 0.0 <= value <= 1.0
+
+
+def apply_review(
+    view: str, token_view: dict[str, Any], submitted: dict[str, Any]
+) -> tuple[list[Landmark], tuple | None, dict[str, Any]]:
+    """
+    Build the landmarks a report is measured from: the model's points from
+    the signed token, with every reviewed point replaced by what the
+    clinician confirmed.
+
+    A confirmed point is raised to at least the visibility threshold, since
+    a clinician placing it is a stronger check than the model's own score,
+    which po-7 showed does not catch a misplaced point. A point marked not
+    visible goes to visibility 0 and its measurements report insufficient
+    data. On the side view only the facing side is reviewed, so raising
+    visibility can only strengthen the side already chosen.
+
+    Returns (landmarks, iris in pixels image-left first or None, audit).
+    """
+
+    from .exceptions import VISIBILITY_THRESHOLD
+
+    model = rows_to_landmarks(token_view["landmarks"])
+    width, height = token_view["width_px"], token_view["height_px"]
+    expected = review_indices(view, token_view.get("lateral_side"))
+
+    by_index: dict[int, dict] = {}
+    for p in submitted.get("points") or []:
+        if not isinstance(p, dict) or not isinstance(p.get("index"), int):
+            raise ReviewRejected(f"{view}: malformed point")
+        by_index[p["index"]] = p
+
+    missing = [i for i in expected if i not in by_index]
+    if missing:
+        raise ReviewRejected(
+            f"{view}: not every point was reviewed: "
+            + ", ".join(point_name(view, i) for i in missing)
+        )
+    extra = [i for i in by_index if i not in expected]
+    if extra:
+        raise ReviewRejected(f"{view}: points not offered for review: {extra}")
+
+    landmarks = list(model)
+    audit_points = []
+
+    for i in expected:
+        p = by_index[i]
+        m = model[i]
+        not_visible = bool(p.get("notVisible"))
+
+        if not_visible:
+            x, y, vis = m.x, m.y, 0.0
+        else:
+            if not (_in_unit_range(p.get("x")) and _in_unit_range(p.get("y"))):
+                raise ReviewRejected(f"{view}: {point_name(view, i)} is outside the photograph")
+            x, y = float(p["x"]), float(p["y"])
+            vis = max(m.visibility, VISIBILITY_THRESHOLD)
+
+        landmarks[i] = Landmark(index=i, x=x, y=y, z=m.z, visibility=vis)
+
+        audit_points.append(
+            {
+                "index": i,
+                "name": point_name(view, i),
+                "model": {"x": m.x, "y": m.y, "visibility": m.visibility},
+                "confirmed": {"x": x, "y": y, "notVisible": not_visible},
+                "movedPx": None
+                if not_visible
+                else round(math.hypot((x - m.x) * width, (y - m.y) * height), 1),
+            }
+        )
+
+    audit: dict[str, Any] = {"points": audit_points}
+    iris = None
+
+    if view == "front":
+        model_iris = token_view.get("iris")
+        sub_iris = submitted.get("iris")
+
+        if submitted.get("irisNotVisible"):
+            iris = None
+        elif sub_iris is None:
+            if model_iris is not None:
+                raise ReviewRejected("front: the pupils were not reviewed")
+            iris = None
+        else:
+            if (
+                not isinstance(sub_iris, list)
+                or len(sub_iris) != 2
+                or not all(
+                    isinstance(q, dict) and _in_unit_range(q.get("x")) and _in_unit_range(q.get("y"))
+                    for q in sub_iris
+                )
+            ):
+                raise ReviewRejected("front: pupils must be two points inside the photograph")
+            pts = sorted(((q["x"] * width, q["y"] * height) for q in sub_iris), key=lambda t: t[0])
+            iris = (pts[0], pts[1])
+
+        audit["iris"] = {
+            "model": model_iris,
+            "confirmed": [list(p) for p in iris] if iris else None,
+            "notVisible": bool(submitted.get("irisNotVisible")),
+        }
+
+    return landmarks, iris, audit

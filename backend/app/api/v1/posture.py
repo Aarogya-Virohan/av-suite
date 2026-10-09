@@ -8,7 +8,7 @@ from fastapi.responses import Response
 import base64
 import json
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,9 +16,14 @@ from mediapipe.framework.formats import landmark_pb2
 
 from app.services.posture.schemas import Landmark
 from app.services.posture.review import (
+    InvalidDetectionToken,
+    ReviewRejected,
+    apply_review,
     make_detection_token,
     point_name,
+    read_detection_token,
     review_indices,
+    rows_to_landmarks,
 )
 
 from app.services.posture.detector import (
@@ -154,6 +159,17 @@ class DetectedView:
     # Pupil centres in pixels, image-left first. Front view only; None when
     # Face Mesh found no face, which PT-A01 reports as insufficient data.
     iris: tuple[tuple[float, float], tuple[float, float]] | None = None
+    # Set only when the points were reviewed: the model's own points, so the
+    # landmark visibility figure stays the model's confidence and is not
+    # raised by the review.
+    model_landmarks: list[Landmark] | None = None
+    # Display image height over the original's. The reviewed path annotates a
+    # small display copy, so the reference grid's scale must follow it.
+    display_scale: float = 1.0
+
+
+def _scaled(pixels_per_cm: float | None, view: "DetectedView") -> float | None:
+    return None if pixels_per_cm is None else pixels_per_cm * view.display_scale
 
 
 def _detect_view(name: str, image_bytes: bytes, with_iris: bool = False) -> DetectedView:
@@ -283,6 +299,7 @@ def _report_from_points(
     front_source: str,
     side_source: str,
     back_source: str,
+    landmark_review: dict | None = None,
 ) -> dict:
     """
     Everything after detection: measurements, grades, synthesis, report.
@@ -413,14 +430,14 @@ def _report_from_points(
         side.image_bytes,
         side_results,
         landmarks=side_landmarks,
-        pixels_per_cm=side_pixels_per_cm,
+        pixels_per_cm=_scaled(side_pixels_per_cm, side),
         view="side",
     )
 
     side_view = build_side_view_result(
         measurements=side_measurements,
         photo_url=side_photo_url,
-        accuracy=calc_detection_confidence(side_landmarks),
+        accuracy=calc_detection_confidence(side.model_landmarks or side_landmarks),
         capture_source=side_source,
     )
 
@@ -606,14 +623,14 @@ def _report_from_points(
         front.image_bytes,
         front_results,
         landmarks=front_landmarks,
-        pixels_per_cm=pixels_per_cm,
+        pixels_per_cm=_scaled(pixels_per_cm, front),
         view="front",
     )
 
     front_view = build_side_view_result(
         measurements=front_measurements,
         photo_url=front_photo_url,
-        accuracy=calc_detection_confidence(front_landmarks),
+        accuracy=calc_detection_confidence(front.model_landmarks or front_landmarks),
         capture_source=front_source,
     )
 
@@ -721,14 +738,14 @@ def _report_from_points(
         back.image_bytes,
         back_results,
         landmarks=back_landmarks,
-        pixels_per_cm=back_pixels_per_cm,
+        pixels_per_cm=_scaled(back_pixels_per_cm, back),
         view="back",
     )
 
     back_view = build_side_view_result(
         measurements=back_measurements,
         photo_url=back_photo_url,
-        accuracy=calc_detection_confidence(back_landmarks),
+        accuracy=calc_detection_confidence(back.model_landmarks or back_landmarks),
         capture_source=back_source,
     )
 
@@ -768,6 +785,10 @@ def _report_from_points(
         back_view=back_view,
         synthesis=synthesis,
     )
+
+    # Attached before the report is saved, so the saved copy carries it.
+    if landmark_review is not None:
+        report["landmarkReview"] = landmark_review
 
     reports_dir = Path("data/reports")
 
@@ -879,6 +900,127 @@ async def detect_for_review(
             "back": _review_view_payload("back", back, None),
         },
     }
+
+
+# =============================================================================
+# LANDMARK REVIEW, STEP TWO: REPORT FROM CONFIRMED POINTS
+# =============================================================================
+# The report is built only from points the clinician has confirmed. The
+# server, not just the screen, refuses a report without a complete review.
+# The full photographs are not sent again: measurement needs only the points
+# and the original image size, which the signed token carries. A small
+# display copy of each photograph is sent for the annotated image, and is
+# not kept.
+
+# A display copy may be resized but not cropped or rotated, or the points
+# would land in the wrong place on it.
+_ASPECT_TOLERANCE = 0.01
+
+
+@router.post("/report")
+async def report_from_review(
+    detection_token: str = Form(...),
+    review: str = Form(...),
+    front_display: UploadFile = File(...),
+    side_display: UploadFile = File(...),
+    back_display: UploadFile = File(...),
+    patient_name: str = Form(...),
+    age: int = Form(...),
+    gender: str = Form(...),
+    case_ref: str = Form(...),
+    patient_height_cm: float = Form(...),
+    clinician_name: str = Form(""),
+    front_source: str = Form("unknown"),
+    side_source: str = Form("unknown"),
+    back_source: str = Form("unknown"),
+):
+    if not 50 <= patient_height_cm <= 250:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Patient height must be between 50 and 250 cm. "
+                f"Received: {patient_height_cm} cm."
+            ),
+        )
+
+    try:
+        token_views = read_detection_token(detection_token)
+    except InvalidDetectionToken:
+        raise HTTPException(
+            status_code=422,
+            detail="Detection has expired or is not valid. Please run detection again.",
+        )
+
+    try:
+        submitted = json.loads(review)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Review is not valid JSON.")
+
+    if not isinstance(submitted, dict) or submitted.get("confirmed") is not True:
+        raise HTTPException(
+            status_code=422,
+            detail="Landmarks must be confirmed before a report can be generated.",
+        )
+
+    displays = {
+        "front": await front_display.read(),
+        "side": await side_display.read(),
+        "back": await back_display.read(),
+    }
+
+    views: dict[str, DetectedView] = {}
+    audit_views: dict[str, dict] = {}
+
+    for name in ("side", "front", "back"):
+        tv = token_views[name]
+        try:
+            landmarks, iris, audit = apply_review(name, tv, submitted.get(name) or {})
+        except ReviewRejected as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
+        try:
+            disp_w, disp_h = get_image_dimensions(displays[name])
+        except Exception:
+            raise HTTPException(status_code=422, detail=f"{name} display image could not be read.")
+
+        if abs(disp_w / disp_h - tv["width_px"] / tv["height_px"]) > _ASPECT_TOLERANCE * tv["width_px"] / tv["height_px"]:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{name} display image does not match the analysed photograph.",
+            )
+
+        views[name] = DetectedView(
+            landmarks=landmarks,
+            width_px=tv["width_px"],
+            height_px=tv["height_px"],
+            image_bytes=displays[name],
+            iris=iris,
+            model_landmarks=rows_to_landmarks(tv["landmarks"]),
+            display_scale=disp_h / tv["height_px"],
+        )
+        audit_views[name] = audit
+
+    report = _report_from_points(
+        side=views["side"],
+        front=views["front"],
+        back=views["back"],
+        patient_name=patient_name,
+        age=age,
+        gender=gender,
+        case_ref=case_ref,
+        patient_height_cm=patient_height_cm,
+        clinician_name=clinician_name,
+        front_source=front_source,
+        side_source=side_source,
+        back_source=back_source,
+        landmark_review={
+            "confirmedAt": datetime.now(timezone.utc).isoformat(),
+            "confirmedBy": clinician_name,
+            "views": audit_views,
+        },
+    )
+
+    return report
 
 
 # =============================================================================
