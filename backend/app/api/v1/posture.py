@@ -6,6 +6,8 @@ from fastapi import UploadFile
 from fastapi.responses import Response
 
 import base64
+
+import cv2
 import json
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -14,6 +16,7 @@ from types import SimpleNamespace
 
 from mediapipe.framework.formats import landmark_pb2
 
+from app.services.posture.decoder import decode_image_bytes
 from app.services.posture.schemas import Landmark
 from app.services.posture.review import (
     InvalidDetectionToken,
@@ -821,6 +824,26 @@ def _report_from_points(
 # already holds the photographs and draws the points on them.
 
 
+# The review screen shows this copy, not the browser's own decode of the
+# upload: it is exactly the orientation that was measured (EXIF applied
+# server-side), and it works for HEIC, which Chrome cannot display. The
+# same bytes come back to /report for the annotated image.
+DISPLAY_HEIGHT_PX = 1600
+
+
+def _display_jpeg(image_bytes: bytes) -> bytes:
+    image = decode_image_bytes(image_bytes)
+    h, w = image.shape[:2]
+    if h > DISPLAY_HEIGHT_PX:
+        image = cv2.resize(
+            image, (round(w * DISPLAY_HEIGHT_PX / h), DISPLAY_HEIGHT_PX), interpolation=cv2.INTER_AREA
+        )
+    ok, buf = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    if not ok:
+        raise HTTPException(status_code=500, detail="Display image could not be encoded.")
+    return buf.tobytes()
+
+
 def _review_view_payload(view: str, detected: "DetectedView", lateral_side: str | None) -> dict:
     points = [
         {
@@ -836,6 +859,8 @@ def _review_view_payload(view: str, detected: "DetectedView", lateral_side: str 
     payload = {
         "widthPx": detected.width_px,
         "heightPx": detected.height_px,
+        "displayImage": "data:image/jpeg;base64,"
+        + base64.b64encode(_display_jpeg(detected.image_bytes)).decode("ascii"),
         "points": points,
     }
 
