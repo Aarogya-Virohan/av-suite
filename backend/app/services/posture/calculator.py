@@ -449,6 +449,41 @@ def calc_head_lateral_tilt(landmarks: list[Landmark]) -> float:
 
 
 
+def calc_head_tilt_eye_line(
+    image_left_eye: tuple[float, float], image_right_eye: tuple[float, float]
+) -> float:
+    """
+    PT-A01 since 10 October 2026, by the founders' view mapping: the angle
+    of the pupillary line against the image horizontal, in degrees,
+    unsigned. Takes pixel positions, so no aspect correction is needed.
+
+    Like every angle on the report, this has no gravity reference: a camera
+    that is not level adds its own roll to the reading.
+    """
+
+    dx = image_right_eye[0] - image_left_eye[0]
+    dy = image_right_eye[1] - image_left_eye[1]
+
+    return abs(math.degrees(math.atan2(dy, dx)))
+
+
+def head_tilt_eye_side(
+    image_left_eye: tuple[float, float], image_right_eye: tuple[float, float]
+) -> str | None:
+    """
+    Which way the head is tilted, for PT-A01. Anterior view only.
+
+    The head tilts toward the side whose eye sits lower. Facing the camera,
+    the eye on the image left is the patient's right eye. Decided from image
+    position, so neither model's side labels are involved.
+    """
+
+    if abs(image_left_eye[1] - image_right_eye[1]) < 1e-6:
+        return None
+
+    return "right" if image_left_eye[1] > image_right_eye[1] else "left"
+
+
 def head_lateral_tilt_side(landmarks: list[Landmark]) -> str | None:
     """
     Which way the head is tilted, for PT-A01. The angle itself comes from

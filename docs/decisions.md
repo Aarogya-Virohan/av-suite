@@ -744,6 +744,44 @@ landmark exists. Held for the report design pass.
 Verified: tsc --noEmit clean, rendered PDF page 2 checked, a test pins that
 the payload carries no globalIndex, suite 39 passed.
 
+### PT-A01 measures the pupillary line, from Face Mesh iris centres
+The founders' view mapping assigns head lateral tilt to the pupillary line
+against the horizontal, front view. Until today PT-A01 measured the nose to
+mid-shoulder line against the vertical, which is a sideways head shift, not
+a tilt: on po-5 the old method read 6.66 degrees and the eye line 1.70.
+
+The obvious build, Pose's own eye landmarks, was measured and rejected. On
+po-3, a visibly near-level head, it read 8.00 degrees, because the pose
+"right eye" sat on the lower eyelid while the other sat on the pupil.
+About 20 pixels of error over a 160 pixel eye separation is 7 degrees.
+
+MediaPipe Face Mesh with iris refinement, run on a crop around the head
+that Pose finds, put both iris centres on the pupils on all seven subjects,
+checked on annotated crops including the 1200x1600 low-resolution one. po-3
+reads 4.17 there, and the photograph agrees that the image-left pupil sits
+lower. Same mediapipe package, no new dependency. If no face is found the
+row reports insufficient data and the rest of the assessment continues.
+
+Side is read from image position: facing the camera the image-left eye is
+the patient's right, and the head tilts toward the lower eye. Neither
+model's side labels are used.
+
+Bands left at 3/7/10, FOR REVIEW. They were set as a noise-floor fix for the
+old quantity, and no published normal range for a photographic pupillary
+line angle was found. Through the full route on the seven subjects: 0.6 to
+4.21 degrees, two MILD, five normal.
+
+Two things recorded, not acted on. Six of seven subjects read the image-left
+eye lower, while their shoulders read image-left higher; opposite
+directions, so not one camera roll, and not explained. And the same check
+showed Pose's ear landmarks on the cheeks, not the ears, on po-3. PT-A10,
+Ear Level Asymmetry, is built on those points and is on the report today.
+It also measures the same head roll as PT-A01, in millimetres. What to do
+with it is open.
+
+Verified: annotated crops inspected, route run on all seven, suite 40
+passed (one new test for angle and side).
+
 ---
 
 ## Not decided, still blocked

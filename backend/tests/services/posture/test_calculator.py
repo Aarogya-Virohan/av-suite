@@ -323,3 +323,19 @@ def test_posterior_shoulder_side_ignores_reversed_labels():
     correct = _shoulders(0.4, 0.30, 0.6, 0.32)
     reversed_labels = _shoulders(0.6, 0.32, 0.4, 0.30)
     assert posterior_shoulder_higher_side(correct) == posterior_shoulder_higher_side(reversed_labels) == "left"
+
+
+def test_head_tilt_eye_line_angle_and_side():
+    import math
+    from app.services.posture.calculator import calc_head_tilt_eye_line, head_tilt_eye_side
+
+    # Level eyes: no tilt, no side.
+    assert calc_head_tilt_eye_line((100, 200), (200, 200)) == 0
+    assert head_tilt_eye_side((100, 200), (200, 200)) is None
+
+    # Facing the camera, the image-left eye is the patient's right eye.
+    # Image-left eye lower (larger y): head tilted to the patient's right.
+    angle = calc_head_tilt_eye_line((100, 210), (200, 200))
+    assert math.isclose(angle, math.degrees(math.atan(10 / 100)))
+    assert head_tilt_eye_side((100, 210), (200, 200)) == "right"
+    assert head_tilt_eye_side((100, 190), (200, 200)) == "left"

@@ -100,6 +100,11 @@ THRESHOLDS: dict[str, dict] = {
     # moderate_max is unchanged. This is still not a clinical reference
     # range, it is a noise-floor correction, and should be revisited once
     # real photo data exists.
+    #
+    # 10 October 2026: PT-A01 now measures the pupillary line, not the nose
+    # to mid-shoulder line these bands were set for. Kept unchanged, FOR
+    # REVIEW: no published normal range for a photographic pupillary line
+    # angle was found. On the seven test subjects it read 0.9 to 4.4.
     "PT-A01": {
         "direction": "higher_worse",
         "none_max": 3,

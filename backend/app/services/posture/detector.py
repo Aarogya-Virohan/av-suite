@@ -15,6 +15,21 @@ mp_pose = mp_solutions.pose  # type: ignore
 # initialize a Pose estimator
 pose = mp_pose.Pose(static_image_mode=True, model_complexity=1)
 
+# Face Mesh with iris refinement, for PT-A01 only. Pose's own eye and ear
+# points are too coarse for a head tilt angle: on one test subject the
+# pose "right eye" sat on the lower eyelid and both "ears" on the cheeks,
+# turning a near-level head into 8 degrees. The iris centres from this
+# model landed on the pupils on all seven test subjects, including the
+# low-resolution one. Added 10 October 2026.
+face_mesh = mp_solutions.face_mesh.FaceMesh(  # type: ignore
+    static_image_mode=True, refine_landmarks=True, max_num_faces=1
+)
+
+# Pose indices used to find the head: nose, both eyes, both ears.
+_HEAD_POINTS = (0, 2, 5, 7, 8)
+# Face Mesh iris centre indices, available only with refine_landmarks.
+_IRIS_CENTRES = (468, 473)
+
 def get_image_dimensions(image_bytes: bytes) -> tuple[int, int]:
     """Returns (width_px, height_px) for an encoded image."""
 
@@ -61,6 +76,48 @@ def detect_pose_full(image_bytes: bytes):
         )
 
     return landmarks, results
+
+
+def detect_iris_centres(
+    image_bytes: bytes, pose_landmarks: list[Landmark]
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """
+    Pixel positions of the two pupil centres, ordered image-left first.
+
+    Ordered by image position rather than returned as left and right eyes,
+    so no caller depends on how either model labels sides. Face Mesh is run
+    on a crop around the head found by Pose, since the face is a small part
+    of a full-body photograph.
+
+    Raises InsufficientVisibilityError if the head points are not visible
+    or Face Mesh finds no face.
+    """
+
+    check_visibility(pose_landmarks, list(_HEAD_POINTS))
+
+    image = decode_image_bytes(image_bytes)
+    height, width = image.shape[:2]
+
+    xs = [pose_landmarks[i].x * width for i in _HEAD_POINTS]
+    ys = [pose_landmarks[i].y * height for i in _HEAD_POINTS]
+    cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
+    half = max(2 * (max(xs) - min(xs)), 32.0)
+
+    x0, y0 = max(0, int(cx - half)), max(0, int(cy - half))
+    x1, y1 = min(width, int(cx + half)), min(height, int(cy + half))
+    crop = image[y0:y1, x0:x1]
+
+    results = face_mesh.process(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+    if not results.multi_face_landmarks:
+        raise InsufficientVisibilityError("Face not found for iris landmarks")
+
+    mesh = results.multi_face_landmarks[0].landmark
+    crop_h, crop_w = crop.shape[:2]
+    a, b = (
+        (x0 + mesh[i].x * crop_w, y0 + mesh[i].y * crop_h) for i in _IRIS_CENTRES
+    )
+
+    return (a, b) if a[0] <= b[0] else (b, a)
 
 
 def detect_pose(image_bytes: bytes) -> list[Landmark]:

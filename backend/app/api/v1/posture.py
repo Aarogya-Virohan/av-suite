@@ -14,6 +14,7 @@ from app.services.posture.detector import (
     detect_pose_full,
     check_visibility,
     check_limb_order,
+    detect_iris_centres,
     get_image_dimensions,
 )
 from app.services.posture.exceptions import (
@@ -28,8 +29,8 @@ from app.services.posture.calculator import (
     to_geometric_space,
     calc_forward_trunk_lean,
     get_lateral_side,
-    calc_head_lateral_tilt,
-    head_lateral_tilt_side,
+    calc_head_tilt_eye_line,
+    head_tilt_eye_side,
     pelvic_obliquity_side,
     posterior_shoulder_higher_side,
     ear_asymmetry_side,
@@ -338,11 +339,15 @@ async def analyze_posture(
     front_width_px, front_height_px = get_image_dimensions(front_bytes)
     front_geo = to_geometric_space(front_landmarks, front_width_px, front_height_px)
 
-    # PT-A01 — Head Lateral Tilt
+    # PT-A01 — Head Lateral Tilt. Since 10 October 2026 the pupillary line
+    # against the horizontal, per the founders' view mapping, from Face Mesh
+    # iris centres. Until then it was the nose to mid-shoulder line against
+    # the vertical, which is a head shift, not a tilt; calc_head_lateral_tilt
+    # is left in calculator.py with nothing calling it.
     try:
-        check_visibility(front_landmarks, [NOSE, LEFT_SHOULDER, RIGHT_SHOULDER])
+        image_left_eye, image_right_eye = detect_iris_centres(front_bytes, front_landmarks)
 
-        head_tilt = calc_head_lateral_tilt(front_geo)
+        head_tilt = calc_head_tilt_eye_line(image_left_eye, image_right_eye)
         severity = classify("PT-A01", head_tilt)
         findings["PT-A01"] = severity
 
@@ -353,7 +358,7 @@ async def analyze_posture(
                 head_tilt,
                 "\u00b0",
                 severity,
-                side=head_lateral_tilt_side(front_landmarks),
+                side=head_tilt_eye_side(image_left_eye, image_right_eye),
             )
         )
 
