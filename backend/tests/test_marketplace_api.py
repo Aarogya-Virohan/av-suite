@@ -18,10 +18,14 @@ from app.enums.user import UserRole
 from app.models.audit import AuditLog
 from app.models.clinic import Clinic
 from app.models.membership import Membership
-from app.models.product import PlatformBundle, PlatformBundleProduct, Product, WorkspaceProduct
+from app.models.product import (
+    PlatformBundle,
+    PlatformBundleProduct,
+    Product,
+    WorkspaceProduct,
+)
 from app.models.user import User
 from app.main import app
-
 
 pytestmark = pytest.mark.asyncio
 
@@ -45,7 +49,9 @@ async def create_workspace(
     )
     db_session.add_all([clinic, user] if existing_user is None else [clinic])
     await db_session.flush()
-    db_session.add(Membership(user_id=user.id, clinic_id=clinic.id, role=UserRole.ADMIN))
+    db_session.add(
+        Membership(user_id=user.id, clinic_id=clinic.id, role=UserRole.ADMIN)
+    )
     await db_session.commit()
     token = create_access_token(
         subject=user.id,
@@ -120,7 +126,9 @@ async def test_install_is_idempotent_and_records_audit(
 
     assert first.status_code == second.status_code == 200
     count = await db_session.scalar(
-        select(func.count()).select_from(WorkspaceProduct).where(
+        select(func.count())
+        .select_from(WorkspaceProduct)
+        .where(
             WorkspaceProduct.clinic_id == clinic.id,
             WorkspaceProduct.product_id == product.id,
         )
@@ -135,9 +143,7 @@ async def test_concurrent_product_and_bundle_install_are_idempotent(
     clinic, headers = await create_workspace(db_session)
     direct_product = await create_product(db_session)
     bundle_products = [await create_product(db_session) for _ in range(2)]
-    bundle = PlatformBundle(
-        slug=f"bundle-{uuid.uuid4().hex}", name="Concurrent Bundle"
-    )
+    bundle = PlatformBundle(slug=f"bundle-{uuid.uuid4().hex}", name="Concurrent Bundle")
     db_session.add(bundle)
     await db_session.flush()
     db_session.add_all(
@@ -154,7 +160,9 @@ async def test_concurrent_product_and_bundle_install_are_idempotent(
 
     app.dependency_overrides[get_db] = request_session
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as parallel_client:
+    async with AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as parallel_client:
         product_responses = await asyncio.gather(
             *[
                 parallel_client.post(
@@ -208,7 +216,9 @@ async def test_install_rejects_workspace_type_and_inactive_product(
     client: AsyncClient, db_session: AsyncSession
 ):
     _, headers = await create_workspace(db_session, workspace_type=ClinicType.SOLO)
-    restricted = await create_product(db_session, allowed_types=[ClinicType.CLINIC.value])
+    restricted = await create_product(
+        db_session, allowed_types=[ClinicType.CLINIC.value]
+    )
     inactive = await create_product(db_session, is_active=False)
 
     restricted_result = await client.post(
@@ -221,9 +231,7 @@ async def test_install_rejects_workspace_type_and_inactive_product(
 
     assert restricted_result.status_code == 403
     assert inactive_result.status_code == 409
-    assert all(
-        row["product_key"] != inactive.slug for row in catalog.json()["data"]
-    )
+    assert all(row["product_key"] != inactive.slug for row in catalog.json()["data"])
 
 
 async def test_inactive_product_can_still_be_disabled(
@@ -318,10 +326,10 @@ async def test_bundle_restriction_creates_no_partial_entitlements(
 ):
     clinic, headers = await create_workspace(db_session, workspace_type=ClinicType.SOLO)
     eligible = await create_product(db_session)
-    restricted = await create_product(db_session, allowed_types=[ClinicType.CLINIC.value])
-    bundle = PlatformBundle(
-        slug=f"bundle-{uuid.uuid4().hex}", name="Restricted Bundle"
+    restricted = await create_product(
+        db_session, allowed_types=[ClinicType.CLINIC.value]
     )
+    bundle = PlatformBundle(slug=f"bundle-{uuid.uuid4().hex}", name="Restricted Bundle")
     db_session.add(bundle)
     await db_session.flush()
     db_session.add_all(
@@ -337,11 +345,14 @@ async def test_bundle_restriction_creates_no_partial_entitlements(
     )
 
     assert response.status_code == 403
-    assert await db_session.scalar(
-        select(func.count()).select_from(WorkspaceProduct).where(
-            WorkspaceProduct.clinic_id == clinic.id
+    assert (
+        await db_session.scalar(
+            select(func.count())
+            .select_from(WorkspaceProduct)
+            .where(WorkspaceProduct.clinic_id == clinic.id)
         )
-    ) == 0
+        == 0
+    )
 
 
 async def test_marketplace_isolated_between_workspaces(
@@ -374,12 +385,17 @@ async def test_marketplace_isolated_between_workspaces(
     assert all(
         row["product_key"] != product.slug for row in other_workspace.json()["data"]
     )
-    assert await db_session.scalar(
-        select(func.count()).select_from(WorkspaceProduct).where(
-            WorkspaceProduct.clinic_id == clinic_b.id,
-            WorkspaceProduct.product_id == product.id,
+    assert (
+        await db_session.scalar(
+            select(func.count())
+            .select_from(WorkspaceProduct)
+            .where(
+                WorkspaceProduct.clinic_id == clinic_b.id,
+                WorkspaceProduct.product_id == product.id,
+            )
         )
-    ) == 0
+        == 0
+    )
     assert clinic_a.id != clinic_b.id
 
 
@@ -389,9 +405,7 @@ async def test_marketplace_audits_enable_disable_and_bundle_actions(
     clinic, headers = await create_workspace(db_session)
     product = await create_product(db_session)
     bundle_product = await create_product(db_session)
-    bundle = PlatformBundle(
-        slug=f"bundle-{uuid.uuid4().hex}", name="Audited Bundle"
-    )
+    bundle = PlatformBundle(slug=f"bundle-{uuid.uuid4().hex}", name="Audited Bundle")
     db_session.add(bundle)
     await db_session.flush()
     db_session.add(

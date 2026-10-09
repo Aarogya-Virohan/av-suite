@@ -36,13 +36,19 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(exercises.router, prefix="/exercises", tags=["Exercises"])
 api_router.include_router(patients.router, prefix="/patients", tags=["Patients"])
 api_router.include_router(posture.router, prefix="/posture", tags=["Posture"])
-api_router.include_router(prescriptions.router, prefix="/prescriptions", tags=["Prescriptions"])
+api_router.include_router(
+    prescriptions.router, prefix="/prescriptions", tags=["Prescriptions"]
+)
 
 # --- New CRM routers: paths start empty (""), so they need an explicit prefix ---
 api_router.include_router(leads.router, prefix="/leads", tags=["Leads"])
-api_router.include_router(appointments.router, prefix="/appointments", tags=["Appointments"])
+api_router.include_router(
+    appointments.router, prefix="/appointments", tags=["Appointments"]
+)
 api_router.include_router(treatments.router, prefix="/treatments", tags=["Treatments"])
-api_router.include_router(assessments.router, prefix="/assessments", tags=["Assessments"])
+api_router.include_router(
+    assessments.router, prefix="/assessments", tags=["Assessments"]
+)
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 
 # --- New CRM routers: paths already include their own full resource path, NO extra prefix ---

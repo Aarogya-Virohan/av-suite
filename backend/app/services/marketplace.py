@@ -61,9 +61,7 @@ async def list_catalog(
     ]
 
 
-async def list_installed(
-    db: AsyncSession, clinic_id: UUID
-) -> list[dict[str, object]]:
+async def list_installed(db: AsyncSession, clinic_id: UUID) -> list[dict[str, object]]:
     statement = (
         select(Product, WorkspaceProduct)
         .join(WorkspaceProduct, WorkspaceProduct.product_id == Product.id)
