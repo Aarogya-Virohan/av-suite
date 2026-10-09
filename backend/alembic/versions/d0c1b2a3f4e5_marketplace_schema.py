@@ -16,6 +16,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
     # Add allowed_clinic_types to products table
     op.add_column(
         "products",
@@ -49,9 +50,15 @@ def upgrade() -> None:
     }
 
     for product_id, allowed_types in products_allowed.items():
-        # Update the product's allowed_clinic_types
-        op.execute(
-            f"UPDATE products SET allowed_clinic_types = '{allowed_types}'::text[] WHERE id = '{product_id}'"
+        bind.execute(
+            sa.text(
+                "UPDATE products SET allowed_clinic_types = :allowed_types "
+                "WHERE id = :product_id"
+            ).bindparams(
+                sa.bindparam("allowed_types", type_=sa.ARRAY(sa.String())),
+                sa.bindparam("product_id", type_=sa.String()),
+            ),
+            {"allowed_types": allowed_types, "product_id": product_id},
         )
 
 

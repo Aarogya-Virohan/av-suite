@@ -11,8 +11,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
-
+from sqlalchemy.dialects.postgresql import ENUM, UUID as PGUUID
 
 revision: str = "6b0f1d2c3a4e"
 down_revision: Union[str, Sequence[str], None] = "197a7f16b87d"
@@ -73,13 +72,13 @@ CANONICAL_PRODUCTS = (
 )
 
 
-entitlement_status = sa.Enum(
+entitlement_status = ENUM(
     "enabled",
     "disabled",
     name="entitlement_status",
     create_type=False,
 )
-entitlement_source = sa.Enum(
+entitlement_source = ENUM(
     "direct",
     "bundle",
     name="entitlement_source",
@@ -190,7 +189,9 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.ForeignKeyConstraint(["bundle_id"], ["platform_bundles.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["bundle_id"], ["platform_bundles.id"], ondelete="SET NULL"
+        ),
         sa.ForeignKeyConstraint(["clinic_id"], ["clinics.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["product_id"], ["products.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -225,7 +226,10 @@ def upgrade() -> None:
             sa.column("created_at", sa.DateTime(timezone=True)),
             sa.column("updated_at", sa.DateTime(timezone=True)),
         ),
-        [{**product, "created_at": now, "updated_at": now} for product in CANONICAL_PRODUCTS],
+        [
+            {**product, "created_at": now, "updated_at": now}
+            for product in CANONICAL_PRODUCTS
+        ],
     )
 
     clinic_rows = bind.execute(sa.text("SELECT id FROM clinics")).fetchall()
@@ -262,7 +266,9 @@ def downgrade() -> None:
     bind = op.get_bind()
 
     op.drop_index("ix_workspace_products_product_id", table_name="workspace_products")
-    op.drop_index("ix_workspace_products_clinic_status", table_name="workspace_products")
+    op.drop_index(
+        "ix_workspace_products_clinic_status", table_name="workspace_products"
+    )
     op.drop_table("workspace_products")
     op.drop_index(
         "ix_platform_bundle_products_product_id",
