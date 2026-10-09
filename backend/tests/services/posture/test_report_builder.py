@@ -29,3 +29,13 @@ def test_capture_source_defaults_to_unknown_not_camera() -> None:
     result = build_side_view_result(measurements=[], photo_url="")
 
     assert result["captureSource"] == "unknown"
+
+
+def test_severity_labels_describe_the_deviation_not_the_patient():
+
+    # Founders, 10 October 2026.
+    from app.services.posture.classifier import SEVERITY_LABELS
+
+    assert SEVERITY_LABELS["none"] == "NORMAL"
+    for grade in ("mild", "moderate", "severe"):
+        assert SEVERITY_LABELS[grade] == f"{grade.upper()} DEVIATION"

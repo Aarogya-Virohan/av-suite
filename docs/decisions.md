@@ -710,6 +710,21 @@ Verified: route imports, full route run on two subjects shows no PT-A02 or
 PT-A03 rows and the renamed PT-P02, suite 37 passed. Run in a Linux VM
 (opencv 4.11, not the pinned 4.10), so no measured values are quoted here.
 
+### Severity labels name the deviation, not the patient
+The founders' Q1 answer, applied. The report now prints NORMAL, MILD
+DEVIATION, MODERATE DEVIATION and SEVERE DEVIATION in place of NONE, MILD,
+MODERATE and SEVERE. One change in SEVERITY_LABELS, which feeds both the
+PDF and the frontend. Grades themselves are unchanged. The founders' own
+example was "Severe Biomechanical Deviation"; their colour scale reads
+"Mild Deviation", which is what fits a report badge, so that is used.
+
+The four-colour scale they asked for already existed on both surfaces:
+green, yellow, orange, red. Nothing changed there.
+
+The longer label wrapped onto two lines in the PDF, so the value column went
+from 24 to 16 percent of the table. Checked on a rendered PDF of one test
+subject, both pages. Suite 38 passed.
+
 ---
 
 ## Not decided, still blocked

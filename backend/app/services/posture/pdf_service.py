@@ -398,7 +398,7 @@ def build_report_html(report: dict) -> str:
     }}
     .measurements .value {{
         font-weight: bold;
-        width: 24%;
+        width: 16%;
     }}
     .measurements .severity span {{
         display: inline-block;

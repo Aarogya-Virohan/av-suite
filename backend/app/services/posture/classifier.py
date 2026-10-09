@@ -284,11 +284,14 @@ def is_borderline(param_id: str, value: float, unit: str) -> bool:
     return any(abs(value - b) <= margin for b in boundaries)
 
 
+# Founders, 10 October 2026: the label describes the deviation, never the
+# patient, on a four-colour scale (green, yellow, orange, red). The colours
+# are SEVERITY_STYLES in pdf_service.py and getSeverityColor.ts.
 SEVERITY_LABELS: dict[str, str] = {
-    "none": "NONE",
-    "mild": "MILD",
-    "moderate": "MODERATE",
-    "severe": "SEVERE",
+    "none": "NORMAL",
+    "mild": "MILD DEVIATION",
+    "moderate": "MODERATE DEVIATION",
+    "severe": "SEVERE DEVIATION",
     "insufficient_data": "INSUFFICIENT DATA \u2013 RETAKE PHOTO",
     "not_available": "PATIENT HEIGHT REQUIRED",
 }
