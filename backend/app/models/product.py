@@ -1,8 +1,20 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Enum, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,6 +41,12 @@ class Product(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    allowed_clinic_types: Mapped[list[str]] = mapped_column(
+        ARRAY(String()).with_variant(JSON(), "sqlite"),
+        nullable=False,
+        default=lambda: ["clinic", "solo", "personal"],
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     bundle_links: Mapped[list[PlatformBundleProduct]] = relationship(
         "PlatformBundleProduct",
@@ -50,6 +68,7 @@ class PlatformBundle(UUIDMixin, TimestampMixin, Base):
     slug: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     product_links: Mapped[list[PlatformBundleProduct]] = relationship(
         "PlatformBundleProduct",
@@ -88,6 +107,9 @@ class PlatformBundleProduct(UUIDMixin, TimestampMixin, Base):
         nullable=False,
     )
     product: Mapped[Product] = relationship(back_populates="bundle_links")
+    valid_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class WorkspaceProduct(UUIDMixin, TimestampMixin, Base):
@@ -143,4 +165,10 @@ class WorkspaceProduct(UUIDMixin, TimestampMixin, Base):
     )
     bundle: Mapped[PlatformBundle | None] = relationship(
         back_populates="workspace_entitlements"
+    )
+    valid_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    valid_from: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
