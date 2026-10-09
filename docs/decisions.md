@@ -804,6 +804,53 @@ capture and captureSource, which changed what reaches the model and were
 not stamped at the time; the founder prep file of 7 October flagged that
 as undecided.
 
+### Landmark review step built; no report without it
+The founders' Q6, second half. The clinician now checks the points before any
+report exists, and the old one-shot POST /analyze is removed, so there is no
+path to a report without review. The flow is POST /detect, the review screen,
+then POST /report.
+
+Which points are reviewed was not chosen by reading the code. Every landmark
+index the measurement code reads was traced at runtime across all seven
+subjects: 11 points on the front (plus the two pupils), 7 on the back, and on
+the side the facing side's ear, shoulder, hip, knee and ankle plus the nose.
+The far side of a side photograph is hidden behind the body and is not
+offered; it keeps the model's values and only scales the grid. A test pins
+the list, so a measurement that starts reading a new point fails until that
+point is added to review.
+
+Design decisions, each for a stated reason:
+- The full photographs are uploaded once, to /detect. /report takes only
+  the points, a signed token and a small display copy of each photograph,
+  because measurement needs only the points and the original image size.
+  Nothing is held on the server between the two calls, so "patient photos
+  are not saved" still holds, and it works across server restarts and
+  instances, which an in-memory hold would not.
+- The token carries the model's own points, signed with the app's JWT
+  secret, two hour lifetime. The audit in the report (model position,
+  confirmed position, pixels moved, who confirmed, when) cannot have its
+  model half altered by the client. Round trip is exact; tampering is
+  refused.
+- The review screen shows the server's decoded copy of each photograph, not
+  the browser's, so the orientation shown is the one measured and HEIC
+  uploads, which Chrome cannot display, still work.
+- A confirmed point passes the visibility guard: a clinician placing it is a
+  stronger check than the model's score, which po-7 showed does not catch a
+  misplaced point. A point marked not visible reports insufficient data. The
+  limb-order gravity check still runs on confirmed points.
+- The landmark visibility figure on the report stays the model's own.
+- The server refuses a report that is unconfirmed, has any point unreviewed,
+  has a point outside the photograph, an invalid token, or a display image
+  whose shape does not match the analysed photograph.
+
+Verified: the route was first split into detection and measurement with no
+change, reports byte-identical on all seven subjects including annotated
+images. Confirming unchanged points through /report reproduces every row,
+image and visibility figure on all seven. Five rejection cases return 422.
+Levelling po-3's pupils takes PT-A01 to 0.0. The saved report carries the
+audit. Suite 48 passed, tsc clean. The review screen has not yet been tried
+on a phone; that is the next check.
+
 ---
 
 ## Not decided, still blocked

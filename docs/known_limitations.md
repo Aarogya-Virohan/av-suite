@@ -175,3 +175,14 @@ back photograph, the subject whose palms face the camera from behind.
 MediaPipe's documentation does not say how its labels behave on a person
 facing away. The PT-P02 side is therefore read from image position, not
 labels, since 10 October.
+
+### Back view calibration rests on a point that cannot be seen, 10 October 2026
+
+The millimetre calibration measures the span from nose to ankles. From
+behind, the nose is not visible, and MediaPipe still places it, with
+visibility 1.00 on all seven back photographs. Since 10 October the back
+view is the only source of shoulder level and trunk shift, so those
+millimetre values rest on a guessed head point. The review screen labels it
+"Nose (estimate, head midline)" so the clinician places it on purpose. A
+calibration that does not need a facial point on the back view (for
+example the top of the head) has not been built.

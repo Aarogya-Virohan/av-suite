@@ -101,8 +101,10 @@ Still open, blocked on the founders:
 - PT-A10 ear level: its landmarks sit on the cheeks, and it measures the
   same head roll as PT-A01. Keep or withdraw is theirs.
 
-Not built yet, not blocked: the Q6 landmark review step, and the Q5
-regional profile that replaces the global score.
+Built 10 October: the Q6 landmark review step. The flow is now
+/detect, review screen, /report; the one-shot /analyze is gone.
+Not built yet, not blocked: the Q5 regional profile that replaces the
+global score.
 
 ## 4. Done on 2 October, after the founder document went out
 
