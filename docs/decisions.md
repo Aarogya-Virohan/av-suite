@@ -579,6 +579,102 @@ moot since PT-A08 was withdrawn on 2 October. Left in place, not reviewed.
 
 ---
 
+## 10 October 2026
+
+### Founder answers to the 2 October decisions document
+Source: "AI Posture Analysis Clinical Guidelines", a conversation the
+founders held with Gemini and sent to Onkar on 10 October as their answers.
+For each question the founders asked for a "final sequential summary" and
+accepted it as their final word, so those summaries are what is recorded
+here. Where a summary cites evidence, the evidence was checked separately
+on 10 October and some of it does not hold (end of this entry). The
+decisions are clinical and stand as given; only the stated reasons are
+weaker than they read.
+
+**Q1, severity.** Keep Mild, Moderate, Severe. Show it as a four-colour
+scale on the dashboard and the patient PDF: green normal, yellow mild,
+orange moderate, red severe. Apply the label to the deviation, not to the
+patient: "Severe Biomechanical Deviation", never "Severe Posture".
+
+**Q2, forward head (PT-L01).** Normal above 50, mild 45 to 50, moderate 35
+to 44, severe below 35, degrees. A standalone day-one metric, not only for
+change over time. The answer defines CVA from C7 and does not address that
+the tool measures ear to shoulder; the bands are applied to the substituted
+angle and the classifier comment says so.
+
+**Q3, knee.** Answered as the Q-angle with a sex toggle, male 8 to 14
+degrees, female 12 to 17. Not implementable. The Q-angle needs the ASIS,
+the patella centre and the tibial tuberosity, and MediaPipe returns none of
+them; PT-A05 and PT-A06 measure hip-knee-ankle deviation, which is a
+different quantity, correlated with the Q-angle but not interchangeable.
+Current bands left unchanged. What the answer does settle is that a
+sex-specific allowance is wanted. The limits for the quantity we measure
+are still owed.
+
+**Q4, shoulder height.** Millimetres, not degrees. 0 to 5 normal, 6 to 10
+mild, 11 to 20 moderate, above 20 severe. Given for shoulder height only.
+The trunk shift parameters, PT-A03 and PT-P01, received no bands and stay
+at 5/15/25 FOR REVIEW.
+
+**Q5, Global Stability Index.** Remove the single score. The answer was
+revised once in the same conversation; the final version replaces the
+score with a "Biomechanical Signature", a visual profile of regional
+values, and stores each scan as a vector of its measurements. A separate
+"Wellness Index" is allowed only outside the clinical report.
+
+**Q6, review step and disclaimer.** Landmark verification is mandatory:
+draggable points, and no report until the clinician taps "Confirm
+Alignment". Disclaimer, verbatim: "This structural screening report is
+generated via automated 2D optical tracking. It highlights static
+biomechanical asymmetries to predict localized tissue loading. It is not a
+standalone clinical diagnosis and must be correlated with patient symptoms
+and functional movement by a licensed physiotherapist."
+
+**Q7, one metric, one view.** Never two numbers for one metric. Posterior
+only: shoulder height asymmetry, scapular deviation, lateral spinal shift.
+Anterior only: knee valgus and varus. Lateral only: CVA. For our
+parameters this means PT-A02 and PT-A03 leave the front view and PT-P02 and
+PT-P01 stay. Our 2 October recommendation was the front view, because
+calibration was measured on front photographs and back photographs fail
+the visibility guard more often; the founders chose the back.
+
+**Head tilt (PT-A01).** The view mapping assigns cranial lateral tilt to
+the pupillary line on the front view.
+
+**Withdrawals.** No objection was raised to PT-A08 or PT-P04. Both stand.
+
+**Not answered, so not decided.** PT-L06 flexion bands; the PT-P01 rename
+and Schroth removal; the PT-A01 noise-floor ceiling; trunk shift bands;
+the calibration constant. Silence is not taken as agreement.
+
+**Evidence in the summaries, checked 10 October.** Supported: healthy
+adolescents average 7.5 mm shoulder height difference, 72 percent under 10
+mm (Akel et al. 2007, Eur Spine J, doi 10.1007/s00586-007-0546-0), and
+Kuklo graded radiographic shoulder height in 1 cm steps. Not supported: no
+source was found for the 35 degree CVA boundary; Yip et al. 2008 measured
+disability with the Northwick Park questionnaire, not the NDI, and found a
+moderate correlation; Horton and Hall 1989, cited for the female Q-angle,
+found hip width unrelated to it; a 2023 systematic review found the
+Q-angle a poor predictor of knee pathology. The regulatory statements
+(CDSCO guidance "finalized in 2026", data hosting outside India as a DPDP
+violation) do not match the public record and need a regulatory or legal
+opinion, not an engineering one.
+
+### PT-L01 bands moved to the founders' values
+moderate_min 40 to 35. Readings from 35 to under 40 degrees, previously
+SEVERE, now grade MODERATE. Exactly 50.0 still grades normal (the
+classifier uses >=); the founders' wording leaves that single point open.
+Verified by calling classify() at every boundary. No test pinned the old
+value. Suite 34 passed.
+
+### PT-A02 and PT-P02 bands confirmed, no change
+The founders' bands are the existing ones, and the classifier's <=
+boundaries put 5.0 normal, 10.0 mild, 20.0 moderate, as the answer reads.
+Only the "No published source" comments were replaced. Verified at every
+boundary.
+
+---
+
 ## Not decided, still blocked
 
 These were looked at today and deliberately left alone.
@@ -611,7 +707,6 @@ These were looked at today and deliberately left alone.
   ceiling is a clinical question, not an engineering one: the asymmetry
   looks deliberate rather than accidental, given the female allowance
   exists on one and not the other.
-- **Severity tiers themselves.** Whether the product should assign
-  none/mild/moderate/severe at all, or move to a normal-range presentation,
-  is the question that dissolves roughly half of the above. Unanswered
-  since 13 September.
+- **Severity tiers themselves.** Answered 10 October: keep
+  mild/moderate/severe, with a four-colour scale. See the 10 October
+  section.

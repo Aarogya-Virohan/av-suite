@@ -25,17 +25,20 @@ class ThresholdRule(TypedDict):
 # able to point at a reference range for it. Do not attach a citation to
 # one of those rows unless the citation actually publishes that band.
 THRESHOLDS: dict[str, dict] = {
-    # Bands from the published craniovertebral angle literature, but the
-    # tool measures ear to shoulder rather than tragus to C7 because
-    # MediaPipe returns no C7 landmark, so the reference range does not
-    # transfer directly. Open with the founders.
+    # Bands set by the founders, 10 October 2026: normal above 50, mild 45
+    # to 50, moderate 35 to 44, severe below 35. Used as a standalone metric,
+    # not only for change over time. The tool measures ear to shoulder
+    # rather than tragus to C7 because MediaPipe returns no C7 landmark, so
+    # these bands are applied to a substituted angle. Exactly 50.0 grades
+    # normal here (>=); the founders' wording leaves that single point open.
     "PT-L01": {
         "direction": "lower_worse",
         "none_min": 50,
         "mild_min": 45,
-        "moderate_min": 40,
+        "moderate_min": 35,
     },
-    # No published source.
+    # Bands set by the founders, 10 October 2026: 0 to 5 mm normal, 6 to 10
+    # mild, 11 to 20 moderate, above 20 severe. Unchanged numbers.
     "PT-A02": {
         "direction": "higher_worse",
         "none_max": 5,
@@ -119,7 +122,8 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 15,
         "moderate_max": 25,
     },
-    # No published source. Identical calculation to PT-A02.
+    # Bands set by the founders, 10 October 2026, see PT-A02. Identical
+    # calculation to PT-A02.
     "PT-P02": {
         "direction": "higher_worse",
         "none_max": 5,
