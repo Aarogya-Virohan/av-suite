@@ -7,11 +7,15 @@ import ImagePreview from "@/components/posture/ImagePreview"
 
 import ReportCard from "@/components/report/ReportCard"
 
-import { analyzePosture, downloadPostureReportPdf } from "@/lib/api"
+import LandmarkReview from "@/components/review/LandmarkReview"
 
-import type { PostureReport } from "@/types/posture"
+import { detectLandmarks, downloadPostureReportPdf, generateReport } from "@/lib/api"
 
-type Step = "upload" | "report"
+import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@/types/posture"
+
+// "review" is the founders' landmark check (Q6, 10 October 2026): no report
+// exists until the clinician has confirmed the points.
+type Step = "upload" | "review" | "report"
 
 function Header() {
 return ( <header className="border-b border-slate-200 bg-white"> <div className="mx-auto flex w-full max-w-7xl items-center px-4 py-4"> <span className="text-lg font-semibold text-slate-900">
@@ -77,6 +81,9 @@ useState("")
 const [report, setReport] =
 useState<PostureReport | null>(null)
 
+const [detection, setDetection] =
+useState<DetectionResult | null>(null)
+
 const [loading, setLoading] =
 useState(false)
 
@@ -108,23 +115,47 @@ return
 try {
   setLoading(true)
 
-  const result =
-    await analyzePosture(
-       {
-         frontFile,
-         sideFile,
-         backFile,
-         patientName,
-         age,
-         gender,
-         caseRef,
-         patientHeightCm,
-         clinicianName,
-         frontSource,
-         sideSource,
-         backSource,
-       }
-    )
+  const result = await detectLandmarks({ frontFile, sideFile, backFile })
+
+  setDetection(result)
+
+  setStep("review")
+
+} catch (error) {
+
+  console.error(error)
+
+  alert(
+    "Analysis failed: " +
+      (error instanceof Error ? error.message : String(error)),
+  )
+
+} finally {
+
+  setLoading(false)
+}
+
+}
+
+const handleConfirm = async (review: LandmarkReviewSubmission) => {
+if (!detection) return
+
+try {
+  setLoading(true)
+
+  const result = await generateReport({
+    detection,
+    review,
+    patientName,
+    age,
+    gender,
+    caseRef,
+    patientHeightCm,
+    clinicianName,
+    frontSource,
+    sideSource,
+    backSource,
+  })
 
   setReport(result)
 
@@ -135,7 +166,7 @@ try {
   console.error(error)
 
   alert(
-    "Analysis failed: " +
+    "Report failed: " +
       (error instanceof Error ? error.message : String(error)),
   )
 
@@ -379,6 +410,18 @@ return ( <div className="min-h-screen bg-slate-100">
       </section>
     )}
 
+    {step === "review" && detection && (
+      <LandmarkReview
+        detection={detection}
+        loading={loading}
+        onBack={() => {
+          setDetection(null)
+          setStep("upload")
+        }}
+        onConfirm={handleConfirm}
+      />
+    )}
+
     {step === "report" &&
       report && (
         <section className="space-y-6">
@@ -449,6 +492,10 @@ return ( <div className="min-h-screen bg-slate-100">
                 setClinicianName("")
 
                 setReport(
+                  null
+                )
+
+                setDetection(
                   null
                 )
 

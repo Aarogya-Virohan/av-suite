@@ -71,3 +71,60 @@ export interface PostureReport {
   // globalIndex removed 10 October 2026, founders' Q5. Reports saved
   // before then still carry it; nothing reads it.
 }
+
+// Landmark review step, founders' Q6, 10 October 2026.
+
+export interface ReviewPoint {
+  index: number
+  name: string
+  // Normalised to the photograph, 0 to 1, origin top left.
+  x: number
+  y: number
+  visibility: number
+}
+
+export interface ReviewPupil {
+  name: string
+  x: number
+  y: number
+}
+
+export interface DetectedViewForReview {
+  widthPx: number
+  heightPx: number
+  // The server's decoded copy of the photograph, the one that was measured.
+  displayImage: string
+  points: ReviewPoint[]
+  lateralSide?: "left" | "right"
+  // Front view only; null when no face was found.
+  iris?: ReviewPupil[] | null
+}
+
+export interface DetectionResult {
+  detectionToken: string
+  views: {
+    side: DetectedViewForReview
+    front: DetectedViewForReview
+    back: DetectedViewForReview
+  }
+}
+
+export interface ReviewedPoint {
+  index: number
+  x: number
+  y: number
+  notVisible?: boolean
+}
+
+export interface ReviewedView {
+  points: ReviewedPoint[]
+  iris?: { x: number; y: number }[] | null
+  irisNotVisible?: boolean
+}
+
+export interface LandmarkReviewSubmission {
+  confirmed: true
+  side: ReviewedView
+  front: ReviewedView
+  back: ReviewedView
+}

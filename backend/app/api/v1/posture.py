@@ -227,66 +227,10 @@ def _annotate_or_blank(
         return ""
 
 
-@router.post("/analyze")
-async def analyze_posture(
-    front_image: UploadFile = File(...),
-    side_image: UploadFile = File(...),
-    back_image: UploadFile = File(...),
-    patient_name: str = Form(...),
-    age: int = Form(...),
-    gender: str = Form(...),
-    case_ref: str = Form(...),
-    patient_height_cm: float = Form(...),
-    clinician_name: str = Form(""),
-    # Whether each photograph came from the in-app capture screen or from
-    # an existing file. Defaulted rather than required so an older client
-    # keeps working; "unknown" is honest about not knowing.
-    front_source: str = Form("unknown"),
-    side_source: str = Form("unknown"),
-    back_source: str = Form("unknown"),
-):
-
-    # ---------------------------------
-    # Read Uploaded Images
-    # ---------------------------------
-
-    # Height drives the pixel-to-millimetre calibration in
-    # estimate_pixels_per_cm. An out-of-range value does not fail loudly --
-    # it silently rescales every millimetre parameter in the report, so a
-    # typo of 17 for 170 would produce confident readings that are wrong by
-    # a factor of ten. Reject it here rather than reporting it.
-    if not 50 <= patient_height_cm <= 250:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Patient height must be between 50 and 250 cm. "
-                f"Received: {patient_height_cm} cm."
-            ),
-        )
-
-    front_bytes = await front_image.read()
-    side_bytes = await side_image.read()
-    back_bytes = await back_image.read()
-
-    side = _detect_view("Side", side_bytes)
-    front = _detect_view("Front", front_bytes, with_iris=True)
-    back = _detect_view("Back", back_bytes)
-
-    return _report_from_points(
-        side=side,
-        front=front,
-        back=back,
-        patient_name=patient_name,
-        age=age,
-        gender=gender,
-        case_ref=case_ref,
-        patient_height_cm=patient_height_cm,
-        clinician_name=clinician_name,
-        front_source=front_source,
-        side_source=side_source,
-        back_source=back_source,
-    )
-
+# The one-shot POST /analyze, which detected, measured and reported in a
+# single call with no clinician in between, was removed on 10 October 2026.
+# The founders ruled that no report is generated until the landmarks are
+# confirmed (Q6); /detect then /report replaces it.
 
 def _report_from_points(
     *,
@@ -309,7 +253,7 @@ def _report_from_points(
 
     Takes landmarks that have already been detected, so the same code can
     run on the model's points or on points a clinician has reviewed. Split
-    out of analyze_posture on 10 October 2026 with no change in behaviour,
+    out of the former one-shot route on 10 October 2026 with no change in behaviour,
     verified by byte-identical reports on all seven test subjects.
     """
 
