@@ -24,7 +24,13 @@ class Clinic(Base, TimestampMixin):
     branding_logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     branding_color: Mapped[str | None] = mapped_column(String(32), nullable=True)
     plan_tier: Mapped[ClinicPlanTier] = mapped_column(
-        Enum(ClinicPlanTier), nullable=False, default=ClinicPlanTier.FREE
+        Enum(
+            ClinicPlanTier,
+            values_callable=lambda e: [member.value for member in e],
+            name="clinicplantier",
+        ),
+        nullable=False,
+        default=ClinicPlanTier.FREE,
     )
     is_partner_clinic: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
