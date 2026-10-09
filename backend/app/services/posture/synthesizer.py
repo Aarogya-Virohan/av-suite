@@ -39,24 +39,9 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
             {"exercise": "Lateral Neck Stretch", "dosage": "3x30s each side"},
         ],
     },
-    {
-        # PT-A02 — Shoulder Level Asymmetry
-        "param_id": "PT-A02",
-        "hypertonic": ["Upper Trapezius"],
-        "inhibited": ["Middle Trapezius"],
-        "corrective": [
-            {"exercise": "Scapular Retraction", "dosage": "3x15"},
-        ],
-    },
-    {
-        # PT-A03 — Trunk Lateral Shift
-        "param_id": "PT-A03",
-        "hypertonic": ["Quadratus Lumborum", "Obliques (one side)"],
-        "inhibited": ["Gluteus Medius"],
-        "corrective": [
-            {"exercise": "Side Plank", "dosage": "3x20s each side"},
-        ],
-    },
+    # PT-A02 and PT-A03 left the front view on 10 October 2026; the same
+    # quantities are now reported only as PT-P02 and PT-P01. Their mappings
+    # moved with the quantity, see those entries.
     {
         # PT-A04 — Pelvic Obliquity
         "param_id": "PT-A04",
@@ -94,25 +79,30 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
         ],
     },
     {
-        # PT-P01 — Trunk Lateral Deviation (Posterior)
+        # PT-P01 — Trunk Lateral Deviation (Posterior). FOR REVIEW.
+        # Since 10 October 2026 this carries the mapping written for the
+        # same quantity on the front view (PT-A03, trunk lateral shift). The
+        # previous mapping here was written when the row was "Scoliosis
+        # Screen" (one-sided erector spinae, Schroth breathing); the row has
+        # made no scoliosis claim since 18 Sept.
         "param_id": "PT-P01",
-        "hypertonic": ["Quadratus Lumborum", "Erector Spinae (one side)"],
-        "inhibited": ["Obliques", "Gluteus Medius"],
-        # Schroth Method Breathing was removed on 18 Sept. Schroth is
-        # curve pattern specific, the classification is meant to be used
-        # by certified Schroth therapists, and this parameter produces no
-        # curve classification and no spinal measurement of any kind. No
-        # replacement exercise was substituted, because no automatic
-        # exercise can be justified from a shoulder to hip offset alone.
-        "corrective": [],
+        "hypertonic": ["Quadratus Lumborum", "Obliques (one side)"],
+        "inhibited": ["Gluteus Medius"],
+        "corrective": [
+            {"exercise": "Side Plank", "dosage": "3x20s each side"},
+        ],
     },
     {
-        # PT-P02 — Scapular Asymmetry (Winging / Height)
+        # PT-P02 — Shoulder Level Asymmetry. FOR REVIEW.
+        # Since 10 October 2026 this carries the mapping written for the
+        # same quantity on the front view (PT-A02). The previous mapping here
+        # (serratus anterior, wall slides) was written for scapular winging,
+        # which a 2D photograph cannot detect and this row does not claim.
         "param_id": "PT-P02",
-        "hypertonic": ["Levator Scapulae", "Upper Trapezius"],
-        "inhibited": ["Serratus Anterior", "Lower Trapezius"],
+        "hypertonic": ["Upper Trapezius"],
+        "inhibited": ["Middle Trapezius"],
         "corrective": [
-            {"exercise": "Scapular Wall Slides", "dosage": "3x12"},
+            {"exercise": "Scapular Retraction", "dosage": "3x15"},
         ],
     },
     # PT-P03 and PT-P05 had entries here. Both parameters were withdrawn

@@ -673,6 +673,43 @@ boundaries put 5.0 normal, 10.0 mild, 20.0 moderate, as the answer reads.
 Only the "No published source" comments were replaced. Verified at every
 boundary.
 
+### Shoulder level and trunk shift now come only from the back view
+The founders' Q7 answer, applied. PT-A02 and PT-A03 no longer run on the
+front view; PT-P02 and PT-P01 report the same quantities, by the same
+calculations, from the back. Calculations and bands stay in the source with
+nothing calling them, as with the earlier withdrawals. PT-A10, the other
+front millimetre row, is unchanged.
+
+PT-P02 renamed from "Scapular Height Asymmetry" to "Shoulder Level
+Asymmetry". It measures the shoulder landmarks; no scapular landmark
+exists, and the founders' view table lists shoulder height and scapular
+deviation as different things. The number does not change.
+
+Mappings followed the quantity, FOR REVIEW. PT-P02 now carries what PT-A02
+carried (upper trapezius, middle trapezius, scapular retraction) in place of
+its old serratus anterior and wall slides mapping, which was written for
+scapular winging, a finding a 2D photograph cannot detect and the row no
+longer claims. PT-P01 now carries what PT-A03 carried (quadratus lumborum,
+obliques, gluteus medius, side plank) in place of a mapping written when it
+was "Scoliosis Screen". Nothing new was written: each mapping already
+existed for exactly this quantity. Without this, trunk shift would have
+shipped with no exercise at all.
+
+The PT-P02 side is now read from image position. MediaPipe's labels came out
+reversed on po-1's back photograph; with the camera behind the patient, the
+image-left shoulder is the patient's left, the same reasoning PT-P01 and
+PT-P03 already use. On the seven subjects this changes po-1 only. A test
+pins that reversed labels give the same answer, and the old label-based
+function fails it.
+
+Also found, not fixed: on six of seven subjects the front and back photos
+name opposite shoulders as higher. Recorded in known_limitations.md with
+what would address it.
+
+Verified: route imports, full route run on two subjects shows no PT-A02 or
+PT-A03 rows and the renamed PT-P02, suite 37 passed. Run in a Linux VM
+(opencv 4.11, not the pinned 4.10), so no measured values are quoted here.
+
 ---
 
 ## Not decided, still blocked

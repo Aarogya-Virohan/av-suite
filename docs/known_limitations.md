@@ -149,3 +149,29 @@ is that nothing recorded it here, and the report prints a direction and a
 severity with no caveat. Within-patient tracking is not established either:
 that needs the same person photographed on different days, which we do not
 have.
+
+### Shoulder level side, front and back disagree, 10 October 2026
+
+Measured on the seven test subjects with the pipeline's own
+detect_pose_full. On six of seven, the front photograph and the back
+photograph name opposite shoulders as the higher one. One person's real
+asymmetry cannot do that, so on those six at least one view is wrong
+about the side. In 12 of 14 photographs the shoulder line sits higher on
+the image left whichever way the subject faces, which points at the camera
+or the stance rather than the anatomy, but hip and ankle lines do not tilt
+consistently with it, so camera roll alone is not proven. A photograph
+carries no gravity reference, so which view is right cannot be settled
+from these images. Shoulder line tilt reached about 5 degrees, roughly
+30 mm across the shoulders, which is the severe band.
+
+Since 10 October the shoulder row comes only from the back view, by the
+founders' decision. That removes the contradiction from the report; it does
+not make the side reliable. What would: a capture-time device tilt lock
+(the founders suggested plus or minus 1.5 degrees; ours warns at 10 and
+does not block), or a vertical reference in frame.
+
+Separately, MediaPipe's left and right labels came out reversed on po-1's
+back photograph, the subject whose palms face the camera from behind.
+MediaPipe's documentation does not say how its labels behave on a person
+facing away. The PT-P02 side is therefore read from image position, not
+labels, since 10 October.

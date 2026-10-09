@@ -47,7 +47,9 @@ def test_withdrawn_parameters_trigger_nothing():
     # pins the second half: if a mapping is ever added back without the
     # parameter being deliberately reinstated, this fails.
 
-    for param in ("PT-A08_left", "PT-A08_right", "PT-P03_left", "PT-P04", "PT-P05"):
+    # PT-A02 and PT-A03 left the front view on 10 October; their quantities
+    # are reported as PT-P02 and PT-P01.
+    for param in ("PT-A08_left", "PT-A08_right", "PT-P03_left", "PT-P04", "PT-P05", "PT-A02", "PT-A03"):
 
         result = generate_synthesis({param: "severe"})
 
@@ -80,3 +82,17 @@ def test_synthesis_ignores_none_and_mild_severities():
     assert result["hypertonic"] == []
     assert result["inhibited"] == []
     assert result["correctiveProtocol"] == []
+
+
+def test_posterior_rows_carry_the_mapping_for_their_quantity():
+
+    # Since 10 October the shoulder level and trunk shift mappings follow
+    # the quantity to the posterior rows, not the old winging and
+    # scoliosis-era mappings.
+    p02 = generate_synthesis({"PT-P02": "moderate"})
+    assert any(ex["exercise"] == "Scapular Retraction" for ex in p02["correctiveProtocol"])
+    assert "Serratus Anterior" not in p02["inhibited"]
+
+    p01 = generate_synthesis({"PT-P01": "moderate"})
+    assert any(ex["exercise"] == "Side Plank" for ex in p01["correctiveProtocol"])
+    assert not any("Schroth" in ex["exercise"] for ex in p01["correctiveProtocol"])

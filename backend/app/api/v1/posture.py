@@ -31,16 +31,14 @@ from app.services.posture.calculator import (
     calc_head_lateral_tilt,
     head_lateral_tilt_side,
     pelvic_obliquity_side,
-    shoulder_asymmetry_side,
+    posterior_shoulder_higher_side,
     ear_asymmetry_side,
     trunk_shift_side,
     calc_pelvic_obliquity,
     calc_knee_frontal_deviation,
     calc_knee_hyperextension,
     estimate_pixels_per_cm,
-    calc_shoulder_asymmetry_mm,
     calc_ear_level_asymmetry_mm,
-    calc_trunk_lateral_shift_mm,
     calc_trunk_lateral_deviation_mm,
     calc_scapular_height_asymmetry_mm,
     calc_detection_confidence,
@@ -110,6 +108,9 @@ def _knee_sagittal_label(value: float) -> str:
 # report above a physiotherapist signature line. Renamed 18 Sept. An
 # earlier rename was reverted at 6ac72e4; this one is deliberate.
 P01_LABEL = "Trunk Lateral Deviation (Posterior)"
+
+# PT-P02 measures the two shoulder landmarks, not the scapulae.
+P02_LABEL = "Shoulder Level Asymmetry"
 
 
 def _rearfoot_label(value: float, side_label: str) -> str:
@@ -446,7 +447,12 @@ async def analyze_posture(
     # and its discontinuity at -1.5 degrees, which used to live here.
     # See docs/known_limitations.md for the evidence.
 
-    # PT-A02 / PT-A03 / PT-A10 — millimetre measurements (need patient height for calibration)
+    # PT-A10 — millimetre measurement (needs patient height for calibration).
+    # PT-A02 (shoulder level) and PT-A03 (trunk lateral shift) left the front
+    # view on 10 October 2026: the founders ruled one metric, one view, and
+    # assigned both quantities to the posterior view, where PT-P02 and PT-P01
+    # measure them with the same calculation. Calculations and bands are left
+    # in place; nothing calls them. See docs/decisions.md, 10 October.
 
     # Calibration rests on NOSE and both ANKLEs. If those are not visible we
     # get no scale factor, and the millimetre parameters below cannot be
@@ -461,7 +467,6 @@ async def analyze_posture(
         calibration_status = "insufficient_data"
 
     mm_params = [
-        ("PT-A02", "Shoulder Level Asymmetry", LEFT_SHOULDER, RIGHT_SHOULDER, "y"),
         ("PT-A10", "Ear Level Asymmetry", LEFT_EAR, RIGHT_EAR, "y"),
     ]
 
@@ -475,19 +480,12 @@ async def analyze_posture(
                 )
                 continue
 
-            if param_id == "PT-A02":
-                value = calc_shoulder_asymmetry_mm(front_landmarks, front_height_px, pixels_per_cm)
-            else:
-                value = calc_ear_level_asymmetry_mm(front_landmarks, front_height_px, pixels_per_cm)
+            value = calc_ear_level_asymmetry_mm(front_landmarks, front_height_px, pixels_per_cm)
 
             severity = classify(param_id, value)
             findings[param_id] = severity
 
-            side_value = (
-                shoulder_asymmetry_side(front_landmarks)
-                if param_id == "PT-A02"
-                else ear_asymmetry_side(front_landmarks)
-            )
+            side_value = ear_asymmetry_side(front_landmarks)
 
             front_measurements.append(
                 measurement(param_id, label, value, "mm", severity, side=side_value)
@@ -498,34 +496,8 @@ async def analyze_posture(
                 measurement(param_id, label, None, "mm", "insufficient_data")
             )
 
-    # PT-A03 — Trunk Lateral Shift
-    try:
-        check_visibility(front_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP])
-
-        if pixels_per_cm is None:
-            front_measurements.append(
-                measurement("PT-A03", "Trunk Lateral Shift", None, "mm", calibration_status)
-            )
-        else:
-            trunk_shift = calc_trunk_lateral_shift_mm(front_landmarks, front_width_px, pixels_per_cm)
-            severity = classify("PT-A03", trunk_shift)
-            findings["PT-A03"] = severity
-
-            front_measurements.append(
-                measurement(
-                    "PT-A03",
-                    "Trunk Lateral Shift",
-                    trunk_shift,
-                    "mm",
-                    severity,
-                    side=trunk_shift_side(front_landmarks, "anterior"),
-                )
-            )
-
-    except InsufficientVisibilityError:
-        front_measurements.append(
-            measurement("PT-A03", "Trunk Lateral Shift", None, "mm", "insufficient_data")
-        )
+    # PT-A03 — Trunk Lateral Shift. Moved to the posterior view on
+    # 10 October 2026, see the PT-A10 comment above; PT-P01 reports it.
 
     front_photo_url = _annotate_or_blank(
         front_bytes,
@@ -592,13 +564,18 @@ async def analyze_posture(
             measurement("PT-P01", P01_LABEL, None, "mm", "insufficient_data")
         )
 
-    # PT-P02 — Scapular Height Asymmetry
+    # PT-P02 — Shoulder Level Asymmetry. Renamed from "Scapular Height
+    # Asymmetry" on 10 October 2026: it measures the shoulder landmarks, the
+    # same calculation PT-A02 used, and no scapular landmark exists. Since
+    # 10 October it is the only shoulder level row on the report. The higher
+    # side is read from image position, not from MediaPipe's left/right
+    # labels, which were found reversed on one of seven back photographs.
     try:
         check_visibility(back_landmarks, [LEFT_SHOULDER, RIGHT_SHOULDER])
 
         if back_pixels_per_cm is None:
             back_measurements.append(
-                measurement("PT-P02", "Scapular Height Asymmetry", None, "mm", back_calibration_status)
+                measurement("PT-P02", P02_LABEL, None, "mm", back_calibration_status)
             )
         else:
             scapular = calc_scapular_height_asymmetry_mm(back_landmarks, back_height_px, back_pixels_per_cm)
@@ -608,17 +585,17 @@ async def analyze_posture(
             back_measurements.append(
                 measurement(
                     "PT-P02",
-                    "Scapular Height Asymmetry",
+                    P02_LABEL,
                     scapular,
                     "mm",
                     severity,
-                    side=shoulder_asymmetry_side(back_landmarks),
+                    side=posterior_shoulder_higher_side(back_landmarks),
                 )
             )
 
     except InsufficientVisibilityError:
         back_measurements.append(
-            measurement("PT-P02", "Scapular Height Asymmetry", None, "mm", "insufficient_data")
+            measurement("PT-P02", P02_LABEL, None, "mm", "insufficient_data")
         )
 
     # PT-P03 — Rearfoot / calcaneal alignment. Withdrawn from the report

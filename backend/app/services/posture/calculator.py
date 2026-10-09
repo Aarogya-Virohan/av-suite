@@ -478,6 +478,24 @@ def shoulder_asymmetry_side(landmarks: list[Landmark]) -> str | None:
     return _higher_side(landmarks[LEFT_SHOULDER].y, landmarks[RIGHT_SHOULDER].y)
 
 
+def posterior_shoulder_higher_side(landmarks: list[Landmark]) -> str | None:
+    """
+    Which shoulder sits higher, for PT-P02. Posterior view only.
+
+    Decided from image position, not from MediaPipe's left/right labels.
+    With the camera behind the patient, the shoulder on the image left is
+    the patient's left. MediaPipe's documentation does not say how its
+    left/right labels behave on a person facing away, and on one of our
+    seven back photographs (po-1) they came out reversed. The same reasoning
+    already applies to trunk_shift_side and to PT-P03.
+    """
+
+    a, b = landmarks[LEFT_SHOULDER], landmarks[RIGHT_SHOULDER]
+    image_left, image_right = (a, b) if a.x <= b.x else (b, a)
+
+    return _higher_side(image_left.y, image_right.y)
+
+
 def ear_asymmetry_side(landmarks: list[Landmark]) -> str | None:
     """Which ear sits higher, for PT-A10. Anterior view."""
 
@@ -710,7 +728,12 @@ def calc_trunk_lateral_deviation_mm(
 def calc_scapular_height_asymmetry_mm(
     landmarks: list[Landmark], image_height_px: int, pixels_per_cm: float
 ) -> float:
-    """PT-P02 — Scapular height asymmetry (posterior shoulder line). Unit: millimetres."""
+    """
+    PT-P02 — Shoulder level asymmetry, posterior view. Unit: millimetres.
+
+    Same calculation as PT-A02. Named for scapular height until
+    10 October 2026; it uses the shoulder landmarks, not the scapulae.
+    """
 
     diff_px = abs(landmarks[LEFT_SHOULDER].y - landmarks[RIGHT_SHOULDER].y) * image_height_px
 

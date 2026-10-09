@@ -295,3 +295,31 @@ def test_calc_elbow_carrying_angle_right_arm_mirrors_left() -> None:
     _set(points, RIGHT_WRIST, 0.6, 0.7)
 
     assert calc_elbow_carrying_angle(points, "right") < 0
+
+
+def _shoulders(left_x: float, left_y: float, right_x: float, right_y: float) -> list[Landmark]:
+    from app.services.posture.calculator import LEFT_SHOULDER, RIGHT_SHOULDER
+
+    points = [Landmark(index=i, x=0.5, y=0.5, z=0.0, visibility=1.0) for i in range(33)]
+    points[LEFT_SHOULDER] = Landmark(index=LEFT_SHOULDER, x=left_x, y=left_y, z=0.0, visibility=1.0)
+    points[RIGHT_SHOULDER] = Landmark(index=RIGHT_SHOULDER, x=right_x, y=right_y, z=0.0, visibility=1.0)
+    return points
+
+
+def test_posterior_shoulder_side_follows_image_position():
+    from app.services.posture.calculator import posterior_shoulder_higher_side
+
+    # Camera behind the patient: the image-left shoulder is the patient's
+    # left. Image-left shoulder higher (smaller y) reads "left".
+    assert posterior_shoulder_higher_side(_shoulders(0.4, 0.30, 0.6, 0.32)) == "left"
+    assert posterior_shoulder_higher_side(_shoulders(0.4, 0.32, 0.6, 0.30)) == "right"
+
+
+def test_posterior_shoulder_side_ignores_reversed_labels():
+    from app.services.posture.calculator import posterior_shoulder_higher_side
+
+    # Same photograph, MediaPipe's left/right labels reversed, as found on
+    # po-1's back view. The answer must not change.
+    correct = _shoulders(0.4, 0.30, 0.6, 0.32)
+    reversed_labels = _shoulders(0.6, 0.32, 0.4, 0.30)
+    assert posterior_shoulder_higher_side(correct) == posterior_shoulder_higher_side(reversed_labels) == "left"
