@@ -5,22 +5,62 @@ import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { AuditLog, User } from '../../../types/api';
-import { useUsers } from '../../../features/users/api';
+import { useUsers, useDeleteUser } from '../../../features/users/api';
 import { useAuditLogs } from '../../../features/audit/api';
 import { useAuthStore } from '../../../store';
-import { canAccessModule, hasCapability } from '../../../config/permissions';
-import { Settings as SettingsIcon, Users, FileText, AlertCircle, Save, Plus, Palette, Upload, Loader2, Trash2 } from 'lucide-react';
+import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
+import { Settings as SettingsIcon, Users, FileText, Save, Plus, Loader2, Trash2, Info, RotateCcw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClinicSettings, useUpdateClinicSettings } from '../../../features/settings/api';
 import { AddUserSlideOver } from '../../../features/users/components/AddUserSlideOver';
 import { UserPermissionsSlideOver } from '../../../features/users/components/UserPermissionsSlideOver';
-import { useDeleteUser } from '../../../features/users/api';
 import { JsonViewerSlideOver } from '../../../components/ui/JsonViewerSlideOver';
+import {
+  Avatar,
+  Badge,
+  type BadgeTone,
+  Button,
+  Card,
+  FieldLabel,
+  PageHeader,
+  SegmentGroup,
+  SegmentTab,
+  inputClass,
+} from '../../../components/ui/brand';
+import { cn } from '../../../lib/cn';
 
 type TabKey = 'clinic' | 'users' | 'audit';
 
+/** The AV Suite theme colour (globals.css --brand-navy). Used when a clinic has no colour of its own. */
+const THEME_DEFAULT_COLOR = '#0b1238';
+
+const ROLE_TONE: Record<string, BadgeTone> = {
+  admin: 'info',
+  therapist: 'active',
+  front_desk: 'warn',
+};
+
+const timestampFormat = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+function formatTimestamp(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : timestampFormat.format(date);
+}
+
+function actionTone(action: string): BadgeTone {
+  if (action.includes('delete')) return 'danger';
+  if (action.includes('update')) return 'warn';
+  return 'ok';
+}
+
 export default function SettingsPage() {
-  const role = useAuthStore((s) => s.role);
+  usePermissionSubscription(); // see Decisions.md D-013
   const userId = useAuthStore((s) => s.userId);
 
   const hasAccess = canAccessModule('settings');
@@ -32,65 +72,76 @@ export default function SettingsPage() {
   const canEditPermissions = hasCapability('permissions.edit');
   const canViewAudit = hasCapability('audit.view');
 
-  const defaultTab: TabKey = canViewClinic ? 'clinic' : canViewUsers ? 'users' : 'audit';
-  const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
-
-  React.useEffect(() => {
-    if (activeTab === 'clinic' && !canViewClinic) {
-      if (canViewUsers) setActiveTab('users');
-      else if (canViewAudit) setActiveTab('audit');
-    } else if (activeTab === 'users' && !canViewUsers) {
-      if (canViewClinic) setActiveTab('clinic');
-      else if (canViewAudit) setActiveTab('audit');
-    } else if (activeTab === 'audit' && !canViewAudit) {
-      if (canViewClinic) setActiveTab('clinic');
-      else if (canViewUsers) setActiveTab('users');
-    }
-  }, [canViewClinic, canViewUsers, canViewAudit, activeTab]);
+  // Default tab is derived each render (capabilities can load after the first
+  // render); a user's explicit choice wins while it stays visible.
+  const tabs: { key: TabKey; label: string; icon: React.ElementType; visible: boolean }[] = [
+    { key: 'clinic', label: 'Clinic & Branding', icon: SettingsIcon, visible: canViewClinic },
+    { key: 'users', label: 'User Management', icon: Users, visible: canViewUsers },
+    { key: 'audit', label: 'Audit Log', icon: FileText, visible: canViewAudit },
+  ];
+  const visibleTabs = tabs.filter((t) => t.visible);
+  const [selectedTab, setSelectedTab] = useState<TabKey | null>(null);
+  const activeTab: TabKey | null =
+    selectedTab && visibleTabs.some((t) => t.key === selectedTab) ? selectedTab : visibleTabs[0]?.key ?? null;
 
   const [clinicName, setClinicName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
-  const [brandColor, setBrandColor] = useState('#0b2c5f');
-  const [doctorName, setDoctorName] = useState('');
-  const [regNo, setRegNo] = useState('');
+  // null = no clinic colour, the AV Suite theme applies.
+  const [brandColor, setBrandColor] = useState<string | null>(null);
+  const [colorDirty, setColorDirty] = useState(false);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [auditPage, setAuditPage] = useState(1);
+  const [auditOnlyMine, setAuditOnlyMine] = useState(false);
   const [selectedLogForDetails, setSelectedLogForDetails] = useState<AuditLog | null>(null);
 
   const { data: clinicSettings, isLoading: isLoadingSettings } = useClinicSettings(canViewClinic);
   const updateSettings = useUpdateClinicSettings();
   const deleteUser = useDeleteUser();
+  const savedColor = clinicSettings?.branding_color ?? null;
 
   React.useEffect(() => {
     if (clinicSettings) {
       setClinicName(clinicSettings.name || '');
-      if (clinicSettings.branding_color) {
-        setBrandColor(clinicSettings.branding_color);
-        document.documentElement.style.setProperty('--brand-navy', clinicSettings.branding_color);
-      }
-      if (clinicSettings.branding_logo_url) {
-        setLogoBase64(clinicSettings.branding_logo_url);
-      }
+      setBrandColor(clinicSettings.branding_color ?? null);
+      setColorDirty(false);
+      setLogoBase64(clinicSettings.branding_logo_url ?? null);
     }
   }, [clinicSettings]);
+
+  // Live preview of the colour while editing. Leaving the page without saving
+  // restores the saved colour so an unsaved preview does not stick around.
+  React.useEffect(() => {
+    document.documentElement.style.setProperty('--brand-navy', brandColor || THEME_DEFAULT_COLOR);
+  }, [brandColor]);
+  const savedColorRef = React.useRef<string | null>(savedColor);
+  savedColorRef.current = savedColor;
+  React.useEffect(() => {
+    // Unmount only: read the latest saved colour from the ref.
+    return () => {
+      document.documentElement.style.setProperty('--brand-navy', savedColorRef.current || THEME_DEFAULT_COLOR);
+    };
+  }, []);
 
   const { data: usersResponse, isLoading: isLoadingUsers } = useUsers(canViewUsers);
   const users = usersResponse || [];
 
-  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(auditPage, 50, userId, canViewAudit);
+  // Audit logs are clinic-scoped by the backend. Previously the page always
+  // filtered to the signed-in user, so admins only saw their own actions.
+  const { data: auditResponse, isLoading: isLoadingAudit } = useAuditLogs(
+    auditPage,
+    50,
+    auditOnlyMine ? userId : null,
+    canViewAudit,
+  );
   const auditLogs = auditResponse?.data || [];
-  const auditTotal = auditResponse?.meta?.total || auditLogs.length;
+  const auditTotal = auditResponse?.meta?.total ?? auditLogs.length;
 
-  const handleBrandColorChange = (color: string) => {
-    setBrandColor(color);
-    if (typeof document !== 'undefined') {
-      document.documentElement.style.setProperty('--brand-navy', color);
-    }
+  const userName = (id: string | null | undefined) => {
+    if (!id) return 'System';
+    const u = users.find((user) => user.id === id);
+    return u ? `${u.first_name} ${u.last_name}` : `User #${id.slice(0, 8).toUpperCase()}`;
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +156,7 @@ export default function SettingsPage() {
     const reader = new FileReader();
     reader.onload = () => {
       setLogoBase64(reader.result as string);
-      toast.success('Logo uploaded & preview updated');
+      toast.success('Logo ready. Save to apply it.');
     };
     reader.readAsDataURL(file);
   };
@@ -119,50 +170,96 @@ export default function SettingsPage() {
     try {
       await updateSettings.mutateAsync({
         name: clinicName,
-        branding_color: brandColor,
+        // Only send the colour when it was changed, so saving the name never
+        // writes a default colour over the theme (null resets to the theme).
+        ...(colorDirty ? { branding_color: brandColor } : {}),
         branding_logo_url: logoBase64,
       });
-      toast.success('Clinic branding & settings saved successfully!');
+      toast.success('Clinic settings saved');
     } catch (err) {
       toast.error('Failed to save clinic settings');
     }
   };
 
   const auditColumns: Column<AuditLog>[] = [
-    { 
-      key: 'action', 
-      header: 'Action', 
-      render: (log) => {
-        let colorClass = 'text-teal-600 bg-teal-50 dark:bg-teal-900/30';
-        if (log.action.includes('delete')) colorClass = 'text-red-600 bg-red-50 dark:bg-red-900/30';
-        else if (log.action.includes('update')) colorClass = 'text-amber-600 bg-amber-50 dark:bg-amber-900/30';
-        return <span className={`font-mono text-[10px] uppercase font-bold px-2 py-1 rounded-md ${colorClass}`}>{log.action}</span>;
-      }
+    {
+      key: 'action',
+      header: 'Action',
+      render: (log) => (
+        <Badge tone={actionTone(log.action)} className="font-mono uppercase">
+          {log.action}
+        </Badge>
+      ),
     },
-    { key: 'entity_type', header: 'Entity Type', render: (log) => <span className="font-semibold text-slate-700 dark:text-slate-300">{log.entity_type}</span> },
-    { key: 'entity_id', header: 'Entity ID', render: (log) => <span className="font-mono text-xs text-slate-500">{log.entity_id || '-'}</span> },
-    { key: 'user_id', header: 'User ID', render: (log) => <span className="font-mono text-xs text-slate-500">{log.user_id || 'System'}</span> },
-    { 
-      key: 'details', 
-      header: 'Details', 
+    {
+      key: 'entity_type',
+      header: 'Entity',
+      render: (log) => <span className="font-semibold capitalize text-ink">{log.entity_type.replace(/_/g, ' ')}</span>,
+    },
+    {
+      key: 'entity_id',
+      header: 'Entity Ref',
+      render: (log) =>
+        log.entity_id ? (
+          <span title={log.entity_id} className="font-mono text-xs text-muted">
+            #{log.entity_id.slice(0, 8).toUpperCase()}
+          </span>
+        ) : (
+          <span className="text-slate-400">-</span>
+        ),
+    },
+    { key: 'user_id', header: 'By', render: (log) => <span className="text-ink-2">{userName(log.user_id)}</span> },
+    {
+      key: 'details',
+      header: 'Details',
       render: (log) => (
         <button
           onClick={() => setSelectedLogForDetails(log)}
-          className="text-xs font-semibold px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-ink-2 transition-colors hover:bg-canvas"
         >
-          <FileText className="w-3.5 h-3.5" />
+          <FileText className="h-3.5 w-3.5" />
           View Payload
         </button>
-      )
+      ),
     },
-    { key: 'created_at', header: 'Timestamp', render: (log) => <span className="text-xs text-slate-500 font-medium whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</span> },
+    {
+      key: 'created_at',
+      header: 'Time',
+      render: (log) => <span className="whitespace-nowrap text-xs tabular-nums text-muted">{formatTimestamp(log.created_at)}</span>,
+    },
   ];
 
   const userColumns: Column<User>[] = [
-    { key: 'name', header: 'User Name', render: (u) => `${u.first_name} ${u.last_name}` },
-    { key: 'email', header: 'Email' },
-    { key: 'role', header: 'Role', render: (u) => <span className="uppercase text-xs font-bold text-teal-600">{u.role}</span> },
-    { key: 'is_active', header: 'Status', render: (u) => (u.is_active ? 'Active' : 'Inactive') },
+    {
+      key: 'name',
+      header: 'User',
+      render: (u) => (
+        <div className="flex items-center gap-3">
+          <Avatar name={`${u.first_name} ${u.last_name}`} size={32} />
+          <div>
+            <p className="font-semibold text-ink">
+              {u.first_name} {u.last_name}
+              {u.id === userId && <span className="ml-1.5 text-xs font-medium text-muted">(you)</span>}
+            </p>
+            <p className="text-xs text-muted">{u.email}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'role',
+      header: 'Role',
+      render: (u) => (
+        <Badge tone={ROLE_TONE[u.role] ?? 'neutral'} className="capitalize">
+          {u.role.replace(/_/g, ' ')}
+        </Badge>
+      ),
+    },
+    {
+      key: 'is_active',
+      header: 'Status',
+      render: (u) => (u.is_active ? <Badge tone="ok">Active</Badge> : <Badge tone="neutral">Inactive</Badge>),
+    },
     {
       key: 'actions',
       header: 'Actions',
@@ -174,8 +271,9 @@ export default function SettingsPage() {
                 setSelectedUser(u);
                 setIsPermissionsOpen(true);
               }}
-              className="text-xs px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 dark:text-indigo-300 font-semibold rounded-md transition-colors cursor-pointer"
+              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg bg-info-wash px-2.5 text-xs font-semibold text-info transition-colors hover:bg-[#dde2fa]"
             >
+              <ShieldCheck className="h-3.5 w-3.5" />
               Edit Permissions
             </button>
           )}
@@ -192,10 +290,11 @@ export default function SettingsPage() {
                 }
               }}
               disabled={deleteUser.isPending}
-              className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-md transition-colors cursor-pointer disabled:opacity-50"
+              className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-danger transition-colors hover:bg-danger-wash disabled:opacity-50"
               title="Remove User"
+              aria-label={`Remove ${u.first_name} ${u.last_name}`}
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -203,212 +302,215 @@ export default function SettingsPage() {
     },
   ];
 
-  if (!hasAccess || (!canViewClinic && !canViewUsers && !canViewAudit)) {
-    return (
-      <AppShell>
-        <AccessRestricted message="Clinic settings are restricted." />
-      </AppShell>
-    );
+  if (!hasAccess || visibleTabs.length === 0) {
+    // AccessRestricted renders its own AppShell.
+    return <AccessRestricted message="Clinic settings are restricted." />;
   }
 
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Clinic Settings</h1>
-          <p className="text-sm text-slate-500">Manage clinic preferences, branding, users & audit logs</p>
-        </div>
-
-        {/* Tab Selection */}
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
-          {canViewClinic && (
-            <button
-              onClick={() => setActiveTab('clinic')}
-              className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-                activeTab === 'clinic'
-                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <SettingsIcon className="w-4 h-4" />
-              <span>Clinic Settings & Branding</span>
-            </button>
-          )}
-          {canViewUsers && (
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-                activeTab === 'users'
-                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>User Management</span>
-            </button>
-          )}
-          {canViewAudit && (
-            <button
-              onClick={() => setActiveTab('audit')}
-              className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-                activeTab === 'audit'
-                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>Audit Log ({auditTotal})</span>
-            </button>
-          )}
-
-          {activeTab === 'users' && canCreateUser && (
-            <div className="ml-auto">
-              <button
-                onClick={() => setIsAddUserOpen(true)}
-                className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium text-xs rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
+        <PageHeader
+          title="Clinic Settings"
+          subtitle="Manage clinic branding, users and audit logs"
+          actions={
+            activeTab === 'users' && canCreateUser ? (
+              <Button onClick={() => setIsAddUserOpen(true)}>
+                <Plus className="h-4 w-4" />
                 <span>Add User</span>
-              </button>
-            </div>
-          )}
-        </div>
+              </Button>
+            ) : null
+          }
+        />
+
+        <SegmentGroup>
+          {visibleTabs.map((tab) => (
+            <SegmentTab key={tab.key} active={activeTab === tab.key} onClick={() => setSelectedTab(tab.key)} icon={tab.icon}>
+              {tab.label}
+              {tab.key === 'audit' && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-muted">
+                  {auditTotal}
+                </span>
+              )}
+            </SegmentTab>
+          ))}
+        </SegmentGroup>
 
         {/* Clinic Branding Settings Tab */}
         {activeTab === 'clinic' && (
-          <form onSubmit={handleSaveClinic} className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-6 max-w-2xl">
-            <div className="p-3 bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800 rounded-lg text-xs text-teal-800 dark:text-teal-200">
-              ✨ These branding settings automatically apply to invoices, receipts, prescriptions, and public booking forms.
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Clinic Name</label>
-                <input
-                  type="text"
-                  value={clinicName}
-                  onChange={(e) => setClinicName(e.target.value)}
-                  disabled={!canEditClinic}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                />
+          <form onSubmit={handleSaveClinic} className="grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <Card className="space-y-5 p-6">
+              <div className="flex items-start gap-2.5 rounded-xl border border-logo-teal/25 bg-logo-teal-wash px-3.5 py-3 text-xs leading-relaxed text-logo-teal-ink">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  Your clinic name, colour and logo appear in this CRM&apos;s sidebar and header, and on your public
+                  booking page.
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Clinic Phone</label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={!canEditClinic}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
+              {isLoadingSettings ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-muted">
+                  <Loader2 className="h-4 w-4 animate-spin text-grove" /> Loading clinic settings...
                 </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Brand Accent Color</label>
-                  <div className="flex items-center gap-2">
+              ) : (
+                <>
+                  <div>
+                    <FieldLabel htmlFor="clinic-name">Clinic Name</FieldLabel>
                     <input
-                      type="color"
-                      value={brandColor}
-                      onChange={(e) => handleBrandColorChange(e.target.value)}
+                      id="clinic-name"
+                      type="text"
+                      value={clinicName}
+                      onChange={(e) => setClinicName(e.target.value)}
                       disabled={!canEditClinic}
-                      className="w-10 h-9 p-0.5 rounded cursor-pointer border disabled:cursor-not-allowed disabled:opacity-60"
+                      className={inputClass}
                     />
-                    <span className="text-xs font-mono text-slate-500 uppercase">{brandColor}</span>
+                  </div>
+
+                  <div>
+                    <FieldLabel htmlFor="brand-color">Brand Accent Colour</FieldLabel>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input
+                        id="brand-color"
+                        type="color"
+                        value={brandColor || THEME_DEFAULT_COLOR}
+                        onChange={(e) => {
+                          setBrandColor(e.target.value);
+                          setColorDirty(true);
+                        }}
+                        disabled={!canEditClinic}
+                        className="h-10 w-12 cursor-pointer rounded-[10px] border border-line bg-card p-1 disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                      <span className="font-mono text-xs uppercase text-muted">
+                        {brandColor ? brandColor : `${THEME_DEFAULT_COLOR} (AV Suite default)`}
+                      </span>
+                      {canEditClinic && brandColor && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBrandColor(null);
+                            setColorDirty(true);
+                          }}
+                          className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-grove hover:text-grove-hover"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Use AV Suite default
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <FieldLabel htmlFor="clinic-logo">Clinic Logo (max 200KB)</FieldLabel>
+                    {canEditClinic && (
+                      <input
+                        id="clinic-logo"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="w-full cursor-pointer text-xs text-muted file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-grove-wash file:px-4 file:py-2 file:text-xs file:font-semibold file:text-grove hover:file:bg-[#d3eedc]"
+                      />
+                    )}
+                    {logoBase64 && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <div className="w-fit rounded-xl border border-line bg-canvas p-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={logoBase64} alt="Clinic logo preview" className="h-12 rounded object-contain" />
+                        </div>
+                        {canEditClinic && (
+                          <button
+                            type="button"
+                            onClick={() => setLogoBase64(null)}
+                            className="cursor-pointer text-xs font-semibold text-danger hover:underline"
+                          >
+                            Remove logo
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {canEditClinic && (
+                    <div className="border-t border-line pt-5">
+                      <Button type="submit" disabled={updateSettings.isPending}>
+                        {updateSettings.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        <span>Save Settings</span>
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </Card>
+
+            {/* Live preview of how the branding looks in the sidebar */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">Sidebar preview</p>
+              <div
+                className="overflow-hidden rounded-2xl p-4 text-white shadow-card"
+                style={{ background: brandColor || THEME_DEFAULT_COLOR }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-white p-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={logoBase64 || '/brand/av-logo-mark.png'} alt="" className="h-full w-full object-contain" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-display text-sm font-bold">{clinicName || 'Your clinic'}</p>
+                    <p className="text-[11px] text-white/70">Clinic CRM</p>
                   </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Clinic Address</label>
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  disabled={!canEditClinic}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Lead Doctor / Therapist Name</label>
-                  <input
-                    type="text"
-                    value={doctorName}
-                    onChange={(e) => setDoctorName(e.target.value)}
-                    disabled={!canEditClinic}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Medical Registration No.</label>
-                  <input
-                    type="text"
-                    value={regNo}
-                    onChange={(e) => setRegNo(e.target.value)}
-                    disabled={!canEditClinic}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              {/* Clinic Logo Upload */}
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Clinic Logo (For Invoices, Prescriptions & Booking Form, Max 200KB)
-                </label>
-                {canEditClinic && (
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
-                  />
-                )}
-                {logoBase64 && (
-                  <div className="mt-3 p-2 bg-slate-50 dark:bg-slate-950 rounded-lg border w-fit">
-                    <img src={logoBase64} alt="Clinic Logo Preview" className="h-12 object-contain rounded" />
+                <div className="mt-4 space-y-1">
+                  <div className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold">
+                    <span className="h-1.5 w-1.5 rounded-full bg-lime" /> Dashboard
                   </div>
-                )}
+                  <div className="px-3 py-2 text-xs text-white/70">Patients</div>
+                </div>
               </div>
             </div>
-
-            {canEditClinic && (
-              <button
-                type="submit"
-                disabled={updateSettings.isPending}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm"
-              >
-                {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                <span>Save Branding Settings</span>
-              </button>
-            )}
           </form>
         )}
 
         {/* User Management Tab */}
-        {activeTab === 'users' && (
-          <div className="space-y-4">
-            <DataTable columns={userColumns} data={users} isLoading={isLoadingUsers} />
-          </div>
-        )}
+        {activeTab === 'users' && <DataTable columns={userColumns} data={users} isLoading={isLoadingUsers} />}
 
         {/* Audit Log Tab */}
         {activeTab === 'audit' && (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SegmentGroup aria-label="Audit log scope">
+                <SegmentTab
+                  active={!auditOnlyMine}
+                  onClick={() => {
+                    setAuditOnlyMine(false);
+                    setAuditPage(1);
+                  }}
+                  icon={Users}
+                >
+                  All users
+                </SegmentTab>
+                <SegmentTab
+                  active={auditOnlyMine}
+                  onClick={() => {
+                    setAuditOnlyMine(true);
+                    setAuditPage(1);
+                  }}
+                  icon={ShieldCheck}
+                >
+                  Only my actions
+                </SegmentTab>
+              </SegmentGroup>
+              <span className="text-xs font-medium text-muted">{auditTotal} entries</span>
+            </div>
+            {/* No search box: the audit API pages on the server and has no search
+                parameter, so a client-side box would only filter the current page. */}
             <DataTable
               columns={auditColumns}
               data={auditLogs}
               isLoading={isLoadingAudit}
-              searchField={(log) => `${log.action} ${log.entity_type}`}
-              searchPlaceholder="Search audit logs by action or entity type..."
               totalItems={auditTotal}
               currentPage={auditPage}
               pageSize={50}
               onPageChange={(page) => setAuditPage(page)}
+              emptyMessage="No audit entries yet."
             />
           </div>
         )}
