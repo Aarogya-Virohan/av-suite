@@ -226,3 +226,25 @@ millimetre values rest on a guessed head point. The review screen labels it
 "Nose (estimate, head midline)" so the clinician places it on purpose. A
 calibration that does not need a facial point on the back view (for
 example the top of the head) has not been built.
+
+Measured 11 October 2026, seven subjects, the pipeline's own detection
+plus MediaPipe Pose's segmentation mask (same model complexity). For each
+photograph the pixels-per-cm scale was computed two ways: from nose to
+ankles with the 0.8134 constant, and from the mask's full top-to-bottom
+span taken as the patient's height. On the front view, where the nose is
+seen, the two agree: nose over mask 1.0042 on average, sd 0.0066. On the
+back view the guessed nose gives a scale 2.8 percent larger on average,
+sd 2.2 percent, at worst 5.7 percent (po-4), so back-view millimetre
+values read about 3 percent small, differently for each patient. This is
+the 2.6 percent front-back gap that decisions.md recorded on 1 October as
+unexplained. The mask edges were checked by eye on three back photographs
+and sit at the top of the hair and the bottom of the feet; on po-7 the
+feet reach the bottom edge of the frame, so a mask method would need a
+guard for that.
+
+Not built, on purpose. About 3 percent of a 20 mm reading is 0.6 mm,
+while moving one back shoulder point by hand moved a trunk shift by 20 mm
+on 11 October. The mask method needs a second model pass, a change to the
+detection token and a new guard; it is worth building once point
+placement is under control, and the figures above are what it would be
+judged against.

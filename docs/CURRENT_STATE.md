@@ -222,8 +222,10 @@ step is what stands between that error and the report.
 
 ## 5. Not started
 
-- Back-view millimetre calibration without the nose, which cannot be seen
-  from behind (known_limitations.md).
+- Back-view millimetre calibration without the nose. Measured 11 October:
+  the guessed nose makes back-view millimetres read about 3 percent small,
+  at worst 5.7. Deferred on purpose, since point placement errors are
+  around thirty times larger (known_limitations.md).
 - UI and report design pass (upload screen, web report, PDF). The review
   screen was redone on 11 October; the rest was not.
 - Inter-rater test: two physios placing points on the same photographs.
