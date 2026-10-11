@@ -175,3 +175,27 @@
   border-radius: 1rem;
   box-shadow: 0 25px 50px -12px rgba(11, 18, 56, 0.3);
 }
+
+/* Printing: when a .print-area is on screen (invoice/receipt preview), print
+   only that document, not the app shell, table or modal controls. */
+@media print {
+  body:has(.print-area) {
+    background: #fff;
+  }
+  body:has(.print-area) * {
+    visibility: hidden;
+  }
+  body:has(.print-area) .print-area,
+  body:has(.print-area) .print-area * {
+    visibility: visible;
+  }
+  body:has(.print-area) .print-area {
+    position: absolute;
+    inset: 0 0 auto 0;
+    border: 0;
+    box-shadow: none;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
