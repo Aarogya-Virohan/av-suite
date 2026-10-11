@@ -249,6 +249,20 @@ Each entry follows this structure:
 
 ---
 
+## [D-016] Public Booking Links Use the Clinic UUID Until a Real Slug Exists
+- **Date**: 2026-10-12
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: `ClinicRepository.get_by_slug_or_id` resolves a non-UUID slug with `Clinic.name ILIKE '%<slug with spaces>%'` and returns the first row. Verified locally with two clinics, "Sunrise Physio" and "Sunrise Physio Clinic": `/booking/sunrise-physio` opened "Sunrise Physio Clinic". The public page then posted the patient's name, phone and complaint to that clinic, and showed a name built from the URL, so the patient could not tell. Separately, `POST /booking/request?clinic_slug=` calls `clinic_repository.get_by_slug`, which does not exist (HTTP 500). `clinics` has no slug column.
+- **Options Considered**:
+  1. Keep name slugs and wait for a backend fix
+  2. Frontend now: link by clinic UUID (exact match through `get_by_slug_or_id`); public page verifies the clinic on load and shows the server's name. Backend later: unique `clinics.slug`, exact lookup, fix or remove the slug POST path.
+- **Decision**: Option 2. The frontend part is done (commit a8d37c2).
+- **Reasoning**: A UUID cannot match another clinic, so the leak path is closed without waiting on the backend. Nothing is deployed, so no name-based links exist in the wild.
+- **Trade-offs**: Booking URLs are long until the backend slug exists. The fuzzy lookup still exists server-side (anyone typing a word gets some clinic's page), so the backend fix is still required before launch.
+- **Affected Files**: `app/(dashboard)/appointments/page.tsx`, `app/(public)/booking/[clinicSlug]/page.tsx`; backend: `repositories/clinic.py`, `services/booking.py`, `models/clinic.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -267,5 +281,10 @@ Each entry follows this structure:
 | L-11 | Recycle bin `deleted_by` is always null: the backend does not record who deleted an item | Open; set deleted_by on soft delete | Sparsh (later) |
 | L-12 | Payroll / salary is not built (fake column removed, D-014) | Product decision needed before building | Onkar + founders |
 | L-13 | Pages that are only correct when reached via the sidebar: fixed for Leads, Therapists, Recycle Bin, Billing (D-013); all 9 dashboard pages pass a direct-load check as of 2026-10-12 | Resolved | - |
+| L-14 | Clinic address, phone, lead doctor and registration no. are not stored (the fake Settings fields were removed). Invoices and prescriptions will need them | Open; add clinic profile fields | Sparsh (later), then frontend |
+| L-15 | Audit log records almost nothing: only patient create and clinic settings updates were seen. Lead delete/restore/stage, invoices, payments are not audited | Open; needed for a healthcare CRM | Sparsh |
+| L-16 | Booking slug: fuzzy clinic-name lookup and a missing `get_by_slug` (D-016). Frontend mitigated with UUID links | **Must fix before launch** | Sparsh |
+| L-17 | Public booking services and time slots are a fixed list, not configured per clinic | Open, product decision | Onkar + founders |
+| L-18 | Prescription PDF falls back to "Aarogya-Virohan Clinic" when the clinic is missing (`prescription_service.py`) | Open, low | Sparsh |
 
-*Last updated: 2026-10-12 (after Recycle Bin) | Branch: feat/crm-ui-theme*
+*Last updated: 2026-10-12 (after Settings, invoice, booking) | Branch: feat/crm-ui-theme*
