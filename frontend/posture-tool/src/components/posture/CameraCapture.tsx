@@ -11,17 +11,38 @@ interface CameraCaptureProps {
   onClose: () => void
 }
 
-// Tilt beyond this is called out. The capture protocol asks for a
-// levelled camera; this cannot measure camera height, only tilt, so it
-// is a partial check and is worded as guidance rather than a gate.
-const LEVEL_TOLERANCE_DEG = 3
-// Beyond this the tilt is bad enough to distort landmark positions more
-// than the measurements we report. It warns rather than blocks: a small
-// share of captures happen without a tripod, and refusing to take the
-// photo at all leaves the clinician with nothing, which is worse than a
-// flagged imperfect one. The angle is recorded with the capture so a
-// questionable frame can be identified later.
-const LEVEL_BLOCK_DEG = 10
+// Founders' guidelines, 10 October 2026, given three times: the capture
+// button stays disabled until the phone is within 1.5 degrees of vertical
+// in both pitch (leaning toward or away from the patient) and roll
+// (turned sideways, which tilts the horizon). Roll is the one that makes
+// one shoulder or one hip look higher than the other, and the previous
+// check did not read it at all: it read pitch only, and only warned, at
+// 3 and 10 degrees.
+//
+// A device that cannot report its tilt (a laptop, or permission refused)
+// cannot capture. The upload path stays open for it, and an uploaded photo
+// is already marked on the PDF as not checked against the protocol.
+const LEVEL_LIMIT_DEG = 1.5
+// Readings are smoothed so the button does not flicker on hand tremor.
+const LEVEL_SMOOTHING = 0.2
+// If no motion reading arrives within this time, the device has no sensor.
+const LEVEL_TIMEOUT_MS = 1500
+
+type LevelStatus = "off" | "waiting" | "active" | "unavailable" | "denied"
+
+// Pitch and roll from the gravity vector, in degrees, both 0 when the
+// phone stands upright in portrait. Taken from gravity rather than from
+// deviceorientation's beta and gamma, which suffer gimbal lock exactly at
+// upright (beta 90), where gamma stops meaning sideways tilt. Only the
+// size is used: iOS and Android report gravity with opposite signs, so a
+// direction would point the wrong way on one of them.
+function levelFromGravity(x: number, y: number, z: number) {
+  const deg = (r: number) => (r * 180) / Math.PI
+  return {
+    roll: Math.abs(deg(Math.atan2(x, Math.hypot(y, z)))),
+    pitch: Math.abs(deg(Math.atan2(z, Math.hypot(x, y)))),
+  }
+}
 
 const GUIDANCE: Record<CaptureView, string> = {
   front: "Patient faces the camera. Feet on the floor markers, arms relaxed at the sides, eyes level and looking straight ahead.",
@@ -40,7 +61,9 @@ export default function CameraCapture({
 
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
-  const [tilt, setTilt] = useState<number | null>(null)
+  const [level, setLevel] = useState<{ roll: number; pitch: number } | null>(null)
+  const [levelStatus, setLevelStatus] = useState<LevelStatus>("off")
+  const motionHandlerRef = useRef<((e: DeviceMotionEvent) => void) | null>(null)
   const [layers, setLayers] = useState<GuideLayers>({
     lines: true,
     grid: true,
@@ -112,29 +135,71 @@ export default function CameraCapture({
     }
   }, [onClose])
 
-  // ---- tilt ----
-  // iOS requires an explicit user gesture before orientation events are
+  // ---- level ----
+  // iOS requires an explicit user gesture before motion events are
   // delivered, so this is requested from a button rather than on mount.
-  const enableTilt = useCallback(async () => {
-    type OrientationPermission = {
+  const enableLevel = useCallback(async () => {
+    type MotionPermission = {
       requestPermission?: () => Promise<"granted" | "denied">
     }
 
-    const api = DeviceOrientationEvent as unknown as OrientationPermission
+    if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) {
+      setLevelStatus("unavailable")
+      return
+    }
+
+    const api = DeviceMotionEvent as unknown as MotionPermission
 
     try {
       if (typeof api.requestPermission === "function") {
         const res = await api.requestPermission()
-        if (res !== "granted") return
+        if (res !== "granted") {
+          setLevelStatus("denied")
+          return
+        }
       }
-
-      window.addEventListener("deviceorientation", (e) => {
-        if (e.beta === null) return
-        // beta is front-back tilt; 90 means the phone is upright.
-        setTilt(Math.round(e.beta - 90))
-      })
     } catch {
-      // Tilt is optional guidance; failing to get it must not block capture.
+      setLevelStatus("denied")
+      return
+    }
+
+    setLevelStatus("waiting")
+    let received = false
+
+    const handler = (e: DeviceMotionEvent) => {
+      const g = e.accelerationIncludingGravity
+      if (!g || g.x === null || g.y === null || g.z === null) return
+      received = true
+      const next = levelFromGravity(g.x, g.y, g.z)
+      setLevel((prev) =>
+        prev
+          ? {
+              roll: prev.roll + LEVEL_SMOOTHING * (next.roll - prev.roll),
+              pitch: prev.pitch + LEVEL_SMOOTHING * (next.pitch - prev.pitch),
+            }
+          : next,
+      )
+      setLevelStatus("active")
+    }
+
+    if (motionHandlerRef.current) {
+      window.removeEventListener("devicemotion", motionHandlerRef.current)
+    }
+    motionHandlerRef.current = handler
+    window.addEventListener("devicemotion", handler)
+
+    window.setTimeout(() => {
+      if (!received) setLevelStatus("unavailable")
+    }, LEVEL_TIMEOUT_MS)
+  }, [])
+
+  // The old listener was never removed; this one is, when the camera closes.
+  useEffect(() => {
+    return () => {
+      if (motionHandlerRef.current) {
+        window.removeEventListener("devicemotion", motionHandlerRef.current)
+        motionHandlerRef.current = null
+      }
     }
   }, [])
 
@@ -187,9 +252,9 @@ export default function CameraCapture({
     )
   }, [view, onCapture, onClose])
 
-  const absTilt = tilt === null ? null : Math.abs(tilt)
-  const level = absTilt !== null && absTilt <= LEVEL_TOLERANCE_DEG
-  const severeTilt = absTilt !== null && absTilt > LEVEL_BLOCK_DEG
+  const rollOk = level !== null && level.roll <= LEVEL_LIMIT_DEG
+  const pitchOk = level !== null && level.pitch <= LEVEL_LIMIT_DEG
+  const isLevel = levelStatus === "active" && rollOk && pitchOk
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black">
@@ -284,39 +349,42 @@ export default function CameraCapture({
           {GUIDANCE[view]}
         </p>
 
-        {tilt === null ? (
+        {levelStatus === "off" || levelStatus === "waiting" ? (
           <button
             type="button"
-            onClick={enableTilt}
-            className="w-full rounded-lg border border-white/25 py-1.5 text-[11px] text-white/70"
+            onClick={enableLevel}
+            disabled={levelStatus === "waiting"}
+            className="w-full rounded-lg border border-white/25 py-1.5 text-[11px] text-white/70 disabled:opacity-50"
           >
-            Enable level check
+            {levelStatus === "waiting" ? "Starting level check..." : "Enable level check to capture"}
           </button>
+        ) : levelStatus === "active" && level ? (
+          <div className="flex items-center justify-between gap-2 text-[11px]">
+            <span className={rollOk ? "text-emerald-400" : "text-amber-400"}>
+              Side tilt {`${level.roll.toFixed(1)}\u00b0`} {rollOk ? "\u2713" : ""}
+            </span>
+            <span className={pitchOk ? "text-emerald-400" : "text-amber-400"}>
+              Forward tilt {`${level.pitch.toFixed(1)}\u00b0`} {pitchOk ? "\u2713" : ""}
+            </span>
+            <span className={isLevel ? "text-emerald-400" : "text-white/60"}>
+              {isLevel ? "Level" : `Both within ${LEVEL_LIMIT_DEG}\u00b0`}
+            </span>
+          </div>
         ) : (
-          <p
-            className={`text-[11px] ${
-              severeTilt
-                ? "text-rose-400"
-                : level
-                  ? "text-emerald-400"
-                  : "text-amber-400"
-            }`}
-          >
-            {severeTilt
-              ? `Camera is tilted ${tilt}\u00b0. Straighten it before capturing -- this much tilt distorts the measurements.`
-              : level
-                ? `Camera is level (${tilt}\u00b0)`
-                : `Camera is tilted ${tilt}\u00b0. Straighten it for a cleaner frame.`}
+          <p className="text-[11px] leading-snug text-rose-300">
+            {levelStatus === "denied"
+              ? "Motion access was refused, so the level cannot be checked and the photo cannot be captured here. Allow motion access, or upload a photo instead."
+              : "This device cannot report its tilt, so the photo cannot be captured here. Use a phone, or upload a photo instead."}
           </p>
         )}
 
         <button
           type="button"
           onClick={capture}
-          disabled={!ready}
+          disabled={!ready || !isLevel}
           className="w-full rounded-xl bg-white py-2.5 text-sm font-medium text-slate-900 disabled:opacity-30"
         >
-          Capture
+          {isLevel || levelStatus !== "active" ? "Capture" : "Hold the phone level to capture"}
         </button>
       </div>
     </div>

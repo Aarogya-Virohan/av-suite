@@ -202,6 +202,14 @@ is now 2026-10-11.2.
 - The PDF names whether each photograph was a guided capture or an upload.
 - Q5 Biomechanical Signature built: regional profile on the web report and
   the PDF, a radar drawn on the server, and a per-row vector in the report.
+- Capture locked until pitch and roll are both within 1.5 degrees, per the
+  founders' guidelines; it previously read pitch only and only warned.
+  Phone check still owed: on one Android phone it read 0.6 and 0.6 held by
+  hand, which shows it runs, not that it is right. Three physical tests
+  settle it: upright against a door frame (both near 0), flat on a table
+  (forward tilt near 90), landscape against the frame (side tilt near 90).
+  Holding 1.5 degrees by hand is possible but hard; an auto-capture that
+  fires once the phone has been level for a moment is proposed, not built.
 - Saved report files are uniquely named; a "../" in the case reference
   could previously write outside data/reports, and equal case references
   overwrote each other.
@@ -214,8 +222,6 @@ step is what stands between that error and the report.
 
 ## 5. Not started
 
-- Capture-time tilt lock. The founders' guidelines say plus or minus 1.5
-  degrees; the capture screen warns at 10 and does not block.
 - Back-view millimetre calibration without the nose, which cannot be seen
   from behind (known_limitations.md).
 - UI and report design pass (upload screen, web report, PDF). The review

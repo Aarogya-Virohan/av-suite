@@ -206,8 +206,9 @@ from these images. Shoulder line tilt reached about 5 degrees, roughly
 Since 10 October the shoulder row comes only from the back view, by the
 founders' decision. That removes the contradiction from the report; it does
 not make the side reliable. What would: a capture-time device tilt lock
-(the founders suggested plus or minus 1.5 degrees; ours warns at 10 and
-does not block), or a vertical reference in frame.
+(the founders' plus or minus 1.5 degrees, built 11 October for pitch and
+roll; whether it removes the disagreement has not been measured yet), or a
+vertical reference in frame.
 
 Separately, MediaPipe's left and right labels came out reversed on po-1's
 back photograph, the subject whose palms face the camera from behind.

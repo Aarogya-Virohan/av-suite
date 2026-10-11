@@ -1086,3 +1086,30 @@ that has not occurred.
 Two questions for the founders, collected with the others: is "worst grade
 in the region" the regional index they meant, or do they want a formula;
 and should the thoracic region show as "No parameter" or be left out.
+
+### Capture locked until the phone is level, pitch and roll within 1.5 degrees
+The founders' guidelines (10 October) say three times that the capture
+button stays disabled until the device reads pitch and roll within 1.5
+degrees of vertical. The capture screen did something weaker: it read
+pitch only (deviceorientation beta), never roll, and only warned, at 3 and
+10 degrees. Roll is the tilt that matters most for this report, since a
+sideways-turned phone tilts the horizon and makes one shoulder or one hip
+look higher; the known front-back shoulder disagreement
+(known_limitations.md) is consistent with it, though not proven to come
+from it. A code comment also said the tilt was recorded with the capture;
+it was not, and the comment is gone.
+
+Now: pitch and roll are computed from the gravity vector of devicemotion
+(beta and gamma suffer gimbal lock at upright, which is the only position
+that matters here), smoothed, and the Capture button is disabled until both
+are within 1.5 degrees. Only magnitudes are shown, because iOS and Android
+report gravity with opposite signs and an arrow would point the wrong way
+on one of them. A device that cannot report tilt, or where motion access is
+refused, cannot capture; the upload path stays open and an upload is
+already marked on the PDF as not checked against the protocol. The motion
+listener is now removed when the camera closes; the old one never was.
+
+Verified: type check; the angle function checked on constructed gravity
+vectors for both sign conventions, 1 and 2 degrees of roll, 1.4 and 3 of
+pitch, landscape and flat. Not yet verified on a phone; whether 1.5 degrees
+can be held by hand without a tripod is the thing that test will show.
