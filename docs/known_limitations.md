@@ -150,6 +150,22 @@ severity with no caveat. Within-patient tracking is not established either:
 that needs the same person photographed on different days, which we do not
 have.
 
+Update, 11 October 2026. Two things changed. The founders set the bands to
+within 4 degrees normal, 4 to 7 mild, on the basis of a photogrammetry
+study (Ferreira et al. 2011) whose trunk angle runs from the acromion to
+the greater trochanter, which are the bony landmarks this model does not
+return. The offset above is now large enough to grade: re-run on 11 October
+with the model's own points, the seven subjects read -0.9 to -6.72 degrees,
+all backward, and po-7 at -6.72 grades MILD, though po-7's side detection
+is the one excluded above as visibly wrong. And the landmark review now
+exists, so the clinician can move the points. The side-view guidance on the
+review screen therefore names where each point belongs (ear opening, bony
+tip of the shoulder, bony bump at the side of the hip, middle of the knee,
+outer ankle bone). Whether hand-placed points bring healthy subjects near
+zero has not been measured yet; the first test is one patient, side view,
+shoulder and hip dragged to the bony landmarks, compared with the
+unedited reading.
+
 ### Shoulder level side, front and back disagree, 10 October 2026
 
 Measured on the seven test subjects with the pipeline's own

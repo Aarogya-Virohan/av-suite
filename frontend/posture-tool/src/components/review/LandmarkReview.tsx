@@ -49,7 +49,13 @@ const STAGE_TITLE: Record<Stage, string> = {
 }
 
 const VIEW_HINT: Record<ViewName, string> = {
-  side: "Only the side facing the camera is checked. Each point should sit on its landmark.",
+  // The model places joint centres, not bony landmarks: on a side photo its
+  // shoulder falls toward the back of the shoulder and its hip near the
+  // waistband (docs/known_limitations.md, PT-L05). The bands the founders
+  // approved on 11 October rest on studies that used the acromion and the
+  // greater trochanter, so the clinician is told where each point belongs.
+  side:
+    "Only the side facing the camera is checked. Ear point on the ear opening, shoulder on the bony tip of the shoulder, hip on the bony bump at the side of the hip, knee at the middle of the joint, ankle on the outer ankle bone.",
   front:
     "Left and right are the patient's own sides, so the left shoulder appears on the right of the photo. Pupils go in the centre of each eye.",
   back: "From behind, the head point is an estimate. Place it on the middle of the back of the head.",
