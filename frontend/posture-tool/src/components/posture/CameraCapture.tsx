@@ -44,6 +44,43 @@ function levelFromGravity(x: number, y: number, z: number) {
   }
 }
 
+// iOS only delivers motion events after a permission granted inside a user
+// tap. The "Use camera" tap that opens this screen is that tap, so the
+// slot calls this before opening the camera, and the level check then
+// starts by itself. Android needs no permission and resolves at once.
+//
+// One request is shared: the camera screen asks again as it opens, and on
+// iOS a second call made outside a tap, while the first prompt is still on
+// screen, would be refused and wrongly show the level as denied. A refusal
+// is not kept, so a later tap can ask again.
+let motionPermission: Promise<boolean> | null = null
+
+// The setup sheet opens on the first camera of a page visit, not on every
+// one; "?" brings it back.
+let setupSeenThisVisit = false
+
+export function requestMotionPermission(): Promise<boolean> {
+  type MotionPermission = { requestPermission?: () => Promise<"granted" | "denied"> }
+  if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) {
+    return Promise.resolve(false)
+  }
+  if (motionPermission) return motionPermission
+  const api = DeviceMotionEvent as unknown as MotionPermission
+  if (typeof api.requestPermission !== "function") {
+    motionPermission = Promise.resolve(true)
+    return motionPermission
+  }
+  const pending = api.requestPermission().then(
+    (r) => r === "granted",
+    () => false,
+  )
+  motionPermission = pending
+  pending.then((ok) => {
+    if (!ok && motionPermission === pending) motionPermission = null
+  })
+  return pending
+}
+
 const GUIDANCE: Record<CaptureView, string> = {
   front: "Patient faces the camera. Feet on the floor markers, arms relaxed at the sides, eyes level and looking straight ahead.",
   side: "Patient turns side-on. Arms hanging naturally, eyes level and looking straight ahead. Do not let them correct their posture.",
@@ -68,7 +105,7 @@ export default function CameraCapture({
     lines: true,
     grid: true,
   })
-  const [showSetup, setShowSetup] = useState(true)
+  const [showSetup, setShowSetup] = useState(() => !setupSeenThisVisit)
 
   // ---- camera ----
   useEffect(() => {
@@ -139,26 +176,12 @@ export default function CameraCapture({
   // iOS requires an explicit user gesture before motion events are
   // delivered, so this is requested from a button rather than on mount.
   const enableLevel = useCallback(async () => {
-    type MotionPermission = {
-      requestPermission?: () => Promise<"granted" | "denied">
-    }
-
     if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) {
       setLevelStatus("unavailable")
       return
     }
 
-    const api = DeviceMotionEvent as unknown as MotionPermission
-
-    try {
-      if (typeof api.requestPermission === "function") {
-        const res = await api.requestPermission()
-        if (res !== "granted") {
-          setLevelStatus("denied")
-          return
-        }
-      }
-    } catch {
+    if (!(await requestMotionPermission())) {
       setLevelStatus("denied")
       return
     }
@@ -193,15 +216,21 @@ export default function CameraCapture({
     }, LEVEL_TIMEOUT_MS)
   }, [])
 
+  // Starts by itself when the camera opens; no button. If iOS still refuses
+  // (permission not granted from the tap), the screen offers one.
   // The old listener was never removed; this one is, when the camera closes.
   useEffect(() => {
+    // Started from a timer rather than in the effect body, so its state
+    // updates happen in a callback and not during the commit.
+    const start = window.setTimeout(() => void enableLevel(), 0)
     return () => {
+      window.clearTimeout(start)
       if (motionHandlerRef.current) {
         window.removeEventListener("devicemotion", motionHandlerRef.current)
         motionHandlerRef.current = null
       }
     }
-  }, [])
+  }, [enableLevel])
 
   // ---- capture ----
   const capture = useCallback(() => {
@@ -256,50 +285,72 @@ export default function CameraCapture({
   const pitchOk = level !== null && level.pitch <= LEVEL_LIMIT_DEG
   const isLevel = levelStatus === "active" && rollOk && pitchOk
 
+  const guidesOn = layers.lines || layers.grid
+  const pill = (ok: boolean) =>
+    `rounded-full px-3 py-1.5 text-[12px] font-medium tabular-nums transition ${
+      ok ? "bg-[#1E6B57] text-white" : "bg-white/10 text-white/80"
+    }`
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
-      <div className="flex items-center justify-between px-4 py-3 text-white">
-        <span className="text-sm font-medium">{label}</span>
+    <div className="fixed inset-0 z-50 flex flex-col bg-black text-white">
+      {/* Top bar, above the picture so it never covers the head guide line */}
+      <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-[max(10px,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg px-3 py-1 text-sm text-white/80"
+          className="h-10 rounded-full bg-white/10 px-4 text-[14px] font-medium backdrop-blur-md"
         >
           Cancel
         </button>
+        <span className="text-[15px] font-semibold">{label} view</span>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => setLayers({ lines: !guidesOn, grid: !guidesOn })}
+            aria-pressed={guidesOn}
+            className={`h-10 rounded-full px-3 text-[13px] font-medium backdrop-blur-md ${
+              guidesOn ? "bg-white text-[#15181D]" : "bg-white/10 text-white"
+            }`}
+          >
+            Guides
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowSetup(true)}
+            aria-label="Capture setup"
+            className="h-10 w-10 rounded-full bg-white/10 text-[15px] font-semibold backdrop-blur-md"
+          >
+            ?
+          </button>
+        </div>
       </div>
 
       <div className="relative flex-1 overflow-hidden">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          className="h-full w-full object-contain"
-        />
+        <video ref={videoRef} playsInline muted className="h-full w-full object-contain" />
 
         {ready && <SilhouetteGuide layers={layers} />}
 
         {showSetup && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/95 px-6">
-            <div className="w-full max-w-sm space-y-4">
-              <h3 className="text-sm font-medium text-white">Before you capture</h3>
-
-              <ul className="space-y-2.5 text-[13px] leading-snug text-white/75">
-                <li>Camera on a tripod, roughly at half the patient&apos;s height.</li>
+          <div className="absolute inset-0 z-10 flex items-end justify-center bg-black/80 p-4 sm:items-center">
+            <div className="w-full max-w-sm space-y-4 rounded-2xl bg-[#15181D] p-5">
+              <h3 className="text-[17px] font-semibold">Before you capture</h3>
+              <ul className="space-y-2.5 text-[14px] leading-snug text-white/80">
+                <li>Phone on a tripod, at about half the patient&apos;s height.</li>
                 <li>Tripod 1.5 to 3 m from the patient, in the same spot every visit.</li>
-                <li>Patient stands on the floor marker, feet in the standard position.</li>
-                <li>Minimal clothing so the shoulders, hips, knees and ankles are visible.</li>
-                <li>Whole body inside the frame: the top of the head and the feet both within the guide lines. The calibration is measured from the nose to the ankles, so a cropped head or foot drops every millimetre measurement from the report.</li>
+                <li>Patient on the floor marker, feet in the standard position.</li>
+                <li>Clothing that shows the shoulders, hips, knees and ankles.</li>
+                <li>Head and feet inside the guide lines. A cropped head or foot drops every millimetre measurement from the report.</li>
               </ul>
-
-              <p className="text-[11px] leading-snug text-white/45">
-                Distance and camera height are set once on the tripod, not adjusted per patient. Changing them between visits makes measurements incomparable.
+              <p className="text-[12px] leading-snug text-white/50">
+                Set distance and height once on the tripod. Changing them between visits makes the measurements incomparable.
               </p>
-
               <button
                 type="button"
-                onClick={() => setShowSetup(false)}
-                className="w-full rounded-xl bg-white py-2.5 text-sm font-medium text-slate-900"
+                onClick={() => {
+                  setupSeenThisVisit = true
+                  setShowSetup(false)
+                }}
+                className="h-12 w-full rounded-xl bg-white text-[15px] font-medium text-[#15181D]"
               >
                 Got it
               </button>
@@ -308,84 +359,66 @@ export default function CameraCapture({
         )}
 
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center p-8">
-            <p className="text-center text-sm text-white">{error}</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-8">
+            <p className="max-w-xs text-center text-[15px] leading-relaxed">{error}</p>
           </div>
         )}
       </div>
 
-      <div className="space-y-2 px-3 pb-3 pt-2">
-        <div className="flex gap-1.5">
-          {(
-            [
-              ["lines", "Lines"],
-              ["grid", "Grid"],
-            ] as [keyof GuideLayers, string][]
-          ).map(([key, text]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setLayers((l) => ({ ...l, [key]: !l[key] }))}
-              className={`rounded-full border px-2.5 py-0.5 text-[11px] transition ${
-                layers[key]
-                  ? "border-white/80 bg-white/90 text-slate-900"
-                  : "border-white/25 text-white/50"
-              }`}
-            >
-              {text}
-            </button>
-          ))}
+      {/* Bottom panel */}
+      <div className="space-y-3 bg-black px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
+        <p className="text-center text-[13px] leading-snug text-white/60">{GUIDANCE[view]}</p>
 
-          <button
-            type="button"
-            onClick={() => setShowSetup(true)}
-            className="rounded-full border border-white/25 px-2.5 py-0.5 text-[11px] text-white/50"
-          >
-            Setup
-          </button>
-        </div>
-
-        <p className="text-[11px] leading-snug text-white/60">
-          {GUIDANCE[view]}
-        </p>
-
-        {levelStatus === "off" || levelStatus === "waiting" ? (
-          <button
-            type="button"
-            onClick={enableLevel}
-            disabled={levelStatus === "waiting"}
-            className="w-full rounded-lg border border-white/25 py-1.5 text-[11px] text-white/70 disabled:opacity-50"
-          >
-            {levelStatus === "waiting" ? "Starting level check..." : "Enable level check to capture"}
-          </button>
-        ) : levelStatus === "active" && level ? (
-          <div className="flex items-center justify-between gap-2 text-[11px]">
-            <span className={rollOk ? "text-emerald-400" : "text-amber-400"}>
-              Side tilt {`${level.roll.toFixed(1)}\u00b0`} {rollOk ? "\u2713" : ""}
-            </span>
-            <span className={pitchOk ? "text-emerald-400" : "text-amber-400"}>
-              Forward tilt {`${level.pitch.toFixed(1)}\u00b0`} {pitchOk ? "\u2713" : ""}
-            </span>
-            <span className={isLevel ? "text-emerald-400" : "text-white/60"}>
-              {isLevel ? "Level" : `Both within ${LEVEL_LIMIT_DEG}\u00b0`}
-            </span>
+        {levelStatus === "active" && level ? (
+          <div className="flex items-center justify-center gap-2">
+            <span className={pill(rollOk)}>Side {`${level.roll.toFixed(1)}\u00b0`}</span>
+            <span className={pill(pitchOk)}>Forward {`${level.pitch.toFixed(1)}\u00b0`}</span>
           </div>
-        ) : (
-          <p className="text-[11px] leading-snug text-rose-300">
-            {levelStatus === "denied"
-              ? "Motion access was refused, so the level cannot be checked and the photo cannot be captured here. Allow motion access, or upload a photo instead."
-              : "This device cannot report its tilt, so the photo cannot be captured here. Use a phone, or upload a photo instead."}
+        ) : levelStatus === "denied" ? (
+          <div className="space-y-2 text-center">
+            <p className="text-[13px] leading-snug text-[#F2B8B5]">
+              The level check needs motion access. Without it the photo cannot be taken here.
+            </p>
+            <button
+              type="button"
+              onClick={() => void enableLevel()}
+              className="h-10 rounded-full bg-white/10 px-4 text-[13px] font-medium"
+            >
+              Allow motion access
+            </button>
+          </div>
+        ) : levelStatus === "unavailable" ? (
+          <p className="text-center text-[13px] leading-snug text-[#F2B8B5]">
+            This device cannot report its tilt, so the photo cannot be taken here. Use a phone, or upload a photo instead.
           </p>
+        ) : (
+          <p className="text-center text-[13px] text-white/50">Starting level check...</p>
         )}
 
-        <button
-          type="button"
-          onClick={capture}
-          disabled={!ready || !isLevel}
-          className="w-full rounded-xl bg-white py-2.5 text-sm font-medium text-slate-900 disabled:opacity-30"
-        >
-          {isLevel || levelStatus !== "active" ? "Capture" : "Hold the phone level to capture"}
-        </button>
+        <div className="flex flex-col items-center gap-1.5">
+          <button
+            type="button"
+            onClick={capture}
+            disabled={!ready || !isLevel}
+            aria-label="Capture"
+            className={`flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 transition ${
+              isLevel && ready ? "border-[#3FB68B]" : "border-white/25"
+            }`}
+          >
+            <span
+              className={`h-[60px] w-[60px] rounded-full transition ${
+                isLevel && ready ? "bg-white" : "bg-white/20"
+              }`}
+            />
+          </button>
+          <span className={`text-[13px] font-medium ${isLevel ? "text-[#3FB68B]" : "text-white/60"}`}>
+            {isLevel
+              ? "Level. Tap to capture"
+              : levelStatus === "active"
+                ? `Hold the phone straight, both within ${LEVEL_LIMIT_DEG}\u00b0`
+                : "Capture is off until the level is checked"}
+          </span>
+        </div>
       </div>
     </div>
   )

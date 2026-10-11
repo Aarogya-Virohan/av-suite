@@ -1113,3 +1113,40 @@ Verified: type check; the angle function checked on constructed gravity
 vectors for both sign conventions, 1 and 2 degrees of roll, 1.4 and 3 of
 pitch, landscape and flat. Not yet verified on a phone; whether 1.5 degrees
 can be held by hand without a tripod is the thing that test will show.
+
+### Intake screen redesigned; empty age no longer fails after the review
+The report endpoint takes age as an integer form field. Checked on the
+project's FastAPI 0.115 on 11 October: an empty age returns 422, while an
+empty name, gender or case reference is accepted as an empty string. The
+intake screen let the clinician continue with age blank, so the refusal
+came only after the whole landmark review, and going back to fix the form
+discarded the review. It is a likely cause of the unexplained 422 seen in
+the phone test that morning, not a proven one.
+
+The intake screen now has labelled fields; name, age (whole number 1 to
+120) and height (50 to 250 cm) are required, gender, case reference and
+clinician optional, since no band uses gender since 11 October and an
+empty case reference is handled by the report file name. The continue
+button stays disabled and says what is still needed. The three photograph
+slots show the photo with a "Captured" or "Uploaded, not checked" badge;
+the long upload warning moved behind "What makes a good photo?". The
+separate preview column is gone. No request, field name or value sent to
+the backend changed.
+
+### Capture screen redesigned; the level check starts by itself
+After the phone test of 11 October. The "Enable level check" button is
+gone: Android needs no motion permission, and iOS grants it only inside a
+tap, so the request is now made from the "Use camera" tap that opens the
+camera, and the check starts on its own when the camera opens. Both share
+one pending request, because a second call outside a tap while the iOS
+prompt is open would be refused and wrongly report the level as denied. If
+access is refused, the screen offers one "Allow motion access" button.
+
+The screen itself: picture full height with the top bar over it (Cancel,
+view name, Guides on or off, setup help), tilt shown as two pills that turn
+green inside 1.5 degrees, and a round shutter that lights only when level.
+On phones the photo slots on the intake screen are now compact rows instead
+of full-width cards, and a failed detection shows on the screen in plain
+words ("No person was found in the front photo...") instead of a browser
+alert. Verified by type check and lint only; the iOS permission path has
+not been run on an iPhone.

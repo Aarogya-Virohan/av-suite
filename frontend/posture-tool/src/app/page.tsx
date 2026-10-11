@@ -3,7 +3,6 @@
 import { useState } from "react"
 
 import UploadZone from "@/components/posture/UploadZone"
-import ImagePreview from "@/components/posture/ImagePreview"
 
 import ReportCard from "@/components/report/ReportCard"
 
@@ -18,9 +17,41 @@ import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@
 type Step = "upload" | "review" | "report"
 
 function Header() {
-return ( <header className="border-b border-slate-200 bg-white"> <div className="mx-auto flex w-full max-w-7xl items-center px-4 py-4"> <span className="text-lg font-semibold text-slate-900">
-Aarogya Virohan </span> </div> </header>
-)
+  return (
+    <header className="border-b border-[#E3E1DA] bg-white">
+      <div className="mx-auto flex w-full max-w-7xl items-baseline gap-3 px-4 py-4">
+        <span className="text-[17px] font-semibold tracking-tight text-[#15181D]">Aarogya Virohan</span>
+        <span className="text-[13px] text-[#7A818B]">Posture assessment</span>
+      </div>
+    </header>
+  )
+}
+
+const INPUT_CLASS =
+  "h-11 w-full rounded-xl border border-[#E3E1DA] bg-white px-3 text-[15px] text-[#15181D] outline-none transition placeholder:text-[#A3A8B0] focus:border-[#15181D]"
+
+function Field({
+  label,
+  hint,
+  error,
+  children,
+}: {
+  label: string
+  hint?: string
+  error?: string | null
+  children: React.ReactNode
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-[13px] font-medium text-[#3A4048]">{label}</span>
+      {children}
+      {error ? (
+        <span className="mt-1 block text-[12px] text-[#B4231B]">{error}</span>
+      ) : hint ? (
+        <span className="mt-1 block text-[12px] text-[#7A818B]">{hint}</span>
+      ) : null}
+    </label>
+  )
 }
 
 export default function Page() {
@@ -87,6 +118,11 @@ useState<DetectionResult | null>(null)
 const [loading, setLoading] =
 useState(false)
 
+// Shown on the intake screen instead of a browser alert. Kept with the
+// photos it was about, so it disappears as soon as any photo is replaced.
+const [detectError, setDetectError] =
+useState<{ message: string; photos: (string | null)[] } | null>(null)
+
 // Height drives the pixel-to-millimetre calibration. A missing value
 // means the millimetre parameters cannot be computed at all; a wrong
 // one (170 typed as 17) is worse, because every millimetre reading
@@ -99,6 +135,35 @@ patientHeightCm.trim() !== "" &&
 Number.isFinite(heightNumber) &&
 heightNumber >= 50 &&
 heightNumber <= 250
+
+// Age goes to the report as an integer, and the report endpoint refuses an
+// empty one (FastAPI 0.115, checked 11 October 2026). Before this check the
+// refusal came only after the clinician had finished the whole landmark
+// review, and going back to fix the form threw that review away.
+const ageNumber = Number(age)
+
+const isAgeValid =
+age.trim() !== "" &&
+Number.isInteger(ageNumber) &&
+ageNumber >= 1 &&
+ageNumber <= 120
+
+const shownError =
+detectError &&
+detectError.photos[0] === frontImage &&
+detectError.photos[1] === sideImage &&
+detectError.photos[2] === backImage
+  ? detectError.message
+  : null
+
+const missing = [
+  patientName.trim() === "" ? "name" : null,
+  !isAgeValid ? "age" : null,
+  !isHeightValid ? "height" : null,
+  !frontImage ? "front photo" : null,
+  !sideImage ? "side photo" : null,
+  !backImage ? "back photo" : null,
+].filter((m): m is string => m !== null)
 
 const handleAnalyze = async () => {
 if (
@@ -114,6 +179,7 @@ return
 
 try {
   setLoading(true)
+  setDetectError(null)
 
   const result = await detectLandmarks({ frontFile, sideFile, backFile })
 
@@ -125,10 +191,16 @@ try {
 
   console.error(error)
 
-  alert(
-    "Analysis failed: " +
-      (error instanceof Error ? error.message : String(error)),
-  )
+  const message = error instanceof Error ? error.message : String(error)
+  // The server names the view and the reason, for example
+  // "Front image: pose detection failed: No person detected".
+  const noPerson = message.match(/^(Front|Side|Back) image: pose detection failed: No person detected/i)
+  setDetectError({
+    message: noPerson
+      ? `No person was found in the ${noPerson[1].toLowerCase()} photo. Retake it with the whole body in frame.`
+      : `The photos could not be analysed: ${message}`,
+    photos: [frontImage, sideImage, backImage],
+  })
 
 } finally {
 
@@ -177,236 +249,107 @@ try {
 
 }
 
-return ( <div className="min-h-screen bg-slate-100">
+return ( <div className="min-h-screen bg-[#F4F3EF]">
 
   <Header />
 
   <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8">
 
     {step === "upload" && (
-      <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-
-        <div className="max-w-2xl">
-
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">
-            Clinical Posture Assessment
-          </h1>
-
-          <p className="mt-3 text-lg text-slate-600">
-            Upload patient posture images to generate a
-            multi-plane biomechanical analysis report.
+      <section className="mx-auto w-full max-w-3xl pb-28 sm:pb-0">
+        <header>
+          <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#7A818B]">
+            New assessment
           </p>
+          <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight text-[#15181D]">
+            Patient and photographs
+          </h1>
+          <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-[#5F6672]">
+            Fill in the patient&apos;s details, then take the three photographs. You will check
+            the landmarks before any report is made.
+          </p>
+        </header>
 
-        </div>
-
-        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-
-            <h2 className="text-xl font-semibold text-slate-900">
-              Patient Intake
-            </h2>
-
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-
-              <input
-                type="text"
-                placeholder="Patient Name"
-                value={patientName}
-                onChange={(e) =>
-                  setPatientName(
-                    e.target.value
-                  )
-                }
-                className="rounded-xl border p-3"
-              />
-
-              <input
-                type="number"
-                placeholder="Age"
-                value={age}
-                onChange={(e) =>
-                  setAge(
-                    e.target.value
-                  )
-                }
-                className="rounded-xl border p-3"
-              />
-
-              <select
-                value={gender}
-                onChange={(e) =>
-                  setGender(
-                    e.target.value
-                  )
-                }
-                className="rounded-xl border p-3 text-slate-900"
-              >
-                <option value="" disabled>
-                  Gender
-                </option>
+        <div className="mt-6 rounded-2xl border border-[#E3E1DA] bg-white p-5 sm:p-6">
+          <h2 className="text-[17px] font-semibold text-[#15181D]">Patient</h2>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Name">
+              <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} className={INPUT_CLASS} autoComplete="off" />
+            </Field>
+            <Field
+              label="Age"
+              error={age.trim() !== "" && !isAgeValid ? "Enter a whole number between 1 and 120." : null}
+            >
+              <input type="number" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} className={INPUT_CLASS} />
+            </Field>
+            <Field
+              label="Height (cm)"
+              hint="Used to turn the photo into millimetres. Measure it, do not ask."
+              error={patientHeightCm.trim() !== "" && !isHeightValid ? "Enter the height in centimetres, between 50 and 250." : null}
+            >
+              <input type="number" inputMode="decimal" value={patientHeightCm} onChange={(e) => setPatientHeightCm(e.target.value)} className={INPUT_CLASS} />
+            </Field>
+            <Field label="Gender (optional)">
+              <select value={gender} onChange={(e) => setGender(e.target.value)} className={INPUT_CLASS}>
+                <option value="">Not given</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
                 <option value="Other">Other</option>
               </select>
-
-              <input
-                type="text"
-                placeholder="Case Reference"
-                value={caseRef}
-                onChange={(e) =>
-                  setCaseRef(
-                    e.target.value
-                  )
-                }
-                className="rounded-xl border p-3"
-              />
-
-              <div>
-                <input
-                  type="number"
-                  placeholder="Height in cm *"
-                  value={patientHeightCm}
-                  onChange={(e) =>
-                    setPatientHeightCm(
-                      e.target.value
-                    )
-                  }
-                  className="w-full rounded-xl border p-3"
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  Required. Used to convert pixel
-                  measurements into millimetres. Without
-                  it, asymmetry parameters cannot be
-                  reported.
-                </p>
-              </div>
-
-              <input
-                type="text"
-                placeholder="Lead Clinician"
-                value={clinicianName}
-                onChange={(e) =>
-                  setClinicianName(
-                    e.target.value
-                  )
-                }
-                className="rounded-xl border p-3"
-              />
-
-            </div>
-
-            <div className="mt-8 space-y-4">
-
-              <UploadZone
-                label="Front View"
-                view="front"
-                setImage={
-                  setFrontImage
-                }
-                setImageFile={
-                  setFrontFile
-                }
-                setSource={
-                  setFrontSource
-                }
-              />
-
-              <UploadZone
-                label="Side View"
-                view="side"
-                setImage={
-                  setSideImage
-                }
-                setImageFile={
-                  setSideFile
-                }
-                setSource={
-                  setSideSource
-                }
-              />
-
-              <UploadZone
-                label="Back View"
-                view="back"
-                setImage={
-                  setBackImage
-                }
-                setImageFile={
-                  setBackFile
-                }
-                setSource={
-                  setBackSource
-                }
-              />
-
-            </div>
-
+            </Field>
+            <Field label="Case reference (optional)">
+              <input type="text" value={caseRef} onChange={(e) => setCaseRef(e.target.value)} className={INPUT_CLASS} autoComplete="off" />
+            </Field>
+            <Field label="Clinician (optional)">
+              <input type="text" value={clinicianName} onChange={(e) => setClinicianName(e.target.value)} className={INPUT_CLASS} />
+            </Field>
           </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6">
-
-            <h2 className="text-xl font-semibold text-slate-900">
-              Image Preview
-            </h2>
-
-            <div className="mt-6 space-y-4">
-
-              <ImagePreview
-                image={frontImage}
-              />
-
-              <ImagePreview
-                image={sideImage}
-              />
-
-              <ImagePreview
-                image={backImage}
-              />
-
-            </div>
-
-          </div>
-
         </div>
 
-        {loading && (
-          <p className="mt-6 text-slate-600">
-            Running posture analysis...
+        <div className="mt-4 rounded-2xl border border-[#E3E1DA] bg-white p-5 sm:p-6">
+          <h2 className="text-[17px] font-semibold text-[#15181D]">Photographs</h2>
+          <p className="mt-1 text-[14px] leading-relaxed text-[#5F6672]">
+            The camera only takes the photo when the phone is level. An uploaded photo is measured
+            the same way, but the report marks it as not checked.
           </p>
-        )}
-
-        <div className="mt-8 flex justify-end">
-
-          <button
-            type="button"
-            onClick={handleAnalyze}
-            disabled={
-              !frontImage ||
-              !sideImage ||
-              !backImage ||
-              !isHeightValid ||
-              loading
-            }
-            className="
-              rounded-full
-              bg-slate-900
-              px-6
-              py-3
-              text-white
-              transition
-              hover:bg-slate-800
-              disabled:cursor-not-allowed
-              disabled:bg-slate-300
-            "
-          >
-            {loading
-              ? "Analysing..."
-              : "Analyse Posture"}
-          </button>
-
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <UploadZone label="Front" view="front" setImage={setFrontImage} setImageFile={setFrontFile} setSource={setFrontSource} />
+            <UploadZone label="Side" view="side" setImage={setSideImage} setImageFile={setSideFile} setSource={setSideSource} />
+            <UploadZone label="Back" view="back" setImage={setBackImage} setImageFile={setBackFile} setSource={setBackSource} />
+          </div>
+          <details className="mt-4 rounded-xl bg-[#F7F6F2] px-4 py-3 text-[13px] leading-relaxed text-[#5F6672]">
+            <summary className="cursor-pointer font-medium text-[#15181D]">What makes a good photo?</summary>
+            <p className="mt-2">
+              The whole body in frame from head to feet, the camera level and at about half the
+              patient&apos;s height, the same distance each visit, and clothing that leaves the
+              shoulders, hips, knees and ankles visible. A screenshot or a photo of a screen will not
+              measure correctly.
+            </p>
+          </details>
         </div>
 
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3E1DA] bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+          <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+            {shownError && !loading && (
+              <p role="alert" className="rounded-xl border border-[#F2C9C5] bg-[#FDF1F0] px-3 py-2 text-center text-[13px] text-[#8C1D18] sm:text-right">
+                {shownError}
+              </p>
+            )}
+            {missing.length > 0 && !loading && (
+              <p className="text-center text-[13px] text-[#7A818B] sm:text-right">
+                Still needed: {missing.join(", ")}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleAnalyze}
+              disabled={missing.length > 0 || loading}
+              className="h-12 rounded-xl bg-[#15181D] px-6 text-[15px] font-medium text-white transition hover:bg-[#2A2F37] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {loading ? "Finding landmarks..." : "Continue to landmark check"}
+            </button>
+          </div>
+        </div>
       </section>
     )}
 
