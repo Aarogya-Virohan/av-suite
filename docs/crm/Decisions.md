@@ -180,3 +180,52 @@ Each entry follows this structure:
 - **Reasoning**: Zustand explicitly supports and documents calling `.getState()` on the store object outside React. This is simpler, has no side effects, and does not require any new infrastructure. No hooks are invoked — `.getState()` is a plain synchronous call on the store module export.
 - **Trade-offs**: Slight coupling between `api-client.ts` (lib layer) and `store/index.ts`. Acceptable because auth state management is already centralized in the store by design.
 - **Affected Files**: `frontend/crm/src/lib/api-client.ts`, `frontend/crm/src/store/index.ts`
+
+---
+
+## [D-011] Midnight & Grove Brand Theme Applied Through Tokens
+- **Date**: 2026-10-11
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: The CRM UI looked generic and did not match the brand. Founders approved the "Midnight & Grove" palette: website midnight blue, green and lime, fused with the logo's cream and teal.
+- **Options Considered**:
+  1. Restyle every component by hand with new hex values
+  2. Remap Tailwind v4 `slate` and `teal` scales plus semantic tokens in `globals.css`, then restyle pages one by one with shared primitives
+- **Decision**: Option 2. Tokens live in `@theme` in `app/globals.css`; shared primitives in `components/ui/brand.tsx` (Card, PageHeader, KpiCard, Badge, Button, Avatar, IconChip, Delta).
+- **Reasoning**: Every page picks up the palette at once without touching logic. A future palette change happens in one file. Pages are then restyled one at a time with before/after screenshots, keeping queries, permissions, handlers and test-visible text unchanged.
+- **Trade-offs**: Pages not yet restyled still use the old layout (with new colours). `--brand-navy` can still be overridden by a clinic's `branding_color`.
+- **Affected Files**: `app/globals.css`, `app/layout.tsx`, `lib/cn.ts`, `components/ui/brand.tsx`, `components/layout/*`, restyled pages
+
+---
+
+## [D-012] Hardcoded Pain Scores and WA Session Report Removed (D-008 violation)
+- **Date**: 2026-10-12
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: The patient header showed "Initial Pain 8/10, Current 3/10, 5 pts improved" for every patient, and "WA Session Report" sent those same invented scores, a fixed treatment and fixed home advice to the patient on WhatsApp. Real data exists in `treatment_sessions` (`pain_score`, `treatment`, `home_advice`, `finalized`).
+- **Options Considered**:
+  1. Compute badges and the report on the client from `GET /treatments`
+  2. Remove the fake values now; build both from a backend clinical summary later
+- **Decision**: Option 2, in three parts:
+  - Part 1 (done, frontend): remove the badges, disable the WA report button with a "coming soon" tooltip, sort sessions by `treatment_date` then `created_at` in the Progression tab.
+  - Part 2 (Sparsh, after PR B): `order_by` in `list_sessions`; new `GET /patients/{id}/clinical-summary` counting only finalized sessions (initial/current pain, change, session count, last finalized session), scoped by `treatments.view`, with tests.
+  - Part 3 (frontend, after Part 2): header badges and WA report built only from that summary; clinic name instead of hardcoded "Aarogya Virohan"; message opens prefilled in WhatsApp so the therapist reviews it before sending.
+- **Reasoning**: Option 1 is unreliable: the list API has no ordering and a default limit of 100, so "initial" can be any session. Showing nothing is safer than showing wrong clinical data. Only finalized sessions should ever reach a patient.
+- **Trade-offs**: The WA Session Report feature is unavailable until Parts 2 and 3 land.
+- **Verified**: Three sessions inserted out of order (8, 5, 2). Old code showed initial 5, current 8, "-3 pts". New code shows 8 → 2, 6 pts.
+- **Affected Files**: `app/(dashboard)/patients/[id]/page.tsx`, `features/patients/components/ProgressionTab.tsx`
+
+---
+
+## Known Limitations and Deferred Questions
+> Keep this list current. Remove an item only when it is resolved, and note where.
+
+| # | Item | Status | Owner |
+|---|---|---|---|
+| L-1 | Treatment list API has no `order_by`; with the default limit of 100, older sessions may be skipped | Open, queued (D-012 Part 2) | Sparsh |
+| L-2 | WA Session Report disabled until the clinical summary endpoint exists | Open (D-012 Part 3) | Frontend |
+| L-3 | Prescriptions return 403 for CRM-only clinics; is Rx part of CRM or a separate tool? | **Deferred**: Onkar to discuss with founders. Onkar leans to "separate tool". | Onkar + founders |
+| L-4 | Patient consent (DPDP) before sending clinical info (pain, treatment) on WhatsApp | **Deferred**: founders to decide, must be settled before launch | Onkar + founders |
+| L-5 | Role templates are deny-all, contradicting the founders' 13 Aug decision | Open, queued after PR B | Sparsh |
+| L-6 | Auth still reads `users.clinic_id`; no workspace switch; membership auth incomplete | In progress (PR B) | Sparsh |
+| L-7 | Frontend lint config is broken (pre-existing) | Open | Unassigned |
+
+*Last updated: 2026-10-12 | Branch: feat/crm-ui-theme*
