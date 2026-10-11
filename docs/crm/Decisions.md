@@ -283,6 +283,15 @@ Each entry follows this structure:
 
 ---
 
+## [D-019] Finalized SOAP Notes Are Immutable; Corrections Go in a New Note
+- **Date**: 2026-10-12
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: The SOAP tab offered "Re-open (Admin Only)", but `update_assessment` rejects any change to a finalized note, so it always failed. The tab also claimed autosave that did not exist, read `finalized_at` (never returned), and never saved pain VAS.
+- **Decision**: Keep the backend rule (finalized notes cannot be edited), which matches medico-legal practice. The tab has Save draft, Finalize (with confirmation), a note list and New note. Pain VAS and clinical area are stored in `form_data` (`pain_vas`, `area`) because the DB enum lacks the area values (L-25).
+- **Affected Files**: `features/patients/components/SoapNotesTab.tsx`, `types/api.ts`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -312,5 +321,9 @@ Each entry follows this structure:
 | L-22 | `POST /users` creates no `memberships` row (register does; migration 65d7c21a9d4e backfilled only users that existed when it ran). These users log in today through the legacy `users.clinic_id` fallback; they would be locked out if PR B removes it without a backfill | **Check in PR B** | Sparsh |
 | L-23 | Permissions drawer shows "none" for capabilities without an override (ignores the role template) and saves explicit "none" for all of them (PUT replaces all). Harmless while templates are deny-all; would wipe template access once templates are restored | Fix together with role templates: backend returns effective scopes, drawer sends only real overrides | Sparsh + frontend |
 | L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Open; add clinic time zone (default Asia/Kolkata) | Sparsh (later) |
+| L-25 | DB enum `specialty_type` has only physiotherapy, chiropractic, osteopathy, massage, acupuncture, other. Migration 38ebc0d87a65 "added" ortho/neuro/cardiopulm/sports/paeds/general with `alter_column`, which does not add Postgres enum values, so saving them returns 500 (verified locally) | Open; `ALTER TYPE specialty_type ADD VALUE ...` migration; then frontend can move `form_data.area` into `specialty` | Sparsh |
+| L-26 | `types/schema.ts` is stale (e.g. SoapAssessment lacks `finalized`) | Open; regenerate from the backend OpenAPI | Frontend |
+| L-27 | Auto-Rx creates a prescription with empty items and the note "Auto-generated prescription." (invented content on a clinical document). Not changed because Rx scope is parked with founders | Decide with Rx scope | Onkar + founders |
+| L-28 | Document storage errors reach users as raw text (e.g. "[Errno 111] Connection refused") | Open; backend should return a friendly message and log the detail | Sparsh |
 
-*Last updated: 2026-10-12 (after drawers) | Branch: feat/crm-ui-theme*
+*Last updated: 2026-10-12 (after patient tabs) | Branch: feat/crm-ui-theme*
