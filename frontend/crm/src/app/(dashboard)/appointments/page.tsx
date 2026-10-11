@@ -8,13 +8,61 @@ import { AddAppointmentSlideOver } from '../../../features/appointments/componen
 import { RescheduleSlideOver } from '../../../features/appointments/components/RescheduleSlideOver';
 import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
 import { AppointmentStatus, Appointment } from '../../../types/api';
-import { Plus, Calendar as CalendarIcon, Clock, User, CheckCircle2, XCircle, Copy, ExternalLink, QrCode } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Clock, CheckCircle2, XCircle, Copy, ExternalLink, QrCode, Phone } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { apiClient } from '../../../lib/api-client';
 import { useAuthStore } from '../../../store';
 import { canAccessModule, canPerformAction, hasCapability } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
+import { Avatar, Badge, type BadgeTone, Button, Card, PageHeader } from '../../../components/ui/brand';
+import { cn } from '../../../lib/cn';
+
+const STATUS_STYLE: Record<string, string> = {
+  scheduled: 'bg-info-wash text-info border-info/20',
+  completed: 'bg-ok-wash text-ok border-ok/20',
+  cancelled: 'bg-danger-wash text-danger border-danger/20',
+  no_show: 'bg-warn-wash text-warn border-warn/20',
+};
+
+const REQUEST_TONE: Record<BookingRequest['status'], BadgeTone> = {
+  pending: 'warn',
+  approved: 'ok',
+  rejected: 'danger',
+};
+
+function apptDay(iso: string): string {
+  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(new Date(iso));
+}
+
+function apptTime(iso: string): string {
+  return new Intl.DateTimeFormat('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
+}
+
+function SubTab({
+  active,
+  onClick,
+  icon: Icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'flex cursor-pointer items-center gap-2 rounded-[9px] px-3.5 py-2 text-[13px] font-semibold transition-colors',
+        active ? 'bg-card text-ink shadow-[0_1px_2px_rgba(20,26,51,0.08)]' : 'text-muted hover:text-ink',
+      )}
+    >
+      <Icon className={cn('h-4 w-4', active && 'text-grove')} />
+      {children}
+    </button>
+  );
+}
 
 interface BookingRequest {
   id: string;
@@ -139,79 +187,50 @@ export default function AppointmentsPage() {
 
   return (
     <AppShell>
-      <div className="space-y-6">
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Appointments & Bookings</h1>
-            <p className="text-sm text-slate-500">Manage daily schedules & incoming public booking requests</p>
-          </div>
-
-          {canPerformAction('manageAppointments') && (
-            <button
-              onClick={() => setIsAddOpen(true)}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Book Visit</span>
-            </button>
-          )}
-        </div>
+      <div className="space-y-5">
+        <PageHeader
+          title="Appointments & Bookings"
+          subtitle="Manage daily schedules & incoming public booking requests"
+          actions={
+            canPerformAction('manageAppointments') ? (
+              <Button onClick={() => setIsAddOpen(true)}>
+                <Plus className="h-4 w-4" />
+                <span>Book Visit</span>
+              </Button>
+            ) : null
+          }
+        />
 
         {/* Sub-Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
-          <button
-            onClick={() => setActiveSubTab('list')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeSubTab === 'list'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <CalendarIcon className="w-4 h-4" />
-            <span>Appointments Schedule</span>
-          </button>
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 p-1">
+          <SubTab active={activeSubTab === 'list'} onClick={() => setActiveSubTab('list')} icon={CalendarIcon}>
+            Appointments Schedule
+          </SubTab>
 
           {canViewBookingRequests && (
-            <button
-              onClick={() => setActiveSubTab('requests')}
-              className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-                activeSubTab === 'requests'
-                  ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              <span>Pending Requests</span>
+            <SubTab active={activeSubTab === 'requests'} onClick={() => setActiveSubTab('requests')} icon={Clock}>
+              Pending Requests
               {pendingRequestsCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500 text-white animate-pulse">
+                <span className="rounded-full bg-danger px-2 py-0.5 text-[10px] font-extrabold text-white">
                   {pendingRequestsCount}
                 </span>
               )}
-            </button>
+            </SubTab>
           )}
 
-          <button
-            onClick={() => setActiveSubTab('bookingLink')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeSubTab === 'bookingLink'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <QrCode className="w-4 h-4" />
-            <span>Public Booking Link & QR</span>
-          </button>
+          <SubTab active={activeSubTab === 'bookingLink'} onClick={() => setActiveSubTab('bookingLink')} icon={QrCode}>
+            Public Booking Link & QR
+          </SubTab>
         </div>
 
         {/* Sub-Tab 1: Appointments List */}
         {activeSubTab === 'list' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as 'all' | 'scheduled' | 'completed' | 'cancelled')}
-                className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-700 dark:text-slate-300"
+                className="h-10 rounded-[10px] border border-line bg-card px-3 text-sm font-medium text-ink-2"
               >
                 <option value="all">All Statuses</option>
                 <option value="scheduled">Scheduled</option>
@@ -219,50 +238,71 @@ export default function AppointmentsPage() {
                 <option value="cancelled">Cancelled</option>
                 <option value="no_show">No Show</option>
               </select>
+              <span className="text-xs text-muted">
+                {filteredAppointments.length} {filteredAppointments.length === 1 ? 'appointment' : 'appointments'}
+              </span>
             </div>
 
-            <div className="space-y-3">
-              {filteredAppointments.length === 0 ? (
-                <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 text-sm">
-                  No appointments found.
-                </div>
-              ) : (
-                filteredAppointments.map((apt) => (
+            {isLoading ? (
+              <Card className="p-8 text-center text-sm text-muted">Loading appointments…</Card>
+            ) : filteredAppointments.length === 0 ? (
+              <Card className="p-10 text-center">
+                <CalendarIcon className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 text-sm text-muted">No appointments found.</p>
+              </Card>
+            ) : (
+              <Card className="divide-y divide-line-soft">
+                {filteredAppointments.map((apt) => (
                   <div
                     key={apt.id}
-                    className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs"
+                    className="flex flex-col items-start justify-between gap-4 px-5 py-4 md:flex-row md:items-center"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-teal-50 dark:bg-teal-950 text-teal-600 rounded-xl">
-                        <CalendarIcon className="w-6 h-6" />
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="w-[76px] shrink-0 rounded-xl bg-canvas px-2 py-2 text-center">
+                        <p className="font-display text-lg font-bold leading-none tabular-nums text-ink">
+                          {apptTime(apt.scheduled_at)}
+                        </p>
+                        <p className="mt-1 text-[11px] font-medium text-muted">{apptDay(apt.scheduled_at)}</p>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                      <Avatar name={apt.patient_name} size={40} />
+                      <div className="min-w-0">
+                        <h3 className="truncate text-[15px] font-semibold text-ink">
                           {apt.patient_name || `Patient ID: ${apt.patient_id}`}
                         </h3>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
                           <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            {new Date(apt.scheduled_at).toLocaleString()} ({apt.duration_minutes} mins)
+                            <Clock className="h-3.5 w-3.5" />
+                            {apt.duration_minutes} mins
                           </span>
-                          <span>•</span>
-                          <span className="capitalize text-teal-600 font-semibold">{apt.appointment_type}</span>
+                          {apt.therapist_name && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span>{apt.therapist_name}</span>
+                            </>
+                          )}
+                          {apt.appointment_type && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span className="font-semibold capitalize text-logo-teal-ink">{apt.appointment_type}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-                      <button
-                        onClick={() => setRescheduleAppointment(apt)}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
-                      >
-                        <Clock className="w-3.5 h-3.5" />
+                    <div className="flex w-full items-center justify-between gap-2.5 md:w-auto md:justify-end">
+                      <Button variant="secondary" className="h-9 px-3 text-xs" onClick={() => setRescheduleAppointment(apt)}>
+                        <Clock className="h-3.5 w-3.5" />
                         <span>Reschedule</span>
-                      </button>
+                      </Button>
                       <select
                         value={apt.status}
                         onChange={(e) => handleStatusChange(apt.id, e.target.value as AppointmentStatus)}
-                        className="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold uppercase text-slate-700 dark:text-slate-200"
+                        aria-label="Appointment status"
+                        className={cn(
+                          'h-9 cursor-pointer rounded-[10px] border px-3 text-xs font-semibold',
+                          STATUS_STYLE[apt.status] ?? 'border-line bg-card text-ink-2',
+                        )}
                       >
                         <option value="scheduled">Scheduled</option>
                         <option value="completed">Completed</option>
@@ -271,120 +311,122 @@ export default function AppointmentsPage() {
                       </select>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </Card>
+            )}
           </div>
         )}
 
         {/* Sub-Tab 2: Pending Booking Requests */}
         {activeSubTab === 'requests' && (
-          <div className="space-y-4">
-            <p className="text-xs text-slate-500">
+          <div className="space-y-3">
+            <p className="text-xs text-muted">
               Incoming appointment requests from the public booking form. Approving auto-creates confirmed appointment & patient records.
             </p>
 
-            <div className="space-y-3">
-              {requests.length === 0 ? (
-                <div className="p-8 text-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 text-sm">
-                  No public booking requests found.
-                </div>
-              ) : (
-                requests.map((req) => (
-                  <div
+            {requests.length === 0 ? (
+              <Card className="p-10 text-center">
+                <Clock className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 text-sm text-muted">No public booking requests found.</p>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {requests.map((req) => (
+                  <Card
                     key={req.id}
-                    className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs"
+                    className="flex flex-col items-start justify-between gap-4 p-5 md:flex-row md:items-center"
                   >
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                          {req.name}
-                        </h3>
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                            req.status === 'pending'
-                              ? 'bg-amber-100 text-amber-800'
-                              : req.status === 'approved'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}
-                        >
-                          {req.status}
-                        </span>
-                      </div>
+                    <div className="flex min-w-0 gap-4">
+                      <Avatar name={req.name} size={40} />
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex items-center gap-2.5">
+                          <h3 className="text-[15px] font-semibold text-ink">{req.name}</h3>
+                          <Badge tone={REQUEST_TONE[req.status] ?? 'neutral'} className="capitalize">
+                            {req.status}
+                          </Badge>
+                        </div>
 
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                        <span>Phone: <strong>{req.phone}</strong></span>
-                        <WhatsAppButton phone={req.phone} name={req.name} />
-                        <span>•</span>
-                        <span>Service: <strong>{req.notes ? req.notes.replace('Service Requested: ', '') : 'Consultation'}</strong></span>
-                        <span>•</span>
-                        <span>Slot: <strong>{req.preferred_date} at {req.preferred_slot}</strong></span>
-                      </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted">
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3.5 w-3.5" />
+                            <strong className="font-semibold text-ink-2">{req.phone}</strong>
+                          </span>
+                          <WhatsAppButton phone={req.phone} name={req.name} />
+                          <span aria-hidden="true">·</span>
+                          <span>
+                            Service: <strong className="font-semibold text-ink-2">{req.notes ? req.notes.replace('Service Requested: ', '') : 'Consultation'}</strong>
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>
+                            Slot: <strong className="font-semibold text-ink-2">{req.preferred_date} at {req.preferred_slot}</strong>
+                          </span>
+                        </div>
 
-                      <p className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                        <strong>Complaint:</strong> {req.chief_complaint}
-                      </p>
+                        <p className="rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-ink-2">
+                          <strong className="font-semibold text-ink">Complaint:</strong> {req.chief_complaint}
+                        </p>
+                      </div>
                     </div>
 
                     {req.status === 'pending' && (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleRejectRequest(req)}
-                          className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer"
+                          className="flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] bg-danger-wash px-3 text-xs font-semibold text-danger transition-colors hover:bg-[#f7d6d1]"
                         >
-                          <XCircle className="w-4 h-4" />
+                          <XCircle className="h-4 w-4" />
                           <span>Reject</span>
                         </button>
-                        <button
-                          onClick={() => handleApproveRequest(req)}
-                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1 cursor-pointer shadow-xs"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
+                        <Button className="h-9 px-3.5 text-xs" onClick={() => handleApproveRequest(req)}>
+                          <CheckCircle2 className="h-4 w-4" />
                           <span>Approve & Book</span>
-                        </button>
+                        </Button>
                       </div>
                     )}
-                  </div>
-                ))
-              )}
-            </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Sub-Tab 3: Public Booking Link & QR Code */}
         {activeSubTab === 'bookingLink' && (
-          <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-6 max-w-2xl">
-            <div className="bg-gradient-to-r from-navy to-blue-700 p-6 rounded-xl text-white space-y-4 shadow-md">
-              <h3 className="text-lg font-bold">Public Appointment Booking Link</h3>
-              <p className="text-xs text-slate-200">
+          <Card className="max-w-2xl space-y-6 p-6">
+            <div className="relative space-y-4 overflow-hidden rounded-2xl bg-[radial-gradient(90%_120%_at_100%_0%,#1d5a5a_0%,rgba(29,90,90,0)_55%),linear-gradient(135deg,#0b1238_0%,#13235a_60%,#1b4a54_100%)] p-6 text-white shadow-hero">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-gradient-to-br from-fresh to-[#0b665a] opacity-50"
+              />
+              <h3 className="relative text-lg font-bold">Public Appointment Booking Link</h3>
+              <p className="relative text-xs text-[#c3c9e6]">
                 Share this URL with patients on WhatsApp, Instagram bio, or print the QR Code for your clinic reception.
               </p>
 
-              <div className="flex items-center gap-2">
+              <div className="relative flex items-center gap-2">
                 <input
                   type="text"
                   value={bookingUrl}
                   readOnly
-                  className="flex-1 px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-xs text-white placeholder-slate-300 focus:outline-none cursor-not-allowed opacity-90"
+                  className="flex-1 cursor-not-allowed rounded-[10px] border border-white/20 bg-white/10 px-3 py-2 text-xs text-white focus:outline-none"
                 />
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(bookingUrl);
                     toast.success('Booking link copied to clipboard!');
                   }}
-                  className="px-3.5 py-2 bg-teal-500 hover:bg-teal-600 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 cursor-pointer"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-[10px] bg-lime px-3.5 py-2 text-xs font-bold text-midnight transition-colors hover:bg-[#d3ff9a]"
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="h-3.5 w-3.5" />
                   <span>Copy</span>
                 </button>
                 <a
                   href={bookingUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-2 bg-white/20 hover:bg-white/30 text-white font-bold text-xs rounded-lg flex items-center gap-1 cursor-pointer"
+                  className="flex cursor-pointer items-center gap-1 rounded-[10px] bg-white/15 px-3 py-2 text-xs font-bold text-white hover:bg-white/25"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="h-3.5 w-3.5" />
                   <span>Preview</span>
                 </a>
               </div>
@@ -392,32 +434,29 @@ export default function AppointmentsPage() {
 
             {/* QR Code Action */}
             <div className="space-y-4">
-              <button
-                onClick={() => setShowQr((prev) => !prev)}
-                className="px-4 py-2 bg-teal-600 text-white text-xs font-bold rounded-lg flex items-center gap-2 cursor-pointer"
-              >
-                <QrCode className="w-4 h-4" />
+              <Button variant="secondary" onClick={() => setShowQr((prev) => !prev)}>
+                <QrCode className="h-4 w-4" />
                 <span>{showQr ? 'Hide QR Code' : 'Generate & Display QR Code'}</span>
-              </button>
+              </Button>
 
               {showQr && (
-                <div className="p-6 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-6">
-                  <div className="w-32 h-32 bg-white p-2 rounded-lg border border-slate-300 flex items-center justify-center font-bold text-xs text-slate-800 text-center shadow-xs">
-                    <QRCodeCanvas value={bookingUrl} size={110} />
+                <div className="flex items-center gap-6 rounded-2xl border border-line bg-canvas p-6">
+                  <div className="flex h-32 w-32 items-center justify-center rounded-xl border border-line bg-white p-2 shadow-card">
+                    <QRCodeCanvas value={bookingUrl} size={110} fgColor="#0b1238" />
                   </div>
-                  <div className="text-xs text-slate-500 space-y-1">
-                    <p className="font-bold text-slate-800 dark:text-slate-200">Scan to Book</p>
+                  <div className="space-y-1 text-xs text-muted">
+                    <p className="text-sm font-bold text-ink">Scan to Book</p>
                     <p>Patients can scan this QR code with their mobile cameras to launch the public booking form directly.</p>
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Add Appointment Drawer */}
         <AddAppointmentSlideOver isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
-        
+
         {/* Reschedule Appointment Drawer */}
         <RescheduleSlideOver
           isOpen={!!rescheduleAppointment}
