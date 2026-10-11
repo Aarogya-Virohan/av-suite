@@ -4,17 +4,35 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { SlideOver } from '../../../components/ui/SlideOver';
-import { patientFormSchema, PatientFormValues } from '../../../lib/schemas';
-import { useUpdatePatient } from '../api';
 import { Loader2 } from 'lucide-react';
+import { SlideOver } from '../../../components/ui/SlideOver';
+import { patientFormSchema, PatientFormValues, toPatientPayload } from '../../../lib/schemas';
+import { useUpdatePatient } from '../api';
 import { Patient } from '../../../types/api';
+import { Button } from '../../../components/ui/brand';
+import { PatientFormFields } from './PatientFormFields';
 
 interface EditPatientSlideOverProps {
   isOpen: boolean;
   onClose: () => void;
   patient: Patient;
 }
+
+/*
+ * The old form filled a missing gender with 'male' and a missing referral with
+ * 'Direct Walk-in', so saving any edit wrote those invented values into the
+ * record. Blanks now stay blank (null), and DOB can be cleared.
+ */
+const fromPatient = (patient: Patient): PatientFormValues => ({
+  first_name: patient.first_name,
+  last_name: patient.last_name,
+  date_of_birth: patient.date_of_birth || '',
+  phone: patient.phone || '',
+  gender: (patient.gender as PatientFormValues['gender']) ?? null,
+  chief_complaint: patient.chief_complaint || '',
+  referral_source: patient.referral_source ?? null,
+  status: patient.status,
+});
 
 export function EditPatientSlideOver({ isOpen, onClose, patient }: EditPatientSlideOverProps) {
   const updatePatient = useUpdatePatient();
@@ -26,175 +44,39 @@ export function EditPatientSlideOver({ isOpen, onClose, patient }: EditPatientSl
     formState: { errors },
   } = useForm<PatientFormValues>({
     resolver: zodResolver(patientFormSchema),
-    defaultValues: {
-      first_name: patient.first_name,
-      last_name: patient.last_name,
-      date_of_birth: patient.date_of_birth || '',
-      phone: patient.phone || '',
-      gender: (patient.gender as 'male' | 'female' | 'other') || 'male',
-      chief_complaint: patient.chief_complaint || '',
-      referral_source: patient.referral_source || 'Direct Walk-in',
-      status: patient.status,
-    },
+    defaultValues: fromPatient(patient),
   });
 
-  // Update form if patient changes
   React.useEffect(() => {
-    reset({
-      first_name: patient.first_name,
-      last_name: patient.last_name,
-      date_of_birth: patient.date_of_birth || '',
-      phone: patient.phone || '',
-      gender: (patient.gender as 'male' | 'female' | 'other') || 'male',
-      chief_complaint: patient.chief_complaint || '',
-      referral_source: patient.referral_source || 'Direct Walk-in',
-      status: patient.status,
-    });
-  }, [patient, reset]);
+    if (isOpen) reset(fromPatient(patient));
+  }, [isOpen, patient, reset]);
 
   const onSubmit = async (values: PatientFormValues) => {
     try {
-      const payload = {
-        ...values,
-        date_of_birth: values.date_of_birth ? values.date_of_birth : undefined,
-      };
-      await updatePatient.mutateAsync({ id: patient.id, values: payload });
+      await updatePatient.mutateAsync({
+        id: patient.id,
+        values: toPatientPayload(values) as Partial<PatientFormValues>,
+      });
       toast.success(`Patient ${values.first_name} ${values.last_name} updated successfully`);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('Failed to update patient');
+      toast.error(err?.message || 'Failed to update patient');
     }
   };
 
   return (
     <SlideOver isOpen={isOpen} onClose={onClose} title="Edit Patient" subtitle="Update existing patient record">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Section 1: Demographics */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-teal-600 border-b pb-1">
-            Demographics
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                First Name *
-              </label>
-              <input
-                {...register('first_name')}
-                type="text"
-                placeholder="Rajesh"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
-              />
-              {errors.first_name && <p className="text-xs text-rose-500 mt-1">{errors.first_name.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Last Name *
-              </label>
-              <input
-                {...register('last_name')}
-                type="text"
-                placeholder="Kumar"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
-              />
-              {errors.last_name && <p className="text-xs text-rose-500 mt-1">{errors.last_name.message}</p>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Date of Birth
-              </label>
-              <input
-                {...register('date_of_birth')}
-                type="date"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Gender *
-              </label>
-              <select
-                {...register('gender')}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
-              >
-                <option value="male">MALE</option>
-                <option value="female">FEMALE</option>
-                <option value="other">OTHER</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Chief Complaint *
-            </label>
-            <textarea
-              {...register('chief_complaint')}
-              rows={3}
-              placeholder="e.g. Lower back pain during prolonged sitting"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
-            />
-            {errors.chief_complaint && <p className="text-xs text-rose-500 mt-1">{errors.chief_complaint.message}</p>}
-          </div>
-        </div>
-
-        {/* Section 2: Contact Info */}
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-teal-600 border-b pb-1">
-            Contact & Source
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Phone Number *
-              </label>
-              <input
-                {...register('phone')}
-                type="tel"
-                placeholder="+919876543210"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
-              />
-              {errors.phone && <p className="text-xs text-rose-500 mt-1">{errors.phone.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Referral Source *
-              </label>
-              <input
-                {...register('referral_source')}
-                type="text"
-                placeholder="Google Search / Doctor"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
-              />
-              {errors.referral_source && <p className="text-xs text-rose-500 mt-1">{errors.referral_source.message}</p>}
-            </div>
-          </div>
-        </div>
-
-        {/* Sticky Action Footer */}
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-          >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+        <PatientFormFields register={register} errors={errors} idPrefix="edit-patient" />
+        <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={updatePatient.isPending}
-            className="px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 cursor-pointer"
-          >
-            {updatePatient.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            Save Changes
-          </button>
+          </Button>
+          <Button type="submit" disabled={updatePatient.isPending}>
+            {updatePatient.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            <span>Save Changes</span>
+          </Button>
         </div>
       </form>
     </SlideOver>

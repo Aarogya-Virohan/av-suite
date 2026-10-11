@@ -38,7 +38,8 @@ apiClient.interceptors.response.use(
         detailMessage = responseData.detail;
       } else if (Array.isArray(responseData.detail)) {
         detailMessage = responseData.detail
-          .map((item) => (typeof item === 'object' && item && item.msg ? item.msg : JSON.stringify(item)))
+          // Pydantic prefixes custom validator messages with "Value error, ".
+          .map((item) => (typeof item === 'object' && item && item.msg ? item.msg.replace(/^Value error, /, '') : JSON.stringify(item)))
           .join(', ');
       } else if (typeof responseData.message === 'string') {
         detailMessage = responseData.message;

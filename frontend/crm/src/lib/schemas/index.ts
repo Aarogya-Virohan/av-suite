@@ -18,12 +18,28 @@ export const patientFormSchema = z.object({
   last_name: z.string().min(1, 'Last name is required'),
   date_of_birth: z.string().nullable().optional(),
   phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-  gender: genderSchema,
+  // Optional, as in the backend. Blank ('') means "not recorded"; forms send it
+  // as null via toPatientPayload(). The forms used to default to 'male' and
+  // 'Direct Walk-in', which stored invented values (and overwrote blanks on edit).
+  gender: z.union([genderSchema, z.literal('')]).nullable(),
   chief_complaint: z.string().min(1, 'Chief complaint is required'),
-  referral_source: z.string().min(1, 'Referral source is required'),
+  referral_source: z.string().nullable(),
   status: patientStatusSchema,
 });
 export type PatientFormValues = z.infer<typeof patientFormSchema>;
+
+/** Form values to API payload: blanks become null so nothing is invented. */
+export function toPatientPayload(values: PatientFormValues) {
+  return {
+    ...values,
+    first_name: values.first_name.trim(),
+    last_name: values.last_name.trim(),
+    phone: values.phone.trim(),
+    gender: values.gender ? values.gender : null,
+    referral_source: values.referral_source?.trim() ? values.referral_source.trim() : null,
+    date_of_birth: values.date_of_birth ? values.date_of_birth : null,
+  };
+}
 
 // Lead Form Schema
 export const leadFormSchema = z.object({
