@@ -122,6 +122,12 @@ def _measurement_rows(measurements: list[dict]) -> str:
     return "".join(rows)
 
 
+CAPTURE_SOURCE_TEXT: dict[str, str] = {
+    "camera": "Guided camera capture",
+    "upload": "Uploaded photo, capture protocol not checked",
+}
+
+
 def _view_section(title: str, view: dict) -> str:
     """Render one anatomical plane: annotated image beside its measurements."""
 
@@ -140,6 +146,18 @@ def _view_section(title: str, view: dict) -> str:
         if isinstance(accuracy, (int, float))
         else ""
     )
+
+    # Founders, 10 October 2026: a guided camera capture and an uploaded
+    # photo are measured the same way, but only the capture is checked
+    # against the protocol (framing, camera height, distance), so the two
+    # are not equally comparable across visits. The report has carried
+    # captureSource since 3 October without printing it. Reports saved
+    # before then have no value, and print nothing.
+    source_text = CAPTURE_SOURCE_TEXT.get(view.get("captureSource") or "", "")
+    if source_text:
+        accuracy_text = (
+            f"{accuracy_text}<br>{source_text}" if accuracy_text else source_text
+        )
 
     interpretation = _esc(view.get("interpretation")) or "&nbsp;"
 

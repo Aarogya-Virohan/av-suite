@@ -1039,3 +1039,13 @@ insufficient data. Grades and values are unchanged, so ANALYSIS_VERSION is
 not bumped. Verified: five tests, the seven test subjects' summaries
 checked against their rows, and the longest case (po-7 side view: mild
 plus a row not measured) rendered in the PDF on one line.
+
+### The PDF names how each photograph was taken
+The report has carried captureSource ("camera", "upload" or "unknown") on
+each view since 3 October, but the PDF never printed it, so a reader could
+not tell a guided capture from an uploaded photo, which the upload screen
+itself warns is not checked against the capture protocol. The PDF now adds
+a line under "Landmark visibility": "Guided camera capture" or "Uploaded
+photo, capture protocol not checked". "unknown" and reports saved before
+3 October print nothing. The web report is unchanged. Verified: three tests;
+a PDF rendered with one view of each kind, still two pages.
