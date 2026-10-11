@@ -83,24 +83,17 @@ export default function AppointmentsPage() {
     fetchRequests();
   }, [canViewBookingRequests]);
 
-  // Clinic Settings for Booking Link
+  // Booking link uses the clinic's UUID. The backend resolves a name-based
+  // slug with a fuzzy name match, so a name link could open another clinic's
+  // form (Decisions.md D-016). There is no fallback slug: until the clinic is
+  // known, no link is shown.
   const { data: clinicSettings } = useClinicSettings();
-  const generateSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-  const clinicName = clinicSettings?.name || 'aarogya';
-  const slug = generateSlug(clinicName);
-
-  const defaultBookingUrl = typeof window !== 'undefined' ? `${window.location.origin}/booking/${slug}` : `/booking/${slug}`;
-
-  // Booking Link State
-  const [bookingUrl, setBookingUrl] = useState(defaultBookingUrl);
-  
+  const [bookingUrl, setBookingUrl] = useState<string | null>(null);
   React.useEffect(() => {
-    if (clinicSettings?.name && typeof window !== 'undefined') {
-       const newUrl = `${window.location.origin}/booking/${generateSlug(clinicSettings.name)}`;
-       setBookingUrl(newUrl);
-       localStorage.setItem('av_crm_booking_url', newUrl);
+    if (clinicSettings?.id && typeof window !== 'undefined') {
+      setBookingUrl(`${window.location.origin}/booking/${clinicSettings.id}`);
     }
-  }, [clinicSettings?.name]);
+  }, [clinicSettings?.id]);
   const [showQr, setShowQr] = useState(false);
 
   const filteredAppointments = appointments.filter((apt) => {
@@ -381,22 +374,26 @@ export default function AppointmentsPage() {
               <div className="relative flex items-center gap-2">
                 <input
                   type="text"
-                  value={bookingUrl}
+                  value={bookingUrl ?? 'Loading your booking link...'}
                   readOnly
+                  aria-label="Public booking link"
                   className="flex-1 cursor-not-allowed rounded-[10px] border border-white/20 bg-white/10 px-3 py-2 text-xs text-white focus:outline-none"
                 />
                 <button
                   onClick={() => {
+                    if (!bookingUrl) return;
                     navigator.clipboard.writeText(bookingUrl);
                     toast.success('Booking link copied to clipboard!');
                   }}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-[10px] bg-lime px-3.5 py-2 text-xs font-bold text-midnight transition-colors hover:bg-[#d3ff9a]"
+                  disabled={!bookingUrl}
+                  className="flex cursor-pointer items-center gap-1.5 rounded-[10px] bg-lime px-3.5 py-2 text-xs font-bold text-midnight transition-colors hover:bg-[#d3ff9a] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Copy className="h-3.5 w-3.5" />
                   <span>Copy</span>
                 </button>
                 <a
-                  href={bookingUrl}
+                  href={bookingUrl ?? undefined}
+                  aria-disabled={!bookingUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="flex cursor-pointer items-center gap-1 rounded-[10px] bg-white/15 px-3 py-2 text-xs font-bold text-white hover:bg-white/25"
@@ -414,7 +411,7 @@ export default function AppointmentsPage() {
                 <span>{showQr ? 'Hide QR Code' : 'Generate & Display QR Code'}</span>
               </Button>
 
-              {showQr && (
+              {showQr && bookingUrl && (
                 <div className="flex items-center gap-6 rounded-2xl border border-line bg-canvas p-6">
                   <div className="flex h-32 w-32 items-center justify-center rounded-xl border border-line bg-white p-2 shadow-card">
                     <QRCodeCanvas value={bookingUrl} size={110} fgColor="#0b1238" />
