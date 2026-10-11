@@ -11,12 +11,16 @@ def test_unknown_parameter():
 
 def test_pt_l06_knee_hyperextension_thresholds():
 
-    # PT-L06 — lower_worse, more negative = worse.
+    # PT-L06 — centred since 11 October 2026: hyperextension (negative) and
+    # flexion (positive) grade on the same tiers.
     assert classify("PT-L06", 5) == "none"
     assert classify("PT-L06", -5) == "none"
     assert classify("PT-L06", -7) == "mild"
     assert classify("PT-L06", -12) == "moderate"
     assert classify("PT-L06", -20) == "severe"
+    assert classify("PT-L06", 7) == "mild"
+    assert classify("PT-L06", 12) == "moderate"
+    assert classify("PT-L06", 30) == "severe"
 
 
 def test_pt_a08_elbow_carrying_angle_gender_thresholds():

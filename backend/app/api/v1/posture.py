@@ -97,8 +97,8 @@ from app.services.posture.report_builder import (
 # flexed knee. The row label was fixed text reading "Knee Hyperextension",
 # so a flexed knee printed under a hyperextension heading and the sample
 # report's 5.25 degrees was flexion described as its opposite. The label
-# now follows the sign. The severity bands are deliberately untouched here:
-# they still grade only the hyperextension side, which needs clinical input.
+# now follows the sign. Since 11 October 2026 both sides grade, see the
+# PT-L06 entry in classifier.py.
 KNEE_SAGITTAL_LABEL = "Knee Sagittal Alignment"
 
 # PT-L05 is signed since 18 Sept: positive is forward, negative is
@@ -309,7 +309,13 @@ def _report_from_points(
 
         trunk_lean = calc_forward_trunk_lean(side_geo, side=lateral_side)
         severity = classify("PT-L05", trunk_lean)
-        findings["PT-L05"] = severity
+        # The synthesis entry for PT-L05 was written for a forward lean
+        # (hip flexors tight, hip flexor stretch). A backward lean grades on
+        # the same bands but must not pull in that mapping, so it is not
+        # passed to the synthesis. Founders asked for a backward-lean
+        # mapping, 11 October 2026.
+        if trunk_lean > 0:
+            findings["PT-L05"] = severity
 
         side_measurements.append(
             measurement(
@@ -340,7 +346,13 @@ def _report_from_points(
 
         knee_sagittal = calc_knee_hyperextension(side_geo, side=lateral_side)
         severity = classify("PT-L06", knee_sagittal)
-        findings["PT-L06"] = severity
+        # Since 11 October 2026 a bent knee grades too (founders, 5a). The
+        # synthesis entry for PT-L06 is a hyperextension mapping, so only a
+        # hyperextended knee is passed to it; a flexed knee shows its grade
+        # in the row but adds no muscles or exercises until the founders
+        # supply a flexion mapping.
+        if knee_sagittal < 0:
+            findings["PT-L06"] = severity
 
         side_measurements.append(
             measurement(

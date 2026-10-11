@@ -950,3 +950,56 @@ Same session, frontend only: the landmark review screen was redesigned
 after the first phone test (one view at a time, tap a point for its
 controls, zoom, skeleton lines, a confirm summary). The submission sent
 to the server did not change.
+
+### Founders' second reply, 11 October: five more bands
+Five bands were running without an approved number. None appeared in the
+founders' guidelines document of 10 October (checked: head tilt, trunk
+shift and knee hyperextension appear only as view assignments; pelvic
+obliquity and trunk lean not at all). Asked once, with research and a
+suggestion each; answered "1a, 2a, 3a, 4a, 5a". As before, the write-up
+that came with the answer claims more than the sources do (for example
+that leg length difference up to 10 mm is present in "up to 70%" of
+people, and that a resting flexed knee is "a primary diagnostic
+indicator" of osteoarthritis); neither was checked and neither changes
+the numbers.
+
+- PT-A01 head tilt: 5 / 8 / 12 (was 3 / 7 / 10).
+- PT-A04 pelvic obliquity: 3 / 6 / 10 (was 3 / 5 / 10).
+- PT-P01 trunk shift, back view: 10 / 20 / 30 mm (was 5 / 15 / 25).
+  PT-A03, withdrawn from the front, moved with it so the two cannot drift.
+- PT-L05 trunk lean: within 4 / 7 / 10 either way (was 3 / 6 / 10).
+- PT-L06 knee, side view: hyperextension unchanged at 5 / 10 / 15, and a
+  bent knee now grades on the same tiers. It used to grade NONE at any
+  size. The classifier rule changed from lower_worse to centred.
+
+Sources behind the suggestions: Ferreira et al. 2011 (J Manipulative
+Physiol Ther, photogrammetry of 115 healthy young adults: head horizontal
+alignment 1.5 +/- 2.4, ASIS 0.2 +/- 1.6, trunk vertical 182.4 +/- 2.1
+degrees); Moharrami et al. 2023 (J Exp Orthop, pelvic obliquity on
+standing radiographs, 95th percentile 5.6 degrees); coronal balance on
+spine radiographs, C7 plumb line within 20 mm of the sacral midline
+(Radiopaedia); genu recurvatum defined as more than 5 degrees, more than
+15 pathological (as cited in Dierick et al. 2020). All of these use
+hand-placed markers or radiographs, not a pose model.
+
+Synthesis kept to the direction each mapping was written for. The PT-L06
+mapping (gastrocnemius and soleus tight, terminal knee extension control)
+is for hyperextension, and the PT-L05 mapping (hip flexors tight, hip
+flexor stretch) is for a forward lean. A bent knee and a backward lean now
+grade in their rows but are not passed to the synthesis, so the report
+cannot prescribe the opposite correction. This was already wrong for a
+backward lean before today; it never fired only because no backward lean
+had reached MODERATE. Flexed-knee and backward-lean mappings are a founder
+question.
+
+ANALYSIS_VERSION 2026-10-11.2. Verified: posture suite 101 passed (65
+before; the PT-L06 test extended to flexion, and every new boundary pinned
+in test_founder_bands_11oct.py); full route and PDF on all seven test
+subjects. Effects seen there: po-4 and po-6 knees now grade MILD flexion
+(8.38 and 5.55 degrees) with no synthesis entry; po-6 and po-7 pelvic
+obliquity at 5.25 degrees moves from MODERATE to MILD; head tilt 4.17 and
+4.21 on po-3 and po-7 moves from MILD to NORMAL; trunk shift stays MODERATE
+on po-3, po-6 and po-7 (22 to 27 mm). Also seen, not acted on: the trunk
+lean reads backward on all seven subjects (-0.9 to -6.72 degrees), which
+is worth checking against the sign convention before anyone reads it
+clinically.

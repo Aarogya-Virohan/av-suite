@@ -121,7 +121,9 @@ def build_side_view_result(
 # and captureSource, which changed what reaches the model without a bump.
 # 2026-10-11: founders' answers of 11 October. Knee bands 5/9/13 for both
 # directions with no female allowance, knee rows renamed, ear level removed.
-ANALYSIS_VERSION = "2026-10-11"
+# 2026-10-11.2: founders' second reply the same day. New bands for head
+# tilt, pelvic obliquity, trunk shift and trunk lean; a bent knee now grades.
+ANALYSIS_VERSION = "2026-10-11.2"
 
 
 def build_report_response(

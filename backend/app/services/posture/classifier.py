@@ -64,17 +64,24 @@ THRESHOLDS: dict[str, dict] = {
     # one report. Harmonised onto the tighter set on 18 Sept. Neither set
     # had a published source; the tighter one was kept because it is the
     # more conservative of two unsourced options.
+    # Withdrawn from the front view 10 October 2026. Kept on the same bands
+    # as PT-P01 so the two cannot drift if it ever returns.
     "PT-A03": {
         "direction": "higher_worse",
-        "none_max": 5,
-        "mild_max": 15,
-        "moderate_max": 25,
+        "none_max": 10,
+        "mild_max": 20,
+        "moderate_max": 30,
     },
-    # No published source.
+    # Founders, 11 October 2026 (second reply, answer 2a): 0 to 3 normal,
+    # over 3 to 6 mild, over 6 to 10 moderate, above 10 severe. Basis offered:
+    # photogrammetry of healthy young adults, ASIS line 0.2 +/- 1.6 degrees
+    # (Ferreira et al. 2011), and a 95th percentile of 5.6 degrees on
+    # standing radiographs (Moharrami et al. 2023). Our line runs through the
+    # model's hip joint estimates, not the ASIS. Replaces 3/5/10, unsourced.
     "PT-A04": {
         "direction": "higher_worse",
         "none_max": 3,
-        "mild_max": 5,
+        "mild_max": 6,
         "moderate_max": 10,
     },
     # No published source. Withdrawn from the report 11 October 2026,
@@ -89,12 +96,17 @@ THRESHOLDS: dict[str, dict] = {
     # forward and negative backward, so the bands are mirrored rather
     # than one sided; a backward lean would otherwise grade NONE at any
     # size. The tier boundaries themselves are unchanged.
+    # Founders, 11 October 2026 (second reply, answer 4a): within 4
+    # degrees either way normal, 4 to 7 mild, 7 to 10 moderate, above 10
+    # severe. Basis offered: trunk vertical alignment 182.4 +/- 2.1 degrees in
+    # healthy young adults (Ferreira et al. 2011) plus about 2 degrees of
+    # model error. Replaces 3/6/10.
     "PT-L05": {
         "direction": "centred",
-        "none_low": -3,
-        "none_high": 3,
-        "mild_low": -6,
-        "mild_high": 6,
+        "none_low": -4,
+        "none_high": 4,
+        "mild_low": -7,
+        "mild_high": 7,
         "moderate_low": -10,
         "moderate_high": 10,
     },
@@ -112,11 +124,16 @@ THRESHOLDS: dict[str, dict] = {
     # to mid-shoulder line these bands were set for. Kept unchanged, FOR
     # REVIEW: no published normal range for a photographic pupillary line
     # angle was found. On the seven test subjects it read 0.9 to 4.4.
+    # Founders, 11 October 2026 (second reply, answer 1a): 0 to 5 normal,
+    # over 5 to 8 mild, over 8 to 12 moderate, above 12 severe. Basis
+    # offered: head horizontal alignment 1.5 +/- 2.4 degrees in 115 healthy
+    # young adults (Ferreira et al. 2011), so the 3 degree ceiling above
+    # flagged roughly a third of healthy people. Replaces 3/7/10.
     "PT-A01": {
         "direction": "higher_worse",
-        "none_max": 3,
-        "mild_max": 7,
-        "moderate_max": 10,
+        "none_max": 5,
+        "mild_max": 8,
+        "moderate_max": 12,
     },
     # Founders, 11 October 2026: same bands as PT-A06, see there. The
     # female normal ceiling of 7 is removed; the founders' table has one
@@ -128,11 +145,17 @@ THRESHOLDS: dict[str, dict] = {
         "moderate_max": 13,
     },
     # Same measurement as PT-A03, same bands since 18 Sept. See PT-A03.
+    # Founders, 11 October 2026 (second reply, answer 3a): 0 to 10 mm
+    # normal, over 10 to 20 mild, over 20 to 30 moderate, above 30 severe.
+    # Basis offered: coronal balance on spine radiographs counts a C7 plumb
+    # line within 20 mm of the sacral midline as balanced. Ours is the
+    # shoulder midpoint against the hip midpoint, an analogue, not the same
+    # landmarks. Replaces 5/15/25, unsourced.
     "PT-P01": {
         "direction": "higher_worse",
-        "none_max": 5,
-        "mild_max": 15,
-        "moderate_max": 25,
+        "none_max": 10,
+        "mild_max": 20,
+        "moderate_max": 30,
     },
     # Bands set by the founders, 10 October 2026, see PT-A02. Identical
     # calculation to PT-A02.
@@ -186,14 +209,21 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 8,
         "moderate_max": 12,
     },
-    # Grades the hyperextension side only. Any non negative value grades
-    # NONE, so a flexion contracture of any size reads as normal. Flexion
-    # bands are outstanding.
+    # Founders, 11 October 2026 (second reply, answer 5a): hyperextension
+    # bands unchanged, and a bent knee is now graded on the same tiers:
+    # within 5 degrees either way normal, 5 to 10 mild, 10 to 15 moderate,
+    # above 15 severe. Until this date any flexion graded NONE. Basis offered
+    # for hyperextension: genu recurvatum is commonly defined as more than
+    # 5 degrees, with more than 15 considered pathological (cited in Dierick
+    # et al. 2020). The flexion side mirrors it; no source was given for it.
     "PT-L06": {
-        "direction": "lower_worse",
-        "none_min": -5,
-        "mild_min": -10,
-        "moderate_min": -15,
+        "direction": "centred",
+        "none_low": -5,
+        "none_high": 5,
+        "mild_low": -10,
+        "mild_high": 10,
+        "moderate_low": -15,
+        "moderate_high": 15,
     },
     # A separate hardcoded rule outside this table grades any negative
     # Retained but unused. PT-A08 was withdrawn from the report on
