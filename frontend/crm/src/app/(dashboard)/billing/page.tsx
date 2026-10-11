@@ -10,8 +10,7 @@ import { InvoicePreviewModal } from '../../../features/billing/components/Invoic
 import { Invoice, Payment, Package, InvoiceStatus } from '../../../types/api';
 import { Plus, CreditCard, FileText, Package as PackageIcon, Eye, Printer } from 'lucide-react';
 import { usePatients } from '../../../features/patients/api';
-import { useAuthStore } from '../../../store';
-import { canAccessModule, hasCapability } from '../../../config/permissions';
+import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { Avatar, Badge, type BadgeTone, Button, PageHeader, SegmentGroup, SegmentTab } from '../../../components/ui/brand';
 import { formatMoney } from '../../../lib/money';
@@ -50,11 +49,7 @@ const SMALL_ACTION =
   'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors';
 
 export default function BillingPage() {
-  // The permission helpers read the auth store with getState(), which does not
-  // re-render. Subscribing here re-renders the page once role and capabilities
-  // load after login; without it the page stays on "Access Restricted".
-  useAuthStore((s) => s.role);
-  useAuthStore((s) => s.capabilities);
+  usePermissionSubscription(); // see Decisions.md D-013
   const isAllowed = canAccessModule('billing');
   const canViewInvoices = hasCapability('invoices.view');
   const canViewPayments = hasCapability('payments.view');

@@ -445,3 +445,18 @@ export function getPermissionsForRole(role?: UserRole | null): RolePermissions {
     },
   };
 }
+
+/**
+ * Re-render the calling component when role or capabilities change.
+ *
+ * The helpers above (hasCapability, canAccessModule, canPerformAction) read the
+ * store with getState(), which never triggers a render. A page that calls them
+ * without subscribing keeps the values from its first render, which is before
+ * login data has loaded on a direct visit or reload, and shows
+ * "Access Restricted" to an admin. Call this at the top of any page or
+ * component that uses those helpers. See Decisions.md D-013.
+ */
+export function usePermissionSubscription(): void {
+  useAuthStore((s) => s.role);
+  useAuthStore((s) => s.capabilities);
+}

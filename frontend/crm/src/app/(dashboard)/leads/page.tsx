@@ -5,21 +5,51 @@ import { AppShell } from '../../../components/layout/AppShell';
 import { useLeads, useUpdateLeadStage, useConvertLead } from '../../../features/leads/api';
 import { AddLeadSlideOver } from '../../../features/leads/components/AddLeadSlideOver';
 import { Lead, LeadStage } from '../../../types/api';
-import { Plus, UserCheck, Phone, Mail, Search, List, LayoutGrid, CalendarClock } from 'lucide-react';
+import { Plus, UserCheck, Phone, Mail, Search, List, LayoutGrid, CalendarClock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuthStore } from '../../../store';
-import { canAccessModule, hasCapability } from '../../../config/permissions';
+import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
+import {
+  Avatar,
+  Badge,
+  type BadgeTone,
+  Button,
+  Card,
+  PageHeader,
+  SegmentGroup,
+  SegmentTab,
+} from '../../../components/ui/brand';
+import { cn } from '../../../lib/cn';
 
-const STAGES: { key: LeadStage; label: string; color: string }[] = [
-  { key: 'new', label: 'New', color: 'bg-blue-500' },
-  { key: 'contacted', label: 'Contacted', color: 'bg-amber-500' },
-  { key: 'qualified', label: 'Qualified', color: 'bg-purple-500' },
-  { key: 'converted', label: 'Converted', color: 'bg-emerald-500' },
-  { key: 'lost', label: 'Lost', color: 'bg-slate-400' },
+const STAGES: { key: LeadStage; label: string; tone: BadgeTone; dot: string }[] = [
+  { key: 'new', label: 'New', tone: 'info', dot: 'bg-info' },
+  { key: 'contacted', label: 'Contacted', tone: 'warn', dot: 'bg-warn' },
+  { key: 'qualified', label: 'Qualified', tone: 'active', dot: 'bg-logo-teal' },
+  { key: 'converted', label: 'Converted', tone: 'ok', dot: 'bg-fresh' },
+  { key: 'lost', label: 'Lost', tone: 'neutral', dot: 'bg-slate-400' },
 ];
 
+const STAGE_SELECT: Record<LeadStage, string> = {
+  new: 'border-info/25 bg-info-wash text-info',
+  contacted: 'border-warn/25 bg-warn-wash text-warn',
+  qualified: 'border-logo-teal/30 bg-logo-teal-wash text-logo-teal-ink',
+  converted: 'border-ok/25 bg-ok-wash text-ok',
+  lost: 'border-line bg-slate-100 text-slate-600',
+};
+
+const createdDateFormat = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+function formatCreated(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : createdDateFormat.format(date);
+}
+
+const sourceLabel = (source: string | null | undefined) => (source ? source.replace(/_/g, ' ') : null);
+
+const isConverted = (lead: Lead) => lead.stage === 'converted' || !!lead.converted_patient_id;
+
 export default function LeadsPage() {
+  usePermissionSubscription(); // see Decisions.md D-013
   const hasAccess = canAccessModule('leads');
   const canCreateLead = hasCapability('leads.create');
   const canConvertLead = hasCapability('leads.convert');
@@ -28,7 +58,7 @@ export default function LeadsPage() {
   const { data: leads = [], isLoading } = useLeads(undefined, hasAccess);
   const updateStage = useUpdateLeadStage();
   const convertLead = useConvertLead();
-  
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,18 +79,16 @@ export default function LeadsPage() {
       toast.success('Lead stage updated');
     } catch (err) {
       console.error(err);
+      toast.error('Failed to update lead stage');
     }
   };
 
   if (!hasAccess) {
-    return (
-      <AppShell>
-        <AccessRestricted message="You do not have permission to view or manage leads." />
-      </AppShell>
-    );
+    // AccessRestricted renders its own AppShell.
+    return <AccessRestricted message="You do not have permission to view or manage leads." />;
   }
 
-  const filteredLeads = leads.filter(lead => {
+  const filteredLeads = leads.filter((lead) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -70,259 +98,235 @@ export default function LeadsPage() {
     );
   });
 
+  const stageCounts = STAGES.map((stage) => ({
+    ...stage,
+    count: leads.filter((l) => l.stage === stage.key).length,
+  }));
+
+  const stageSelect = (lead: Lead, compact = false) => (
+    <select
+      aria-label={`Stage for ${lead.name}`}
+      value={lead.stage}
+      onChange={(e) => handleStageChange(lead.id, e.target.value as LeadStage)}
+      disabled={!canEditLead || isConverted(lead)}
+      className={cn(
+        'cursor-pointer rounded-lg border font-semibold focus:outline-none focus:ring-2 focus:ring-grove/20 disabled:cursor-not-allowed disabled:opacity-60',
+        compact ? 'h-8 flex-1 px-2 text-[11.5px]' : 'h-9 px-3 text-xs',
+        STAGE_SELECT[lead.stage] ?? STAGE_SELECT.lost,
+      )}
+    >
+      {STAGES.map((s) => (
+        <option key={s.key} value={s.key}>
+          {s.label}
+        </option>
+      ))}
+    </select>
+  );
+
+  const convertButton = (lead: Lead, compact = false) => (
+    <button
+      onClick={() => handleConvert(lead.id, lead.name)}
+      className={cn(
+        'inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-ok-wash font-semibold text-ok transition-colors hover:bg-[#d3eedc]',
+        compact ? 'h-8 px-2.5 text-[11.5px]' : 'h-9 px-3 text-xs',
+      )}
+    >
+      <UserCheck className="h-3.5 w-3.5" />
+      <span>Convert</span>
+    </button>
+  );
+
   return (
     <AppShell>
       <div className="space-y-6">
-        {/* Header & Controls */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Leads Pipeline</h1>
-            <p className="text-sm text-slate-500">Track and convert prospective patients</p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {/* View Toggle */}
-            <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                  viewMode === 'list' 
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                <span className="hidden sm:inline">List</span>
-              </button>
-              <button
-                onClick={() => setViewMode('kanban')}
-                className={`p-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                  viewMode === 'kanban' 
-                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-                <span className="hidden sm:inline">Kanban</span>
-              </button>
-            </div>
+        <PageHeader
+          title="Leads Pipeline"
+          subtitle="Track and convert prospective patients"
+          actions={
+            <>
+              <SegmentGroup>
+                <SegmentTab active={viewMode === 'list'} onClick={() => setViewMode('list')} icon={List}>
+                  <span className="hidden sm:inline">List</span>
+                </SegmentTab>
+                <SegmentTab active={viewMode === 'kanban'} onClick={() => setViewMode('kanban')} icon={LayoutGrid}>
+                  <span className="hidden sm:inline">Kanban</span>
+                </SegmentTab>
+              </SegmentGroup>
+              {canCreateLead && (
+                <Button onClick={() => setIsAddOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add Lead</span>
+                </Button>
+              )}
+            </>
+          }
+        />
 
-            {canCreateLead && (
-              <button
-                onClick={() => setIsAddOpen(true)}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Add Lead</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Filters Bar */}
-        <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        {/* Stage summary + search */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search by name, phone, or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all"
+              className="h-10 w-full rounded-[10px] border border-line bg-card pl-9 pr-4 text-sm text-ink placeholder:text-slate-400 transition-colors focus:border-grove focus:outline-none focus:ring-2 focus:ring-grove/15 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
             />
           </div>
+          {!isLoading && leads.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {stageCounts.map((stage) => (
+                <span
+                  key={stage.key}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 text-xs font-medium text-ink-2"
+                >
+                  <span className={cn('h-2 w-2 rounded-full', stage.dot)} aria-hidden="true" />
+                  {stage.label}
+                  <span className="font-bold tabular-nums text-ink">{stage.count}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {isLoading ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-          </div>
+          <Card className="flex h-64 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-grove" aria-label="Loading leads" />
+          </Card>
         ) : viewMode === 'list' ? (
           /* List View (Default) */
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+          <Card className="overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Lead</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contact</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Source</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Stage</th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                  <tr className="border-b border-line bg-canvas/60 dark:border-slate-800 dark:bg-slate-950">
+                    {['Lead', 'Contact', 'Source', 'Stage'].map((h) => (
+                      <th key={h} className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                        {h}
+                      </th>
+                    ))}
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                <tbody className="divide-y divide-line-soft dark:divide-slate-800">
                   {filteredLeads.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-slate-500 text-sm">
+                      <td colSpan={5} className="px-5 py-12 text-center text-sm text-muted">
                         No leads found matching your search.
                       </td>
                     </tr>
                   ) : (
-                    filteredLeads.map((lead) => {
-                      const currentStage = STAGES.find(s => s.key === lead.stage);
-                      return (
-                        <tr key={lead.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center text-teal-700 dark:text-teal-400 font-bold text-sm">
-                                {lead.name.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="font-bold text-sm text-slate-900 dark:text-white">{lead.name}</p>
-                                <div className="flex items-center gap-1 mt-0.5 text-xs text-slate-500">
-                                  <CalendarClock className="w-3 h-3" />
-                                  <span>{new Date(lead.created_at).toLocaleDateString()}</span>
-                                </div>
+                    filteredLeads.map((lead) => (
+                      <tr key={lead.id} className="transition-colors hover:bg-canvas/70 dark:hover:bg-slate-800/50">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <Avatar name={lead.name} size={36} />
+                            <div>
+                              <p className="text-sm font-semibold text-ink">{lead.name}</p>
+                              <div className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                                <CalendarClock className="h-3 w-3" />
+                                <span>{formatCreated(lead.created_at)}</span>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                                <span>{lead.phone}</span>
-                              </div>
-                              {lead.email && (
-                                <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                                  <Mail className="w-3.5 h-3.5 text-slate-400" />
-                                  <span>{lead.email}</span>
-                                </div>
-                              )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="space-y-1 text-sm text-ink-2">
+                            <div className="flex items-center gap-2">
+                              <Phone className="h-3.5 w-3.5 text-slate-400" />
+                              <span className="tabular-nums">{lead.phone}</span>
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 capitalize">
-                              {lead.source || 'Unknown'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <select
-                              value={lead.stage}
-                              onChange={(e) => handleStageChange(lead.id, e.target.value as LeadStage)}
-                              disabled={!canEditLead || lead.stage === 'converted' || !!lead.converted_patient_id}
-                              className="text-xs font-semibold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-teal-500 cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {STAGES.map((s) => (
-                                <option key={s.key} value={s.key}>
-                                  {s.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            {lead.stage !== 'converted' && !lead.converted_patient_id ? (
-                              canConvertLead ? (
-                                <button
-                                  onClick={() => handleConvert(lead.id, lead.name)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
-                                >
-                                  <UserCheck className="w-3.5 h-3.5" />
-                                  <span>Convert</span>
-                                </button>
-                              ) : (
-                                <span className="text-xs text-slate-400 italic">No convert permission</span>
-                              )
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-500 text-xs font-bold uppercase tracking-wider px-3 py-1.5">
-                                <UserCheck className="w-3.5 h-3.5" />
-                                Converted
-                              </span>
+                            {lead.email && (
+                              <div className="flex items-center gap-2">
+                                <Mail className="h-3.5 w-3.5 text-slate-400" />
+                                <span>{lead.email}</span>
+                              </div>
                             )}
-                          </td>
-                        </tr>
-                      );
-                    })
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <Badge tone="neutral" className="capitalize">
+                            {sourceLabel(lead.source) || 'Unknown'}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3.5">{stageSelect(lead)}</td>
+                        <td className="px-5 py-3.5 text-right">
+                          {!isConverted(lead) ? (
+                            canConvertLead ? (
+                              convertButton(lead)
+                            ) : (
+                              <span className="text-xs italic text-slate-400">No convert permission</span>
+                            )
+                          ) : (
+                            <Badge tone="ok">Converted</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         ) : (
           /* Kanban View */
-          <div className="flex overflow-x-auto pb-4 gap-4 items-start snap-x w-full">
+          <div className="flex w-full snap-x items-start gap-4 overflow-x-auto pb-4">
             {STAGES.map((stage) => {
               const stageLeads = filteredLeads.filter((l) => l.stage === stage.key);
               return (
                 <div
                   key={stage.key}
-                  className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 space-y-3 min-h-[500px] min-w-[280px] sm:min-w-[320px] flex-shrink-0 snap-start flex flex-col"
+                  className="flex min-h-[500px] min-w-[280px] flex-shrink-0 snap-start flex-col space-y-3 rounded-2xl border border-line bg-canvas p-3 sm:min-w-[300px] dark:border-slate-800 dark:bg-slate-900/50"
                 >
-                  {/* Column Header */}
-                  <div className="flex items-center justify-between pb-2 px-1">
+                  <div className="flex items-center justify-between px-1 pb-1">
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-3 h-3 rounded-full ${stage.color} shadow-sm`} />
-                      <span className="font-bold text-sm tracking-wide text-slate-800 dark:text-slate-100">
-                        {stage.label}
-                      </span>
+                      <span className={cn('h-2.5 w-2.5 rounded-full', stage.dot)} aria-hidden="true" />
+                      <span className="font-display text-sm font-bold text-ink">{stage.label}</span>
                     </div>
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm border border-slate-100 dark:border-slate-700">
+                    <span className="rounded-full border border-line bg-card px-2.5 py-0.5 text-xs font-bold tabular-nums text-ink-2">
                       {stageLeads.length}
                     </span>
                   </div>
 
-                  {/* Lead Cards */}
-                  <div className="space-y-3 flex-1">
+                  <div className="flex-1 space-y-3">
                     {stageLeads.length === 0 ? (
-                      <div className="h-full min-h-[100px] border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center p-4">
-                        <span className="text-xs font-medium text-slate-400 text-center">No leads in this stage</span>
+                      <div className="flex h-full min-h-[100px] items-center justify-center rounded-xl border-2 border-dashed border-line p-4">
+                        <span className="text-center text-xs font-medium text-slate-400">No leads in this stage</span>
                       </div>
                     ) : (
                       stageLeads.map((lead) => (
-                        <div
-                          key={lead.id}
-                          className="p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-shadow space-y-3 group"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="font-bold text-sm text-slate-900 dark:text-white leading-tight">{lead.name}</p>
-                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-1">
-                                {lead.source || 'Unknown Source'}
+                        <Card key={lead.id} className="space-y-3 p-4 transition-shadow hover:shadow-hero/20">
+                          <div className="flex items-start gap-3">
+                            <Avatar name={lead.name} size={32} />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold leading-tight text-ink">{lead.name}</p>
+                              <p className="mt-1 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">
+                                {sourceLabel(lead.source) || 'Unknown Source'}
                               </p>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center text-slate-500 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
-                              {lead.name.charAt(0).toUpperCase()}
-                            </div>
                           </div>
-                          
-                          <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
+
+                          <div className="space-y-1.5 rounded-lg bg-canvas p-2.5 text-xs text-ink-2">
                             <div className="flex items-center gap-2">
-                              <Phone className="w-3.5 h-3.5 text-slate-400" />
-                              <span className="font-medium">{lead.phone}</span>
+                              <Phone className="h-3.5 w-3.5 text-slate-400" />
+                              <span className="font-medium tabular-nums">{lead.phone}</span>
                             </div>
                             {lead.email && (
                               <div className="flex items-center gap-2 truncate">
-                                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                 <span className="truncate">{lead.email}</span>
                               </div>
                             )}
                           </div>
 
-                          <div className="pt-1 flex items-center justify-between gap-2">
-                            <select
-                              value={lead.stage}
-                              onChange={(e) => handleStageChange(lead.id, e.target.value as LeadStage)}
-                              disabled={!canEditLead || lead.stage === 'converted' || !!lead.converted_patient_id}
-                              className="flex-1 text-[11px] font-semibold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1.5 text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {STAGES.map((s) => (
-                                <option key={s.key} value={s.key}>
-                                  {s.label}
-                                </option>
-                              ))}
-                            </select>
-
-                            {lead.stage !== 'converted' && !lead.converted_patient_id && canConvertLead && (
-                              <button
-                                onClick={() => handleConvert(lead.id, lead.name)}
-                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-400 rounded-md text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer transition-colors border border-emerald-200 dark:border-emerald-800/50"
-                              >
-                                <UserCheck className="w-3.5 h-3.5" />
-                                <span>Convert</span>
-                              </button>
-                            )}
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
+                            {stageSelect(lead, true)}
+                            {!isConverted(lead) && canConvertLead && convertButton(lead, true)}
                           </div>
-                        </div>
+                        </Card>
                       ))
                     )}
                   </div>
