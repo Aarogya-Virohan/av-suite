@@ -9,7 +9,9 @@ export const packageStatusSchema = z.enum(['active', 'inactive', 'completed', 'e
 export const invoiceStatusSchema = z.enum(['unpaid', 'paid', 'partial', 'draft', 'issued', 'cancelled', 'overdue']);
 export const paymentMethodSchema = z.enum(['cash', 'upi', 'card', 'bank_transfer', 'insurance', 'other']);
 export const paymentStatusSchema = z.enum(['completed', 'voided']);
-export const documentCategorySchema = z.enum(['medical_report', 'prescription', 'lab_result', 'consent', 'other']);
+// Must match backend DocumentCategory (app/enums/document.py). 'consent' was wrong and every
+// consent-form upload failed with 422.
+export const documentCategorySchema = z.enum(['medical_report', 'prescription', 'lab_result', 'consent_form', 'x_ray_scan', 'id_proof', 'other']);
 export const genderSchema = z.enum(['male', 'female', 'other']);
 
 // Patient Form Schema
