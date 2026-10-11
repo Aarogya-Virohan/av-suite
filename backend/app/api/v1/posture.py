@@ -329,10 +329,10 @@ def _report_from_points(
         trunk_lean = calc_forward_trunk_lean(side_geo, side=lateral_side)
         severity = classify("PT-L05", trunk_lean)
         # The synthesis entry for PT-L05 was written for a forward lean
-        # (hip flexors tight, hip flexor stretch). A backward lean grades on
-        # the same bands but must not pull in that mapping, so it is not
-        # passed to the synthesis. Founders asked for a backward-lean
-        # mapping, 11 October 2026.
+        # (hip flexors likely hypertonic). A backward lean grades on the
+        # same bands but must not pull in that mapping, so it is not passed
+        # to the synthesis. No backward-lean muscle mapping exists
+        # (decisions.md, 11 October 2026, reply 1b).
         if trunk_lean > 0:
             findings["PT-L05"] = severity
 
@@ -368,8 +368,8 @@ def _report_from_points(
         # Since 11 October 2026 a bent knee grades too (founders, 5a). The
         # synthesis entry for PT-L06 is a hyperextension mapping, so only a
         # hyperextended knee is passed to it; a flexed knee shows its grade
-        # in the row but adds no muscles or exercises until the founders
-        # supply a flexion mapping.
+        # in the row but adds no muscles. No flexion muscle mapping exists
+        # (decisions.md, 11 October 2026, reply 1b).
         if knee_sagittal < 0:
             findings["PT-L06"] = severity
 

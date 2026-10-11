@@ -1188,3 +1188,39 @@ the answer named photos only; whether it should go is open. Files saved
 before this change still hold photographs and are not touched by the
 code. A lawyer's view on consent and retention period is owed, per the
 same answer.
+
+### PDF branding, first pass (founders' voice note and references)
+The founders sent two lab reports as references (Healthians and another)
+and a voice note: logo at top left, the logo as a watermark, and a
+"powered by" line at the bottom. They called this a basic adoption; the
+colour scheme of the report is still to be discussed with them.
+
+Done in pdf_service.py only, layout and content unchanged:
+- Aarogya Virohan logo top left on every page, document title and the
+  patient's name and date top right, so a loose page still says whose it is.
+- The logo mark (house and hands) centred behind every page at 4.5 percent.
+  WeasyPrint has no background opacity, so the fade is baked into the PNG.
+- Footer, wording as Onkar gave it: "(c) POWERED BY AAROGYA VIROHAN .
+  AV SUITE . (A CLINICAL EXERCISE PRESCRIPTION TOOL)", then the page count.
+  "Excercise" in his message corrected to "Exercise". Flagged to him: this
+  report prescribes no exercise (1b), so the tagline reads as describing AV
+  Suite as a whole; to confirm with the founders.
+- Brand colours taken from the logo (charcoal #2f3336, teal #4e888f).
+  Held in constants because the scheme is not decided. Severity colours
+  not touched; they are the four colour scale confirmed on 10 October.
+- Gender, already collected at intake, now prints beside age.
+- Logo files in app/services/posture/brand/, embedded as data URIs so the
+  PDF does not depend on a base URL.
+
+po-6 still renders on 2 pages. Suite 123 passed on the Mac.
+
+Direction for later, from Onkar: once the tool is connected to the
+marketplace, the clinic's own logo and details go in the header, and
+Aarogya Virohan appears only as the "powered by" co-brand in the footer.
+Not built now: clinic data, upload and storage belong to the marketplace
+and CRM work, and their shape is not decided. Open: whose logo is the
+watermark then, and which clinic details print.
+
+Also: two comments in api/v1/posture.py (PT-L05, PT-L06) said the founders
+had asked for backward-lean and flexion mappings and mentioned exercises.
+Corrected: no such mapping exists, and 1b closed the question.

@@ -13,7 +13,10 @@ follows the prescription PDF so both documents read as the same clinic's.
 
 from __future__ import annotations
 
+import base64
 import html
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from weasyprint import HTML
@@ -23,7 +26,46 @@ from app.services.posture.signature_svg import render_signature_svg
 
 CLINIC_NAME = "Aarogya Virohan"
 CLINIC_SUBTITLE = "Clinical Posture Assessment"
-BRAND = "#ff7a00"
+REPORT_TITLE = "Posture Assessment Report"
+
+# Brand, 11 October 2026. Colours are taken from the logo itself: the
+# charcoal of the wordmark and the teal of the hands. The founders said the
+# full colour scheme is still to be discussed, so everything brand related
+# lives in these constants and nothing else in the file hard codes it.
+# Severity colours are NOT brand colours and stay as they were (the four
+# colour scale the founders confirmed on 10 October).
+BRAND = "#4e888f"          # logo teal
+BRAND_DARK = "#3b6a70"     # teal for small text, darker for contrast on white
+INK = "#2f3336"            # logo charcoal, body headings
+RULE = "#d9e3e4"           # hairlines
+TINT = "#f3f7f7"           # panel background
+
+# Footer wording as given by Onkar, 11 October 2026:
+# "(c) POWERED BY AAROGYA VIROHAN . AV SUITE . (A CLINICAL EXERCISE
+# PRESCRIPTION TOOL)". "Exercise" corrected from "Excercise" in the
+# message. The tagline describes AV Suite as a whole; this report itself
+# prescribes no exercise (founders, 1b).
+POWERED_BY_COMPANY = "AAROGYA VIROHAN"
+POWERED_BY_PRODUCT = "AV SUITE"
+POWERED_BY_TAGLINE = "(A CLINICAL EXERCISE PRESCRIPTION TOOL)"
+
+_BRAND_DIR = Path(__file__).parent / "brand"
+
+
+@lru_cache(maxsize=None)
+def _brand_data_uri(filename: str) -> str:
+    """
+    Embed a brand image as a data URI, so the PDF never depends on a base
+    URL or on the working directory WeasyPrint happens to run from. Returns
+    an empty string when the file is missing, and the template then leaves
+    the logo out instead of failing the whole report.
+    """
+
+    path = _BRAND_DIR / filename
+    if not path.is_file():
+        return ""
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 # Severity -> (text colour, background). Deliberately sober: this is printed
 # and read by a clinician, not a dashboard badge.
@@ -289,6 +331,38 @@ def build_report_html(report: dict) -> str:
     # sign conventions or calibration change.
     analysis_version = report.get("analysisVersion")
 
+    # Gender was collected at intake but never printed before; it now sits
+    # beside age, the way lab reports show it.
+    age_sex = " / ".join(
+        _esc(v) for v in (patient.get("age"), patient.get("gender")) if v not in (None, "")
+    )
+
+    # Under the title on every page, so a loose second page still says whose
+    # report it is.
+    header_sub = " &nbsp;&middot;&nbsp; ".join(
+        _esc(v)
+        for v in (patient.get("name"), patient.get("assessmentDate"))
+        if v not in (None, "")
+    ) or CLINIC_SUBTITLE
+
+    logo = _brand_data_uri("av_logo_wordmark.png")
+    logo_block = (
+        f'<img src="{logo}" alt="{CLINIC_NAME}" />'
+        if logo
+        else f'<span class="logo-text">{CLINIC_NAME}</span>'
+    )
+
+    # The logo mark, already faded in the file itself (6 percent), centred
+    # behind every page. WeasyPrint has no background opacity, so the
+    # fading is baked into the PNG.
+    watermark = _brand_data_uri("av_watermark.png")
+    page_background = (
+        f'background: url("{watermark}") no-repeat center 50%; '
+        f"background-size: 95mm auto;"
+        if watermark
+        else ""
+    )
+
     # Global Stability Index removed from the report on 10 October 2026 by the founders (Q5): a single
     # score masks a localised finding behind an average, and its weights were
     # never sourced. calculate_global_index stays in scoring.py with nothing
@@ -303,81 +377,156 @@ def build_report_html(report: dict) -> str:
 <style>
     @page {{
         size: A4;
-        margin: 16mm 14mm;
+        margin: 27mm 14mm 22mm 14mm;
+        {page_background}
 
-        @bottom-left {{
-            content: "{CLINIC_NAME} – Clinical Posture Assessment";
-            font-family: Helvetica, Arial, sans-serif;
-            font-size: 7.5pt;
-            color: #64748b;
+        @top-left {{
+            content: element(runningHeader);
+            width: 100%;
+            vertical-align: bottom;
+            padding-bottom: 4mm;
         }}
-        @bottom-right {{
-            content: "Page " counter(page) " of " counter(pages);
-            font-family: Helvetica, Arial, sans-serif;
-            font-size: 7.5pt;
-            color: #64748b;
+        @bottom-center {{
+            content: element(runningFooter);
+            width: 100%;
+            vertical-align: top;
+            padding-top: 3mm;
         }}
     }}
 
     body {{
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        color: #0f172a;
+        color: {INK};
         margin: 0;
         padding: 0;
         line-height: 1.45;
         font-size: 9.5pt;
     }}
 
-    .header {{
-        border-bottom: 2px solid {BRAND};
-        padding-bottom: 10px;
-        margin-bottom: 14px;
+    /* Repeated on every page: logo left, document title right. */
+    .running-header {{
+        position: running(runningHeader);
+        width: 100%;
+        border-collapse: collapse;
+        border-bottom: 1.5px solid {BRAND};
     }}
-    .clinic-title {{
-        font-size: 20pt;
-        font-weight: bold;
-        color: {BRAND};
-        margin: 0 0 3px 0;
+    .running-header td {{
+        padding: 0 0 7px 0;
+        vertical-align: bottom;
     }}
-    .clinic-subtitle {{
-        font-size: 8.5pt;
-        color: #475569;
+    .running-header .logo img {{
+        height: 9.5mm;
+        width: auto;
+        display: block;
+    }}
+    .running-header .logo .logo-text {{
+        font-size: 16pt;
+        color: {INK};
+        letter-spacing: 0.3px;
+    }}
+    .running-header .doc {{
+        text-align: right;
+    }}
+    .running-header .doc-title {{
+        font-size: 10.5pt;
+        font-weight: 700;
+        color: {INK};
+        letter-spacing: 0.2px;
         margin: 0;
+    }}
+    .running-header .doc-sub {{
+        font-size: 7pt;
+        color: {BRAND_DARK};
         text-transform: uppercase;
-        letter-spacing: 1.2px;
+        letter-spacing: 1.4px;
+        margin: 2px 0 0 0;
+    }}
+
+    /* Repeated on every page: centred "Powered by", legal name, page count. */
+    .running-footer {{
+        position: running(runningFooter);
+        width: 100%;
+        border-top: 1px solid {RULE};
+        padding-top: 5px;
+        text-align: center;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }}
+    .running-footer .powered {{
+        margin: 0;
+        font-size: 8pt;
+        color: {INK};
+    }}
+    .running-footer .powered {{
+        letter-spacing: 0.9px;
+    }}
+    .running-footer .powered .by {{
+        font-size: 7pt;
+        font-weight: 700;
+        color: {BRAND_DARK};
+    }}
+    .running-footer .powered .company {{
+        font-size: 7pt;
+        font-weight: 700;
+        color: {INK};
+    }}
+    .running-footer .powered .dot {{
+        color: {BRAND};
+        margin: 0 3px;
+    }}
+    .running-footer .powered .product {{
+        font-size: 8.5pt;
+        font-weight: 700;
+        color: {BRAND_DARK};
+    }}
+    .running-footer .powered .tagline {{
+        font-size: 6.5pt;
+        color: #6b7378;
+    }}
+    .running-footer .legal {{
+        margin: 3px 0 0 0;
+        font-size: 6.5pt;
+        color: #8a9296;
+    }}
+    .running-footer .legal .page::after {{
+        content: "Page " counter(page) " of " counter(pages);
     }}
 
     .meta-table {{
         width: 100%;
         border-collapse: collapse;
-        margin-bottom: 16px;
+        margin: 2px 0 18px 0;
+        background: {TINT};
+        border: 1px solid {RULE};
+        border-radius: 3px;
     }}
     .meta-table td {{
-        padding: 4px 8px;
+        padding: 6px 10px;
         vertical-align: top;
         font-size: 9pt;
-        border-bottom: 1px solid #f1f5f9;
     }}
     .meta-table .label {{
-        font-weight: bold;
-        color: #475569;
-        width: 16%;
+        color: #6b7378;
+        width: 11%;
+        white-space: nowrap;
         text-transform: uppercase;
-        font-size: 7.5pt;
+        letter-spacing: 0.6px;
+        font-size: 7pt;
+        padding-top: 7.5px;
     }}
     .meta-table .value {{
-        color: #0f172a;
-        width: 34%;
+        color: {INK};
+        font-weight: 600;
+        width: 22%;
     }}
 
     .plane {{
-        margin-bottom: 16px;
+        margin-bottom: 12px;
         page-break-inside: avoid;
     }}
     .plane-head {{
         width: 100%;
         border-collapse: collapse;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid {RULE};
         margin-bottom: 8px;
     }}
     .plane-head td {{
@@ -386,8 +535,11 @@ def build_report_html(report: dict) -> str:
     }}
     .plane-head h2 {{
         font-size: 12pt;
-        color: #0f172a;
+        color: {INK};
         margin: 0;
+        padding-left: 8px;
+        border-left: 3px solid {BRAND};
+        line-height: 1.15;
     }}
     .plane-head .accuracy {{
         text-align: right;
@@ -407,9 +559,10 @@ def build_report_html(report: dict) -> str:
     }}
     .plane-photo {{
         width: 100%;
-        max-height: 78mm;
+        max-height: 64mm;
         object-fit: contain;
-        border: 1px solid #e2e8f0;
+        border: 1px solid {RULE};
+        border-radius: 2px;
     }}
     .photo-missing {{
         border: 1px dashed #cbd5e1;
@@ -463,11 +616,11 @@ def build_report_html(report: dict) -> str:
 
     .interpretation {{
         font-size: 8.5pt;
-        color: #334155;
+        color: {INK};
         margin: 6px 0 0 0;
-        padding: 5px 8px;
-        background: #f8fafc;
-        border-left: 3px solid {BRAND};
+        padding: 6px 10px;
+        background: {TINT};
+        border-left: 2px solid {BRAND};
     }}
 
     .bio-signature {{
@@ -476,9 +629,12 @@ def build_report_html(report: dict) -> str:
     }}
     .bio-signature h2 {{
         font-size: 12pt;
+        color: {INK};
         margin: 0 0 6px 0;
-        border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 4px;
+        border-bottom: 1px solid {RULE};
+        padding: 0 0 4px 8px;
+        border-left: 3px solid {BRAND};
+        line-height: 1.15;
     }}
     .bio-signature-grid {{
         width: 100%;
@@ -531,9 +687,12 @@ def build_report_html(report: dict) -> str:
     }}
     .synthesis h2 {{
         font-size: 12pt;
+        color: {INK};
         margin: 0 0 8px 0;
-        border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 4px;
+        border-bottom: 1px solid {RULE};
+        padding: 0 0 4px 8px;
+        border-left: 3px solid {BRAND};
+        line-height: 1.15;
     }}
     .synthesis-grid {{
         width: 100%;
@@ -548,7 +707,7 @@ def build_report_html(report: dict) -> str:
         font-size: 8pt;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: {BRAND};
+        color: {BRAND_DARK};
         margin: 0 0 5px 0;
     }}
     .synthesis-grid ul {{
@@ -652,27 +811,38 @@ def build_report_html(report: dict) -> str:
 </head>
 <body>
 
-<div class="header">
-    <p class="clinic-title">{CLINIC_NAME}</p>
-    <p class="clinic-subtitle">{CLINIC_SUBTITLE}</p>
+<table class="running-header">
+    <tr>
+        <td class="logo">{logo_block}</td>
+        <td class="doc">
+            <p class="doc-title">{REPORT_TITLE}</p>
+            <p class="doc-sub">{header_sub}</p>
+        </td>
+    </tr>
+</table>
+
+<div class="running-footer">
+    <p class="powered">
+        <span class="by">&copy; POWERED BY</span>
+        <span class="company">{POWERED_BY_COMPANY}</span><span class="dot">&bull;</span><span class="product">{POWERED_BY_PRODUCT}</span><span class="dot">&bull;</span><span class="tagline">{POWERED_BY_TAGLINE}</span>
+    </p>
+    <p class="legal"><span class="page"></span></p>
 </div>
 
 <table class="meta-table">
     <tr>
         <td class="label">Patient</td>
         <td class="value">{_esc(patient.get('name'))}</td>
-        <td class="label">Case Reference</td>
+        <td class="label">Age / Sex</td>
+        <td class="value">{age_sex}</td>
+        <td class="label">Case Ref.</td>
         <td class="value">{_esc(patient.get('caseRef'))}</td>
-    </tr>
-    <tr>
-        <td class="label">Age</td>
-        <td class="value">{_esc(patient.get('age'))}</td>
-        <td class="label">Assessment Date</td>
-        <td class="value">{_esc(patient.get('assessmentDate'))}</td>
     </tr>
     <tr>
         <td class="label">Clinician</td>
         <td class="value">{_esc(patient.get('clinician'))}</td>
+        <td class="label">Assessed</td>
+        <td class="value">{_esc(patient.get('assessmentDate'))}</td>
         <td class="label"></td>
         <td class="value"></td>
     </tr>
