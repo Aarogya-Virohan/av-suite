@@ -1,27 +1,113 @@
 @import "tailwindcss";
 
+/*
+ * AV Suite brand theme: "Midnight & Grove" with the logo's cream and teal.
+ *
+ * Dark mode follows the app's own data-theme attribute, not the OS setting.
+ * Without this, Tailwind v4 applies every dark: class whenever the OS is in
+ * dark mode, while the CSS variables below only switch on data-theme, which
+ * left half the screen dark and half light.
+ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-sans: "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", "Inter Variable", sans-serif;
+
+  /*
+   * Brand-aligned neutrals. Every existing slate-* class in the CRM picks
+   * these up, so the whole app moves to the brand without touching markup.
+   * Light end is the logo cream, dark end is the website's midnight indigo.
+   * Text shades 500 and up pass WCAG AA (4.5:1) on both white and canvas.
+   */
+  --color-slate-50: #f6f2ea;
+  --color-slate-100: #efe9dc;
+  --color-slate-200: #e7e1d4;
+  --color-slate-300: #d3cfd9;
+  --color-slate-400: #767b93;
+  --color-slate-500: #5d6380;
+  --color-slate-600: #454b66;
+  --color-slate-700: #343a55;
+  --color-slate-800: #232a45;
+  --color-slate-900: #141a33;
+  --color-slate-950: #0b1238;
+
+  /*
+   * Teal becomes the brand "grove" green. teal-600 (the CRM's primary
+   * action colour, used about 100 times) is the brand primary #1c7a54,
+   * 5.2:1 with white text.
+   */
+  --color-teal-50: #ecf6f0;
+  --color-teal-100: #d7eee0;
+  --color-teal-200: #b3dfc5;
+  --color-teal-300: #84c9a2;
+  --color-teal-400: #4fae7c;
+  --color-teal-500: #22935f;
+  --color-teal-600: #1c7a54;
+  --color-teal-700: #15623f;
+  --color-teal-800: #124f35;
+  --color-teal-900: #0f3f2b;
+  --color-teal-950: #08261a;
+
+  /* Semantic brand tokens for new components. */
+  --color-midnight: #0b1238;
+  --color-midnight-800: #16205a;
+  --color-deep-teal: #1b4a54;
+  --color-grove: #1c7a54;
+  --color-grove-hover: #15623f;
+  --color-grove-wash: #e3f3ea;
+  --color-fresh: #16a25c;
+  --color-spring: #9ae26e;
+  --color-lime: #c1ff72;
+  --color-logo-teal: #4e888f;
+  --color-logo-teal-ink: #2f6f75;
+  --color-logo-teal-wash: #e4efee;
+  --color-ink: #141a33;
+  --color-ink-2: #454b66;
+  --color-muted: #5d6380;
+  --color-canvas: #f6f2ea;
+  --color-card: #fffdf9;
+  --color-line: #ebe5d8;
+  --color-line-soft: #f1ece2;
+
+  --color-ok: #17663f;
+  --color-ok-wash: #e2f5e8;
+  --color-info: #3346a8;
+  --color-info-wash: #e8ebfb;
+  --color-warn: #8a5a0e;
+  --color-warn-wash: #f8eed9;
+  --color-danger: #b03a2e;
+  --color-danger-wash: #fbe7e4;
+
+  --shadow-card: 0 1px 2px rgba(60, 48, 20, 0.04), 0 8px 24px -18px rgba(60, 48, 20, 0.18);
+  --shadow-hero: 0 12px 28px -14px rgba(11, 18, 56, 0.55);
+  --shadow-primary: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 6px 16px -6px rgba(28, 122, 84, 0.55);
+}
+
 @layer base {
   :root {
-    --background: #f8fafc;
-    --foreground: #0f172a;
-    --card: #ffffff;
-    --card-foreground: #1e293b;
-    --primary: #0b2c5f;
+    --background: #f6f2ea;
+    --foreground: #141a33;
+    --card: #fffdf9;
+    --card-foreground: #232a45;
+    --primary: #1c7a54;
     --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #0f172a;
-    --accent: #0d9488;
+    --secondary: #efe9dc;
+    --secondary-foreground: #141a33;
+    --accent: #4e888f;
     --accent-foreground: #ffffff;
-    --destructive: #ef4444;
+    --destructive: #b03a2e;
     --destructive-foreground: #ffffff;
-    --border: #e2e8f0;
-    --input: #cbd5e1;
-    --ring: #0d9488;
-    --radius: 0.625rem; /* 10px md default radius */
+    --border: #ebe5d8;
+    --input: #d3cfd9;
+    --ring: #1c7a54;
+    --radius: 0.75rem;
 
-    --brand-navy: #0b2c5f;
-    --brand-teal: #0d9488;
-    --sidebar-bg: #0b2c5f;
+    /* Sidebar colour. A clinic's own branding_color still overrides this
+       at runtime from AppShell, as before. */
+    --brand-navy: #0b1238;
+    --brand-teal: #1c7a54;
+    --sidebar-bg: #0b1238;
   }
 
   [data-theme="dark"] {
@@ -29,24 +115,43 @@
     --foreground: #f8fafc;
     --card: #16213a;
     --card-foreground: #e2e8f0;
-    --primary: #0b2c5f;
+    --primary: #22935f;
     --primary-foreground: #f8fafc;
     --secondary: #1f2937;
     --secondary-foreground: #f8fafc;
-    --accent: #0d9488;
+    --accent: #4e888f;
     --accent-foreground: #f8fafc;
     --destructive: #ef4444;
     --destructive-foreground: #ffffff;
     --border: rgba(255, 255, 255, 0.12);
     --input: rgba(255, 255, 255, 0.12);
-    --ring: #0d9488;
+    --ring: #22935f;
     --sidebar-bg: #0a0f1f;
   }
 
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: #d7eee0;
+    color: #141a33;
+  }
+
+  :focus-visible {
+    outline: 2px solid #1c7a54;
+    outline-offset: 2px;
   }
 }
 
@@ -55,7 +160,7 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  background-color: rgba(15, 23, 42, 0.75);
+  background-color: rgba(11, 18, 56, 0.6);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -67,6 +172,6 @@
   background-color: var(--card);
   color: var(--foreground);
   border: 1px solid var(--border);
-  border-radius: 0.875rem; /* 14px modal radius */
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px -12px rgba(11, 18, 56, 0.3);
 }
