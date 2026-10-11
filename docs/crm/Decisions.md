@@ -229,6 +229,26 @@ Each entry follows this structure:
 
 ---
 
+## [D-014] Hardcoded Therapist Salary Removed; No Payroll Until Real Data Exists
+- **Date**: 2026-10-12
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: The Therapists page showed "Rs 35,000 / mo" for every therapist under "Monthly Salary" and was titled "Therapists Directory & Payroll". The backend has no salary or payroll data. Another D-008 violation, and on compensation data.
+- **Decision**: Remove the column; rename the page "Therapists Directory". Payroll is listed as a not-built feature (L-12).
+- **Reasoning**: Invented salary figures shown to admins are worse than none.
+- **Affected Files**: `app/(dashboard)/therapists/page.tsx`
+
+---
+
+## [D-015] Frontend Types for API Responses Come From the Generated Schema
+- **Date**: 2026-10-12
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: Recycle Bin defined its own interface (`name`, `resource`) while the API returns `title`, `resource_type`. Names showed blank and Restore called `/recycle-bin/undefined/...`. Billing had a similar mismatch (amounts are Decimal strings, code treated them as numbers).
+- **Decision**: Pages type API data with `components['schemas'][...]` from `types/schema.ts` instead of hand-written interfaces, so a contract change fails `tsc`.
+- **Trade-offs**: `types/schema.ts` must be regenerated when the backend changes.
+- **Affected Files**: `app/(dashboard)/recycle-bin/page.tsx` (others as they are touched)
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -244,5 +264,8 @@ Each entry follows this structure:
 | L-8 | Billing resolves patient names from only the first 100 patients; others show a short reference | Open; fix with patient name in the invoice/payment API response | Sparsh (later) |
 | L-9 | "Create Invoice" and "Record Payment" buttons show for every role; the backend enforces permissions, but the UI should hide them | Open, frontend | Frontend |
 | L-10 | Permission helpers are not reactive (see D-013); long-term, convert to hooks | Open, low priority | Frontend |
+| L-11 | Recycle bin `deleted_by` is always null: the backend does not record who deleted an item | Open; set deleted_by on soft delete | Sparsh (later) |
+| L-12 | Payroll / salary is not built (fake column removed, D-014) | Product decision needed before building | Onkar + founders |
+| L-13 | Pages that are only correct when reached via the sidebar: fixed for Leads, Therapists, Recycle Bin, Billing (D-013); all 9 dashboard pages pass a direct-load check as of 2026-10-12 | Resolved | - |
 
-*Last updated: 2026-10-12 | Branch: feat/crm-ui-theme*
+*Last updated: 2026-10-12 (after Recycle Bin) | Branch: feat/crm-ui-theme*
