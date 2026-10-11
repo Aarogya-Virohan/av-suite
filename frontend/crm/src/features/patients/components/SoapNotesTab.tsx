@@ -1,322 +1,363 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { Activity, Baby, FileCheck, Heart, Loader2, Lock, Plus, Save, Stethoscope, Zap } from 'lucide-react';
 import { SoapAssessment } from '../../../types/api';
 import { useAssessments, useCreateAssessment, useUpdateAssessment } from '../../assessments/api';
 import { useAuthStore } from '../../../store';
-import { CheckCircle2, Lock, Unlock, Save, FileCheck, Stethoscope, Heart, Zap, Baby, Activity } from 'lucide-react';
+import { Badge, Button, Card, FieldLabel, inputClass } from '../../../components/ui/brand';
+import { cn } from '../../../lib/cn';
 
-interface SpecialtyOption {
-  key: string;
-  label: string;
-  icon: React.ElementType;
+/*
+ * Rewritten after verifying against the API (Decisions.md D-019):
+ * - "Draft (Autosaving)" / "autosaved every 2 seconds" was shown but the
+ *   autosave function was empty: nothing was saved until Finalize. There is now
+ *   a real "Save draft", an "unsaved changes" marker and a leave-page warning.
+ * - The pain VAS (default 6) was never sent. It now starts unset and is saved
+ *   in form_data.pain_vas.
+ * - Chip labels did not match the stored values (Neuro saved "chiropractic",
+ *   Cardio "osteopathy", ...). The backend enum lists ortho/neuro/... but the
+ *   database enum does not contain them (500 on save, L-25), so the area is
+ *   stored in form_data.area and specialty stays "physiotherapy".
+ * - "Finalized" was read from finalized_at, which the API never returns, so a
+ *   finalized note still looked like a draft. It now uses `finalized`.
+ * - "Re-open (Admin Only)" always failed: the backend never edits finalized
+ *   notes. Removed; corrections go in a new note.
+ * - Only the first note was ever shown; there is now a note list and "New note".
+ */
+
+const AREAS = [
+  { key: 'ortho', label: 'Ortho', icon: Activity },
+  { key: 'neuro', label: 'Neuro', icon: Stethoscope },
+  { key: 'cardiopulm', label: 'Cardio-pulmonary', icon: Heart },
+  { key: 'sports', label: 'Sports', icon: Zap },
+  { key: 'paeds', label: 'Paediatrics', icon: Baby },
+  { key: 'general', label: 'General', icon: FileCheck },
+] as const;
+
+const SOAP_FIELDS = [
+  { key: 'subjective', label: 'Subjective (S)', placeholder: 'Patient reported symptoms, pain history, and limitations...' },
+  { key: 'objective', label: 'Objective (O)', placeholder: 'Physical findings, ROM tests, posture analysis...' },
+  { key: 'assessment', label: 'Assessment (A)', placeholder: 'Clinical impression and progress comparison...' },
+  { key: 'plan', label: 'Plan (P)', placeholder: 'Treatment goals, frequency of visits, home routine...' },
+] as const;
+
+type Draft = {
+  id?: string;
+  diagnosis: string;
+  area: string | null;
+  pain_vas: number | null;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  finalized: boolean;
+};
+
+const emptyDraft = (): Draft => ({
+  diagnosis: '',
+  area: null,
+  pain_vas: null,
+  subjective: '',
+  objective: '',
+  assessment: '',
+  plan: '',
+  finalized: false,
+});
+
+function toDraft(note: SoapAssessment): Draft {
+  const f = (note.form_data || {}) as Record<string, any>;
+  return {
+    id: note.id,
+    diagnosis: note.diagnosis || '',
+    area: typeof f.area === 'string' ? f.area : null,
+    pain_vas: typeof f.pain_vas === 'number' ? f.pain_vas : null,
+    subjective: String(f.subjective || ''),
+    objective: String(f.objective || ''),
+    assessment: String(f.assessment || ''),
+    plan: String(f.plan || ''),
+    finalized: !!note.finalized,
+  };
 }
 
-const SPECIALTIES: SpecialtyOption[] = [
-  { key: 'physiotherapy', label: 'Ortho', icon: Activity },
-  { key: 'chiropractic', label: 'Neuro', icon: Stethoscope },
-  { key: 'osteopathy', label: 'Cardio', icon: Heart },
-  { key: 'massage', label: 'Sports', icon: Zap },
-  { key: 'acupuncture', label: 'Paeds', icon: Baby },
-  { key: 'other', label: 'General', icon: FileCheck },
-];
+const noteDateFormat = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+const fmt = (v?: string) => (v ? noteDateFormat.format(new Date(v)) : '');
 
-export function SoapNotesTab({
-  patientId,
-  isReassessmentOnly = false,
-}: {
-  patientId: string;
-  isReassessmentOnly?: boolean;
-}) {
-  const role = useAuthStore((s) => s.role);
-  const [selectedSpecialty, setSelectedSpecialty] = useState('physiotherapy');
-  const [painVas, setPainVas] = useState<number>(6);
+function painTone(v: number) {
+  if (v <= 3) return 'border-ok bg-ok text-white';
+  if (v <= 6) return 'border-warn bg-warn text-white';
+  return 'border-danger bg-danger text-white';
+}
 
+export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patientId: string; isReassessmentOnly?: boolean }) {
   const { data: assessmentsResponse, isLoading } = useAssessments(patientId);
-  const assessmentsData = React.useMemo(() => assessmentsResponse?.data || [], [assessmentsResponse?.data]);
-  
-  const [assessments, setAssessments] = useState<SoapAssessment[]>([]);
-
-  React.useEffect(() => {
-    setAssessments(
-      assessmentsData.filter(
-        (a: SoapAssessment) => a.is_reassessment === isReassessmentOnly
-      )
-    );
-  }, [assessmentsData, isReassessmentOnly]);
-
   const createAssessment = useCreateAssessment();
   const updateAssessment = useUpdateAssessment();
 
-  const [activeNote, setActiveNote] = useState<Partial<SoapAssessment>>(() => {
-    const existing = assessments[0];
-    if (existing) return existing;
-    return {
-      patient_id: patientId,
-      specialty: 'physiotherapy',
-      diagnosis: '',
-      is_reassessment: isReassessmentOnly,
-      form_data: {
-        subjective: '',
-        objective: '',
-        assessment: '',
-        plan: '',
-        specialty_data: {},
-      },
+  const notes = useMemo(
+    () =>
+      ((assessmentsResponse?.data || []) as SoapAssessment[])
+        .filter((a) => !!a.is_reassessment === isReassessmentOnly)
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))),
+    [assessmentsResponse?.data, isReassessmentOnly],
+  );
+
+  const [selectedId, setSelectedId] = useState<string | 'new' | null>(null);
+  const [draft, setDraft] = useState<Draft>(emptyDraft());
+  const [dirty, setDirty] = useState(false);
+
+  // Default to the latest note once loaded, or a new note if there are none.
+  React.useEffect(() => {
+    if (selectedId !== null || isLoading) return;
+    if (notes.length) {
+      setSelectedId(notes[0].id);
+      setDraft(toDraft(notes[0]));
+    } else {
+      setSelectedId('new');
+      setDraft(emptyDraft());
+    }
+  }, [notes, isLoading, selectedId]);
+
+  // Warn before leaving the page with unsaved text.
+  React.useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
     };
-  });
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
 
-  useEffect(() => {
-    if (assessments.length > 0 && !activeNote.id) {
-      setActiveNote(assessments[0]);
-    }
-  }, [assessments, activeNote.id]);
+  const isFinalized = draft.finalized;
+  const busy = createAssessment.isPending || updateAssessment.isPending;
+  const title = isReassessmentOnly ? 'Re-assessment' : 'SOAP Assessment';
 
-  const isFinalized = !!activeNote.finalized_at;
+  const confirmDiscard = () => !dirty || window.confirm('You have unsaved changes in this note. Discard them?');
 
-  // Debounced auto-save effect (2s)
-  useEffect(() => {
-    if (isFinalized) return;
-    const timer = setTimeout(() => {
-      // Auto-save logic
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [activeNote, isFinalized]);
-
-  const handleFinalize = async () => {
-    try {
-      const payload = {
-        patient_id: patientId,
-        therapist_id: useAuthStore.getState().userId || undefined,
-        specialty: activeNote.specialty,
-        diagnosis: activeNote.diagnosis,
-        is_reassessment: isReassessmentOnly,
-        form_data: activeNote.form_data,
-        finalized: true,
-      };
-
-      let updatedNote;
-      if (!activeNote.id) {
-        // Create new
-        updatedNote = await createAssessment.mutateAsync(payload);
-      } else {
-        // Update existing
-        updatedNote = await updateAssessment.mutateAsync({ id: activeNote.id, values: payload });
-      }
-
-      setActiveNote(updatedNote);
-      toast.success('SOAP note finalized & locked');
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to finalize note');
-    }
+  const openNote = (note: SoapAssessment) => {
+    if (note.id === selectedId || !confirmDiscard()) return;
+    setSelectedId(note.id);
+    setDraft(toDraft(note));
+    setDirty(false);
   };
 
-  const handleReopen = async () => {
-    if (role !== 'admin') {
-      toast.error('Only Admins can re-open finalized clinical notes');
+  const startNew = () => {
+    if (!confirmDiscard()) return;
+    setSelectedId('new');
+    setDraft(emptyDraft());
+    setDirty(false);
+  };
+
+  const edit = <K extends keyof Draft>(key: K, value: Draft[K]) => {
+    if (isFinalized) return;
+    setDraft((prev) => ({ ...prev, [key]: value }));
+    setDirty(true);
+  };
+
+  const hasContent = !!(draft.diagnosis.trim() || draft.subjective.trim() || draft.objective.trim() || draft.assessment.trim() || draft.plan.trim());
+
+  const save = async (finalize: boolean) => {
+    if (!hasContent) {
+      toast.error('Write something in the note before saving');
       return;
     }
+    if (finalize && !window.confirm('Finalize this note? Finalized notes are locked and cannot be edited. Corrections go in a new note.')) {
+      return;
+    }
+    const payload = {
+      patient_id: patientId,
+      therapist_id: useAuthStore.getState().userId || undefined,
+      specialty: 'physiotherapy',
+      diagnosis: draft.diagnosis.trim() || null,
+      is_reassessment: isReassessmentOnly,
+      finalized: finalize,
+      form_data: {
+        subjective: draft.subjective,
+        objective: draft.objective,
+        assessment: draft.assessment,
+        plan: draft.plan,
+        area: draft.area,
+        pain_vas: draft.pain_vas,
+      },
+    };
     try {
-      if (!activeNote.id) return;
-      const updatedNote = await updateAssessment.mutateAsync({ id: activeNote.id, values: { finalized: false } });
-      setActiveNote(updatedNote);
-      toast.success('Note re-opened for editing (Audit log recorded)');
+      const saved: SoapAssessment = draft.id
+        ? await updateAssessment.mutateAsync({ id: draft.id, values: payload })
+        : await createAssessment.mutateAsync(payload);
+      setSelectedId(saved.id);
+      setDraft(toDraft(saved));
+      setDirty(false);
+      toast.success(finalize ? `${title} finalized and locked` : 'Draft saved');
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Failed to re-open note');
+      toast.error(err?.message || 'Failed to save note');
     }
   };
 
-  const updateFormData = (key: string, value: unknown) => {
-    if (isFinalized) return;
-    setActiveNote((prev) => ({
-      ...prev,
-      form_data: {
-        ...prev.form_data,
-        [key]: value,
-      },
-    }));
-  };
-
-  const getPainColor = (val: number) => {
-    if (val <= 3) return 'bg-emerald-500 text-white border-emerald-600';
-    if (val <= 6) return 'bg-amber-500 text-white border-amber-600';
-    return 'bg-rose-500 text-white border-rose-600';
-  };
+  if (isLoading) {
+    return (
+      <Card className="flex items-center gap-2 p-6 text-sm text-muted">
+        <Loader2 className="h-4 w-4 animate-spin text-grove" /> Loading notes...
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              {isReassessmentOnly ? 'Re-assessment Note' : 'SOAP Clinical Assessment'}
-            </h3>
-            {isFinalized ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                <Lock className="w-3 h-3" /> Finalized
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                <Save className="w-3 h-3 animate-pulse" /> Draft (Autosaving)
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {isFinalized && activeNote.finalized_at
-              ? `Finalized on ${new Date(activeNote.finalized_at).toLocaleString()}`
-              : 'Changes autosaved every 2 seconds'}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {isFinalized ? (
-            role === 'admin' && (
-              <button
-                onClick={handleReopen}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs rounded-lg flex items-center gap-1.5 cursor-pointer"
-              >
-                <Unlock className="w-3.5 h-3.5" />
-                <span>Re-open (Admin Only)</span>
-              </button>
-            )
-          ) : (
-            <button
-              onClick={handleFinalize}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs rounded-lg flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <FileCheck className="w-4 h-4" />
-              <span>Finalize & Lock Note</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Specialty Chips Selector */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {SPECIALTIES.map((spec) => {
-          const Icon = spec.icon;
-          const isSelected = selectedSpecialty === spec.key;
+    <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+      {/* Note history */}
+      <Card className="h-fit space-y-2 p-3">
+        <Button variant="secondary" className="h-9 w-full" onClick={startNew}>
+          <Plus className="h-4 w-4" /> New note
+        </Button>
+        {selectedId === 'new' && (
+          <div className="rounded-lg border border-grove/30 bg-grove-wash px-3 py-2 text-xs font-semibold text-grove">New note (not saved yet)</div>
+        )}
+        {notes.length === 0 && <p className="px-1 py-2 text-xs text-muted">No {title.toLowerCase()} notes yet.</p>}
+        {notes.map((n) => {
+          const area = AREAS.find((a) => a.key === (n.form_data as any)?.area)?.label;
           return (
             <button
-              key={spec.key}
-              disabled={isFinalized}
-              onClick={() => {
-                setSelectedSpecialty(spec.key);
-                setActiveNote((prev) => ({ ...prev, specialty: spec.key }));
-              }}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
-                isSelected
-                  ? 'bg-teal-600 border-teal-600 text-white shadow-xs'
-                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-teal-500'
-              }`}
+              key={n.id}
+              type="button"
+              onClick={() => openNote(n)}
+              className={cn(
+                'w-full cursor-pointer rounded-lg border px-3 py-2 text-left transition-colors',
+                selectedId === n.id ? 'border-grove bg-grove-wash' : 'border-line hover:bg-canvas',
+              )}
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{spec.label}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-ink">{fmt(n.created_at)}</span>
+                {n.finalized ? <Lock className="h-3.5 w-3.5 text-ok" aria-label="Finalized" /> : <span className="text-[10px] font-bold uppercase text-warn">Draft</span>}
+              </div>
+              <p className="mt-0.5 truncate text-xs text-muted">{n.diagnosis || area || 'No diagnosis'}</p>
             </button>
           );
         })}
-      </div>
+      </Card>
 
-      {/* Pain VAS 0-10 Interactive Scale */}
-      <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
-        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-          Pain VAS Scale (0 to 10)
-        </label>
-        <div className="flex items-center gap-1.5 overflow-x-auto py-1">
-          {Array.from({ length: 11 }, (_, i) => (
-            <button
-              key={i}
-              type="button"
+      {/* Editor */}
+      <div className="space-y-5">
+        <Card className="flex flex-col items-start justify-between gap-4 p-4 sm:flex-row sm:items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-display text-base font-bold text-ink">{title}</h3>
+              {isFinalized ? (
+                <Badge tone="ok">Finalized</Badge>
+              ) : dirty ? (
+                <Badge tone="warn">Unsaved changes</Badge>
+              ) : draft.id ? (
+                <Badge tone="info">Draft saved</Badge>
+              ) : (
+                <Badge tone="neutral">New</Badge>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-muted">
+              {isFinalized
+                ? 'Finalized notes are locked. Start a new note for corrections or follow-up.'
+                : 'Save a draft any time; finalize when the note is complete.'}
+            </p>
+          </div>
+          {!isFinalized && (
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => save(false)} disabled={busy || !dirty}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save draft
+              </Button>
+              <Button onClick={() => save(true)} disabled={busy}>
+                <FileCheck className="h-4 w-4" />
+                Finalize & lock
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        <Card className="space-y-5 p-5">
+          <div>
+            <FieldLabel>Clinical area</FieldLabel>
+            <div className="flex flex-wrap items-center gap-2">
+              {AREAS.map((a) => {
+                const Icon = a.icon;
+                const active = draft.area === a.key;
+                return (
+                  <button
+                    key={a.key}
+                    type="button"
+                    disabled={isFinalized}
+                    aria-pressed={active}
+                    onClick={() => edit('area', active ? null : a.key)}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                      active ? 'border-grove bg-grove text-white' : 'border-line bg-card text-ink-2 hover:border-grove',
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <FieldLabel>Pain VAS (0 to 10)</FieldLabel>
+              {draft.pain_vas !== null && !isFinalized && (
+                <button type="button" onClick={() => edit('pain_vas', null)} className="cursor-pointer text-xs font-semibold text-muted hover:text-ink">
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {Array.from({ length: 11 }, (_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  disabled={isFinalized}
+                  aria-pressed={draft.pain_vas === i}
+                  onClick={() => edit('pain_vas', i)}
+                  className={cn(
+                    'h-9 w-9 cursor-pointer rounded-lg border text-xs font-bold transition-colors disabled:cursor-not-allowed',
+                    draft.pain_vas === i ? painTone(i) : 'border-line bg-card text-ink-2 hover:bg-canvas',
+                  )}
+                >
+                  {i}
+                </button>
+              ))}
+              {draft.pain_vas === null && <span className="ml-1 text-xs text-muted">Not recorded</span>}
+            </div>
+          </div>
+
+          <div>
+            <FieldLabel htmlFor={`dx-${isReassessmentOnly}`}>Clinical Diagnosis</FieldLabel>
+            <input
+              id={`dx-${isReassessmentOnly}`}
+              type="text"
               disabled={isFinalized}
-              onClick={() => setPainVas(i)}
-              className={`w-8 h-8 rounded-lg text-xs font-extrabold border transition-all ${
-                painVas === i
-                  ? getPainColor(i)
-                  : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-              }`}
-            >
-              {i}
-            </button>
+              value={draft.diagnosis}
+              onChange={(e) => edit('diagnosis', e.target.value)}
+              placeholder="e.g. Lumbar disc herniation L4-L5"
+              className={inputClass}
+            />
+          </div>
+
+          {SOAP_FIELDS.map((f) => (
+            <div key={f.key}>
+              <label htmlFor={`${f.key}-${isReassessmentOnly}`} className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-grove">
+                {f.label}
+              </label>
+              <textarea
+                id={`${f.key}-${isReassessmentOnly}`}
+                rows={3}
+                disabled={isFinalized}
+                value={draft[f.key]}
+                onChange={(e) => edit(f.key, e.target.value)}
+                placeholder={f.placeholder}
+                className={cn(inputClass, 'h-auto py-2')}
+              />
+            </div>
           ))}
-        </div>
-      </div>
-
-      {/* Main SOAP Editor Card */}
-      <div className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-6">
-        <div className="border-b border-slate-100 dark:border-slate-800 pb-4">
-          <label className="block text-xs font-bold uppercase text-slate-400 mb-1">
-            Clinical Diagnosis
-          </label>
-          <input
-            type="text"
-            disabled={isFinalized}
-            value={activeNote.diagnosis || ''}
-            onChange={(e) => setActiveNote({ ...activeNote, diagnosis: e.target.value })}
-            placeholder="e.g. Lumbar disc herniation L4-L5"
-            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"
-          />
-        </div>
-
-        {/* 4 SOAP Quadrants */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase text-teal-600 mb-1">
-              Subjective (S)
-            </label>
-            <textarea
-              rows={3}
-              disabled={isFinalized}
-              value={String(activeNote.form_data?.subjective || '')}
-              onChange={(e) => updateFormData('subjective', e.target.value)}
-              placeholder="Patient reported symptoms, pain history, and limitations..."
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold uppercase text-teal-600 mb-1">
-              Objective (O)
-            </label>
-            <textarea
-              rows={3}
-              disabled={isFinalized}
-              value={String(activeNote.form_data?.objective || '')}
-              onChange={(e) => updateFormData('objective', e.target.value)}
-              placeholder="Physical findings, ROM tests, posture analysis..."
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold uppercase text-teal-600 mb-1">
-              Assessment (A)
-            </label>
-            <textarea
-              rows={3}
-              disabled={isFinalized}
-              value={String(activeNote.form_data?.assessment || '')}
-              onChange={(e) => updateFormData('assessment', e.target.value)}
-              placeholder="Clinical impression and progress comparison..."
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold uppercase text-teal-600 mb-1">
-              Plan (P)
-            </label>
-            <textarea
-              rows={3}
-              disabled={isFinalized}
-              value={String(activeNote.form_data?.plan || '')}
-              onChange={(e) => updateFormData('plan', e.target.value)}
-              placeholder="Treatment goals, frequency of visits, home routine..."
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm disabled:opacity-60"
-            />
-          </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

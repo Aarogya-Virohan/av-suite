@@ -46,6 +46,9 @@ export type TreatmentSession = components['schemas']['TreatmentSessionResponse']
 
 export type SoapAssessment = Omit<components['schemas']['SoapAssessmentResponse'], 'form_data'> & {
   form_data?: Record<string, any>;
+  // The backend returns `finalized` (types/schema.ts is out of date); it does
+  // not return finalized_at, which the old SOAP tab relied on.
+  finalized?: boolean;
   finalized_at?: string | null;
   author_id?: string | null;
 };
