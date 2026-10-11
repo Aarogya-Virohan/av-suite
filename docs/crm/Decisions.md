@@ -215,6 +215,20 @@ Each entry follows this structure:
 
 ---
 
+## [D-013] Pages Must Subscribe to the Auth Store Before Using Permission Helpers
+- **Date**: 2026-10-12
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: `hasCapability`, `canAccessModule` and `canPerformAction` in `config/permissions.ts` read `useAuthStore.getState()`, which never triggers a re-render. While restyling Billing, removing an "unused" `useAuthStore((s) => s.role)` line made admins see "Access Restricted" permanently. The same mechanism made Billing open on the wrong tab: the default tab was frozen into `useState` before capabilities loaded.
+- **Options Considered**:
+  1. Make the helpers reactive hooks (changes every call site)
+  2. Keep helpers as they are; every page that uses them subscribes to `role` and `capabilities`, and never freezes permission results into `useState`
+- **Decision**: Option 2 for now, with a comment at each subscription. Option 1 is the cleaner long-term fix (queued, not urgent).
+- **Reasoning**: Smallest safe change during the UI freeze; no logic changes to the permission system.
+- **Trade-offs**: The subscription line looks unused. Do not delete it.
+- **Affected Files**: `app/(dashboard)/billing/page.tsx` (other pages are checked as they are restyled)
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -227,5 +241,8 @@ Each entry follows this structure:
 | L-5 | Role templates are deny-all, contradicting the founders' 13 Aug decision | Open, queued after PR B | Sparsh |
 | L-6 | Auth still reads `users.clinic_id`; no workspace switch; membership auth incomplete | In progress (PR B) | Sparsh |
 | L-7 | Frontend lint config is broken (pre-existing) | Open | Unassigned |
+| L-8 | Billing resolves patient names from only the first 100 patients; others show a short reference | Open; fix with patient name in the invoice/payment API response | Sparsh (later) |
+| L-9 | "Create Invoice" and "Record Payment" buttons show for every role; the backend enforces permissions, but the UI should hide them | Open, frontend | Frontend |
+| L-10 | Permission helpers are not reactive (see D-013); long-term, convert to hooks | Open, low priority | Frontend |
 
 *Last updated: 2026-10-12 | Branch: feat/crm-ui-theme*
