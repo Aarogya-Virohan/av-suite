@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+
 from sqlalchemy.pool import NullPool, StaticPool
 import asyncio
 from typing import AsyncGenerator
@@ -79,25 +80,7 @@ def engine():
         poolclass = StaticPool
     else:
         poolclass = NullPool
-    debug_file = f"/tmp/engine_debug_{os.getpid()}.txt"
-    with open(debug_file, "a") as f:
-        f.write(f"DEBUG: engine: TEST_DATABASE_URL={TEST_DATABASE_URL!r}\n")
-        f.write(f"DEBUG: engine: url.get_backend_name()={url.get_backend_name()!r}\n")
-        f.write(f"DEBUG: engine: url.database={url.database!r}\n")
-        f.write(
-            f"DEBUG: engine: url.get_backend_name() == 'sqlite': {url.get_backend_name() == 'sqlite'!r}\n"
-        )
-        f.write(
-            f"DEBUG: engine: url.database == ':memory:': {url.database == ':memory:'!r}\n"
-        )
-        f.write(
-            f"DEBUG: engine: condition={url.get_backend_name() == 'sqlite' and url.database == ':memory:'!r}\n"
-        )
-        f.write(f"DEBUG: engine: poolclass variable={poolclass}\n")
     engine_obj = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=poolclass)
-    with open(debug_file, "a") as f:
-        f.write(f"DEBUG: engine: poolclass={engine_obj.pool.__class__.__name__}\n")
-        f.write(f"DEBUG: engine: engine id={id(engine_obj)}\n")
     return engine_obj
 
 
@@ -111,19 +94,9 @@ def sessionmaker(engine):
 @pytest.fixture(scope="session")
 async def setup_db(engine, sessionmaker):
     assert_safe_test_database_url(TEST_DATABASE_URL)
-    with open("/tmp/setup_db_debug.txt", "a") as f:
-        f.write(f"DEBUG: setup_db: called\n")
-        f.write(f"DEBUG: setup_db: engine poolclass={engine.pool.__class__.__name__}\n")
-        f.write(f"DEBUG: setup_db: engine id={id(engine)}\n")
     async with engine.begin() as conn:
-        with open("/tmp/setup_db_debug.txt", "a") as f:
-            f.write(f"DEBUG: setup_db: dropping all tables\n")
         await conn.run_sync(Base.metadata.drop_all)
-        with open("/tmp/setup_db_debug.txt", "a") as f:
-            f.write(f"DEBUG: setup_db: creating all tables\n")
         await conn.run_sync(Base.metadata.create_all)
-        with open("/tmp/setup_db_debug.txt", "a") as f:
-            f.write(f"DEBUG: setup_db: tables created\n")
 
     # Seed initial test clinic and users for test suite
     async with sessionmaker() as session:

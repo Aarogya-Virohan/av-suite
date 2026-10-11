@@ -44,7 +44,7 @@ class Product(TimestampMixin, Base):
     allowed_clinic_types: Mapped[list[str]] = mapped_column(
         ARRAY(String()).with_variant(JSON(), "sqlite"),
         nullable=False,
-        default=lambda: ["clinic", "solo", "personal"],
+        default=lambda: ["clinic"],
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

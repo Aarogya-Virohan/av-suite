@@ -47,13 +47,6 @@ CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
         "description": "Screening and tracking for psycho-social factors.",
         "category": "Clinical",
     },
-    {
-        "id": "analytics",
-        "slug": "analytics",
-        "name": "Analytics",
-        "description": "Clinical and operational insights for your workspace.",
-        "category": "Analytics",
-    },
 )
 
 
@@ -68,6 +61,7 @@ CRM_CAPABILITY_PREFIXES: tuple[str, ...] = (
     "packages.",
     "booking.",
     "recyclebin.",
+    "analytics.",
 )
 
 PRODUCT_CAPABILITY_PREFIXES: Mapping[str, tuple[str, ...]] = MappingProxyType(
