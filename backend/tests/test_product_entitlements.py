@@ -29,6 +29,13 @@ router = APIRouter()
 
 @router.get("/test-product-entitled-crm")
 async def product_entitled_crm(
+    scope: CapabilityScope = Depends(require_capability("leads.view")),
+):
+    return {"scope": scope}
+
+
+@router.get("/test-platform-core")
+async def platform_core(
     scope: CapabilityScope = Depends(require_capability("patients.view")),
 ):
     return {"scope": scope}
@@ -37,6 +44,27 @@ async def product_entitled_crm(
 @router.get("/test-product-unmapped")
 async def product_unmapped(
     scope: CapabilityScope = Depends(require_capability("analytics.clinic_financials")),
+):
+    return {"scope": scope}
+
+
+@router.get("/test-product-exercises")
+async def product_exercises(
+    scope: CapabilityScope = Depends(require_capability("exercises.view")),
+):
+    return {"scope": scope}
+
+
+@router.get("/test-product-posture")
+async def product_posture(
+    scope: CapabilityScope = Depends(require_capability("posture.view")),
+):
+    return {"scope": scope}
+
+
+@router.get("/test-product-prescriptions")
+async def product_prescriptions(
+    scope: CapabilityScope = Depends(require_capability("prescriptions.view")),
 ):
     return {"scope": scope}
 
@@ -235,3 +263,55 @@ async def test_unmapped_capability_keeps_existing_rbac_behavior(
 
     assert response.status_code == 200
     assert response.json()["scope"] == "all"
+
+
+async def test_platform_core_capability_does_not_require_crm(
+    client: AsyncClient,
+    db_session: AsyncSession,
+):
+    _, _, headers = await create_workspace_user(
+        db_session,
+        email=f"platform-core-{uuid.uuid4()}@avtest.com",
+    )
+
+    response = await client.get("/test-platform-core", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["scope"] == "all"
+
+
+@pytest.mark.parametrize(
+    ("product_id", "path"),
+    [
+        ("exercise-library", "/test-product-exercises"),
+        ("posture-tool", "/test-product-posture"),
+        ("exercise-prescription", "/test-product-prescriptions"),
+    ],
+)
+async def test_tool_capability_requires_its_product_entitlement(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    product_id: str,
+    path: str,
+):
+    clinic, _, headers = await create_workspace_user(
+        db_session,
+        email=f"tool-entitlement-{uuid.uuid4()}@avtest.com",
+    )
+
+    denied = await client.get(path, headers=headers)
+    assert denied.status_code == 403
+    assert product_error_code(denied) == "PRODUCT_NOT_ENTITLED"
+
+    db_session.add(
+        WorkspaceProduct(
+            clinic_id=clinic.id,
+            product_id=product_id,
+            status=EntitlementStatus.ENABLED,
+        )
+    )
+    await db_session.commit()
+
+    allowed = await client.get(path, headers=headers)
+    assert allowed.status_code == 200
+    assert allowed.json()["scope"] == "all"

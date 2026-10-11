@@ -35,6 +35,7 @@ async def create_workspace(
     *,
     workspace_type: ClinicType = ClinicType.CLINIC,
     existing_user: User | None = None,
+    role: UserRole = UserRole.ADMIN,
 ) -> tuple[Clinic, dict[str, str]]:
     clinic = Clinic(name=f"Marketplace Workspace {uuid.uuid4()}", type=workspace_type)
     user = existing_user or User(
@@ -42,7 +43,7 @@ async def create_workspace(
         clinic_id=None,
         email=f"marketplace-{uuid.uuid4()}@avtest.com",
         password_hash="hash",
-        role=UserRole.ADMIN,
+        role=role,
         first_name="Market",
         last_name="User",
         is_active=True,
@@ -50,18 +51,47 @@ async def create_workspace(
     db_session.add_all([clinic, user] if existing_user is None else [clinic])
     await db_session.flush()
     db_session.add(
-        Membership(user_id=user.id, clinic_id=clinic.id, role=UserRole.ADMIN)
+        Membership(user_id=user.id, clinic_id=clinic.id, role=role)
     )
     await db_session.commit()
     token = create_access_token(
         subject=user.id,
         clinic_id=clinic.id,
-        role=UserRole.ADMIN.value,
+        role=role.value,
     )
     return clinic, {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
+
+
+async def test_marketplace_management_requires_admin_role(
+    client: AsyncClient, db_session: AsyncSession
+):
+    _, therapist_headers = await create_workspace(db_session, role=UserRole.THERAPIST)
+    _, frontdesk_headers = await create_workspace(
+        db_session, role=UserRole.FRONT_DESK
+    )
+    product = await create_product(db_session)
+    bundle = PlatformBundle(
+        slug=f"bundle-{uuid.uuid4().hex}", name="Restricted Bundle"
+    )
+    db_session.add(bundle)
+    await db_session.commit()
+
+    for headers in (therapist_headers, frontdesk_headers):
+        for path in (
+            f"/products/{product.slug}/install",
+            f"/products/{product.slug}/enable",
+            f"/products/{product.slug}/disable",
+            f"/bundles/{bundle.slug}/install",
+        ):
+            response = await client.post(marketplace_url(path), headers=headers)
+            assert response.status_code == 403
+
+        assert (
+            await client.get(marketplace_url("/products"), headers=headers)
+        ).status_code == 200
 
 
 async def create_product(

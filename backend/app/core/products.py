@@ -58,7 +58,6 @@ CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
 
 
 CRM_CAPABILITY_PREFIXES: tuple[str, ...] = (
-    "patients.",
     "leads.",
     "appointments.",
     "treatments.",
@@ -68,11 +67,15 @@ CRM_CAPABILITY_PREFIXES: tuple[str, ...] = (
     "payments.",
     "packages.",
     "booking.",
-    "settings.",
-    "users.",
-    "permissions.",
-    "audit.",
     "recyclebin.",
+)
+
+PRODUCT_CAPABILITY_PREFIXES: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {
+        "exercise-library": ("exercises.",),
+        "posture-tool": ("posture.",),
+        "exercise-prescription": ("prescriptions.",),
+    }
 )
 
 
@@ -84,14 +87,19 @@ def _capabilities_for_prefix(prefix: str) -> tuple[str, ...]:
 
 CAPABILITY_PRODUCT_MAP: Mapping[str, str] = MappingProxyType(
     {
-        # Keep this first entitlement pass intentionally scoped to CRM-owned
-        # backend capabilities. Capabilities omitted from this map use the
-        # existing RBAC behavior unchanged.
+        # Platform-core capabilities such as patients, users, permissions,
+        # audit, and settings remain governed by RBAC without a product gate.
         **{
             capability_key: "crm"
             for prefix in CRM_CAPABILITY_PREFIXES
             for capability_key in _capabilities_for_prefix(prefix)
-        }
+        },
+        **{
+            capability_key: product_id
+            for product_id, prefixes in PRODUCT_CAPABILITY_PREFIXES.items()
+            for prefix in prefixes
+            for capability_key in _capabilities_for_prefix(prefix)
+        },
     }
 )
 

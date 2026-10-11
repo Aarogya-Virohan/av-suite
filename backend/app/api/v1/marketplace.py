@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.api.v1.audit import AuditLogServiceDep
-from app.core.dependencies import AuthenticatedContextDep, SessionDep
+from app.core.dependencies import (
+    AuthenticatedContextDep,
+    SessionDep,
+    require_roles,
+)
+from app.enums.user import UserRole
 from app.schemas.envelope import ResponseEnvelope
 from app.schemas.marketplace import (
     BundleInstallResponse,
@@ -39,6 +44,7 @@ async def get_installed_products(
 @router.post(
     "/products/{product_key}/install",
     response_model=ResponseEnvelope[MarketplaceEntitlementResponse],
+    dependencies=[Depends(require_roles(UserRole.ADMIN))],
 )
 async def install_product(
     product_key: str,
@@ -67,6 +73,7 @@ async def install_product(
 @router.post(
     "/products/{product_key}/enable",
     response_model=ResponseEnvelope[MarketplaceEntitlementResponse],
+    dependencies=[Depends(require_roles(UserRole.ADMIN))],
 )
 async def enable_product(
     product_key: str,
@@ -92,6 +99,7 @@ async def enable_product(
 @router.post(
     "/products/{product_key}/disable",
     response_model=ResponseEnvelope[MarketplaceEntitlementResponse],
+    dependencies=[Depends(require_roles(UserRole.ADMIN))],
 )
 async def disable_product(
     product_key: str,
@@ -117,6 +125,7 @@ async def disable_product(
 @router.post(
     "/bundles/{bundle_key}/install",
     response_model=ResponseEnvelope[BundleInstallResponse],
+    dependencies=[Depends(require_roles(UserRole.ADMIN))],
 )
 async def install_bundle(
     bundle_key: str,

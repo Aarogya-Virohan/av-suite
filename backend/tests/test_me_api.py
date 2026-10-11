@@ -112,6 +112,87 @@ async def test_me_returns_user_workspace_products_and_authorized_capabilities(
     assert data["active_products"][0]["valid_until"] is None
     assert "patients.view" in data["capabilities"]
     assert "unknown.capability" not in data["capabilities"]
+    assert "exercises.view" not in data["capabilities"]
+    assert "posture.view" not in data["capabilities"]
+    assert "prescriptions.view" not in data["capabilities"]
+    assert "users.view" in data["capabilities"]
+    assert "permissions.view" in data["capabilities"]
+    assert "audit.view" in data["capabilities"]
+    assert "settings.view" in data["capabilities"]
+
+
+async def test_me_exposes_core_capabilities_without_crm(
+    client: AsyncClient, db_session: AsyncSession
+):
+    _, _, headers = await create_platform_user(
+        db_session,
+        memberships=[("Core-only Workspace", ClinicType.CLINIC, UserRole.ADMIN)],
+    )
+
+    response = await client.get("/api/v1/me", headers=headers)
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["active_products"] == []
+    assert {
+        "patients.view",
+        "users.view",
+        "permissions.view",
+        "audit.view",
+        "settings.view",
+    }.issubset(data["capabilities"])
+    assert "leads.view" not in data["capabilities"]
+    assert "exercises.view" not in data["capabilities"]
+    assert "posture.view" not in data["capabilities"]
+    assert "prescriptions.view" not in data["capabilities"]
+
+
+async def test_me_filters_capabilities_by_multiple_enabled_products(
+    client: AsyncClient, db_session: AsyncSession
+):
+    _, _, headers = await create_platform_user(
+        db_session,
+        memberships=[("Multi-product Workspace", ClinicType.CLINIC, UserRole.ADMIN)],
+        active_products=[
+            ("crm", EntitlementStatus.ENABLED),
+            ("exercise-library", EntitlementStatus.ENABLED),
+            ("posture-tool", EntitlementStatus.ENABLED),
+        ],
+    )
+
+    response = await client.get("/api/v1/me", headers=headers)
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    capabilities = set(data["capabilities"])
+    assert "patients.view" in capabilities
+    assert "leads.view" in capabilities
+    assert "exercises.view" in capabilities
+    assert "posture.view" in capabilities
+    assert "prescriptions.view" not in capabilities
+    assert {"crm", "exercise-library", "posture-tool"} == {
+        product["key"] for product in data["active_products"]
+    }
+
+
+async def test_me_lists_exercise_prescription_capabilities_when_entitled(
+    client: AsyncClient, db_session: AsyncSession
+):
+    _, _, headers = await create_platform_user(
+        db_session,
+        memberships=[("Prescription Workspace", ClinicType.CLINIC, UserRole.ADMIN)],
+        active_products=[
+            ("exercise-prescription", EntitlementStatus.ENABLED),
+        ],
+    )
+
+    response = await client.get("/api/v1/me", headers=headers)
+
+    assert response.status_code == 200
+    capabilities = set(response.json()["data"]["capabilities"])
+    assert "prescriptions.view" in capabilities
+    assert "exercises.view" not in capabilities
+    assert "patients.view" in capabilities
 
 
 async def test_me_uses_membership_roles_for_each_workspace_and_active_context(
@@ -157,7 +238,8 @@ async def test_me_omits_disabled_products_and_their_mapped_capabilities(
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["active_products"] == []
-    assert "patients.view" not in data["capabilities"]
+    assert "patients.view" in data["capabilities"]
+    assert "leads.view" not in data["capabilities"]
 
 
 async def test_me_applies_user_specific_capability_overrides(
@@ -217,4 +299,5 @@ async def test_me_isolates_active_workspace_products_and_capabilities(
     data = response.json()["data"]
     assert data["active_workspace"]["id"] == str(clinics[1].id)
     assert data["active_products"] == []
-    assert "patients.view" not in data["capabilities"]
+    assert "patients.view" in data["capabilities"]
+    assert "leads.view" not in data["capabilities"]
