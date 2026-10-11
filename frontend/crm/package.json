@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run --environment jsdom",
+    "typecheck": "tsc --noEmit",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
@@ -29,15 +31,20 @@
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.6",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "jsdom": "^30.1.1",
     "nodemon": "^3.1.14",
     "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2",
     "wrangler": "^4.135.0"
   }
 }

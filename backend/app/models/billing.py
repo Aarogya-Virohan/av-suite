@@ -5,14 +5,25 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Text, func, text
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDMixin
-from app.enums.billing import InvoiceStatus, PaymentMethod
+from app.enums.billing import InvoiceStatus, PaymentMethod, PaymentStatus
 from app.enums.package import PackageStatus
 from app.models.appointment import Appointment
 from app.models.clinic import Clinic
@@ -27,6 +38,12 @@ def _invoice_status_values(enum_cls: type[InvoiceStatus]) -> list[str]:
 
 def _payment_method_values(enum_cls: type[PaymentMethod]) -> list[str]:
     """Return database enum values for payment method."""
+
+    return [member.value for member in enum_cls]
+
+
+def _payment_status_values(enum_cls: type[PaymentStatus]) -> list[str]:
+    """Return database enum values for payment status."""
 
     return [member.value for member in enum_cls]
 
@@ -55,7 +72,9 @@ class Package(UUIDMixin, TimestampMixin, Base):
 
     name: Mapped[str] = mapped_column(String(length=255), nullable=False)
     total_sessions: Mapped[int] = mapped_column(Integer, nullable=False)
-    price: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
+    price: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=2), nullable=False
+    )
     validity_days: Mapped[int] = mapped_column(Integer, nullable=False)
 
     status: Mapped[PackageStatus] = mapped_column(
@@ -68,7 +87,9 @@ class Package(UUIDMixin, TimestampMixin, Base):
         default=PackageStatus.ACTIVE,
     )
 
-    patient_packages: Mapped[list[PatientPackage]] = relationship("PatientPackage", back_populates="package")
+    patient_packages: Mapped[list[PatientPackage]] = relationship(
+        "PatientPackage", back_populates="package"
+    )
 
 
 class PatientPackage(UUIDMixin, TimestampMixin, Base):
@@ -101,12 +122,16 @@ class PatientPackage(UUIDMixin, TimestampMixin, Base):
         ForeignKey("packages.id"),
         nullable=True,
     )
-    package: Mapped[Package | None] = relationship("Package", back_populates="patient_packages")
+    package: Mapped[Package | None] = relationship(
+        "Package", back_populates="patient_packages"
+    )
 
     package_name: Mapped[str] = mapped_column(String(length=255), nullable=False)
     total_sessions: Mapped[int] = mapped_column(Integer, nullable=False)
     completed_sessions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    price: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
+    price: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=2), nullable=False
+    )
 
     status: Mapped[PackageStatus] = mapped_column(
         Enum(
@@ -123,7 +148,9 @@ class PatientPackage(UUIDMixin, TimestampMixin, Base):
         nullable=False,
         server_default=func.now(),
     )
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     @property
     def sessions_remaining(self) -> int:
@@ -166,17 +193,25 @@ class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     appointment: Mapped[Appointment | None] = relationship()
 
     invoice_number: Mapped[str] = mapped_column(String(length=64), nullable=False)
-    issue_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    issue_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    due_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
-    subtotal: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
+    subtotal: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=2), nullable=False
+    )
     discount_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2), nullable=False, default=Decimal("0.00")
     )
     tax_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2), nullable=False, default=Decimal("0.00")
     )
-    total_amount: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
+    total_amount: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=2), nullable=False
+    )
     paid_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2), nullable=False, default=Decimal("0.00")
     )
@@ -229,8 +264,12 @@ class InvoiceItem(UUIDMixin, TimestampMixin, Base):
 
     description: Mapped[str] = mapped_column(String(length=255), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    unit_price: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
-    total_price: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=2), nullable=False
+    )
+    total_price: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=2), nullable=False
+    )
 
 
 class Payment(UUIDMixin, TimestampMixin, Base):
@@ -264,7 +303,9 @@ class Payment(UUIDMixin, TimestampMixin, Base):
     )
     patient: Mapped[Patient] = relationship()
 
-    amount: Mapped[Decimal] = mapped_column(Numeric(precision=10, scale=2), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(
+        Numeric(precision=10, scale=2), nullable=False
+    )
     payment_method: Mapped[PaymentMethod] = mapped_column(
         Enum(
             PaymentMethod,
@@ -273,6 +314,20 @@ class Payment(UUIDMixin, TimestampMixin, Base):
         ),
         nullable=False,
     )
-    payment_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    transaction_reference: Mapped[str | None] = mapped_column(String(length=255), nullable=True)
+    status: Mapped[PaymentStatus] = mapped_column(
+        Enum(
+            PaymentStatus,
+            name="payment_status",
+            values_callable=_payment_status_values,
+        ),
+        nullable=False,
+        default=PaymentStatus.COMPLETED,
+        server_default=text("'completed'"),
+    )
+    payment_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    transaction_reference: Mapped[str | None] = mapped_column(
+        String(length=255), nullable=True
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

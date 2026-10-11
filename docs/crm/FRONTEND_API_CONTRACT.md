@@ -608,28 +608,75 @@ Validation error format (FastAPI standard):
 
 ### 2.7 Analytics (`/analytics`)
 
+Both endpoints accept the optional `period` query parameter: `today`, `week`, `month`, or `year`. If omitted, it defaults to `month`, preserving the existing month-based metrics. These are UTC calendar periods; `week` is Monday 00:00 UTC through the following Monday 00:00 UTC. All ranges use an inclusive start and exclusive end (`start <= timestamp < end`). Period metrics are determined using appointments' `scheduled_at`, patients' `created_at`, treatment sessions' `treatment_date`, SOAP notes' `created_at`, invoice `issue_date` for billed amounts, and payment `payment_date` for collected amounts.
+
+Responses include `meta.period`, `meta.start`, and `meta.end` for the selected UTC range. Additive `*_in_period` fields use that range. Existing explicitly named month/today/week fields retain their fixed meaning, and overview appointment status totals, invoice status totals, and other unperiodized totals remain all-time. Clinic and authenticated-therapist scopes are unchanged.
+
+Financial overview's canonical fields distinguish invoices, cash collection, and current balances. `billed_amount_in_period` sums `Invoice.total_amount` for non-deleted invoices not in `draft` or `cancelled` status, using `Invoice.issue_date` within the selected UTC range. `collected_amount_in_period` sums `Payment.amount` for `completed` payments, using `Payment.payment_date` within the selected UTC range; pending, voided, and refunded payments are excluded. Completed payments on a non-deleted invoice still count if the invoice is currently `draft` or `cancelled`: invoice status does not reverse a recorded completed cash transaction. Soft-deleting an invoice excludes its payments from analytics. Both metrics are restricted to the authenticated clinic. `outstanding_amount` is a current balance snapshot (not a period flow): for non-deleted invoices in `issued`, `unpaid`, `partial`, or `overdue` status it sums `total_amount - paid_amount`, matching the existing billing balance rule.
+
+`paid_invoices_count`, `unpaid_invoices_count`, `partial_invoices_count`, and `total_outstanding_amount` are all-time/current-state values. `unpaid_invoices_count` counts only non-deleted invoices whose status is exactly `unpaid`; `issued` and `overdue` invoices are excluded from that count even though their balances contribute to `outstanding_amount`.
+
+The deprecated `revenue_this_month` and `revenue_in_period` fields preserve their historical calculation for existing consumers. They sum `Invoice.paid_amount` for non-deleted invoices by `Invoice.issue_date` (current UTC month for `revenue_this_month`, selected period for `revenue_in_period`) and apply no invoice-status filter. They are **not** aliases for cash collected in the period; new integrations should use `billed_amount_in_period`, `collected_amount_in_period`, and `outstanding_amount`. Monetary values are serialized as decimal strings (for example, `"126000.00"`); the project does not define a currency code.
+
+`data.patient_revenue` is an additive list of patients with positive billed or completed-collected activity in the selected period; a patient with billed-only or collected-only activity is included with zero for the other amount. Billing is grouped by the invoice's `patient_id` and `issue_date`; collection is grouped through each payment's linked invoice and uses `payment_date`. Both independently use the selected UTC `[start, end)` range. The completed-payment status policy above also applies here: a current draft/cancelled status does not reverse a completed payment, but a soft-deleted invoice is excluded. Soft-deleted patients are not exposed, and all rows are clinic-scoped. `patient_revenue_sort` identifies the descending ranking metric (`collected_amount` by default, or `billed_amount`); ties are ordered by the other amount descending, then patient name and ID. The query parameters `patient_revenue_sort` and `patient_revenue_limit` apply to the overview endpoint; limit defaults to 5 and is bounded to 1-100, and is applied in the database.
+
 #### `GET /analytics/overview`
-- **Purpose**: Clinic-wide dashboard KPIs.
-- **Capability**: `analytics.view` (Scope: ALL)
+- **Purpose**: Clinic-wide dashboard KPIs for the selected period.
+- **Query**: `period` (optional enum: `today`, `week`, `month`, `year`; default `month`).
+- **Patient revenue query**: `patient_revenue_sort` (`collected_amount` or `billed_amount`, default `collected_amount`) and `patient_revenue_limit` (1-100, default 5).
+- **Capability**: `analytics.clinic_financials`
 - **Response (200 OK)**:
   ```json
   {
+    "meta": {
+      "period": "month",
+      "start": "2026-09-01T00:00:00Z",
+      "end": "2026-10-01T00:00:00Z"
+    },
     "data": {
       "patients": {
         "total_patients": 120,
-        "new_this_month": 15
+        "active_patients": 110,
+        "new_patients_this_month": 15,
+        "new_patients_in_period": 15
       },
       "appointments": {
         "today_appointments": 8,
-        "completed_this_month": 84
+        "this_week_appointments": 30,
+        "appointments_in_period": 110,
+        "completed_appointments": 84,
+        "cancelled_appointments": 4,
+        "no_show_appointments": 2
       },
       "revenue": {
-        "revenue_this_month": 126000.0,
-        "outstanding_amount": 14500.0
+        "billed_amount_in_period": "142000.00",
+        "collected_amount_in_period": "126000.00",
+        "outstanding_amount": "14500.00",
+        "revenue_this_month": "119000.00",
+        "revenue_in_period": "119000.00",
+        "paid_invoices_count": 84,
+        "unpaid_invoices_count": 5,
+        "partial_invoices_count": 2,
+        "total_outstanding_amount": "14500.00"
       },
+      "patient_revenue_sort": "collected_amount",
+      "patient_revenue": [
+        {
+          "patient_id": "44444444-4444-4444-4444-444444444444",
+          "patient_name": "Ramesh Kumar",
+          "billed_amount": "5000.00",
+          "collected_amount": "4200.00"
+        }
+      ],
       "leads": {
         "total_leads": 24,
-        "converted_this_month": 6
+        "leads_by_stage": {},
+        "conversion_rate": 25.0
+      },
+      "booking": {
+        "pending_requests": 2,
+        "approved_requests": 4,
+        "rejected_requests": 1
       }
     }
   }
@@ -637,17 +684,30 @@ Validation error format (FastAPI standard):
 
 #### `GET /analytics/my-performance`
 - **Purpose**: Therapist-scoped personal KPI performance metrics.
-- **Capability**: `analytics.view` (Scope: OWN)
+- **Query**: `period` (optional enum: `today`, `week`, `month`, `year`; default `month`).
+- **Capability**: `analytics.my_performance`
+- **Scope**: Authenticated user's clinic and own therapist/user ID only.
 - **Response (200 OK)**:
   ```json
   {
+    "meta": {
+      "period": "month",
+      "start": "2026-09-01T00:00:00Z",
+      "end": "2026-10-01T00:00:00Z"
+    },
     "data": {
       "today_appointments": 4,
+      "appointments_in_period": 44,
       "completed_appointments_this_month": 42,
+      "completed_appointments_in_period": 42,
       "cancelled_appointments_this_month": 2,
+      "cancelled_appointments_in_period": 2,
       "treatment_sessions_this_month": 38,
+      "treatment_sessions_in_period": 38,
       "soap_notes_this_month": 38,
-      "patients_seen_this_month": 18
+      "soap_notes_in_period": 38,
+      "patients_seen_this_month": 18,
+      "patients_seen_in_period": 18
     }
   }
   ```

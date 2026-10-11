@@ -4,6 +4,26 @@ info:
   description: Rehabilitation exercises management backend platform
   version: 0.1.0
 paths:
+  /api/v1/auth/me:
+    get:
+      tags:
+      - Authentication
+      - Authentication
+      summary: Get Me
+      description: 'Get the currently authenticated user''s details, clinic branding,
+        and full effective capabilities.
+
+        Accessible to any active authenticated user.'
+      operationId: get_me_api_v1_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseEnvelope_AuthMeResponse_'
+      security:
+      - OAuth2PasswordBearer: []
   /api/v1/auth/register:
     post:
       tags:
@@ -152,6 +172,8 @@ paths:
         \ Example:\ncurl -X GET \"http://localhost:8000/api/v1/exercises?body_part=Shoulder&is_free=true&page=1\"\
         \ \\\n  -H \"Authorization: Bearer eyJhbGc...\""
       operationId: list_exercises_api_v1_exercises_get
+      security:
+      - OAuth2PasswordBearer: []
       parameters:
       - name: body_part
         in: query
@@ -242,8 +264,8 @@ paths:
         \ token\n- 403 FORBIDDEN: User role is not admin\n- 400 BAD REQUEST: Invalid\
         \ request body or validation failure\n- 500 INTERNAL_SERVER_ERROR: Database\
         \ error\n\nSecurity:\n- JWT token required: All requests authenticated\n-\
-        \ Admin only: Only admin role create kar sakte hain (no physios, patients)\n\
-        - Clinic isolation: Exercise automatically current clinic se associated\n\
+        \ Admin only: Only admin role create kar sakte hain (no therapists, front\
+        \ desk)\n- Clinic isolation: Exercise automatically current clinic se associated\n\
         - Input validation: Pydantic schema se strict validation\n\nAuthorization:\n\
         - Admin: Can create exercises\n- Physio: Cannot create (read-only access)\n\
         - Patient: Cannot create (no access)\n\nBusiness Logic:\n1. Authorization\
@@ -289,6 +311,8 @@ paths:
 
         Maps known conditions to exercise titles, or searches title/description.'
       operationId: get_exercises_by_condition_api_v1_exercises_by_condition_get
+      security:
+      - OAuth2PasswordBearer: []
       parameters:
       - name: condition
         in: query
@@ -343,6 +367,8 @@ paths:
         \ details for patient view\n- Fetch video URL for streaming\n- Load exercise\
         \ instructions\n- Retrieve exercise metadata for prescriptions"
       operationId: get_exercise_api_v1_exercises__id__get
+      security:
+      - OAuth2PasswordBearer: []
       parameters:
       - name: id
         in: path
@@ -435,7 +461,7 @@ paths:
       summary: List Patients
       description: "Endpoint ka purpose: Clinic ke sare patients ko list karna pagination\
         \ ke saath\nYeh endpoint patient listing handle karta hai jismein:\n1. Authorization\
-        \ check (physio ya admin)\n2. Clinic-specific patients fetch karte hain\n\
+        \ check (therapist ya admin)\n2. Clinic-specific patients fetch karte hain\n\
         3. Pagination apply karte hain\n4. Metadata ke saath results return karte\
         \ hain\n\nHTTP Method: GET\nURL: /api/v1/patients\nStatus Code: 200 OK\n\n\
         Query Parameters (PaginationParams):\n- page: Page number (1-based, default:\
@@ -452,7 +478,7 @@ paths:
         \ (patient, nurse) is not authorized\n- 400 BAD REQUEST: Invalid pagination\
         \ parameters\n- 500 INTERNAL_SERVER_ERROR: Database error\n\nSecurity:\n-\
         \ JWT token required: All requests authenticated hone chahiye\n- Clinic isolation:\
-        \ Sirf user ke clinic ke patients visible\n- Role check: Only admin/physio\
+        \ Sirf user ke clinic ke patients visible\n- Role check: Only admin/therapist\
         \ access kar sakte hain\n\nPagination:\n- Server-side pagination: Large datasets\
         \ efficiently handle\n- Total count: Frontend pagination UI ke liye\n- Page\
         \ size limit: DOS attack prevention\n\nUsage Example:\ncurl -X GET \"http://localhost:8000/api/v1/patients?page=1&page_size=10\"\
@@ -525,8 +551,8 @@ paths:
         \ not authorized for patient creation\n- 400 BAD REQUEST: Invalid request\
         \ body or validation failure\n- 500 INTERNAL_SERVER_ERROR: Database error\n\
         \nSecurity:\n- JWT token required: All requests authenticated\n- Clinic isolation:\
-        \ Patient automatically current clinic se associated\n- Role check: Only admin/physio\
-        \ create kar sakte hain\n\nBusiness Logic:\n1. Authorization check - physio\
+        \ Patient automatically current clinic se associated\n- Role check: Only admin/therapist\
+        \ create kar sakte hain\n\nBusiness Logic:\n1. Authorization check - therapist\
         \ ya admin\n2. Request data validation (Pydantic schema)\n3. Patient database\
         \ record create\n4. Created patient return\n\nUsage Example:\ncurl -X POST\
         \ http://localhost:8000/api/v1/patients \\\n  -H \"Authorization: Bearer eyJhbGc...\"\
@@ -575,9 +601,9 @@ paths:
         \ not authorized\n- 404 NOT_FOUND: Patient not found or not in user's clinic\n\
         - 400 BAD REQUEST: Invalid patient ID format\n- 500 INTERNAL_SERVER_ERROR:\
         \ Database error\n\nSecurity:\n- JWT token required: All requests authenticated\n\
-        - Clinic isolation: Patient sirf user ke clinic mein\n- Role check: Only admin/physio\
+        - Clinic isolation: Patient sirf user ke clinic mein\n- Role check: Only admin/therapist\
         \ access kar sakte hain\n- Cross-clinic prevention: Can't access other clinic's\
-        \ patients\n\nBusiness Logic:\n1. Authorization check - physio ya admin\n\
+        \ patients\n\nBusiness Logic:\n1. Authorization check - therapist ya admin\n\
         2. Patient fetch by ID aur clinic check\n3. Patient found = return data, Not\
         \ found = 404\n\nUsage Example:\ncurl -X GET http://localhost:8000/api/v1/patients/12345678-1234-5678-1234-567812345678\
         \ \\\n  -H \"Authorization: Bearer eyJhbGc...\""
@@ -691,6 +717,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
   /api/v1/prescriptions:
     post:
       tags:
@@ -729,6 +757,8 @@ paths:
       summary: List Prescriptions
       description: List prescriptions in a clinic, optionally filtered by patient.
       operationId: list_prescriptions_api_v1_prescriptions_get
+      security:
+      - OAuth2PasswordBearer: []
       parameters:
       - name: patient_id
         in: query
@@ -793,6 +823,8 @@ paths:
       summary: Get Prescription
       description: Fetches a specific prescription by ID.
       operationId: get_prescription_api_v1_prescriptions__id__get
+      security:
+      - OAuth2PasswordBearer: []
       parameters:
       - name: id
         in: path
@@ -889,6 +921,8 @@ paths:
       description: Generates a PDF for the prescription and returns the static file
         URL.
       operationId: generate_pdf_api_v1_prescriptions__id__pdf_post
+      security:
+      - OAuth2PasswordBearer: []
       parameters:
       - name: id
         in: path
@@ -921,6 +955,8 @@ paths:
 
         Replaces the old public /static/... access (no auth, no tenant check).'
       operationId: download_pdf_api_v1_prescriptions__id__pdf_download_get
+      security:
+      - OAuth2PasswordBearer: []
       parameters:
       - name: id
         in: path
@@ -1637,6 +1673,15 @@ paths:
             format: uuid
           - type: 'null'
           title: Appointment Id
+      - name: therapist_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Therapist Id
       - name: specialty
         in: query
         required: false
@@ -1725,6 +1770,154 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SoapAssessmentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/users:
+    get:
+      tags:
+      - Users
+      - Users
+      summary: List Users
+      description: List all users/therapists in the clinic.
+      operationId: list_users_api_v1_users_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseEnvelope_List_UserRead__'
+      security:
+      - OAuth2PasswordBearer: []
+    post:
+      tags:
+      - Users
+      - Users
+      summary: Create User
+      description: Create a new user in the clinic.
+      operationId: create_user_api_v1_users_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseEnvelope_UserRead_'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/v1/users/{user_id}/permissions:
+    get:
+      tags:
+      - Users
+      - Users
+      summary: Get User Permissions
+      description: Get all explicit permission overrides for a user in the clinic.
+      operationId: get_user_permissions_api_v1_users__user_id__permissions_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseEnvelope_List_UserPermissionRead__'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - Users
+      - Users
+      summary: Update User Permissions
+      description: 'Completely replace the user''s explicit permission overrides.
+
+        Any existing override not in this list will be removed.'
+      operationId: update_user_permissions_api_v1_users__user_id__permissions_put
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserPermissionCreate'
+              title: Permissions
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseEnvelope_List_UserPermissionRead__'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/users/{user_id}:
+    delete:
+      tags:
+      - Users
+      - Users
+      summary: Delete User
+      description: Remove a user from the clinic.
+      operationId: delete_user_api_v1_users__user_id__delete
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: User Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseEnvelope_NoneType_'
         '422':
           description: Validation Error
           content:
@@ -2337,6 +2530,7 @@ paths:
             application/json:
               schema:
                 type: object
+                additionalProperties: true
                 title: Response Generate Invoice Pdf Endpoint Api V1 Invoices  Id  Pdf
                   Post
         '422':
@@ -2600,9 +2794,18 @@ paths:
       tags:
       - Booking
       summary: Create Public Appointment Request
-      description: Public unauthenticated endpoint to submit an appointment request.
+      description: Public unauthenticated endpoint to submit an appointment request
+        using clinic slug or clinic id.
       operationId: create_public_appointment_request_api_v1_booking_request_post
       parameters:
+      - name: clinic_slug
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Clinic Slug
       - name: clinic_id
         in: query
         required: false
@@ -2712,7 +2915,7 @@ paths:
         required: false
         schema:
           anyOf:
-          - $ref: '#/components/schemas/AppointmentRequestStatus'
+          - $ref: '#/components/schemas/app__enums__appointment__AppointmentRequestStatus'
           - type: 'null'
           title: Status
       - name: search
@@ -2864,7 +3067,7 @@ paths:
       tags:
       - Documents
       summary: Upload Patient Document
-      description: Register document metadata for a specific patient.
+      description: Upload and register a document for a specific patient.
       operationId: upload_patient_document_api_v1_patients__patient_id__documents_post
       security:
       - OAuth2PasswordBearer: []
@@ -2879,9 +3082,9 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatientDocumentCreate'
+              $ref: '#/components/schemas/Body_upload_patient_document_api_v1_patients__patient_id__documents_post'
       responses:
         '201':
           description: Successful Response
@@ -3492,17 +3695,100 @@ paths:
       tags:
       - Analytics
       summary: Get Analytics Overview
-      description: Retrieve clinic-scoped analytics dashboard metrics.
+      description: 'Retrieve clinic-wide analytics metrics.
+
+        Requires analytics.clinic_financials capability.'
       operationId: get_analytics_overview_api_v1_analytics_overview_get
+      security:
+      - OAuth2PasswordBearer: []
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/AnalyticsPeriod'
+          description: 'UTC calendar reporting period: today (current UTC day), week
+            (current Monday-based calendar week), month (current UTC calendar month),
+            or year (current UTC calendar year). The start is inclusive and the end
+            is exclusive. Defaults to month.'
+          default: month
+        description: 'UTC calendar reporting period: today (current UTC day), week
+          (current Monday-based calendar week), month (current UTC calendar month),
+          or year (current UTC calendar year). The start is inclusive and the end
+          is exclusive. Defaults to month.'
+      - name: patient_revenue_sort
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/PatientRevenueSort'
+          description: 'Financial metric used to rank the patient_revenue list: collected_amount
+            (default) or billed_amount.'
+          default: collected_amount
+        description: 'Financial metric used to rank the patient_revenue list: collected_amount
+          (default) or billed_amount.'
+      - name: patient_revenue_limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Maximum patient_revenue results to return (1-100; default 5).
+          default: 5
+          title: Patient Revenue Limit
+        description: Maximum patient_revenue results to return (1-100; default 5).
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResponseEnvelope_AnalyticsOverviewResponse_'
+                $ref: '#/components/schemas/AnalyticsOverviewEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/analytics/my-performance:
+    get:
+      tags:
+      - Analytics
+      summary: Get My Performance
+      description: 'Retrieve therapist-scoped performance metrics.
+
+        Requires analytics.my_performance capability.'
+      operationId: get_my_performance_api_v1_analytics_my_performance_get
       security:
       - OAuth2PasswordBearer: []
+      parameters:
+      - name: period
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/AnalyticsPeriod'
+          description: 'UTC calendar reporting period: today (current UTC day), week
+            (current Monday-based calendar week), month (current UTC calendar month),
+            or year (current UTC calendar year). The start is inclusive and the end
+            is exclusive. Defaults to month.'
+          default: month
+        description: 'UTC calendar reporting period: today (current UTC day), week
+          (current Monday-based calendar week), month (current UTC calendar month),
+          or year (current UTC calendar year). The start is inclusive and the end
+          is exclusive. Defaults to month.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TherapistPerformanceEnvelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /posture/analyze:
     post:
       tags:
@@ -3527,6 +3813,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
   /health:
     get:
       tags:
@@ -3542,6 +3830,20 @@ paths:
               schema: {}
 components:
   schemas:
+    AnalyticsOverviewEnvelope:
+      properties:
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/AnalyticsOverviewResponse'
+          - type: 'null'
+        meta:
+          $ref: '#/components/schemas/AnalyticsPeriodMetadata'
+      type: object
+      required:
+      - meta
+      title: AnalyticsOverviewEnvelope
+      description: Overview envelope with metadata describing the selected report
+        period.
     AnalyticsOverviewResponse:
       properties:
         patients:
@@ -3550,6 +3852,13 @@ components:
           $ref: '#/components/schemas/AppointmentAnalytics'
         revenue:
           $ref: '#/components/schemas/RevenueAnalytics'
+        patient_revenue:
+          items:
+            $ref: '#/components/schemas/PatientRevenueAnalytics'
+          type: array
+          title: Patient Revenue
+        patient_revenue_sort:
+          $ref: '#/components/schemas/PatientRevenueSort'
         leads:
           $ref: '#/components/schemas/LeadAnalytics'
         booking:
@@ -3559,10 +3868,41 @@ components:
       - patients
       - appointments
       - revenue
+      - patient_revenue
+      - patient_revenue_sort
       - leads
       - booking
       title: AnalyticsOverviewResponse
-      description: Aggregated dashboard overview response schema.
+      description: Aggregated dashboard overview response schema (admin/clinic-wide).
+    AnalyticsPeriod:
+      type: string
+      enum:
+      - today
+      - week
+      - month
+      - year
+      title: AnalyticsPeriod
+      description: Supported UTC calendar periods for analytics reports.
+    AnalyticsPeriodMetadata:
+      properties:
+        period:
+          $ref: '#/components/schemas/AnalyticsPeriod'
+        start:
+          type: string
+          format: date-time
+          title: Start
+        end:
+          type: string
+          format: date-time
+          title: End
+      type: object
+      required:
+      - period
+      - start
+      - end
+      title: AnalyticsPeriodMetadata
+      description: Selected UTC calendar range; ``start`` is inclusive and ``end``
+        exclusive.
     AppointmentAnalytics:
       properties:
         today_appointments:
@@ -3571,6 +3911,9 @@ components:
         this_week_appointments:
           type: integer
           title: This Week Appointments
+        appointments_in_period:
+          type: integer
+          title: Appointments In Period
         completed_appointments:
           type: integer
           title: Completed Appointments
@@ -3584,6 +3927,7 @@ components:
       required:
       - today_appointments
       - this_week_appointments
+      - appointments_in_period
       - completed_appointments
       - cancelled_appointments
       - no_show_appointments
@@ -3609,12 +3953,10 @@ components:
           title: Duration Minutes
           default: 30
         status:
-          allOf:
-          - $ref: '#/components/schemas/AppointmentStatus'
+          $ref: '#/components/schemas/AppointmentStatus'
           default: scheduled
         source:
-          allOf:
-          - $ref: '#/components/schemas/AppointmentSource'
+          $ref: '#/components/schemas/AppointmentSource'
           default: manual
       type: object
       required:
@@ -3737,6 +4079,12 @@ components:
           - type: 'null'
           title: Preferred Slot
           description: Preferred time slot e.g. morning/afternoon.
+        turnstile_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Turnstile Token
+          description: Optional Cloudflare Turnstile token.
       type: object
       required:
       - name
@@ -3809,7 +4157,7 @@ components:
           format: uuid
           title: Clinic Id
         status:
-          $ref: '#/components/schemas/AppointmentRequestStatus'
+          $ref: '#/components/schemas/AppointmentRequestStatus-Output'
         created_at:
           type: string
           format: date-time
@@ -3829,7 +4177,7 @@ components:
       - updated_at
       title: AppointmentRequestResponse
       description: Schema representing a complete appointment request record.
-    AppointmentRequestStatus:
+    AppointmentRequestStatus-Output:
       type: string
       enum:
       - pending
@@ -3841,7 +4189,7 @@ components:
       properties:
         status:
           anyOf:
-          - $ref: '#/components/schemas/AppointmentRequestStatus'
+          - $ref: '#/components/schemas/app__enums__booking__AppointmentRequestStatus'
           - type: 'null'
         notes:
           anyOf:
@@ -3872,12 +4220,10 @@ components:
           title: Duration Minutes
           default: 30
         status:
-          allOf:
-          - $ref: '#/components/schemas/AppointmentStatus'
+          $ref: '#/components/schemas/AppointmentStatus'
           default: scheduled
         source:
-          allOf:
-          - $ref: '#/components/schemas/AppointmentSource'
+          $ref: '#/components/schemas/AppointmentSource'
           default: manual
         id:
           type: string
@@ -3887,6 +4233,16 @@ components:
           type: string
           format: uuid
           title: Clinic Id
+        patient_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Patient Name
+        therapist_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Therapist Name
         created_at:
           type: string
           format: date-time
@@ -3989,7 +4345,8 @@ components:
           title: Entity Id
         details:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Details
         created_at:
@@ -4008,19 +4365,36 @@ components:
       - created_at
       title: AuditLogResponse
       description: Schema representing an audit log entry.
+    AuthMeResponse:
+      properties:
+        user:
+          $ref: '#/components/schemas/UserInfoResponse'
+        clinic:
+          $ref: '#/components/schemas/ClinicInfoResponse'
+        capabilities:
+          additionalProperties:
+            type: string
+          type: object
+          title: Capabilities
+      type: object
+      required:
+      - user
+      - clinic
+      - capabilities
+      title: AuthMeResponse
     Body_analyze_posture_api_v1_posture_posture_analyze_post:
       properties:
         front_image:
           type: string
-          format: binary
+          contentMediaType: application/octet-stream
           title: Front Image
         side_image:
           type: string
-          format: binary
+          contentMediaType: application/octet-stream
           title: Side Image
         back_image:
           type: string
-          format: binary
+          contentMediaType: application/octet-stream
           title: Back Image
         patient_name:
           type: string
@@ -4034,15 +4408,6 @@ components:
         case_ref:
           type: string
           title: Case Ref
-        patient_height_cm:
-          anyOf:
-          - type: number
-          - type: 'null'
-          title: Patient Height Cm
-        clinician_name:
-          type: string
-          title: Clinician Name
-          default: ''
       type: object
       required:
       - front_image
@@ -4057,15 +4422,15 @@ components:
       properties:
         front_image:
           type: string
-          format: binary
+          contentMediaType: application/octet-stream
           title: Front Image
         side_image:
           type: string
-          format: binary
+          contentMediaType: application/octet-stream
           title: Side Image
         back_image:
           type: string
-          format: binary
+          contentMediaType: application/octet-stream
           title: Back Image
         patient_name:
           type: string
@@ -4079,15 +4444,6 @@ components:
         case_ref:
           type: string
           title: Case Ref
-        patient_height_cm:
-          anyOf:
-          - type: number
-          - type: 'null'
-          title: Patient Height Cm
-        clinician_name:
-          type: string
-          title: Clinician Name
-          default: ''
       type: object
       required:
       - front_image
@@ -4098,6 +4454,37 @@ components:
       - gender
       - case_ref
       title: Body_analyze_posture_posture_analyze_post
+    Body_upload_patient_document_api_v1_patients__patient_id__documents_post:
+      properties:
+        label:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Label
+        category:
+          $ref: '#/components/schemas/DocumentCategory'
+        notes:
+          anyOf:
+          - type: string
+            maxLength: 2000
+          - type: 'null'
+          title: Notes
+        treatment_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Treatment Id
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+      type: object
+      required:
+      - label
+      - category
+      - file
+      title: Body_upload_patient_document_api_v1_patients__patient_id__documents_post
     BookingAnalytics:
       properties:
         pending_requests:
@@ -4116,6 +4503,38 @@ components:
       - rejected_requests
       title: BookingAnalytics
       description: Analytics metrics for public booking appointment requests.
+    CapabilityScope:
+      type: string
+      enum:
+      - none
+      - own
+      - all
+      title: CapabilityScope
+      description: Allowed Rev3 capability scopes.
+    ClinicInfoResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        branding_logo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Branding Logo Url
+        branding_color:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Branding Color
+      type: object
+      required:
+      - id
+      - name
+      title: ClinicInfoResponse
     ClinicPlanTier:
       type: string
       enum:
@@ -4147,13 +4566,16 @@ components:
           title: Branding Color
           description: 'Primary branding color hex code (e.g. #008080).'
         plan_tier:
-          allOf:
-          - $ref: '#/components/schemas/ClinicPlanTier'
+          $ref: '#/components/schemas/ClinicPlanTier'
           description: Read-only subscription plan tier.
         is_partner_clinic:
           type: boolean
           title: Is Partner Clinic
           description: Read-only partner clinic designation flag.
+        is_documents_enabled:
+          type: boolean
+          title: Is Documents Enabled
+          description: Whether document storage is enabled for the clinic.
         created_at:
           type: string
           format: date-time
@@ -4168,6 +4590,7 @@ components:
       - name
       - plan_tier
       - is_partner_clinic
+      - is_documents_enabled
       - created_at
       - updated_at
       title: ClinicSettingsResponse
@@ -4185,7 +4608,6 @@ components:
         branding_logo_url:
           anyOf:
           - type: string
-            maxLength: 2048
           - type: 'null'
           title: Branding Logo Url
           description: Updated branding logo URL.
@@ -4196,6 +4618,12 @@ components:
           - type: 'null'
           title: Branding Color
           description: Updated branding color hex string.
+        is_documents_enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Documents Enabled
+          description: Toggle document storage bucket on/off.
       type: object
       title: ClinicSettingsUpdate
       description: Schema for updating clinic settings and branding.
@@ -4318,6 +4746,13 @@ components:
           title: Video Url
       type: object
       title: ExerciseUpdate
+    Gender:
+      type: string
+      enum:
+      - male
+      - female
+      - other
+      title: Gender
     HTTPValidationError:
       properties:
         detail:
@@ -4357,6 +4792,7 @@ components:
           - type: number
             minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Discount Amount
           default: '0.00'
         tax_amount:
@@ -4364,6 +4800,7 @@ components:
           - type: number
             minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Tax Amount
           default: '0.00'
         notes:
@@ -4378,6 +4815,7 @@ components:
           title: Items
         line_items:
           items:
+            additionalProperties: true
             type: object
           type: array
           title: Line Items
@@ -4403,6 +4841,7 @@ components:
           - type: number
             minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Unit Price
       type: object
       required:
@@ -4422,6 +4861,7 @@ components:
           default: 1
         unit_price:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Unit Price
         id:
           type: string
@@ -4437,6 +4877,7 @@ components:
           title: Invoice Id
         total_price:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Total Price
         created_at:
           type: string
@@ -4509,10 +4950,12 @@ components:
           title: Due Date
         discount_amount:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Discount Amount
           default: '0.00'
         tax_amount:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Tax Amount
           default: '0.00'
         notes:
@@ -4530,17 +4973,21 @@ components:
           title: Clinic Id
         subtotal:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Subtotal
         total_amount:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Total Amount
         paid_amount:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Paid Amount
         status:
           $ref: '#/components/schemas/InvoiceStatus'
         line_items:
           items:
+            additionalProperties: true
             type: object
           type: array
           title: Line Items
@@ -4601,13 +5048,17 @@ components:
         discount_amount:
           anyOf:
           - type: number
+            minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           - type: 'null'
           title: Discount Amount
         tax_amount:
           anyOf:
           - type: number
+            minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           - type: 'null'
           title: Tax Amount
         status:
@@ -4682,14 +5133,11 @@ components:
           description: Contact email address.
         source:
           anyOf:
-          - type: string
-            maxLength: 100
+          - $ref: '#/components/schemas/LeadSource'
           - type: 'null'
-          title: Source
-          description: Lead acquisition source (e.g. google, meta).
+          description: Lead acquisition source.
         stage:
-          allOf:
-          - $ref: '#/components/schemas/LeadStage'
+          $ref: '#/components/schemas/LeadStage'
           description: Lifecycle stage of lead.
           default: new
         notes:
@@ -4762,14 +5210,11 @@ components:
           description: Contact email address.
         source:
           anyOf:
-          - type: string
-            maxLength: 100
+          - $ref: '#/components/schemas/LeadSource'
           - type: 'null'
-          title: Source
-          description: Lead acquisition source (e.g. google, meta).
+          description: Lead acquisition source.
         stage:
-          allOf:
-          - $ref: '#/components/schemas/LeadStage'
+          $ref: '#/components/schemas/LeadStage'
           description: Lifecycle stage of lead.
           default: new
         notes:
@@ -4819,6 +5264,17 @@ components:
       - updated_at
       title: LeadResponse
       description: Schema representing full details of a lead.
+    LeadSource:
+      type: string
+      enum:
+      - website
+      - referral
+      - social_media
+      - walk_in
+      - advertisement
+      - other
+      title: LeadSource
+      description: Sources where a lead originated.
     LeadStage:
       type: string
       enum:
@@ -4856,10 +5312,8 @@ components:
           title: Email
         source:
           anyOf:
-          - type: string
-            maxLength: 100
+          - $ref: '#/components/schemas/LeadSource'
           - type: 'null'
-          title: Source
         stage:
           anyOf:
           - $ref: '#/components/schemas/LeadStage'
@@ -4950,6 +5404,7 @@ components:
           - type: number
             minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Price
         validity_days:
           type: integer
@@ -4998,6 +5453,7 @@ components:
           title: Total Sessions
         price:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Price
         validity_days:
           type: integer
@@ -5060,7 +5516,9 @@ components:
         price:
           anyOf:
           - type: number
+            minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           - type: 'null'
           title: Price
         validity_days:
@@ -5087,11 +5545,15 @@ components:
         new_patients_this_month:
           type: integer
           title: New Patients This Month
+        new_patients_in_period:
+          type: integer
+          title: New Patients In Period
       type: object
       required:
       - total_patients
       - active_patients
       - new_patients_this_month
+      - new_patients_in_period
       title: PatientAnalytics
       description: Analytics metrics for clinic patients.
     PatientCreate:
@@ -5113,6 +5575,31 @@ components:
           - type: string
           - type: 'null'
           title: Phone
+        gender:
+          anyOf:
+          - $ref: '#/components/schemas/Gender'
+          - type: 'null'
+        chief_complaint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Chief Complaint
+        referral_source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Referral Source
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+          default: active
+        age:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Age
         user_id:
           anyOf:
           - type: string
@@ -5139,8 +5626,7 @@ components:
           title: File Type
           description: MIME type or file extension.
         category:
-          allOf:
-          - $ref: '#/components/schemas/DocumentCategory'
+          $ref: '#/components/schemas/DocumentCategory'
           description: Document classification category.
           default: other
         notes:
@@ -5229,8 +5715,7 @@ components:
           title: File Type
           description: MIME type or file extension.
         category:
-          allOf:
-          - $ref: '#/components/schemas/DocumentCategory'
+          $ref: '#/components/schemas/DocumentCategory'
           description: Document classification category.
           default: other
         notes:
@@ -5341,6 +5826,7 @@ components:
           - type: number
             minimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Price
         expires_at:
           anyOf:
@@ -5401,6 +5887,7 @@ components:
           title: Total Sessions
         price:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Price
         expires_at:
           anyOf:
@@ -5492,6 +5979,31 @@ components:
           - type: string
           - type: 'null'
           title: Phone
+        gender:
+          anyOf:
+          - $ref: '#/components/schemas/Gender'
+          - type: 'null'
+        chief_complaint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Chief Complaint
+        referral_source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Referral Source
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+          default: active
+        age:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Age
         id:
           type: string
           format: uuid
@@ -5524,6 +6036,45 @@ components:
       - created_at
       - updated_at
       title: PatientRead
+    PatientRevenueAnalytics:
+      properties:
+        patient_id:
+          type: string
+          format: uuid
+          title: Patient Id
+        patient_name:
+          type: string
+          title: Patient Name
+          description: Patient first and last name combined.
+        billed_amount:
+          type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
+          title: Billed Amount
+          description: Selected-period sum of eligible Invoice.total_amount values
+            by Invoice.issue_date; zero when the patient has no billed activity.
+        collected_amount:
+          type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
+          title: Collected Amount
+          description: Selected-period sum of completed Payment.amount values by Payment.payment_date
+            through the linked invoice. Current draft or cancelled invoice status
+            does not reverse a completed payment; soft-deleted invoices are excluded.
+      type: object
+      required:
+      - patient_id
+      - patient_name
+      - billed_amount
+      - collected_amount
+      title: PatientRevenueAnalytics
+      description: Selected-period financial totals for a patient with activity in
+        either measure.
+    PatientRevenueSort:
+      type: string
+      enum:
+      - collected_amount
+      - billed_amount
+      title: PatientRevenueSort
+      description: Financial measure used to order patient revenue analytics.
     PatientUpdate:
       properties:
         first_name:
@@ -5553,6 +6104,30 @@ components:
             format: uuid
           - type: 'null'
           title: User Id
+        gender:
+          anyOf:
+          - $ref: '#/components/schemas/Gender'
+          - type: 'null'
+        chief_complaint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Chief Complaint
+        referral_source:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Referral Source
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        age:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Age
       type: object
       title: PatientUpdate
     PaymentCreate:
@@ -5570,6 +6145,7 @@ components:
           - type: number
             exclusiveMinimum: 0.0
           - type: string
+            pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Amount
         payment_method:
           $ref: '#/components/schemas/PaymentMethod'
@@ -5643,6 +6219,7 @@ components:
           title: Patient Id
         amount:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Amount
         payment_method:
           $ref: '#/components/schemas/PaymentMethod'
@@ -6028,21 +6605,6 @@ components:
       - first_name
       - last_name
       title: RegisterRequest
-    ResponseEnvelope_AnalyticsOverviewResponse_:
-      properties:
-        data:
-          anyOf:
-          - $ref: '#/components/schemas/AnalyticsOverviewResponse'
-          - type: 'null'
-        meta:
-          anyOf:
-          - $ref: '#/components/schemas/MetaPagination'
-          - $ref: '#/components/schemas/MetaError'
-          - type: object
-          - type: 'null'
-          title: Meta
-      type: object
-      title: ResponseEnvelope[AnalyticsOverviewResponse]
     ResponseEnvelope_AppointmentRequestResponse_:
       properties:
         data:
@@ -6053,7 +6615,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6068,11 +6631,28 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
       title: ResponseEnvelope[AuditLogResponse]
+    ResponseEnvelope_AuthMeResponse_:
+      properties:
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/AuthMeResponse'
+          - type: 'null'
+        meta:
+          anyOf:
+          - $ref: '#/components/schemas/MetaPagination'
+          - $ref: '#/components/schemas/MetaError'
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Meta
+      type: object
+      title: ResponseEnvelope[AuthMeResponse]
     ResponseEnvelope_ExerciseRead_:
       properties:
         data:
@@ -6083,7 +6663,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6101,7 +6682,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6119,7 +6701,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6137,11 +6720,50 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
       title: ResponseEnvelope[List[PrescriptionRead]]
+    ResponseEnvelope_List_UserPermissionRead__:
+      properties:
+        data:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/UserPermissionRead'
+            type: array
+          - type: 'null'
+          title: Data
+        meta:
+          anyOf:
+          - $ref: '#/components/schemas/MetaPagination'
+          - $ref: '#/components/schemas/MetaError'
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Meta
+      type: object
+      title: ResponseEnvelope[List[UserPermissionRead]]
+    ResponseEnvelope_List_UserRead__:
+      properties:
+        data:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/UserRead'
+            type: array
+          - type: 'null'
+          title: Data
+        meta:
+          anyOf:
+          - $ref: '#/components/schemas/MetaPagination'
+          - $ref: '#/components/schemas/MetaError'
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Meta
+      type: object
+      title: ResponseEnvelope[List[UserRead]]
     ResponseEnvelope_NoneType_:
       properties:
         data:
@@ -6151,7 +6773,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6166,7 +6789,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6181,7 +6805,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6196,7 +6821,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6211,23 +6837,42 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
       title: ResponseEnvelope[TokenResponse]
+    ResponseEnvelope_UserRead_:
+      properties:
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/UserRead'
+          - type: 'null'
+        meta:
+          anyOf:
+          - $ref: '#/components/schemas/MetaPagination'
+          - $ref: '#/components/schemas/MetaError'
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Meta
+      type: object
+      title: ResponseEnvelope[UserRead]
     ResponseEnvelope_dict_:
       properties:
         data:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Data
         meta:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6236,14 +6881,16 @@ components:
       properties:
         data:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Data
         meta:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6261,7 +6908,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6279,7 +6927,8 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
@@ -6297,37 +6946,84 @@ components:
           anyOf:
           - $ref: '#/components/schemas/MetaPagination'
           - $ref: '#/components/schemas/MetaError'
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Meta
       type: object
       title: ResponseEnvelope[list[AuditLogResponse]]
     RevenueAnalytics:
       properties:
+        billed_amount_in_period:
+          type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
+          title: Billed Amount In Period
+          description: Sum of non-draft, non-cancelled invoice total_amount values
+            whose issue_date is within the selected UTC period [start, end).
+        collected_amount_in_period:
+          type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
+          title: Collected Amount In Period
+          description: Sum of completed payment amounts whose payment_date is within
+            the selected UTC period [start, end), linked to a non-deleted invoice.
+            The current invoice status does not reverse a completed payment.
+        outstanding_amount:
+          type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
+          title: Outstanding Amount
+          description: 'Current all-time outstanding invoice balance: total_amount
+            minus paid_amount for non-deleted invoices in issued, unpaid, partial,
+            or overdue status. This is a balance snapshot, not a period flow.'
         revenue_this_month:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Revenue This Month
+          description: 'Deprecated legacy metric: sum Invoice.paid_amount for non-deleted
+            invoices whose issue_date is in the current UTC calendar month. No invoice-status
+            filter is applied. This is not a cash-collected payment-date metric; prefer
+            collected_amount_in_period.'
+          deprecated: true
+        revenue_in_period:
+          type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
+          title: Revenue In Period
+          description: 'Deprecated legacy metric: sum Invoice.paid_amount for non-deleted
+            invoices whose issue_date is within the selected UTC period [start, end).
+            No invoice-status filter is applied. This is not a cash-collected payment-date
+            metric.'
+          deprecated: true
         paid_invoices_count:
           type: integer
           title: Paid Invoices Count
         unpaid_invoices_count:
           type: integer
           title: Unpaid Invoices Count
+          description: All-time count of non-deleted invoices with exactly status
+            'unpaid'. Invoices in 'issued' or 'overdue' status are excluded even though
+            their balances contribute to outstanding_amount.
         partial_invoices_count:
           type: integer
           title: Partial Invoices Count
         total_outstanding_amount:
           type: string
+          pattern: ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$
           title: Total Outstanding Amount
+          description: Legacy alias for outstanding_amount; retains the all-time status-based
+            invoice balance calculation.
       type: object
       required:
+      - billed_amount_in_period
+      - collected_amount_in_period
+      - outstanding_amount
       - revenue_this_month
+      - revenue_in_period
       - paid_invoices_count
       - unpaid_invoices_count
       - partial_invoices_count
       - total_outstanding_amount
       title: RevenueAnalytics
-      description: Analytics metrics for clinic revenue and billing.
+      description: Financial analytics with billed and actually collected amounts
+        separated.
     SoapAssessmentCreate:
       properties:
         patient_id:
@@ -6340,6 +7036,12 @@ components:
             format: uuid
           - type: 'null'
           title: Appointment Id
+        therapist_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Therapist Id
         specialty:
           type: string
           title: Specialty
@@ -6352,7 +7054,12 @@ components:
           type: boolean
           title: Is Reassessment
           default: false
+        finalized:
+          type: boolean
+          title: Finalized
+          default: false
         form_data:
+          additionalProperties: true
           type: object
           title: Form Data
       type: object
@@ -6397,6 +7104,12 @@ components:
             format: uuid
           - type: 'null'
           title: Appointment Id
+        therapist_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Therapist Id
         specialty:
           type: string
           title: Specialty
@@ -6409,7 +7122,12 @@ components:
           type: boolean
           title: Is Reassessment
           default: false
+        finalized:
+          type: boolean
+          title: Finalized
+          default: false
         form_data:
+          additionalProperties: true
           type: object
           title: Form Data
         id:
@@ -6446,6 +7164,12 @@ components:
             format: uuid
           - type: 'null'
           title: Appointment Id
+        therapist_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Therapist Id
         specialty:
           anyOf:
           - type: string
@@ -6461,14 +7185,94 @@ components:
           - type: boolean
           - type: 'null'
           title: Is Reassessment
+        finalized:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Finalized
         form_data:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Form Data
       type: object
       title: SoapAssessmentUpdate
       description: Payload for updating a SOAP Assessment.
+    TherapistPerformanceEnvelope:
+      properties:
+        data:
+          anyOf:
+          - $ref: '#/components/schemas/TherapistPerformanceResponse'
+          - type: 'null'
+        meta:
+          $ref: '#/components/schemas/AnalyticsPeriodMetadata'
+      type: object
+      required:
+      - meta
+      title: TherapistPerformanceEnvelope
+      description: Therapist performance envelope with selected-period metadata.
+    TherapistPerformanceResponse:
+      properties:
+        today_appointments:
+          type: integer
+          title: Today Appointments
+        appointments_in_period:
+          type: integer
+          title: Appointments In Period
+        completed_appointments_this_month:
+          type: integer
+          title: Completed Appointments This Month
+        completed_appointments_in_period:
+          type: integer
+          title: Completed Appointments In Period
+        cancelled_appointments_this_month:
+          type: integer
+          title: Cancelled Appointments This Month
+        cancelled_appointments_in_period:
+          type: integer
+          title: Cancelled Appointments In Period
+        treatment_sessions_this_month:
+          type: integer
+          title: Treatment Sessions This Month
+        treatment_sessions_in_period:
+          type: integer
+          title: Treatment Sessions In Period
+        soap_notes_this_month:
+          type: integer
+          title: Soap Notes This Month
+        soap_notes_in_period:
+          type: integer
+          title: Soap Notes In Period
+        patients_seen_this_month:
+          type: integer
+          title: Patients Seen This Month
+        patients_seen_in_period:
+          type: integer
+          title: Patients Seen In Period
+      type: object
+      required:
+      - today_appointments
+      - appointments_in_period
+      - completed_appointments_this_month
+      - completed_appointments_in_period
+      - cancelled_appointments_this_month
+      - cancelled_appointments_in_period
+      - treatment_sessions_this_month
+      - treatment_sessions_in_period
+      - soap_notes_this_month
+      - soap_notes_in_period
+      - patients_seen_this_month
+      - patients_seen_in_period
+      title: TherapistPerformanceResponse
+      description: 'Therapist-scoped performance metrics for /analytics/my-performance.
+
+
+        Per RBAC Spec §4: Analytics for therapist = ''Own only''.
+
+        Per Rev3 scope: split analytics into my-performance vs clinic-financials.
+
+        Only contains data belonging to the requesting therapist.'
     TokenResponse:
       properties:
         access_token:
@@ -6522,6 +7326,10 @@ components:
           - type: string
           - type: 'null'
           title: Notes
+        finalized:
+          type: boolean
+          title: Finalized
+          default: false
       type: object
       required:
       - patient_id
@@ -6594,6 +7402,10 @@ components:
           - type: string
           - type: 'null'
           title: Notes
+        finalized:
+          type: boolean
+          title: Finalized
+          default: false
         id:
           type: string
           format: uuid
@@ -6664,9 +7476,226 @@ components:
           - type: string
           - type: 'null'
           title: Notes
+        finalized:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Finalized
       type: object
       title: TreatmentSessionUpdate
       description: Payload for updating a Treatment Session.
+    UserCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          title: Name
+          default: ''
+        email:
+          type: string
+          format: email
+          title: Email
+        phone:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+          title: Phone
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+          title: Is Active
+          default: true
+        password:
+          type: string
+          maxLength: 128
+          minLength: 8
+          title: Password
+        first_name:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: First Name
+        last_name:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+          title: Last Name
+      type: object
+      required:
+      - email
+      - role
+      - password
+      title: UserCreate
+      description: User creation payload with AV Suite first/last name compatibility.
+    UserInfoResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        clinic_id:
+          type: string
+          format: uuid
+          title: Clinic Id
+        email:
+          type: string
+          format: email
+          title: Email
+        first_name:
+          type: string
+          title: First Name
+        last_name:
+          type: string
+          title: Last Name
+        role:
+          type: string
+          title: Role
+        is_active:
+          type: boolean
+          title: Is Active
+      type: object
+      required:
+      - id
+      - clinic_id
+      - email
+      - first_name
+      - last_name
+      - role
+      - is_active
+      title: UserInfoResponse
+    UserPermissionCreate:
+      properties:
+        capability_key:
+          type: string
+          title: Capability Key
+        scope:
+          $ref: '#/components/schemas/CapabilityScope'
+      type: object
+      required:
+      - capability_key
+      - scope
+      title: UserPermissionCreate
+      description: Payload to create or update a user permission.
+    UserPermissionRead:
+      properties:
+        capability_key:
+          type: string
+          title: Capability Key
+        scope:
+          $ref: '#/components/schemas/CapabilityScope'
+        id:
+          type: string
+          format: uuid
+          title: Id
+        clinic_id:
+          type: string
+          format: uuid
+          title: Clinic Id
+        user_id:
+          type: string
+          format: uuid
+          title: User Id
+        granted_by:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Granted By
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - capability_key
+      - scope
+      - id
+      - clinic_id
+      - user_id
+      - granted_by
+      - created_at
+      - updated_at
+      title: UserPermissionRead
+      description: Response payload for user permissions.
+    UserRead:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        email:
+          type: string
+          format: email
+          title: Email
+        phone:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+          title: Phone
+        role:
+          $ref: '#/components/schemas/UserRole'
+        is_active:
+          type: boolean
+          title: Is Active
+          default: true
+        id:
+          type: string
+          format: uuid
+          title: Id
+        clinic_id:
+          type: string
+          format: uuid
+          title: Clinic Id
+        first_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: First Name
+        last_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Name
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - name
+      - email
+      - role
+      - id
+      - clinic_id
+      - created_at
+      - updated_at
+      title: UserRead
+      description: User response payload.
+    UserRole:
+      type: string
+      enum:
+      - admin
+      - therapist
+      - front_desk
+      - patient
+      title: UserRole
+      description: Application roles available to CRM users.
     ValidationError:
       properties:
         loc:
@@ -6682,12 +7711,33 @@ components:
         type:
           type: string
           title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
       type: object
       required:
       - loc
       - msg
       - type
       title: ValidationError
+    app__enums__appointment__AppointmentRequestStatus:
+      type: string
+      enum:
+      - pending
+      - approved
+      - rejected
+      title: AppointmentRequestStatus
+      description: Approval states for public booking requests.
+    app__enums__booking__AppointmentRequestStatus:
+      type: string
+      enum:
+      - pending
+      - approved
+      - rejected
+      title: AppointmentRequestStatus
+      description: Status options for public appointment requests.
   securitySchemes:
     OAuth2PasswordBearer:
       type: oauth2
