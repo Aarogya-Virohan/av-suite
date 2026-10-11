@@ -15,7 +15,7 @@ import { apiClient } from '../../../lib/api-client';
 import { useAuthStore } from '../../../store';
 import { canAccessModule, canPerformAction, hasCapability } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
-import { Avatar, Badge, type BadgeTone, Button, Card, PageHeader } from '../../../components/ui/brand';
+import { Avatar, Badge, type BadgeTone, Button, Card, PageHeader, SegmentGroup, SegmentTab } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
 
 const STATUS_STYLE: Record<string, string> = {
@@ -37,31 +37,6 @@ function apptDay(iso: string): string {
 
 function apptTime(iso: string): string {
   return new Intl.DateTimeFormat('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
-}
-
-function SubTab({
-  active,
-  onClick,
-  icon: Icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ElementType;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'flex cursor-pointer items-center gap-2 rounded-[9px] px-3.5 py-2 text-[13px] font-semibold transition-colors',
-        active ? 'bg-card text-ink shadow-[0_1px_2px_rgba(20,26,51,0.08)]' : 'text-muted hover:text-ink',
-      )}
-    >
-      <Icon className={cn('h-4 w-4', active && 'text-grove')} />
-      {children}
-    </button>
-  );
 }
 
 interface BookingRequest {
@@ -202,26 +177,26 @@ export default function AppointmentsPage() {
         />
 
         {/* Sub-Tabs */}
-        <div className="inline-flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 p-1">
-          <SubTab active={activeSubTab === 'list'} onClick={() => setActiveSubTab('list')} icon={CalendarIcon}>
+        <SegmentGroup>
+          <SegmentTab active={activeSubTab === 'list'} onClick={() => setActiveSubTab('list')} icon={CalendarIcon}>
             Appointments Schedule
-          </SubTab>
+          </SegmentTab>
 
           {canViewBookingRequests && (
-            <SubTab active={activeSubTab === 'requests'} onClick={() => setActiveSubTab('requests')} icon={Clock}>
+            <SegmentTab active={activeSubTab === 'requests'} onClick={() => setActiveSubTab('requests')} icon={Clock}>
               Pending Requests
               {pendingRequestsCount > 0 && (
                 <span className="rounded-full bg-danger px-2 py-0.5 text-[10px] font-extrabold text-white">
                   {pendingRequestsCount}
                 </span>
               )}
-            </SubTab>
+            </SegmentTab>
           )}
 
-          <SubTab active={activeSubTab === 'bookingLink'} onClick={() => setActiveSubTab('bookingLink')} icon={QrCode}>
+          <SegmentTab active={activeSubTab === 'bookingLink'} onClick={() => setActiveSubTab('bookingLink')} icon={QrCode}>
             Public Booking Link & QR
-          </SubTab>
-        </div>
+          </SegmentTab>
+        </SegmentGroup>
 
         {/* Sub-Tab 1: Appointments List */}
         {activeSubTab === 'list' && (

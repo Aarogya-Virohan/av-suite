@@ -257,3 +257,40 @@ export function Delta({
     </span>
   );
 }
+
+/** Segmented tab group (pill style). Used by Appointments, Billing and other sub-views. */
+export function SegmentGroup({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn('inline-flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 p-1', className)}
+      {...props}
+    />
+  );
+}
+
+export function SegmentTab({
+  active,
+  onClick,
+  icon: Icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'flex cursor-pointer items-center gap-2 rounded-[9px] px-3.5 py-2 text-[13px] font-semibold transition-colors',
+        active ? 'bg-card text-ink shadow-[0_1px_2px_rgba(20,26,51,0.08)]' : 'text-muted hover:text-ink',
+      )}
+    >
+      <Icon className={cn('h-4 w-4', active && 'text-grove')} />
+      {children}
+    </button>
+  );
+}
