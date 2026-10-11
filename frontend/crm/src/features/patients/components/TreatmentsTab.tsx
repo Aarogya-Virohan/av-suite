@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { localDateTimeInputToISO, toLocalDateTimeInput } from '../../../lib/datetime';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -27,8 +28,10 @@ export function TreatmentsTab({ patientId }: { patientId: string }) {
     defaultValues: {
       patient_id: patientId,
       therapist_id: useAuthStore.getState().userId ?? '',
-      treatment_date: new Date().toISOString().slice(0, 16),
-      pain_score: 5,
+      // Local time, not UTC (see lib/datetime.ts). Pain starts empty: the old
+      // default of 5 recorded an invented score whenever the field was skipped.
+      treatment_date: toLocalDateTimeInput(),
+      pain_score: null,
       treatment: '',
       home_advice: '',
       notes: '',
@@ -38,10 +41,10 @@ export function TreatmentsTab({ patientId }: { patientId: string }) {
   const createSession = useCreateTreatmentSession();
 
   const onSubmit = (values: TreatmentSessionFormValues) => {
-    createSession.mutate(values, {
+    createSession.mutate({ ...values, treatment_date: localDateTimeInputToISO(values.treatment_date) }, {
       onSuccess: () => {
         toast.success('Treatment session saved successfully.');
-        reset();
+        reset({ ...values, treatment_date: toLocalDateTimeInput(), pain_score: null, treatment: '', home_advice: '', notes: '' });
         setIsSlideOpen(false);
       },
       onError: (err: any) => {
@@ -135,7 +138,8 @@ export function TreatmentsTab({ patientId }: { patientId: string }) {
               Pain Score (0 to 10)
             </label>
             <input
-              {...register('pain_score', { valueAsNumber: true })}
+              {...register('pain_score', { setValueAs: (v) => (v === '' || v === null ? null : Number(v)) })}
+              placeholder="Not recorded"
               type="number"
               min={0}
               max={10}
