@@ -1,6 +1,6 @@
 # Posture Tool, current state
 
-Written 2 October 2026, updated 3, 10 and 11 October, by reading and
+Written 2 October 2026, updated 3, 10, 11 and 12 October, by reading and
 running, not from memory.
 
 This file replaces posture_tool_FULL_STORY_17Sep2026.md and
@@ -219,15 +219,49 @@ moving a single back-view shoulder point to the bony tip took a MODERATE
 trunk shift, and the whole synthesis built on it, to NORMAL. The review
 step is what stands between that error and the report.
 
+## 4e. Done on 11 and 12 October, the report (commits 844dda0, 9774805)
+
+Details and reasons in decisions.md, end of the 11 October section.
+
+- Branding from the founders' references: Aarogya Virohan logo top left on
+  every PDF page, the logo mark as a 2.5 percent watermark, footer as Onkar
+  gave it ("(c) POWERED BY AAROGYA VIROHAN . AV SUITE . (A CLINICAL
+  EXERCISE PRESCRIPTION TOOL)"). Colours from the logo, held in constants
+  in pdf_service.py, because the founders have not settled a colour scheme.
+- Annotated photo redrawn in the review screen's style: white lines, teal
+  points, only the reviewed points. No measurement reads annotator.py.
+- PDF: two views per page with 90 mm photos; capture source as a plain
+  detail and one upload note in the disclaimer box (no amber warnings on a
+  report the patient also gets); report ID printed, dated from the
+  assessment date; values always two decimals; sign-off and disclaimer one
+  block. Two pages for every test report so far, including a worst-case
+  sample; a longer one goes to three with sign-off and disclaimer together.
+- Web report rebuilt to the same layout; stacked rows on phones; Download
+  PDF and New assessment in a sticky bottom bar.
+- Phone-tested over tunnels on 12 October with uploads and with guided
+  camera capture on all three views.
+
+Direction for later (Onkar): once joined to the marketplace, the clinic's
+own logo and details take the header and Aarogya Virohan stays only in the
+footer. Not built: clinic data belongs to the marketplace and CRM work.
+
 ## 5. Not started
 
 - Back-view millimetre calibration without the nose. Measured 11 October:
   the guessed nose makes back-view millimetres read about 3 percent small,
   at worst 5.7. Deferred on purpose, since point placement errors are
   around thirty times larger (known_limitations.md).
-- Web report and PDF design pass. Review, intake and capture screens were
-  redone on 11 October; the web report and the PDF were not. Onkar is
-  sending reference material for these; do not start before it arrives.
+- Founder batch, drafted 11 October, not yet sent as far as this file
+  knows: Q1 allow uploads at all (recommend camera only), Q3 keep the
+  "likely hypertonic / inhibited" columns (recommend remove), Q4 keep the
+  patient name in saved files (recommend case reference only). Also for
+  them: value precision (two decimals today) and a negative value beside a
+  direction label ("Backward Trunk Lean -3.23"); the footer tagline says
+  "exercise prescription" on a report that prescribes none; the exact
+  registered company name if a legal line is wanted; the upload note's
+  wording, which is ours.
+- Report colour scheme (founders said it is still to be discussed) and
+  clinic co-branding (after the marketplace).
 - Phone checks owed by Onkar: tilt in landscape (side tilt near 90), and a
   real capture on a tripod.
 - Lawyer's view on consent and data retention (founders' answer 6a).
@@ -241,10 +275,10 @@ step is what stands between that error and the report.
   note at line 373 was closed on 3 October.
 - The upload path has no check of any kind. A clinician can choose any
   file, including a screenshot or a photo of a screen, and it is measured
-  as if it were a guided capture. 3 October added wording to the upload
-  card and recorded the source in the report, and since 11 October the
-  PDF prints it, but nothing gates it. A capture-time check was scoped and
-  not built: see section 4b.
+  as if it were a guided capture. The report names the source on every
+  view. On 11 October we concluded that checks cannot catch what matters
+  (tilt, distance, camera height), so the real question is whether uploads
+  are allowed at all: founder Q1, above.
 - detector.py runs MediaPipe at model_complexity=1. Measured on
   2 October: complexity 2 costs 0.11 seconds more per assessment and
   places landmarks better, but it also reports honest visibility on
