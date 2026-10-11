@@ -1,5 +1,6 @@
 import { BiomechanicalSignature } from "@/types/posture"
-import { getSeverityColor } from "@/lib/getSeverityColor"
+import SectionTitle from "./SectionTitle"
+import SeverityBadge from "./SeverityBadge"
 
 /*
  * Biomechanical Signature, founders' Q5, 10 October 2026: a regional
@@ -18,42 +19,37 @@ interface Props {
 
 export default function SignaturePanel({ data }: Props) {
   return (
-    <section className="print-section rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-      <h2 className="text-3xl font-bold text-slate-900">Biomechanical Signature</h2>
-      <p className="mt-2 max-w-2xl text-sm text-slate-500">
-        Each axis is one measurement. Inner ring normal, then mild and moderate, outer ring
-        severe. A region shows the worst grade among its measurements.
-      </p>
+    <section className="print-section">
+      <SectionTitle title="Biomechanical Signature" />
 
-      <div className="mt-6 grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <div className="mt-4 grid grid-cols-1 items-center gap-6 md:grid-cols-2 md:gap-8">
         {data.svg && (
           <div
-            className="mx-auto w-full max-w-[460px] [&_svg]:h-auto [&_svg]:w-full"
+            className="mx-auto w-full max-w-[420px] [&_svg]:h-auto [&_svg]:w-full"
             dangerouslySetInnerHTML={{ __html: data.svg }}
           />
         )}
 
-        <ul className="divide-y divide-slate-100">
-          {data.regions.map((r) => {
-            const colors = r.worst ? getSeverityColor(r.worst) : null
-            return (
-              <li key={r.id} className="flex items-center justify-between py-3">
-                <span className="text-slate-800">{r.label}</span>
-                {colors && r.worstLabel ? (
-                  <span
-                    className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${colors.badgeBg} ${colors.badgeText} ${colors.badgeBorder}`}
-                  >
-                    {r.worstLabel}
-                  </span>
+        <div>
+          <ul>
+            {data.regions.map((r) => (
+              <li key={r.id} className="flex items-center justify-between border-b border-[#EDF2F2] py-2.5">
+                <span className="text-[14px] text-[#2F3336]">{r.label}</span>
+                {r.worst && r.worstLabel ? (
+                  <SeverityBadge severity={r.worst} label={r.worstLabel} />
                 ) : (
-                  <span className="text-xs text-slate-400">
+                  <span className="text-[12px] text-[#6B7378]">
                     {r.parameters.length === 0 ? "No parameter" : "Not measured"}
                   </span>
                 )}
               </li>
-            )
-          })}
-        </ul>
+            ))}
+          </ul>
+          <p className="mt-3 text-[12px] leading-relaxed text-[#8A9296]">
+            Each axis is one measurement. Inner ring normal, then mild and moderate, outer ring
+            severe. A region shows the worst grade among its measurements.
+          </p>
+        </div>
       </div>
     </section>
   )

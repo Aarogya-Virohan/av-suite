@@ -1,39 +1,100 @@
 import cv2
-import numpy as np
-from mediapipe.python.solutions import drawing_utils, pose
 
 from .decoder import decode_image_bytes
 from .exceptions import VISIBILITY_THRESHOLD
+from .review import review_indices
 from .schemas import Landmark
 
-mp_drawing = drawing_utils
-mp_pose = pose
-
+LEFT_EAR = 7
+RIGHT_EAR = 8
 LEFT_SHOULDER = 11
 RIGHT_SHOULDER = 12
 LEFT_HIP = 23
 RIGHT_HIP = 24
+LEFT_KNEE = 25
+RIGHT_KNEE = 26
+LEFT_ANKLE = 27
+RIGHT_ANKLE = 28
 
-# Reference layer colours, BGR. Kept deliberately low-contrast so the
-# neon-green skeleton stays the most prominent thing on the photograph.
-# A bright grid competes with the landmarks and makes the image harder
-# to read, not easier.
-# The grid is background reference and stays faint. The centre line and
-# the shoulder/hip level lines are the part a clinician actually reads,
-# so they get the brand orange, full opacity and double thickness. At a
-# shared colour and weight they disappeared into the grid, which defeated
-# the point of drawing them.
-GRID_COLOR = (210, 210, 210)
-AXIS_COLOR = (43, 121, 232)
-LEVEL_COLOR = (43, 121, 232)
+# Visual language, 11 October 2026: the report photograph now matches the
+# landmark review screen (white skeleton with a dark halo, teal points with
+# a white ring) instead of MediaPipe's default neon green and red, which
+# read as a debug overlay on a document that goes to a patient.
+#
+# Only the points the clinician reviewed are drawn (review.review_indices),
+# joined the same way the review screen joins them. The other landmarks
+# (hands, feet, face) are never measured, and drawing them put unreviewed
+# model guesses on the page next to confirmed ones.
+#
+# Drawing only. No measurement reads anything in this file.
 
-GRID_ALPHA = 0.15
-AXIS_ALPHA = 0.85
+# BGR.
+LINE_COLOR = (255, 255, 255)
+HALO_COLOR = (28, 28, 28)
+POINT_FILL = (143, 136, 78)     # #4E888F, logo teal
+POINT_RING = (255, 255, 255)
+
+# Reference layer. The grid is background and stays faint. The centre line
+# and the shoulder and hip level lines are what a clinician reads the body
+# against, so they are clearly visible but thinner and quieter than the
+# skeleton, in the darker brand teal.
+GRID_COLOR = (225, 225, 225)
+AXIS_COLOR = (112, 106, 59)     # #3B6A70
+LEVEL_COLOR = (112, 106, 59)
+
+GRID_ALPHA = 0.12
+AXIS_ALPHA = 0.75
+HALO_ALPHA = 0.45
 
 # 5 cm fills a full-body frame with roughly 1,400 squares and hides the
 # patient. 10 cm stays readable at the distance these photographs are
 # taken from.
 GRID_SPACING_CM = 10.0
+
+# Same pairs as EDGES in frontend LandmarkReview.tsx. Side view uses only
+# the side facing the camera, see _side_edges.
+_FRONT_EDGES = [
+    (LEFT_SHOULDER, RIGHT_SHOULDER),
+    (LEFT_HIP, RIGHT_HIP),
+    (LEFT_SHOULDER, LEFT_HIP),
+    (RIGHT_SHOULDER, RIGHT_HIP),
+    (LEFT_HIP, LEFT_KNEE),
+    (LEFT_KNEE, LEFT_ANKLE),
+    (RIGHT_HIP, RIGHT_KNEE),
+    (RIGHT_KNEE, RIGHT_ANKLE),
+]
+_BACK_EDGES = [
+    (LEFT_SHOULDER, RIGHT_SHOULDER),
+    (LEFT_HIP, RIGHT_HIP),
+    (LEFT_SHOULDER, LEFT_HIP),
+    (RIGHT_SHOULDER, RIGHT_HIP),
+    (LEFT_HIP, LEFT_ANKLE),
+    (RIGHT_HIP, RIGHT_ANKLE),
+]
+
+
+def _side_edges(lateral_side: str | None) -> list[tuple[int, int]]:
+    left = lateral_side == "left"
+    ear = LEFT_EAR if left else RIGHT_EAR
+    shoulder = LEFT_SHOULDER if left else RIGHT_SHOULDER
+    hip = LEFT_HIP if left else RIGHT_HIP
+    knee = LEFT_KNEE if left else RIGHT_KNEE
+    ankle = LEFT_ANKLE if left else RIGHT_ANKLE
+    return [(ear, shoulder), (shoulder, hip), (hip, knee), (knee, ankle)]
+
+
+def _edges(view: str, lateral_side: str | None) -> list[tuple[int, int]]:
+    if view == "side":
+        return _side_edges(lateral_side)
+    if view == "back":
+        return list(_BACK_EDGES)
+    return list(_FRONT_EDGES)
+
+
+def _scale(height_px: int) -> float:
+    """Stroke and point sizes follow the image, so a small display copy and
+    a full photograph look the same once printed at the same size."""
+    return max(height_px / 900.0, 0.6)
 
 
 def _draw_reference_layer(
@@ -58,6 +119,8 @@ def _draw_reference_layer(
     """
 
     height_px, width_px = canvas.shape[:2]
+    s = _scale(height_px)
+    ref_thickness = max(1, int(round(1.5 * s)))
 
     overlay = canvas.copy()
 
@@ -91,7 +154,9 @@ def _draw_reference_layer(
     overlay = canvas.copy()
 
     centre_x = width_px // 2
-    cv2.line(overlay, (centre_x, 0), (centre_x, height_px), AXIS_COLOR, 2)
+    cv2.line(
+        overlay, (centre_x, 0), (centre_x, height_px), AXIS_COLOR, ref_thickness, cv2.LINE_AA
+    )
 
     # Shoulder and hip level lines. Frontal and posterior only: from the side
     # the two shoulders sit one behind the other, so a horizontal line through
@@ -120,9 +185,74 @@ def _draw_reference_layer(
             y_mid = int(((left.y + right.y) / 2) * height_px)
 
             if 0 <= y_mid < height_px:
-                cv2.line(overlay, (0, y_mid), (width_px, y_mid), LEVEL_COLOR, 2)
+                _dashed_hline(overlay, y_mid, width_px, LEVEL_COLOR, ref_thickness, s)
 
     cv2.addWeighted(overlay, AXIS_ALPHA, canvas, 1 - AXIS_ALPHA, 0, canvas)
+
+
+def _dashed_hline(canvas, y: int, width_px: int, color, thickness: int, s: float) -> None:
+    """Level lines are dashed so they never read as part of the skeleton."""
+    dash = max(6, int(round(14 * s)))
+    gap = max(4, int(round(8 * s)))
+    x = 0
+    while x < width_px:
+        cv2.line(canvas, (x, y), (min(x + dash, width_px), y), color, thickness, cv2.LINE_AA)
+        x += dash + gap
+
+
+def _draw_skeleton(
+    canvas,
+    landmarks: list[Landmark],
+    view: str,
+    lateral_side: str | None,
+) -> None:
+    height_px, width_px = canvas.shape[:2]
+    s = _scale(height_px)
+
+    def px(i: int) -> tuple[int, int]:
+        lm = landmarks[i]
+        return int(round(lm.x * width_px)), int(round(lm.y * height_px))
+
+    edges = _edges(view, lateral_side)
+
+    try:
+        points = review_indices(view, lateral_side)
+    except ValueError:
+        points = sorted({i for e in edges for i in e})
+
+    line_w = max(1, int(round(2.2 * s)))
+    halo_w = line_w + max(2, int(round(2.4 * s)))
+
+    # Halo first, translucent, so white lines stay legible on a white wall.
+    halo = canvas.copy()
+    for a, b in edges:
+        cv2.line(halo, px(a), px(b), HALO_COLOR, halo_w, cv2.LINE_AA)
+    cv2.addWeighted(halo, HALO_ALPHA, canvas, 1 - HALO_ALPHA, 0, canvas)
+
+    for a, b in edges:
+        cv2.line(canvas, px(a), px(b), LINE_COLOR, line_w, cv2.LINE_AA)
+
+    r_outer = max(3, int(round(6.5 * s)))
+    r_inner = max(2, int(round(4.6 * s)))
+
+    halo = canvas.copy()
+    for i in points:
+        cv2.circle(halo, px(i), r_outer + max(1, int(round(1.5 * s))), HALO_COLOR, -1, cv2.LINE_AA)
+    cv2.addWeighted(halo, HALO_ALPHA, canvas, 1 - HALO_ALPHA, 0, canvas)
+
+    for i in points:
+        cv2.circle(canvas, px(i), r_outer, POINT_RING, -1, cv2.LINE_AA)
+        cv2.circle(canvas, px(i), r_inner, POINT_FILL, -1, cv2.LINE_AA)
+
+
+def _landmarks_from_results(results) -> list[Landmark] | None:
+    pose_landmarks = getattr(results, "pose_landmarks", None)
+    if pose_landmarks is None:
+        return None
+    return [
+        Landmark(index=i, x=lm.x, y=lm.y, z=lm.z, visibility=lm.visibility)
+        for i, lm in enumerate(pose_landmarks.landmark)
+    ]
 
 
 def annotate_pose(
@@ -131,6 +261,7 @@ def annotate_pose(
     landmarks: list[Landmark] | None = None,
     pixels_per_cm: float | None = None,
     view: str = "front",
+    lateral_side: str | None = None,
 ) -> bytes:
 
     image = decode_image_bytes(image_bytes)
@@ -148,27 +279,20 @@ def annotate_pose(
         # report entirely.
         annotated = image.copy()
 
-    # mediapipe's POSE_CONNECTIONS is a frozenset; draw_landmarks expects a list (or None)
-    connections = (
-        list(mp_pose.POSE_CONNECTIONS) if mp_pose.POSE_CONNECTIONS is not None else None
-    )
+    points = landmarks if landmarks is not None else _landmarks_from_results(results)
 
-    # Neon green, slightly thicker than the default (2px) for better
-    # visibility against varied backgrounds. Landmark dots keep the
-    # library default (red).
-    connection_drawing_spec = mp_drawing.DrawingSpec(
-        color=(20, 255, 57),  # BGR for neon green (#39FF14)
-        thickness=3,
-    )
+    if points is not None and len(points) >= 33:
+        before_skeleton = annotated.copy()
+        try:
+            _draw_skeleton(annotated, points, view, lateral_side)
+        except Exception:
+            # Same reasoning as the reference layer: a drawing failure must
+            # not remove the photograph.
+            annotated = before_skeleton
 
-    mp_drawing.draw_landmarks(
-        annotated,
-        results.pose_landmarks,
-        connections,
-        connection_drawing_spec=connection_drawing_spec,
-    )
-
-    success, buffer = cv2.imencode(".jpg", annotated)
+    # High quality JPEG: the lines are thin and antialiased, and the default
+    # quality smeared them into the background.
+    success, buffer = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 92])
 
     if not success:
         raise ValueError("Image encoding failed")

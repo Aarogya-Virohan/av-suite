@@ -215,6 +215,7 @@ def _annotate_or_blank(
     landmarks=None,
     pixels_per_cm: float | None = None,
     view: str = "front",
+    lateral_side: str | None = None,
 ) -> str:
     try:
         annotated_bytes = annotate_pose(
@@ -223,6 +224,7 @@ def _annotate_or_blank(
             landmarks=landmarks,
             pixels_per_cm=pixels_per_cm,
             view=view,
+            lateral_side=lateral_side,
         )
         return "data:image/jpeg;base64," + base64.b64encode(annotated_bytes).decode("utf-8")
     except ValueError:
@@ -410,6 +412,7 @@ def _report_from_points(
         landmarks=side_landmarks,
         pixels_per_cm=_scaled(side_pixels_per_cm, side),
         view="side",
+        lateral_side=lateral_side,
     )
 
     side_view = build_side_view_result(
@@ -748,6 +751,16 @@ def _report_from_points(
     if landmark_review is not None:
         report["landmarkReview"] = landmark_review
 
+    # A printed identifier, 11 October 2026, so a paper report can be traced
+    # back to its saved file: the same random suffix ends the file name.
+    saved_at = datetime.now(timezone.utc)
+    suffix = uuid.uuid4().hex[:8]
+    # The date part is the assessment date printed on the report (local
+    # date), not the UTC date of the file: after 18:30 IST the two differ,
+    # and a report reading "Assessed 12 Oct" with ID "PT-20261011-..." looks
+    # like an error.
+    report["reportId"] = f"PT-{patient['assessmentDate'].replace('-', '')}-{suffix.upper()}"
+
     reports_dir = Path("data/reports")
 
     reports_dir.mkdir(
@@ -768,7 +781,7 @@ def _report_from_points(
     }
 
     with open(
-        reports_dir / report_filename(case_ref, datetime.now(timezone.utc), uuid.uuid4().hex[:8]),
+        reports_dir / report_filename(case_ref, saved_at, suffix),
         "w",
     ) as file:
 

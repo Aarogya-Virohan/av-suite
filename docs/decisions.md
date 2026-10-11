@@ -1224,3 +1224,101 @@ watermark then, and which clinic details print.
 Also: two comments in api/v1/posture.py (PT-L05, PT-L06) said the founders
 had asked for backward-lean and flexion mappings and mentioned exercises.
 Corrected: no such mapping exists, and 1b closed the question.
+
+### Report design, first round (PDF and web)
+Onkar asked for a premium, clinical feel. Design only; no value, grade,
+threshold or wording from the founders changed.
+
+Annotated photograph (annotator.py): the MediaPipe default drawing (neon
+green skeleton, red dots, all 33 landmarks including hands, feet and face)
+replaced with the review screen's language: white lines on a dark halo,
+teal points with a white ring, and only the points the clinician reviewed
+(review.review_indices), joined as the review screen joins them. Unreviewed
+model guesses no longer sit on the page beside confirmed points. The side
+view draws only the side facing the camera (lateral_side is now passed in).
+Level lines are dashed and teal; JPEG quality 92 so thin lines survive.
+Drawing only: nothing measured reads this file.
+
+PDF (pdf_service.py):
+- Photograph 78 mm tall at its own proportions; the old fixed box
+  letterboxed a portrait photo down to about 25 mm wide.
+- Capture source is a chip beside the title, amber for an upload, instead
+  of grey small print.
+- Empty intake fields are left out of the patient band.
+- Dates as "11 Oct 2026" (ISO read as a database value; 11/10 is ambiguous).
+- Printed Report ID, "PT-<date>-<suffix>"; the same suffix ends the saved
+  file's name, so paper can be traced to the file. Added in posture.py.
+- Summary under the table, no second teal bar.
+- Separate sign-off block with space to sign, apart from the synthesis.
+- Disclaimer in a labelled box, founders' wording unchanged, regular weight.
+- Watermark at 2.5 percent; 4.5 crossed the tables.
+- Radar outline teal (signature_svg.py; web and PDF share it).
+Still 2 pages for the test subjects rendered.
+
+Web report: rebuilt to the same layout (section titles, photo beside a
+table, shared severity badge, same chips, patient band, disclaimer box,
+footer). Width capped like a document. App bar hides its logo on the report
+step, since the document carries it. Synthesis headings now say "Likely
+hypertonic / inhibited" as the PDF always has; the web said plain
+"Hypertonic", which states as fact what a photo can only suggest.
+
+Not changed, for the founders: value precision (two decimals today) and a
+negative value beside a direction label ("Backward Trunk Lean -3").
+
+Second pass, same day, after Onkar's test report:
+- PDF: photo 62 mm so all three planes fit page 1 (78 mm left 50 mm empty
+  on page 1 and pushed the back view over). Values right aligned; a space
+  before "mm" ("12.19 mm"), none before the degree sign. Radar slightly
+  larger, more room above the sign-off.
+- Web: measurement rows are a real table, so the columns align and the
+  "MODERATE DEVIATION" badge no longer spills past the edge; the photo
+  column takes the photo's own width (no gap before the table); same unit
+  spacing (lib/formatValue.ts); header subtitle is name and date as on the
+  PDF; "Download PDF" and "New assessment" sit above the report, styled to
+  match, and the PDF button shows it is working.
+
+Third pass, same day, Onkar's feedback:
+- Photos are the evidence, so two views per page instead of three: photo
+  90 mm tall (62 before). Page 1 side and front, page 2 back, signature,
+  synthesis, sign-off and notes. Still two pages for the test report.
+  Each view also gets a small caption ("Viewed from the side") and its
+  photo details (photograph source, landmark visibility) under the summary.
+- Capture source wording for a report that also reaches the patient: the
+  amber "Uploaded photo, capture protocol not checked" flag on each view is
+  replaced by a plain "Photograph: Uploaded photo" detail, and one calm
+  sentence in the notes explains it (UPLOAD_NOTE, only when a view was
+  uploaded). The fact is kept, because it decides whether two visits can be
+  compared; three amber warnings read to a patient as "this test was done
+  wrong". Whether uploads are allowed at all is founder question Q1.
+- The "Guided camera capture" Onkar saw on the front view of my preview
+  came from my hand-made preview data, not from the code. His own exported
+  PDF correctly showed all three views as uploaded.
+
+Fourth pass, after the phone test over the tunnels (report PT-20261011-EDEAA04C):
+- Report ID date now comes from the assessment date. It used the UTC date of
+  the file, so after 18:30 IST the report read "Assessed 12 Oct" with ID
+  "PT-20261011-...". The file name keeps its UTC timestamp.
+- Values always print two decimals ("11.90 mm", "-5.70°"). They arrive
+  rounded to two places, so a trailing zero vanished and 11.9 sat beside
+  2.36. Padding only; the precision itself is still a founder question.
+- PDF: the report ID no longer wraps in the patient band.
+- Web, phone width: measurements are one row per parameter (name, then
+  value and grade), since the three-column table squeezed names to a word a
+  line and pushed "MODERATE DEVIATION" past the card. Report ID takes a full
+  row; footer segments never split ("AV Suite" stays on one line).
+- Radar axis labels 10 instead of 8.5 (about 7 px on a phone before).
+- Report actions (Download PDF, New assessment) moved from above the report
+  to a bar that stays at the bottom of the screen and settles under the
+  report at its end: at the top they asked for a download before the report
+  was read, and only at the end a phone user scrolls about ten screens.
+- Phone test, guided camera capture on all three views (report
+  PT-20261012-11D6E71C): ID date matches the assessed date, views read
+  "Guided camera capture", no upload note, PDF two pages.
+- Sandeep's report (PT-20261012-5224332B) ran to three pages with the
+  disclaimer alone on page 3: page 2 had been fitted to one sample, and an
+  extra muscle, a two-line summary and the upload note tipped it over. Now
+  the sign-off and notes are one block that moves together, the muscle
+  lists run inline with commas, and the signature chart is a little
+  shorter. A worst-case sample (three plus two muscles, two-line summary,
+  upload note) renders on two pages. A longer report still goes to three,
+  but with sign-off and disclaimer together on the last page.

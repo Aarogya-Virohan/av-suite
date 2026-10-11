@@ -7,14 +7,22 @@ screen layout happened to end, the browser stamped its own URL and timestamp
 on every page, and interactive controls appeared in the patient's document.
 
 This module renders the same report data as a document designed for paper,
-using WeasyPrint (already a dependency, see prescription_service.py). Styling
-follows the prescription PDF so both documents read as the same clinic's.
+using WeasyPrint (already a dependency, see prescription_service.py).
+
+Design, 11 October 2026: branded after the founders' references (logo top
+left, logo watermark, "powered by" footer), then a first design pass: the
+photograph sized as the evidence it is, the capture source shown as a flag
+rather than a grey footnote, empty intake fields left out, dates written
+the way Indian clinical reports write them, a printed report ID, and a
+separate sign-off block. The web report (frontend/posture-tool, components
+under src/components/report) follows the same layout.
 """
 
 from __future__ import annotations
 
 import base64
 import html
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -37,6 +45,8 @@ REPORT_TITLE = "Posture Assessment Report"
 BRAND = "#4e888f"          # logo teal
 BRAND_DARK = "#3b6a70"     # teal for small text, darker for contrast on white
 INK = "#2f3336"            # logo charcoal, body headings
+MUTED = "#6b7378"          # labels
+FAINT = "#8a9296"          # footnotes
 RULE = "#d9e3e4"           # hairlines
 TINT = "#f3f7f7"           # panel background
 
@@ -66,6 +76,7 @@ def _brand_data_uri(filename: str) -> str:
         return ""
     encoded = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
+
 
 # Severity -> (text colour, background). Deliberately sober: this is printed
 # and read by a clinician, not a dashboard badge.
@@ -101,12 +112,59 @@ SIDE_HIDDEN_SEVERITIES = frozenset(
     {"none", "insufficient_data", "not_available"}
 )
 
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
 
 def _esc(value: Any) -> str:
     """Escape a value for safe inclusion in the HTML template."""
     if value is None:
         return ""
     return html.escape(str(value))
+
+
+def _present(value: Any) -> bool:
+    return value is not None and str(value).strip() != ""
+
+
+def _display_date(value: Any) -> str:
+    """
+    "2026-10-11" -> "11 Oct 2026". ISO dates read as a database value on a
+    clinical document, and 11/10 against 10/11 is ambiguous across readers.
+    Anything that is not an ISO date is printed as it came.
+    """
+
+    if not _present(value):
+        return ""
+    try:
+        d = date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return _esc(value)
+    return f"{d.day} {_MONTHS[d.month - 1]} {d.year}"
+
+
+# Units that sit against the number. Every other unit (mm) takes a space,
+# as SI writing does: "12.2 mm", but "73.2°".
+_TIGHT_UNITS = frozenset({"\u00b0", "%"})
+
+
+def _number(value: Any) -> str:
+    """
+    Two decimals, always. The values arrive rounded to two places, so
+    11.90 came through as 11.9 and sat beside 2.36 in the same column. This
+    only pads; it does not change any value. (How many decimals the report
+    should carry at all is a founder question, see decisions.md.)
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return _esc(value)
+    return f"{value:.2f}"
+
+
+def _value_with_unit(value: Any, unit: str) -> str:
+    if not unit:
+        return _number(value)
+    joiner = "" if unit in _TIGHT_UNITS else "&nbsp;"
+    return f"{_number(value)}{joiner}{_esc(unit)}"
 
 
 def _measurement_rows(measurements: list[dict]) -> str:
@@ -138,7 +196,7 @@ def _measurement_rows(measurements: list[dict]) -> str:
             # again here would say the same thing twice and could drift.
             value_text = "&ndash;"
         else:
-            value_text = f"{_esc(value)}{_esc(unit)}"
+            value_text = _value_with_unit(value, unit)
 
         side_text = m.get("sideLabel")
 
@@ -169,12 +227,34 @@ def _measurement_rows(measurements: list[dict]) -> str:
 
 CAPTURE_SOURCE_TEXT: dict[str, str] = {
     "camera": "Guided camera capture",
-    "upload": "Uploaded photo, capture protocol not checked",
+    "upload": "Uploaded photo",
+}
+
+# Printed once, in the notes at the end, when any view was uploaded. Until
+# 11 October 2026 each uploaded view carried an amber "capture protocol not
+# checked" flag. The PDF goes to the patient as well as the clinician, and
+# three amber warnings read to a patient as "this test was done wrong",
+# while the fact itself only matters for comparing visits. The fact stays on
+# every view, in plain words; the explanation is said once, calmly.
+UPLOAD_NOTE = (
+    "Views marked “Uploaded photo” were measured the same way as a "
+    "guided capture, but were not taken with the guided camera’s level "
+    "check. Compare them with later visits with that in mind."
+)
+
+VIEW_CAPTION = {
+    "side": "Viewed from the side",
+    "front": "Viewed from the front",
+    "back": "Viewed from behind",
 }
 
 
-def _view_section(title: str, view: dict) -> str:
-    """Render one anatomical plane: annotated image beside its measurements."""
+def _view_section(title: str, view: dict, key: str = "") -> str:
+    """
+    Render one anatomical plane. Since 11 October 2026 two planes share a
+    page, so the annotated photograph, the evidence every number comes
+    from, is printed large (92 mm tall) beside the measurements.
+    """
 
     photo = view.get("photoUrl") or ""
 
@@ -187,31 +267,45 @@ def _view_section(title: str, view: dict) -> str:
 
     accuracy = view.get("accuracy")
     accuracy_text = (
-        f"Landmark visibility: {accuracy * 100:.1f}%"
-        if isinstance(accuracy, (int, float))
-        else ""
+        f"{accuracy * 100:.1f}%" if isinstance(accuracy, (int, float)) else ""
     )
 
     # Founders, 10 October 2026: a guided camera capture and an uploaded
     # photo are measured the same way, but only the capture is checked
     # against the protocol (framing, camera height, distance), so the two
-    # are not equally comparable across visits. The report has carried
-    # captureSource since 3 October without printing it. Reports saved
-    # before then have no value, and print nothing.
+    # are not equally comparable across visits. Reports saved before
+    # 3 October have no value and print nothing.
     source_text = CAPTURE_SOURCE_TEXT.get(view.get("captureSource") or "", "")
-    if source_text:
-        accuracy_text = (
-            f"{accuracy_text}<br>{source_text}" if accuracy_text else source_text
-        )
 
-    interpretation = _esc(view.get("interpretation")) or "&nbsp;"
+    details = []
+    if source_text:
+        details.append(("Photograph", source_text))
+    if accuracy_text:
+        details.append(("Landmark visibility", accuracy_text))
+    details_html = "".join(
+        f'<tr><td class="d-label">{label}</td><td class="d-value">{value}</td></tr>'
+        for label, value in details
+    )
+    details_block = (
+        f'<table class="photo-details">{details_html}</table>' if details_html else ""
+    )
+
+    interpretation = _esc(view.get("interpretation"))
+    summary = (
+        f'<div class="interpretation"><p class="tag">Summary</p><p>{interpretation}</p></div>'
+        if interpretation
+        else ""
+    )
+
+    caption = VIEW_CAPTION.get(key, "")
+    caption_html = f'<span class="caption">{caption}</span>' if caption else ""
 
     return f"""
     <section class="plane">
         <table class="plane-head">
             <tr>
                 <td><h2>{_esc(title)}</h2></td>
-                <td class="accuracy">{accuracy_text}</td>
+                <td class="meta-right">{caption_html}</td>
             </tr>
         </table>
 
@@ -223,7 +317,7 @@ def _view_section(title: str, view: dict) -> str:
                         <thead>
                             <tr>
                                 <th>Parameter</th>
-                                <th>Value</th>
+                                <th class="num">Value</th>
                                 <th>Finding</th>
                             </tr>
                         </thead>
@@ -231,11 +325,11 @@ def _view_section(title: str, view: dict) -> str:
                             {_measurement_rows(view.get('measurements') or [])}
                         </tbody>
                     </table>
+                    {summary}
+                    {details_block}
                 </td>
             </tr>
         </table>
-
-        <p class="interpretation">{interpretation}</p>
     </section>
     """
 
@@ -251,7 +345,7 @@ def _biomech_signature_section(signature: dict | None) -> str:
     if not signature or not signature.get("regions"):
         return ""
 
-    svg = render_signature_svg(signature, width=360, height=220)
+    svg = render_signature_svg(signature, width=380, height=175)
 
     rows = []
     for r in signature["regions"]:
@@ -320,29 +414,64 @@ def _synthesis_section(synthesis: dict) -> str:
     """
 
 
+def _patient_band(patient: dict, report_id: str) -> str:
+    """
+    Patient details, three to a row. A field left empty at intake is left
+    out rather than printed as a blank label: an empty "Clinician" on a
+    clinical document reads as an omission, not as "not given".
+    """
+
+    age_sex = " / ".join(
+        _esc(v) for v in (patient.get("age"), patient.get("gender")) if _present(v)
+    )
+
+    items = [
+        ("Patient", _esc(patient.get("name"))),
+        ("Age / Sex", age_sex),
+        ("Case ref.", _esc(patient.get("caseRef"))),
+        ("Clinician", _esc(patient.get("clinician"))),
+        ("Assessed", _display_date(patient.get("assessmentDate"))),
+        ("Report ID", f'<span class="nowrap">{_esc(report_id)}</span>' if report_id else ""),
+    ]
+    items = [(label, value) for label, value in items if value]
+
+    cells = [
+        f'<td class="label">{label}</td><td class="value">{value}</td>'
+        for label, value in items
+    ]
+    while len(cells) % 3:
+        cells.append('<td class="label"></td><td class="value"></td>')
+
+    rows = "".join(
+        "<tr>" + "".join(cells[i:i + 3]) + "</tr>" for i in range(0, len(cells), 3)
+    )
+    return f'<table class="meta-table">{rows}</table>'
+
+
 def build_report_html(report: dict) -> str:
     """Assemble the full clinical report document."""
 
     patient = report.get("patient") or {}
     views = report.get("views") or {}
+    report_id = report.get("reportId") or ""
 
     # Stamped so two reports for the same patient are only compared when
     # they came from the same analysis code. Grades move when thresholds,
     # sign conventions or calibration change.
     analysis_version = report.get("analysisVersion")
 
-    # Gender was collected at intake but never printed before; it now sits
-    # beside age, the way lab reports show it.
-    age_sex = " / ".join(
-        _esc(v) for v in (patient.get("age"), patient.get("gender")) if v not in (None, "")
-    )
+    # Global Stability Index removed from the report on 10 October 2026 by
+    # the founders (Q5): a single score masks a localised finding behind an
+    # average, and its weights were never sourced. calculate_global_index
+    # stays in scoring.py with nothing calling it. Its replacement is the
+    # Biomechanical Signature below.
 
     # Under the title on every page, so a loose second page still says whose
     # report it is.
     header_sub = " &nbsp;&middot;&nbsp; ".join(
-        _esc(v)
-        for v in (patient.get("name"), patient.get("assessmentDate"))
-        if v not in (None, "")
+        v
+        for v in (_esc(patient.get("name")), _display_date(patient.get("assessmentDate")))
+        if v
     ) or CLINIC_SUBTITLE
 
     logo = _brand_data_uri("av_logo_wordmark.png")
@@ -352,9 +481,9 @@ def build_report_html(report: dict) -> str:
         else f'<span class="logo-text">{CLINIC_NAME}</span>'
     )
 
-    # The logo mark, already faded in the file itself (6 percent), centred
-    # behind every page. WeasyPrint has no background opacity, so the
-    # fading is baked into the PNG.
+    # The logo mark, already faded in the file itself, centred behind every
+    # page. WeasyPrint has no background opacity, so the fading is baked
+    # into the PNG (2.5 percent since 11 October; 4.5 crossed the tables).
     watermark = _brand_data_uri("av_watermark.png")
     page_background = (
         f'background: url("{watermark}") no-repeat center 50%; '
@@ -363,11 +492,18 @@ def build_report_html(report: dict) -> str:
         else ""
     )
 
-    # Global Stability Index removed from the report on 10 October 2026 by the founders (Q5): a single
-    # score masks a localised finding behind an average, and its weights were
-    # never sourced. calculate_global_index stays in scoring.py with nothing
-    # calling it. The founders' replacement, a regional profile, is not built
-    # yet. See docs/decisions.md, 10 October.
+    any_upload = any(
+        (views.get(k) or {}).get("captureSource") == "upload" for k in ("side", "front", "back")
+    )
+    upload_note = f'<p class="side-note">{UPLOAD_NOTE}</p>' if any_upload else ""
+
+    version_line = (
+        f'<p class="analysis-version">Analysis version {_esc(analysis_version)}. '
+        "Values and grades are only comparable with reports carrying the same "
+        "version.</p>"
+        if analysis_version
+        else ""
+    )
 
     return f"""
 <!DOCTYPE html>
@@ -442,7 +578,7 @@ def build_report_html(report: dict) -> str:
         margin: 2px 0 0 0;
     }}
 
-    /* Repeated on every page: centred "Powered by", legal name, page count. */
+    /* Repeated on every page: centred "Powered by", then the page count. */
     .running-footer {{
         position: running(runningFooter);
         width: 100%;
@@ -455,8 +591,6 @@ def build_report_html(report: dict) -> str:
         margin: 0;
         font-size: 8pt;
         color: {INK};
-    }}
-    .running-footer .powered {{
         letter-spacing: 0.9px;
     }}
     .running-footer .powered .by {{
@@ -480,43 +614,55 @@ def build_report_html(report: dict) -> str:
     }}
     .running-footer .powered .tagline {{
         font-size: 6.5pt;
-        color: #6b7378;
+        color: {MUTED};
     }}
     .running-footer .legal {{
         margin: 3px 0 0 0;
         font-size: 6.5pt;
-        color: #8a9296;
+        color: {FAINT};
     }}
     .running-footer .legal .page::after {{
         content: "Page " counter(page) " of " counter(pages);
     }}
 
+    /* Patient band. */
     .meta-table {{
         width: 100%;
         border-collapse: collapse;
-        margin: 2px 0 18px 0;
+        margin: 2px 0 14px 0;
         background: {TINT};
         border: 1px solid {RULE};
-        border-radius: 3px;
     }}
     .meta-table td {{
         padding: 6px 10px;
-        vertical-align: top;
+        vertical-align: baseline;
         font-size: 9pt;
     }}
     .meta-table .label {{
-        color: #6b7378;
-        width: 11%;
+        color: {MUTED};
+        width: 10%;
         white-space: nowrap;
         text-transform: uppercase;
         letter-spacing: 0.6px;
-        font-size: 7pt;
-        padding-top: 7.5px;
+        font-size: 6.8pt;
+    }}
+    .meta-table .nowrap {{
+        white-space: nowrap;
     }}
     .meta-table .value {{
         color: {INK};
-        font-weight: 600;
-        width: 22%;
+        font-weight: 700;
+        width: 23%;
+    }}
+
+    /* Section headings, one style throughout. */
+    h2 {{
+        font-size: 12pt;
+        color: {INK};
+        margin: 0;
+        padding-left: 8px;
+        border-left: 3px solid {BRAND};
+        line-height: 1.15;
     }}
 
     .plane {{
@@ -530,39 +676,43 @@ def build_report_html(report: dict) -> str:
         margin-bottom: 8px;
     }}
     .plane-head td {{
-        padding: 0 0 4px 0;
+        padding: 0 0 5px 0;
         vertical-align: bottom;
     }}
-    .plane-head h2 {{
-        font-size: 12pt;
-        color: {INK};
-        margin: 0;
-        padding-left: 8px;
-        border-left: 3px solid {BRAND};
-        line-height: 1.15;
+    .plane-head .meta-right {{
+        text-align: right;
+        white-space: nowrap;
     }}
     .plane-head .accuracy {{
-        text-align: right;
-        font-size: 8pt;
-        color: #64748b;
-        white-space: nowrap;
+        font-size: 7.5pt;
+        color: {MUTED};
+        margin-left: 6px;
+    }}
+    .plane-head .caption {{
+        font-size: 7pt;
+        color: {MUTED};
+        text-transform: uppercase;
+        letter-spacing: 0.9px;
     }}
 
     .plane-body {{
         width: 100%;
         border-collapse: collapse;
     }}
+    /* The photograph is the evidence the numbers come from, so it gets the
+       full height of its cell, with no letterbox around a portrait image. */
     .photo-cell {{
-        width: 34%;
+        width: 1%;
         vertical-align: top;
-        padding-right: 10px;
+        padding-right: 16px;
+        text-align: center;
     }}
     .plane-photo {{
-        width: 100%;
-        max-height: 64mm;
-        object-fit: contain;
-        border: 1px solid {RULE};
-        border-radius: 2px;
+        height: 90mm;
+        width: auto;
+        max-width: 80mm;
+        border: 0.8px solid {RULE};
+        border-radius: 3px;
     }}
     .photo-missing {{
         border: 1px dashed #cbd5e1;
@@ -581,67 +731,112 @@ def build_report_html(report: dict) -> str:
     }}
     .measurements th {{
         text-align: left;
-        font-size: 7.5pt;
+        font-size: 6.8pt;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #475569;
-        border-bottom: 1px solid #cbd5e1;
-        padding: 3px 6px;
+        letter-spacing: 0.7px;
+        color: {MUTED};
+        border-bottom: 1px solid {RULE};
+        padding: 3px 6px 4px 6px;
     }}
     .measurements td {{
-        padding: 3px 6px;
-        border-bottom: 1px solid #f1f5f9;
+        padding: 5px 6px;
+        border-bottom: 1px solid #edf2f2;
         font-size: 9pt;
+        vertical-align: middle;
     }}
     .measurements .param {{
-        color: #334155;
+        color: {INK};
         width: 52%;
     }}
     .measurements .value {{
-        font-weight: bold;
+        font-weight: 700;
         width: 16%;
+        white-space: nowrap;
+        text-align: right;
+        padding-right: 14px;
+    }}
+    .measurements th.num {{
+        text-align: right;
+        padding-right: 14px;
     }}
     .measurements .severity span {{
         display: inline-block;
-        padding: 1px 7px;
+        padding: 1.5px 7px;
         border-radius: 3px;
-        font-size: 7.5pt;
-        font-weight: bold;
+        font-size: 7pt;
+        font-weight: 700;
         text-transform: uppercase;
+        letter-spacing: 0.3px;
     }}
     .measurements .empty {{
         color: #94a3b8;
         font-style: italic;
     }}
 
+    .data-cell {{
+        padding-left: 4px;
+    }}
+    .measurements td {{
+        padding-top: 7px;
+        padding-bottom: 7px;
+    }}
     .interpretation {{
-        font-size: 8.5pt;
-        color: {INK};
-        margin: 6px 0 0 0;
-        padding: 6px 10px;
+        margin: 12px 0 0 0;
+        padding: 8px 11px;
         background: {TINT};
-        border-left: 2px solid {BRAND};
+        border-radius: 3px;
+    }}
+    .interpretation p {{
+        margin: 0;
+        font-size: 8.8pt;
+        color: {INK};
+        line-height: 1.45;
+    }}
+    .interpretation .tag {{
+        font-size: 6.5pt;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: {BRAND_DARK};
+        margin-bottom: 2px;
+    }}
+    .photo-details {{
+        margin-top: 12px;
+        border-collapse: collapse;
+        font-size: 7.6pt;
+    }}
+    .photo-details td {{
+        padding: 1.5px 0;
+    }}
+    .photo-details .d-label {{
+        color: {MUTED};
+        padding-right: 12px;
+        white-space: nowrap;
+    }}
+    .photo-details .d-value {{
+        color: {INK};
     }}
 
     .bio-signature {{
         margin-top: 12px;
         page-break-inside: avoid;
     }}
-    .bio-signature h2 {{
-        font-size: 12pt;
-        color: {INK};
-        margin: 0 0 6px 0;
+    .bio-signature h2,
+    .synthesis h2 {{
+        margin-bottom: 8px;
+    }}
+    .section-rule {{
         border-bottom: 1px solid {RULE};
-        padding: 0 0 4px 8px;
-        border-left: 3px solid {BRAND};
-        line-height: 1.15;
     }}
     .bio-signature-grid {{
         width: 100%;
         border-collapse: collapse;
+        border-top: 1px solid {RULE};
     }}
     .bio-signature-grid td {{
         vertical-align: middle;
+        padding-top: 6px;
     }}
     .bio-signature-grid .chart {{
         width: 50%;
@@ -652,13 +847,13 @@ def build_report_html(report: dict) -> str:
     }}
     .region-list {{
         border-collapse: collapse;
-        font-size: 8.5pt;
-        color: #334155;
+        font-size: 8.8pt;
+        color: {INK};
         width: 100%;
     }}
     .region-list td {{
         padding: 3px 0;
-        border-bottom: 1px solid #f1f5f9;
+        border-bottom: 1px solid #edf2f2;
     }}
     .region-list .grade {{
         text-align: right;
@@ -669,143 +864,142 @@ def build_report_html(report: dict) -> str:
         padding: 2px 6px;
         border-radius: 3px;
         white-space: nowrap;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
     }}
     .region-list .sig-none {{
         color: #64748b;
         background: #f8fafc;
-        font-weight: 400;
+        font-weight: 400 !important;
+        text-transform: none !important;
     }}
     .bio-signature .key {{
         font-size: 7pt;
-        color: #94a3b8;
-        margin: 6px 0 0 0;
+        color: {FAINT};
+        margin: 7px 0 0 0;
     }}
 
     .synthesis {{
-        margin-top: 18px;
+        margin-top: 12px;
         page-break-inside: avoid;
-    }}
-    .synthesis h2 {{
-        font-size: 12pt;
-        color: {INK};
-        margin: 0 0 8px 0;
-        border-bottom: 1px solid {RULE};
-        padding: 0 0 4px 8px;
-        border-left: 3px solid {BRAND};
-        line-height: 1.15;
     }}
     .synthesis-grid {{
         width: 100%;
         border-collapse: collapse;
+        border-top: 1px solid {RULE};
     }}
     .synthesis-grid td {{
         vertical-align: top;
         width: 50%;
-        padding: 0 8px 0 0;
+        padding: 8px 8px 0 0;
     }}
     .synthesis-grid h3 {{
-        font-size: 8pt;
+        font-size: 7pt;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.8px;
         color: {BRAND_DARK};
         margin: 0 0 5px 0;
     }}
+    /* Muscles run inline, separated by commas: one per line cost a line of
+       page height per muscle and pushed the sign-off to a third page. */
     .synthesis-grid ul {{
         margin: 0;
-        padding-left: 14px;
-        font-size: 8.5pt;
-        color: #334155;
+        padding: 0;
+        font-size: 9pt;
+        color: {INK};
+        list-style: none;
+        line-height: 1.6;
     }}
     .synthesis-grid li {{
-        margin-bottom: 2px;
+        display: inline-block;
+        white-space: nowrap;
+    }}
+    .synthesis-grid li {{
+        margin-right: 5px;
+    }}
+    .synthesis-grid li:not(:last-child)::after {{
+        content: ",";
     }}
     .synthesis-grid .empty {{
         color: #94a3b8;
         font-style: italic;
-        list-style: none;
-        margin-left: -14px;
     }}
 
-    .index-block {{
-        margin-top: 16px;
-        border: 1px solid #e2e8f0;
-        padding: 10px 14px;
+    /* Sign-off, kept well apart from the synthesis above so its lines can
+       not be read as underlines of the muscle lists. */
+    /* Sign-off and notes travel together. When a long report pushes them
+       off page 2, both move to the next page as one closing block, instead
+       of the disclaimer sitting alone on a page (seen 12 October 2026). */
+    .closing {{
         page-break-inside: avoid;
     }}
-    .index-block .label {{
-        font-size: 7.5pt;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: #475569;
-        margin: 0;
-    }}
-    .index-block .score {{
-        font-size: 20pt;
-        font-weight: bold;
-        color: {BRAND};
-        margin: 2px 0 0 0;
-    }}
-    .index-block .descriptor {{
-        font-size: 9pt;
-        color: #334155;
-        margin: 0;
-    }}
-    .index-block .index-basis {{
-        font-size: 7pt;
-        color: #94a3b8;
-        margin: 3px 0 0 0;
-    }}
-
-    .signature {{
-        margin-top: 22px;
+    .sign-off {{
+        margin-top: 16px;
         width: 100%;
         border-collapse: collapse;
         page-break-inside: avoid;
     }}
-    .signature td {{
-        padding-top: 26px;
-        border-top: 1px solid #cbd5e1;
-        font-size: 8pt;
-        color: #64748b;
+    .sign-off td {{
+        vertical-align: bottom;
+        width: 44%;
+        padding: 0;
     }}
-    .signature .sig-name {{
-        width: 46%;
+    .sign-off .gap {{
+        width: 12%;
     }}
-    .signature .sig-date {{
-        width: 46%;
+    .sign-off .space {{
+        height: 9mm;
+        border-bottom: 1px solid #aeb8bb;
     }}
-    .signature .sig-spacer {{
-        width: 8%;
-        border-top: none;
+    .sign-off .caption {{
+        font-size: 7.5pt;
+        color: {MUTED};
+        padding-top: 4px;
     }}
 
     .side {{
         display: block;
-        margin-top: 2px;
-        font-size: 7.5pt;
+        margin-top: 1px;
+        font-size: 7.3pt;
         font-weight: 400;
-        color: #64748b;
+        color: {MUTED};
     }}
 
-    .side-note {{
-        margin-top: 14px;
-        font-size: 7.5pt;
-        color: #94a3b8;
+    .notes {{
+        margin-top: 10px;
+        border: 1px solid {RULE};
+        border-radius: 3px;
+        padding: 7px 11px;
+        page-break-inside: avoid;
     }}
-
-    .analysis-version {{
-        margin-top: 6px;
+    .notes .disclaimer-tag {{
         font-size: 6.5pt;
-        color: #94a3b8;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: {BRAND_DARK};
+        margin: 0 0 3px 0;
     }}
-
-    .disclaimer {{
-        margin-top: 18px;
-        border-top: 1px solid #e2e8f0;
-        padding-top: 8px;
+    /* The founders' wording, unchanged. Set in the regular weight: a block
+       of bold grey type at this size reads as shouting. */
+    .notes .disclaimer {{
         font-size: 7.5pt;
-        color: #64748b;
+        color: {INK};
         line-height: 1.5;
+        margin: 0;
+    }}
+    .notes .disclaimer strong {{
+        font-weight: 400;
+    }}
+    .notes .side-note {{
+        font-size: 7pt;
+        color: {MUTED};
+        margin: 5px 0 0 0;
+    }}
+    .analysis-version {{
+        margin: 6px 0 0 0;
+        font-size: 6.5pt;
+        color: {FAINT};
     }}
 </style>
 </head>
@@ -829,44 +1023,33 @@ def build_report_html(report: dict) -> str:
     <p class="legal"><span class="page"></span></p>
 </div>
 
-<table class="meta-table">
-    <tr>
-        <td class="label">Patient</td>
-        <td class="value">{_esc(patient.get('name'))}</td>
-        <td class="label">Age / Sex</td>
-        <td class="value">{age_sex}</td>
-        <td class="label">Case Ref.</td>
-        <td class="value">{_esc(patient.get('caseRef'))}</td>
-    </tr>
-    <tr>
-        <td class="label">Clinician</td>
-        <td class="value">{_esc(patient.get('clinician'))}</td>
-        <td class="label">Assessed</td>
-        <td class="value">{_esc(patient.get('assessmentDate'))}</td>
-        <td class="label"></td>
-        <td class="value"></td>
-    </tr>
-</table>
+{_patient_band(patient, report_id)}
 
-{_view_section("Sagittal (Side) Plane", views.get("side") or {})}
-{_view_section("Coronal (Front) Plane", views.get("front") or {})}
-{_view_section("Posterior (Back) Plane", views.get("back") or {})}
+{_view_section("Sagittal (Side) Plane", views.get("side") or {}, "side")}
+{_view_section("Coronal (Front) Plane", views.get("front") or {}, "front")}
+{_view_section("Posterior (Back) Plane", views.get("back") or {}, "back")}
 
 {_biomech_signature_section(report.get("signature"))}
 
 {_synthesis_section(report.get("synthesis") or {})}
 
-<table class="signature">
+<div class="closing">
+<table class="sign-off">
     <tr>
-        <td class="sig-name">Assessing Physiotherapist</td>
-        <td class="sig-spacer"></td>
-        <td class="sig-date">Date</td>
+        <td><div class="space"></div><div class="caption">Assessing physiotherapist, name and signature</div></td>
+        <td class="gap"></td>
+        <td><div class="space"></div><div class="caption">Date</div></td>
     </tr>
 </table>
 
-<p class="side-note">{SIDE_NOTE}</p>
-<p class="disclaimer">{DISCLAIMER}</p>
-{f'<p class="analysis-version">Analysis version {_esc(analysis_version)}. Values and grades are only comparable with reports carrying the same version.</p>' if analysis_version else ''}
+<div class="notes">
+    <p class="disclaimer-tag">Disclaimer</p>
+    <p class="disclaimer">{DISCLAIMER}</p>
+    <p class="side-note">{SIDE_NOTE}</p>
+    {upload_note}
+    {version_line}
+</div>
+</div>
 
 </body>
 </html>

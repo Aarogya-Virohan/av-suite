@@ -31,6 +31,9 @@ export interface ViewData {
   accuracy: number
   measurements: Measurement[]
   interpretation: string
+  // How the photograph was taken. Sent by the backend since 3 October 2026;
+  // optional because earlier reports do not carry it.
+  captureSource?: "camera" | "upload" | "unknown"
 }
 
 export interface SynthesisData {
@@ -49,6 +52,7 @@ export interface PostureReport {
   patient: {
     name: string
     age: number
+    gender?: string
     caseRef: string
     assessmentDate: string
     clinician: string
@@ -69,6 +73,10 @@ export interface PostureReport {
   // it, and the absence of it is itself the signal that a report predates
   // the September threshold work.
   analysisVersion?: string
+
+  // Printed identifier, since 11 October 2026; the same suffix ends the
+  // saved file's name. Optional because earlier reports do not carry it.
+  reportId?: string
 
   // globalIndex removed 10 October 2026, founders' Q5. Reports saved
   // before then still carry it; nothing reads it.

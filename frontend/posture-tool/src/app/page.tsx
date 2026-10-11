@@ -16,11 +16,20 @@ import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@
 // exists until the clinician has confirmed the points.
 type Step = "upload" | "review" | "report"
 
-function Header() {
+// On the report step the document below carries the logo itself, so the
+// bar shows only the product name; two logos one above the other read as a
+// mistake.
+function Header({ showLogo = true }: { showLogo?: boolean }) {
   return (
     <header className="border-b border-[#E3E1DA] bg-white">
-      <div className="mx-auto flex w-full max-w-7xl items-baseline gap-3 px-4 py-4">
-        <span className="text-[17px] font-semibold tracking-tight text-[#15181D]">Aarogya Virohan</span>
+      <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-4">
+        {showLogo && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/av_logo_wordmark.png" alt="Aarogya Virohan" className="h-6 w-auto" />
+            <span className="h-4 w-px bg-[#E3E1DA]" aria-hidden="true" />
+          </>
+        )}
         <span className="text-[13px] text-[#7A818B]">Posture assessment</span>
       </div>
     </header>
@@ -209,6 +218,56 @@ try {
 
 }
 
+const [pdfBusy, setPdfBusy] = useState(false)
+
+// Clears everything for the next patient. Was inline on the old
+// "Start Over" button; now the report's "New assessment" action.
+const resetAll = () => {
+
+                setFrontImage(
+                  null
+                )
+                setSideImage(
+                  null
+                )
+                setBackImage(
+                  null
+                )
+
+                setFrontFile(
+                  null
+                )
+                setSideFile(
+                  null
+                )
+                setBackFile(
+                  null
+                )
+
+                setFrontSource("unknown")
+                setSideSource("unknown")
+                setBackSource("unknown")
+
+                setPatientName("")
+                setAge("")
+                setGender("")
+                setCaseRef("")
+                setPatientHeightCm("")
+                setClinicianName("")
+
+                setReport(
+                  null
+                )
+
+                setDetection(
+                  null
+                )
+
+                setStep(
+                  "upload"
+                )
+              }
+
 const handleConfirm = async (review: LandmarkReviewSubmission) => {
 if (!detection) return
 
@@ -251,7 +310,7 @@ try {
 
 return ( <div className="min-h-screen bg-[#F4F3EF]">
 
-  <Header />
+  <Header showLogo={step !== "report"} />
 
   <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8">
 
@@ -367,98 +426,44 @@ return ( <div className="min-h-screen bg-[#F4F3EF]">
 
     {step === "report" &&
       report && (
-        <section className="space-y-6">
+        <section className="mx-auto w-full max-w-4xl space-y-4">
 
           <ReportCard
             data={report}
           />
 
-          <div className="no-print flex flex-wrap gap-4">
-
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await downloadPostureReportPdf(
-                    report
-                  )
-                } catch (err) {
-                  alert(
-                    "Could not generate the report PDF. Please try again."
-                  )
-                }
-              }}
-              className="
-                rounded-full
-                bg-slate-900
-                px-6
-                py-3
-                text-white
-              "
-            >
-              Export Report
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-
-                setFrontImage(
-                  null
-                )
-                setSideImage(
-                  null
-                )
-                setBackImage(
-                  null
-                )
-
-                setFrontFile(
-                  null
-                )
-                setSideFile(
-                  null
-                )
-                setBackFile(
-                  null
-                )
-
-                setFrontSource("unknown")
-                setSideSource("unknown")
-                setBackSource("unknown")
-
-                setPatientName("")
-                setAge("")
-                setGender("")
-                setCaseRef("")
-                setPatientHeightCm("")
-                setClinicianName("")
-
-                setReport(
-                  null
-                )
-
-                setDetection(
-                  null
-                )
-
-                setStep(
-                  "upload"
-                )
-              }}
-              className="
-                rounded-full
-                border
-                border-slate-300
-                bg-white
-                px-6
-                py-3
-                text-slate-700
-              "
-            >
-              Start Over
-            </button>
-
+          {/* Actions in a bar that stays at the bottom of the screen while
+              the report is read, and settles under the report at its end.
+              At the top (before 12 October) they asked for a download
+              before the report had been read; only at the end, a phone
+              user scrolled ten screens to reach them. */}
+          <div className="no-print sticky bottom-0 z-20 -mx-4 border-t border-[#D9E3E4] bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border">
+            <div className="mx-auto flex max-w-4xl gap-2.5 sm:justify-end">
+              <button
+                type="button"
+                onClick={resetAll}
+                className="h-10 flex-1 rounded-lg border border-[#D9E3E4] bg-white px-4 text-[14px] font-medium text-[#2F3336] transition hover:bg-[#F3F7F7] sm:flex-none"
+              >
+                New assessment
+              </button>
+              <button
+                type="button"
+                disabled={pdfBusy}
+                onClick={async () => {
+                  setPdfBusy(true)
+                  try {
+                    await downloadPostureReportPdf(report)
+                  } catch {
+                    alert("Could not generate the report PDF. Please try again.")
+                  } finally {
+                    setPdfBusy(false)
+                  }
+                }}
+                className="h-10 flex-1 rounded-lg bg-[#3B6A70] px-5 text-[14px] font-semibold text-white transition hover:bg-[#2F5A60] disabled:opacity-60 sm:flex-none"
+              >
+                {pdfBusy ? "Preparing PDF…" : "Download PDF"}
+              </button>
+            </div>
           </div>
 
         </section>

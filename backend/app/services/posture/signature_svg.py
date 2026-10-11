@@ -15,7 +15,11 @@ import math
 from html import escape
 from typing import Any
 
-# Same colours as the PDF badges (pdf_service.SEVERITY_STYLES).
+# Axis labels 10 units since 11 October 2026: at 8.5 they rendered at about
+# 7 px on a phone.
+# Same colours as the PDF badges (pdf_service.SEVERITY_STYLES). The outline
+# is the brand teal since 11 October 2026 (it was near-black and the only
+# black shape on the page).
 COLOUR = {
     "none": "#15803d",
     "mild": "#a16207",
@@ -86,10 +90,10 @@ def render_signature_svg(signature: dict[str, Any], width: int = 440, height: in
         measured = p.get("tier") is not None
         label = escape(_short(p))
         second = "" if measured else (
-            f'<tspan x="{lx:.1f}" dy="10" font-size="7.5">not measured</tspan>'
+            f'<tspan x="{lx:.1f}" dy="11" font-size="8.5">not measured</tspan>'
         )
         parts.append(
-            f'<text x="{lx:.1f}" y="{ly + 3:.1f}" font-size="8.5" text-anchor="{anchor}" '
+            f'<text x="{lx:.1f}" y="{ly + 3:.1f}" font-size="10" text-anchor="{anchor}" '
             f'fill="{"#334155" if measured else GREY}" '
             f'font-family="Helvetica, Arial, sans-serif">{label}{second}</text>'
         )
@@ -101,8 +105,8 @@ def render_signature_svg(signature: dict[str, Any], width: int = 440, height: in
     if len(measured_pts) >= 3:
         d = " ".join(f"{x:.1f},{y:.1f}" for x, y in measured_pts)
         parts.append(
-            f'<polygon points="{d}" fill="#0f172a" fill-opacity="0.06" '
-            f'stroke="#0f172a" stroke-width="1.2" stroke-linejoin="round"/>'
+            f'<polygon points="{d}" fill="#4e888f" fill-opacity="0.12" '
+            f'stroke="#3b6a70" stroke-width="1.3" stroke-linejoin="round"/>'
         )
 
     for x, y, p in points:
