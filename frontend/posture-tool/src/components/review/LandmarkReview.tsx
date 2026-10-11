@@ -18,7 +18,7 @@
  *   its controls: not visible, reset, zoom.
  * - Zoom and pan, so the face points on the front view can be told apart.
  * - Skeleton lines, so a point off its joint shows up as a bent line.
- * - Points the model was unsure of are counted, and "Check next" steps
+ * - Points to check are counted, and "Check next" steps
  *   through them.
  * - A drag only starts after the finger moves a few pixels, so tapping a
  *   point to select it never nudges it.
@@ -68,6 +68,18 @@ const VIEW_HINT: Record<ViewName, string> = {
 // Points the model was less sure of are flagged. Founders' suggestion, 80 percent.
 const LOW_CONFIDENCE = 0.8
 
+// Points flagged for checking whatever the model's confidence, because the
+// model places a joint centre where the measurement needs a bony landmark.
+// Side view: documented on all seven test subjects (known_limitations.md,
+// PT-L05), shoulder toward the back of the shoulder, hip near the
+// waistband. Back view: on 11 October moving one shoulder point to the bony
+// tip took a trunk shift from 23 mm to 3 mm. Indices are MediaPipe's.
+const ALWAYS_CHECK: Record<ViewName, number[]> = {
+  side: [11, 12, 23, 24],
+  front: [],
+  back: [11, 12, 23, 24],
+}
+
 const ZOOM = 2.6
 const LOUPE = 124
 const LOUPE_GAP = 92
@@ -116,6 +128,9 @@ interface EditablePoint {
   origX: number
   origY: number
   lowConfidence: boolean
+  // True when flagged because of the landmark problem above, rather than
+  // because the model was unsure.
+  jointCentre: boolean
   notVisible: boolean
   isPupil: boolean
 }
@@ -160,7 +175,8 @@ function initialPoints(detection: DetectionResult): PointsByView {
       y: p.y,
       origX: p.x,
       origY: p.y,
-      lowConfidence: p.visibility < LOW_CONFIDENCE,
+      lowConfidence: p.visibility < LOW_CONFIDENCE || ALWAYS_CHECK[view].includes(p.index),
+      jointCentre: ALWAYS_CHECK[view].includes(p.index),
       notVisible: false,
       isPupil: false,
     }))
@@ -183,6 +199,7 @@ function initialPoints(detection: DetectionResult): PointsByView {
           origX: q.x,
           origY: q.y,
           lowConfidence: !v.iris,
+          jointCentre: false,
           notVisible: false,
           isPupil: true,
         }),
@@ -773,8 +790,10 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                         ? "Not visible. Measurements that need it are left out."
                         : isMoved(selectedPoint)
                           ? "Moved from where the model placed it."
-                          : selectedPoint.lowConfidence
-                            ? "The model was unsure of this one. Check it closely."
+                          : selectedPoint.jointCentre
+                            ? "The model marks the joint centre here, not the bone. Move it onto the bony landmark."
+                            : selectedPoint.lowConfidence
+                              ? "The model was unsure of this one. Check it closely."
                             : "Where the model placed it."}
                     </p>
                   </div>
@@ -837,8 +856,8 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                     <span className="h-2.5 w-2.5 flex-none rounded-full border-2 border-[#E8A23A]" />
                     <p className="flex-1 text-[14px] text-[#6B4A12]">
                       {flaggedLeft === 1
-                        ? "1 point the model was unsure of"
-                        : `${flaggedLeft} points the model was unsure of`}
+                        ? "1 point to check"
+                        : `${flaggedLeft} points to check`}
                     </p>
                     <button
                       type="button"
@@ -984,8 +1003,8 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
               {totalUnseen > 0 && (
                 <p className="text-[#A8670F]">
                   {totalUnseen === 1
-                    ? "1 point the model was unsure of has not been opened."
-                    : `${totalUnseen} points the model was unsure of have not been opened.`}{" "}
+                    ? "1 point marked for checking has not been opened."
+                    : `${totalUnseen} points marked for checking have not been opened.`}{" "}
                   You can still confirm if they look right.
                 </p>
               )}
