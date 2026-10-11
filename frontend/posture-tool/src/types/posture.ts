@@ -37,7 +37,9 @@ export interface SynthesisData {
   hypertonic: string[]
   inhibited: string[]
 
-  correctiveProtocol: {
+  // Removed from new reports on 11 October 2026 (founders, answer 1b).
+  // Reports saved before then still carry it; nothing displays it.
+  correctiveProtocol?: {
     exercise: string
     dosage: string
   }[]

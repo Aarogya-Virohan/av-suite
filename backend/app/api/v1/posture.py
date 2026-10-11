@@ -755,13 +755,25 @@ def _report_from_points(
         exist_ok=True,
     )
 
+    # Founders, 11 October 2026, answer 6a: the saved copy keeps the points,
+    # angles and review audit but not the photographs. The annotated photo
+    # in each view is dropped from the file; the response to the clinician
+    # still carries it, for the report on screen and the PDF.
+    saved = {
+        **report,
+        "views": {
+            name: {k: v for k, v in view.items() if k != "photoUrl"}
+            for name, view in report["views"].items()
+        },
+    }
+
     with open(
         reports_dir / report_filename(case_ref, datetime.now(timezone.utc), uuid.uuid4().hex[:8]),
         "w",
     ) as file:
 
         json.dump(
-            report,
+            saved,
             file,
             indent=2,
         )

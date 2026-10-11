@@ -1150,3 +1150,37 @@ of full-width cards, and a failed detection shows on the screen in plain
 words ("No person was found in the front photo...") instead of a browser
 alert. Verified by type check and lint only; the iOS permission path has
 not been run on an iPhone.
+
+### Founders' third reply: exercises out, photographs no longer saved
+Answers 1b, 2a, 3a, 4a, 5a, 6a, received 11 October.
+
+1b. The exercise column is removed from the report entirely, web and PDF.
+Their reason: a 2D deviation does not tell you the cause, so prescribing
+from it moves the tool from flagging into diagnosing; the physio
+prescribes. synthesizer.py no longer holds or returns any exercise, and a
+test pins that the report prescribes none. The "likely hypertonic" and
+"likely inhibited" columns stay, because the answer named only the
+exercise column. This also closes the two open items about exercise
+mappings for a flexed knee and a backward lean. Whether the muscle
+columns themselves are approved was not asked separately; read as kept.
+
+2a. The regional profile keeps "worst grade in the region". No change.
+
+3a. Thoracic stays on the signature as "No parameter", so nobody reads it
+as checked and normal. No change.
+
+4a. A tripod is part of the clinic setup. The capture setup sheet now says
+so. The proposed auto-capture is not needed and was not built. The 1.5
+degree lock stays.
+
+5a. No stickers for now. The review step stays the safeguard, and the
+inter-rater test (two physios, same photographs) comes first.
+
+6a. Saved report files no longer contain the photographs: photoUrl is
+stripped from every view before the file is written. The points, angles,
+grades and the landmark review audit are kept. For po-7 the saved file
+went from about 1.8 MB to about 21 KB. The patient name is still saved, since
+the answer named photos only; whether it should go is open. Files saved
+before this change still hold photographs and are not touched by the
+code. A lawyer's view on consent and retention period is owed, per the
+same answer.

@@ -14,7 +14,9 @@ export default function SynthesisPanel({
         Clinical Master Synthesis
       </h2>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* No exercises since 11 October 2026: the founders removed them from
+          the automated report (answer 1b). The physiotherapist prescribes. */}
+      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         {/* Hypertonic */}
         <div className="rounded-2xl bg-red-50 p-6">
@@ -43,31 +45,6 @@ export default function SynthesisPanel({
                 • {muscle}
               </li>
             ))}
-          </ul>
-        </div>
-
-        {/* Corrective */}
-        <div className="rounded-2xl bg-emerald-50 p-6">
-          <h3 className="text-xl font-semibold text-emerald-700">
-            Corrective Protocol
-          </h3>
-
-          <ul className="mt-4 space-y-4">
-
-            {data.correctiveProtocol.map((exercise) => (
-              <li key={exercise.exercise}>
-
-                <p className="font-medium text-slate-900">
-                  {exercise.exercise}
-                </p>
-
-                <p className="text-sm text-slate-600">
-                  {exercise.dosage}
-                </p>
-
-              </li>
-            ))}
-
           </ul>
         </div>
 

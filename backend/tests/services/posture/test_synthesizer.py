@@ -10,7 +10,6 @@ def test_synthesis_single_part_key():
 
     assert "Upper Trapezius" in result["hypertonic"]
     assert "Deep Neck Flexors" in result["inhibited"]
-    assert any(ex["exercise"] == "Chin Tucks" for ex in result["correctiveProtocol"])
 
 
 def test_synthesis_bilateral_key():
@@ -21,7 +20,6 @@ def test_synthesis_bilateral_key():
     result = generate_synthesis(findings)
 
     assert "Gluteus Medius" in result["inhibited"]
-    assert any(ex["exercise"] == "Clamshells" for ex in result["correctiveProtocol"])
 
 
 def test_synthesis_pt_l06_knee_hyperextension():
@@ -32,10 +30,6 @@ def test_synthesis_pt_l06_knee_hyperextension():
 
     assert "Gastrocnemius" in result["hypertonic"]
     assert "Quadriceps" in result["inhibited"]
-    assert any(
-        ex["exercise"] == "Terminal Knee Extension Control"
-        for ex in result["correctiveProtocol"]
-    )
 
 
 def test_withdrawn_parameters_trigger_nothing():
@@ -55,7 +49,6 @@ def test_withdrawn_parameters_trigger_nothing():
 
         assert result["hypertonic"] == [], f"{param} still maps hypertonic muscles"
         assert result["inhibited"] == [], f"{param} still maps inhibited muscles"
-        assert result["correctiveProtocol"] == [], f"{param} still maps an exercise"
 
 
 def test_synthesis_three_part_key_does_not_crash():
@@ -67,7 +60,6 @@ def test_synthesis_three_part_key_does_not_crash():
 
     assert result["hypertonic"] == []
     assert result["inhibited"] == []
-    assert result["correctiveProtocol"] == []
 
 
 def test_synthesis_ignores_none_and_mild_severities():
@@ -81,7 +73,6 @@ def test_synthesis_ignores_none_and_mild_severities():
 
     assert result["hypertonic"] == []
     assert result["inhibited"] == []
-    assert result["correctiveProtocol"] == []
 
 
 def test_posterior_rows_carry_the_mapping_for_their_quantity():
@@ -90,9 +81,20 @@ def test_posterior_rows_carry_the_mapping_for_their_quantity():
     # the quantity to the posterior rows, not the old winging and
     # scoliosis-era mappings.
     p02 = generate_synthesis({"PT-P02": "moderate"})
-    assert any(ex["exercise"] == "Scapular Retraction" for ex in p02["correctiveProtocol"])
+    assert "Middle Trapezius" in p02["inhibited"]
     assert "Serratus Anterior" not in p02["inhibited"]
 
     p01 = generate_synthesis({"PT-P01": "moderate"})
-    assert any(ex["exercise"] == "Side Plank" for ex in p01["correctiveProtocol"])
-    assert not any("Schroth" in ex["exercise"] for ex in p01["correctiveProtocol"])
+    assert "Quadratus Lumborum" in p01["hypertonic"]
+
+
+def test_the_report_prescribes_no_exercises():
+
+    # Founders, 11 October 2026, answer 1b: the tool flags, the physio
+    # prescribes. Every rule at its most severe must return muscles only.
+    from app.services.posture.synthesizer import SYNTHESIS_RULES
+
+    for rule in SYNTHESIS_RULES:
+        assert "corrective" not in rule, f"{rule['param_id']} still carries exercises"
+        result = generate_synthesis({rule["param_id"]: "severe"})
+        assert set(result) == {"hypertonic", "inhibited"}

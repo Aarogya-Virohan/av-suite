@@ -84,7 +84,7 @@ Recent commits, subjects as they actually read:
 
 ## 3. Founder answers
 
-Three rounds, all recorded in decisions.md with which of their evidence
+Four rounds, all recorded in decisions.md with which of their evidence
 holds up:
 
 - 10 October, the seven questions of the 2 October document. All applied
@@ -99,18 +99,16 @@ holds up:
 
 Every graded parameter on the report now has founder-approved bands.
 
-Still owed by the founders, collected for one message, nothing blocked:
-- Exercise mappings for a flexed knee and a backward lean. Both grade in
-  their rows but are kept out of the synthesis, because the existing
-  mappings are for the opposite direction.
-- Approval of the whole synthesis table. None of it was ever founder
-  approved, including the 10 October moves for PT-P01 and PT-P02.
-- Stickers on bony landmarks at capture, yes or no.
-- What to save. Saved reports hold the patient's name and photographs
-  with no retention period and no consent step; their own guidelines
-  point at saving points and angles and keeping photos short-term.
-- For Q5: is "worst grade in the region" the regional index they meant,
-  and should the thoracic region, which has no parameter, show or go.
+- 11 October, third reply (1b, 2a, 3a, 4a, 5a, 6a): exercise column removed
+  from the report, regional profile and thoracic "No parameter" kept,
+  tripod required (no auto-capture), no stickers for now, saved files no
+  longer keep photographs. Details in decisions.md.
+
+Nothing is owed by the founders now. Open from that reply:
+- Lawyer's view on consent and how long to keep data (their answer 6a).
+- Whether the patient name should also leave saved files (6a named photos only).
+- Old files in backend/data/reports from before 11 October still contain
+  photographs; delete them by hand if they are not needed.
 
 ## 4. Done on 2 October, after the founder document went out
 
@@ -208,8 +206,8 @@ is now 2026-10-11.2.
   hand, which shows it runs, not that it is right. Three physical tests
   settle it: upright against a door frame (both near 0), flat on a table
   (forward tilt near 90), landscape against the frame (side tilt near 90).
-  Holding 1.5 degrees by hand is possible but hard; an auto-capture that
-  fires once the phone has been level for a moment is proposed, not built.
+  Holding 1.5 degrees by hand is possible but hard; the founders chose a
+  tripod as part of the clinic setup, so no auto-capture.
 - Saved report files are uniquely named; a "../" in the case reference
   could previously write outside data/reports, and equal case references
   overwrote each other.

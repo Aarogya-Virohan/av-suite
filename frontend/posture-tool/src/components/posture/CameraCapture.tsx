@@ -335,7 +335,7 @@ export default function CameraCapture({
             <div className="w-full max-w-sm space-y-4 rounded-2xl bg-[#15181D] p-5">
               <h3 className="text-[17px] font-semibold">Before you capture</h3>
               <ul className="space-y-2.5 text-[14px] leading-snug text-white/80">
-                <li>Phone on a tripod, at about half the patient&apos;s height.</li>
+                <li>Phone on a tripod, at about half the patient&apos;s height. The tripod is part of the clinic setup: the photo is taken only when the phone is within 1.5&deg; of level.</li>
                 <li>Tripod 1.5 to 3 m from the patient, in the same spot every visit.</li>
                 <li>Patient on the floor marker, feet in the standard position.</li>
                 <li>Clothing that shows the shoulders, hips, knees and ankles.</li>

@@ -247,23 +247,16 @@ def _biomech_signature_section(signature: dict | None) -> str:
 
 
 def _synthesis_section(synthesis: dict) -> str:
-    """Render the muscle-balance summary and corrective protocol."""
+    """
+    Render the muscle-balance summary. No exercises since 11 October 2026:
+    the founders removed them from the automated report (answer 1b), so
+    the tool flags and the physiotherapist prescribes.
+    """
 
     def _list(items: list[str]) -> str:
         if not items:
             return '<li class="empty">None identified</li>'
         return "".join(f"<li>{_esc(i)}</li>" for i in items)
-
-    protocol = synthesis.get("correctiveProtocol") or []
-
-    if protocol:
-        protocol_html = "".join(
-            f"<li><span class='ex'>{_esc(p.get('exercise'))}</span>"
-            f"<span class='dose'>{_esc(p.get('dosage'))}</span></li>"
-            for p in protocol
-        )
-    else:
-        protocol_html = '<li class="empty">None prescribed</li>'
 
     return f"""
     <section class="synthesis">
@@ -278,10 +271,6 @@ def _synthesis_section(synthesis: dict) -> str:
                 <td>
                     <h3>Likely Inhibited</h3>
                     <ul>{_list(synthesis.get('inhibited') or [])}</ul>
-                </td>
-                <td>
-                    <h3>Corrective Protocol</h3>
-                    <ul class="protocol">{protocol_html}</ul>
                 </td>
             </tr>
         </table>
@@ -552,7 +541,7 @@ def build_report_html(report: dict) -> str:
     }}
     .synthesis-grid td {{
         vertical-align: top;
-        width: 33.3%;
+        width: 50%;
         padding: 0 8px 0 0;
     }}
     .synthesis-grid h3 {{
@@ -576,17 +565,6 @@ def build_report_html(report: dict) -> str:
         font-style: italic;
         list-style: none;
         margin-left: -14px;
-    }}
-    .protocol .ex {{
-        display: block;
-        font-weight: bold;
-        color: #0f172a;
-    }}
-    .protocol .dose {{
-        display: block;
-        color: #64748b;
-        font-size: 8pt;
-        margin-bottom: 3px;
     }}
 
     .index-block {{
