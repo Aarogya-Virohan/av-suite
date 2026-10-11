@@ -6,6 +6,8 @@ from fastapi import UploadFile
 from fastapi.responses import Response
 
 import base64
+import re
+import uuid
 
 import cv2
 import json
@@ -231,6 +233,23 @@ def _annotate_or_blank(
 # single call with no clinician in between, was removed on 10 October 2026.
 # The founders ruled that no report is generated until the landmarks are
 # confirmed (Q6); /detect then /report replaces it.
+
+def report_filename(case_ref: str, now: datetime, unique: str) -> str:
+    """
+    File name for a saved report.
+
+    Until 11 October 2026 the file was "<case_ref>.json". Two reports with
+    the same case reference overwrote each other without a trace, and the
+    case reference, typed by the user, went into the path unchecked, so a
+    value containing "../" could write outside data/reports. Now only
+    letters, digits, "-" and "_" survive from the case reference, it is
+    capped at 60 characters, and a UTC timestamp and a random suffix make
+    every file unique.
+    """
+
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", case_ref or "").strip("_")[:60] or "report"
+    return f"{safe}_{now.strftime('%Y%m%dT%H%M%SZ')}_{unique}.json"
+
 
 def _report_from_points(
     *,
@@ -737,7 +756,7 @@ def _report_from_points(
     )
 
     with open(
-        reports_dir / f"{case_ref}.json",
+        reports_dir / report_filename(case_ref, datetime.now(timezone.utc), uuid.uuid4().hex[:8]),
         "w",
     ) as file:
 

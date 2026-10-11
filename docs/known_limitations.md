@@ -166,6 +166,29 @@ zero has not been measured yet; the first test is one patient, side view,
 shoulder and hip dragged to the bony landmarks, compared with the
 unedited reading.
 
+First such test, 11 October 2026, one subject (the photographs of po-3),
+against the same photographs with the model's own points. From the saved
+review audit, the points moved were: side view, shoulder 78 px and hip
+51 px; front view, both shoulders, about 82 px each (no front row reads
+them since 10 October); back view, the right shoulder only, 97 px. The
+back hips were not moved.
+
+| Row | Model's points | Hand-placed |
+|---|---|---|
+| Trunk lean | -0.9 degrees, backward | +0.72, forward |
+| Knee, side | +0.12, flexion | -1.59, hyperextension |
+| Trunk shift, back | 24.34 mm MODERATE | 3.22 mm NORMAL |
+| Shoulder level, back | 9.17 mm MILD | 0.1 mm NORMAL |
+
+The trunk lean came to within a degree of zero, which is what the bony
+landmarks predict for an upright subject. The larger finding is the back
+view: moving one shoulder point took the MODERATE trunk shift, and the
+whole synthesis that came from it (side plank, quadratus lumborum,
+obliques), to NORMAL, so that finding was produced by where the model put
+the point, not by the patient. One subject only, placed by a
+non-clinician; inter-rater agreement has not been measured. The back-view
+review hint now names the shoulder and hip landmarks as well.
+
 ### Shoulder level side, front and back disagree, 10 October 2026
 
 Measured on the seven test subjects with the pipeline's own

@@ -1003,3 +1003,23 @@ on po-3, po-6 and po-7 (22 to 27 mm). Also seen, not acted on: the trunk
 lean reads backward on all seven subjects (-0.9 to -6.72 degrees), which
 is worth checking against the sign convention before anyone reads it
 clinically.
+
+### Saved report files no longer overwrite each other
+Every report is written to backend/data/reports, and since 10 October that
+copy carries the landmark review audit (model point, confirmed point,
+pixels moved). Nothing in the code reads these files back. The file was
+named "<case_ref>.json" since 0f32c5a (1 June), which had two faults: two
+reports with the same case reference overwrote each other silently (all of
+the 10 and 11 October phone tests used "Na", so only the last survives),
+and the case reference went into the path unchecked, so a value with "../"
+could write outside the folder. Now report_filename() keeps only letters,
+digits, "-" and "_" from the case reference, caps it at 60 characters, and
+appends a UTC timestamp and a random suffix. The report itself is
+unchanged. Verified: five new tests, including the "../" case; full route
+on the seven test subjects writes one uniquely named file each.
+
+Open, for the founders, not engineering: these files hold the patient's
+name and photographs on the server's disk with no retention period and no
+consent step. The audits in them are also the only ground truth we have
+for where clinicians actually place landmarks, which would be the data for
+any future landmark model.

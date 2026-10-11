@@ -58,7 +58,11 @@ const VIEW_HINT: Record<ViewName, string> = {
     "Only the side facing the camera is checked. Ear point on the ear opening, shoulder on the bony tip of the shoulder, hip on the bony bump at the side of the hip, knee at the middle of the joint, ankle on the outer ankle bone.",
   front:
     "Left and right are the patient's own sides, so the left shoulder appears on the right of the photo. Pupils go in the centre of each eye.",
-  back: "From behind, the head point is an estimate. Place it on the middle of the back of the head.",
+  // Shoulder level is defined between the acromions (founders' guidelines,
+  // 10 October 2026), and on 11 October moving the back points to the bony
+  // landmarks took one subject's trunk shift from 23 mm to 3 mm.
+  back:
+    "From behind, the head point is an estimate. Place it on the middle of the back of the head. Shoulder points on the bony tips of the shoulders, hip points on the bony bumps at the sides of the hips.",
 }
 
 // Points the model was less sure of are flagged. Founders' suggestion, 80 percent.
