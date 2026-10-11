@@ -888,3 +888,65 @@ These were looked at today and deliberately left alone.
 - **Severity tiers themselves.** Answered 10 October: keep
   mild/moderate/severe, with a four-colour scale. See the 10 October
   section.
+
+## 11 October 2026
+
+### Founder answers on the knee row and ear level
+Source: the founders' reply of 11 October to three questions sent that
+morning, given as "1a, 2a, 3a" with a Gemini write-up and three tables.
+The decisions are theirs and are applied as given. As on 10 October, some
+of the stated reasoning is stronger than the evidence: the write-up says
+the 5 degree ceiling "perfectly absorbs" human and machine variance and
+"ensures the software only flags true pathological deviations", and that
+the eyes "guarantee" reliable detection. Bellemans et al. 2012 measured
+radiographs, not photographs, and gives a prevalence (32 percent of
+healthy young men, 17 percent of women at 3 degrees of varus or more),
+not a cut-off; the 2 degree error figure is from a pose model on knee
+osteoarthritis patients (Saiki et al. 2023). The 5 degree line is a
+reasonable judgement on that evidence, not a validated threshold.
+
+**1a, knee bands.** PT-A05 and PT-A06 now share one set: 0 to 5 normal,
+over 5 to 9 mild, over 9 to 13 moderate, above 13 severe. The founders'
+table writes the boundaries as 5.1, 9.1 and 13; the classifier's <=
+gives exactly that (5.0 normal, 5.1 mild, 9.0 mild, 13.0 moderate).
+PT-A06 moves from 3/7/12. PT-A05 loses its female normal ceiling of 7:
+the table has no sex split, so a woman at 6 degrees of knock-knee now
+grades MILD where she graded NORMAL. Verified at every boundary in
+test_knee_alignment.py.
+
+This also settles the two open knee items from the list above. The bands
+are no longer asymmetric, so a smaller deviation can no longer outgrade a
+larger one on the other leg. The 0.5 degree neutral gate still sits
+inside the measurement noise, but it no longer matters for the grade,
+since both directions share one band set, and the direction word is only
+printed above NORMAL, at 5.1 degrees and up, far outside the 0.84 degree
+noise that could flip it.
+
+**2a, name.** The row is "Left Knee Alignment (Hip-Knee-Ankle)" and
+"Right Knee Alignment (Hip-Knee-Ankle)", never "Knee Valgus" or "Knee
+Varus". The direction prints underneath as "Knock-knee" or "Bow-leg",
+through SIDE_WORDING, so like every other direction it is hidden at
+NORMAL. The parameter ids PT-A05 and PT-A06 stay, because the synthesis
+maps them to different muscles.
+
+**3a, ear level.** PT-A10 is withdrawn from the report, from the
+synthesis and from the front landmark review (the two ear points). The
+calculation and bands stay in the source with nothing calling them. The
+front calibration and the nose stay: the annotated front image still
+draws its reference grid from them. Evidence from the live phone tests:
+on 10 October the model put both ear points on the cheeks and the report
+said 16 mm, severe; on 11 October, with the ears placed by hand on the
+same patient, two runs gave 11.05 mm SEVERE and 8 mm MODERATE while the
+pupillary head tilt on the same photograph read 0.94 degrees NORMAL.
+
+ANALYSIS_VERSION to 2026-10-11. Verified: posture suite 65 passed (47
+before, 18 new); full detect, confirm, report and PDF route on all seven
+test subjects, no PT-A10 row, no "Valgus" or "Varus" label, front review
+offers nine points; PDF page one checked visually, the new label fits on
+one line with the direction beneath. Run on the Mac's Linux VM, Python
+3.10, so no measured values are quoted here as reference figures.
+
+Same session, frontend only: the landmark review screen was redesigned
+after the first phone test (one view at a time, tap a point for its
+controls, zoom, skeleton lines, a confirm summary). The submission sent
+to the server did not change.

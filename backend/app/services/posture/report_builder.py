@@ -22,6 +22,10 @@ SIDE_WORDING: dict[str, dict[str, str]] = {
     "PT-A10": {"left": "Left ear higher", "right": "Right ear higher"},
     "PT-A04": {"left": "Left hip higher", "right": "Right hip higher"},
     "PT-P02": {"left": "Left shoulder higher", "right": "Right shoulder higher"},
+    # Founders, 11 October 2026: the knee row names its direction in plain
+    # words under the "Knee Alignment (Hip-Knee-Ankle)" label.
+    "PT-A05": {"valgus": "Knock-knee"},
+    "PT-A06": {"varus": "Bow-leg"},
 }
 
 
@@ -115,7 +119,9 @@ def build_side_view_result(
 # pupillary line, shoulder level and trunk shift from the back view only,
 # deviation labels, no global score). Also covers the 3 October PNG capture
 # and captureSource, which changed what reaches the model without a bump.
-ANALYSIS_VERSION = "2026-10-10"
+# 2026-10-11: founders' answers of 11 October. Knee bands 5/9/13 for both
+# directions with no female allowance, knee rows renamed, ear level removed.
+ANALYSIS_VERSION = "2026-10-11"
 
 
 def build_report_response(

@@ -454,13 +454,15 @@ def _report_from_points(
             measurement("PT-A04", "Pelvic Obliquity", None, "\u00b0", "insufficient_data")
         )
 
-    # PT-A05 / PT-A06 — Knee Valgus / Varus (bilateral)
-
-    direction_labels = {
-        "valgus": "Knee Valgus",
-        "varus": "Knee Varus",
-        "neutral": "Knee Alignment",
-    }
+    # PT-A05 / PT-A06 — Knee Alignment (Hip-Knee-Ankle), bilateral.
+    #
+    # Founders, 11 October 2026 (answer 2a): the row is named for what is
+    # measured, the hip-knee-ankle line, and never "Knee Valgus" or "Knee
+    # Varus", which a physiotherapist reads as the Q-angle. The direction is
+    # printed underneath as knock-knee or bow-leg, through the same sideLabel
+    # mechanism the other rows use, so it is hidden at NORMAL like theirs.
+    # The two parameter ids stay because the synthesis maps them to
+    # different muscles; their bands are identical since the same date.
 
     direction_param = {
         "valgus": "PT-A05",
@@ -486,10 +488,11 @@ def _report_from_points(
             front_measurements.append(
                 measurement(
                     param_id,
-                    f"{direction_labels[direction]} ({side_label})",
+                    f"{side_label} Knee Alignment (Hip-Knee-Ankle)",
                     deviation,
                     "\u00b0",
                     severity,
+                    side=None if direction == "neutral" else direction,
                 )
             )
 
@@ -497,7 +500,7 @@ def _report_from_points(
             front_measurements.append(
                 measurement(
                     "PT-A05",
-                    f"Knee Alignment ({side_label})",
+                    f"{side_label} Knee Alignment (Hip-Knee-Ankle)",
                     None,
                     "\u00b0",
                     "insufficient_data",
@@ -514,7 +517,6 @@ def _report_from_points(
     # and its discontinuity at -1.5 degrees, which used to live here.
     # See docs/known_limitations.md for the evidence.
 
-    # PT-A10 — millimetre measurement (needs patient height for calibration).
     # PT-A02 (shoulder level) and PT-A03 (trunk lateral shift) left the front
     # view on 10 October 2026: the founders ruled one metric, one view, and
     # assigned both quantities to the posterior view, where PT-P02 and PT-P01
@@ -533,38 +535,16 @@ def _report_from_points(
         pixels_per_cm = None
         calibration_status = "insufficient_data"
 
-    mm_params = [
-        ("PT-A10", "Ear Level Asymmetry", LEFT_EAR, RIGHT_EAR, "y"),
-    ]
-
-    for param_id, label, left_idx, right_idx, _axis in mm_params:
-        try:
-            check_visibility(front_landmarks, [left_idx, right_idx])
-
-            if pixels_per_cm is None:
-                front_measurements.append(
-                    measurement(param_id, label, None, "mm", calibration_status)
-                )
-                continue
-
-            value = calc_ear_level_asymmetry_mm(front_landmarks, front_height_px, pixels_per_cm)
-
-            severity = classify(param_id, value)
-            findings[param_id] = severity
-
-            side_value = ear_asymmetry_side(front_landmarks)
-
-            front_measurements.append(
-                measurement(param_id, label, value, "mm", severity, side=side_value)
-            )
-
-        except InsufficientVisibilityError:
-            front_measurements.append(
-                measurement(param_id, label, None, "mm", "insufficient_data")
-            )
+    # PT-A10 — Ear Level Asymmetry. Withdrawn from the report on
+    # 11 October 2026, founders' answer 3a. Pose ear landmarks land on the
+    # cheeks or under hair on front photographs (seen live on 10 and
+    # 11 October), and the quantity is the head roll PT-A01 already measures
+    # from the pupils. calc_ear_level_asymmetry_mm and the bands are left in
+    # place; nothing calls them. The calibration above stays: the annotated
+    # front image still draws its reference grid from it.
 
     # PT-A03 — Trunk Lateral Shift. Moved to the posterior view on
-    # 10 October 2026, see the PT-A10 comment above; PT-P01 reports it.
+    # 10 October 2026, see the PT-A02 comment above; PT-P01 reports it.
 
     front_photo_url = _annotate_or_blank(
         front.image_bytes,

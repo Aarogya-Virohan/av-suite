@@ -43,7 +43,8 @@ def test_review_covers_every_point_a_measurement_reads():
     # Traced on 10 October 2026: every landmark index _report_from_points
     # reads, across all seven test subjects. If a measurement starts reading
     # a new point, it must be added to review or it escapes the clinician.
-    front_traced = {0, 7, 8, 11, 12, 23, 24, 25, 26, 27, 28}
+    # 11 October 2026: ears 7 and 8 left the front set with PT-A10.
+    front_traced = {0, 11, 12, 23, 24, 25, 26, 27, 28}
     back_traced = {0, 11, 12, 23, 24, 27, 28}
 
     assert set(review_indices("front")) == front_traced

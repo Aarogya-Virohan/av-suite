@@ -12,6 +12,16 @@ async function errorDetail(response: Response, fallback: string): Promise<string
   try {
     const body = await response.json()
     if (typeof body?.detail === "string") return body.detail
+    // FastAPI's own validation errors (a form field missing or of the wrong
+    // type) arrive as a list. Name the field so the failure is not silent.
+    if (Array.isArray(body?.detail)) {
+      return body.detail
+        .map((d: { loc?: unknown[]; msg?: string }) => {
+          const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "request"
+          return `${String(field)}: ${d.msg ?? "invalid"}`
+        })
+        .join("; ")
+    }
   } catch {
     // not JSON
   }

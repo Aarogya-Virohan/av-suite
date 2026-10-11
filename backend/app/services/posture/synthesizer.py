@@ -69,15 +69,7 @@ SYNTHESIS_RULES: list[dict[str, Any]] = [
             {"exercise": "Adductor Strengthening", "dosage": "3x15"},
         ],
     },
-    {
-        # PT-A10 — Ear Level Asymmetry
-        "param_id": "PT-A10",
-        "hypertonic": ["Sternocleidomastoid", "Upper Trapezius"],
-        "inhibited": ["Deep Neck Flexors"],
-        "corrective": [
-            {"exercise": "Cervical Side-Bend Stretch", "dosage": "3x10 each side"},
-        ],
-    },
+    # PT-A10 (Ear Level Asymmetry) removed 11 October 2026 with the row.
     {
         # PT-P01 — Trunk Lateral Deviation (Posterior). FOR REVIEW.
         # Since 10 October 2026 this carries the mapping written for the

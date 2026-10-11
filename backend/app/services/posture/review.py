@@ -57,8 +57,10 @@ POINT_NAMES: dict[int, str] = {
 # still uses it, so the clinician places it on the head midline.
 BACK_NOSE_NAME = "Nose (estimate, head midline)"
 
+# The ears left the front review on 11 October 2026 with PT-A10; no front
+# measurement reads them. The nose stays: the front calibration uses it.
 _FRONT = [
-    NOSE, LEFT_EAR, RIGHT_EAR, LEFT_SHOULDER, RIGHT_SHOULDER,
+    NOSE, LEFT_SHOULDER, RIGHT_SHOULDER,
     LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE,
 ]
 _BACK = [NOSE, LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP, LEFT_ANKLE, RIGHT_ANKLE]

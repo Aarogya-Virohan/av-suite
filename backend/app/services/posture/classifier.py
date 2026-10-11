@@ -45,12 +45,18 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 10,
         "moderate_max": 20,
     },
-    # No published source. Asymmetric with PT-A05 and has no female band.
+    # Bands set by the founders, 11 October 2026: one set for both
+    # directions, 0 to 5 normal, over 5 to 9 mild, over 9 to 13 moderate,
+    # above 13 severe, no sex-specific allowance. Their reasoning: about a
+    # third of healthy young men stand in 3 degrees or more of varus
+    # (Bellemans et al. 2012, radiographs), so the old 3 degree varus
+    # ceiling would flag them, and a further 2 degrees covers the pose
+    # model's error. Replaces 3/7/12, which had no published source.
     "PT-A06": {
         "direction": "higher_worse",
-        "none_max": 3,
-        "mild_max": 7,
-        "moderate_max": 12,
+        "none_max": 5,
+        "mild_max": 9,
+        "moderate_max": 13,
     },
     # PT-A03 and PT-P01 are the same calculation on two views. They used
     # to carry different bands (10/20/30 here, 5/15/25 on the back view),
@@ -71,7 +77,8 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 5,
         "moderate_max": 10,
     },
-    # No published source.
+    # No published source. Withdrawn from the report 11 October 2026,
+    # founders' answer 3a; nothing classifies against it.
     "PT-A10": {
         "direction": "higher_worse",
         "none_max": 3,
@@ -111,12 +118,12 @@ THRESHOLDS: dict[str, dict] = {
         "mild_max": 7,
         "moderate_max": 10,
     },
-    # No published source. 2D validity unverified, direction logic not yet
-    # checked against real photographs.
+    # Founders, 11 October 2026: same bands as PT-A06, see there. The
+    # female normal ceiling of 7 is removed; the founders' table has one
+    # set for everyone.
     "PT-A05": {
         "direction": "higher_worse",
         "none_max": 5,
-        "none_max_female": 7,
         "mild_max": 9,
         "moderate_max": 13,
     },
@@ -321,9 +328,10 @@ def classify(
 
     gender:
         Patient gender, only used for parameters with gender-dependent
-        normal ranges (currently PT-A05 Knee Valgus. PT-A08 also has
-        female bands in THRESHOLDS but is no longer classified against
-        them, see the note on that entry).
+        normal ranges. None of the reported parameters uses one since
+        11 October 2026, when PT-A05 lost its female band. PT-A08 still
+        has female bands in THRESHOLDS but is no longer classified
+        against them, see the note on that entry.
 
     Returns
     -------
