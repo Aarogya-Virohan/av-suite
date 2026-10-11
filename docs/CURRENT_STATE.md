@@ -49,11 +49,10 @@ work/capture-flow-03Oct is the branch the 3 October work was done on and
 is merged into dev by fast-forward. fix/posture-gsi-and-labels still
 exists at 097595b and is behind dev. Neither needs anything doing.
 
-Posture tests: 114 passed on 11 October (tests/services/posture), run in
-the Mac's Linux VM against the real clone. The full suite there has one
-error, tests/test_clinic_isolation.py, a SQLite OperationalError in that
-VM; it is a CRM test, not posture, and was not investigated. Run the full
-suite on the Mac itself before trusting a full-suite count.
+Full suite: 115 passed on 11 October, run on the Mac in the real clone
+(114 posture tests plus tests/test_clinic_isolation.py). In the Mac's
+Linux VM that one CRM test errors on SQLite; the Mac run is the one to
+trust.
 
 Recent commits, subjects as they actually read:
 
@@ -90,7 +89,7 @@ holds up:
 
 - 10 October, the seven questions of the 2 October document. All applied
   except Q3 (answered with the Q-angle, which needs landmarks the model
-  does not return) and Q5's regional profile (not built yet, see section 5).
+  does not return) and Q5's regional profile (built 11 October, see section 4d).
 - 11 October, first reply: knee bands 5/9/13 for both directions with no
   female allowance, rows renamed "Knee Alignment (Hip-Knee-Ankle)", ear
   level (PT-A10) withdrawn. This settles Q3.
@@ -110,7 +109,8 @@ Still owed by the founders, collected for one message, nothing blocked:
 - What to save. Saved reports hold the patient's name and photographs
   with no retention period and no consent step; their own guidelines
   point at saving points and angles and keeping photos short-term.
-- For Q5: how to show the thoracic region, which has no parameter.
+- For Q5: is "worst grade in the region" the regional index they meant,
+  and should the thoracic region, which has no parameter, show or go.
 
 ## 4. Done on 2 October, after the founder document went out
 
@@ -190,7 +190,7 @@ reason).
 
 ## 4d. Done on 11 October
 
-Six commits, see the 11 October section of decisions.md. analysisVersion
+See the 11 October section of decisions.md, and git log for the commits. analysisVersion
 is now 2026-10-11.2.
 
 - Both founder replies applied, with every new boundary pinned in tests.
@@ -200,6 +200,8 @@ is now 2026-10-11.2.
 - Synthesis only receives the direction each mapping was written for.
 - The view summary restates the rows; "within acceptable limits" is gone.
 - The PDF names whether each photograph was a guided capture or an upload.
+- Q5 Biomechanical Signature built: regional profile on the web report and
+  the PDF, a radar drawn on the server, and a per-row vector in the report.
 - Saved report files are uniquely named; a "../" in the case reference
   could previously write outside data/reports, and equal case references
   overwrote each other.
@@ -212,8 +214,6 @@ step is what stands between that error and the report.
 
 ## 5. Not started
 
-- Q5 Biomechanical Signature: the regional profile the founders asked for
-  in place of the global score. The largest piece left.
 - Capture-time tilt lock. The founders' guidelines say plus or minus 1.5
   degrees; the capture screen warns at 10 and does not block.
 - Back-view millimetre calibration without the nose, which cannot be seen

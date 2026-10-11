@@ -1,6 +1,7 @@
 import ReportHeader from "./ReportHeader"
 import ViewSection from "./ViewSection"
 import SynthesisPanel from "./SynthesisPanel"
+import SignaturePanel from "./SignaturePanel"
 
 import { PostureReport } from "@/types/posture"
 
@@ -30,6 +31,8 @@ export default function ReportCard({
         viewName="Back Plane"
         data={data.views.back}
       />
+
+      {data.signature && <SignaturePanel data={data.signature} />}
 
       <SynthesisPanel data={data.synthesis} />
 

@@ -1049,3 +1049,40 @@ a line under "Landmark visibility": "Guided camera capture" or "Uploaded
 photo, capture protocol not checked". "unknown" and reports saved before
 3 October print nothing. The web report is unchanged. Verified: three tests;
 a PDF rendered with one view of each kind, still two pages.
+
+### Biomechanical Signature, founders' Q5
+The founders removed the global score on 10 October and asked for regional
+indices, shown as a visual profile, with each scan kept as a vector of its
+measurements. Built 11 October, with one limit set deliberately: no new
+number. How a regional index should be calculated was never given, and a
+formula of our own would repeat the global score's fault at a smaller
+scale. So each parameter keeps the grade its approved bands gave it, and a
+region shows the worst of its grades.
+
+Regions, head to toe: Head & Neck (CVA, head tilt), Shoulders (shoulder
+level), Thoracic (no parameter; kyphosis needs spinal landmarks the model
+does not return), Trunk (trunk shift, trunk lean), Pelvis (pelvic
+obliquity), Knees (both knee alignment rows, knee from the side).
+
+The report payload gains "signature": every graded row with its region,
+view, severity, tier (0 normal to 3 severe, null when not measured), value
+and unit. It goes into the saved report file too, which makes it the
+vector the founders asked for. The radar drawing is made on the server
+(signature_svg.py): one axis per measurement, each point on the ring of
+its grade, normal innermost, and an unmeasured parameter gets a grey label
+and no point, so it cannot be read as sitting on any ring. The web report
+shows the server's SVG; the PDF redraws from the data and never uses an
+SVG sent back by the client.
+
+Grades and values unchanged, ANALYSIS_VERSION unchanged. Verified: seven
+tests; on the seven test subjects every one of the nine rows lands in the
+signature and each region's worst grade matches its rows; PDFs of all
+seven subjects stay at two pages. A constructed worst case, every row
+severe with the largest possible synthesis, runs to three pages: the
+whole synthesis block moves to page three intact. Without the signature
+that case fits two. Accepted rather than shrinking the report for a case
+that has not occurred.
+
+Two questions for the founders, collected with the others: is "worst grade
+in the region" the regional index they meant, or do they want a formula;
+and should the thoracic region show as "No parameter" or be left out.

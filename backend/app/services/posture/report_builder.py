@@ -1,6 +1,8 @@
 from typing import Any
 
 from app.services.posture.classifier import SEVERITY_LABELS, is_borderline
+from app.services.posture.signature import build_signature
+from app.services.posture.signature_svg import render_signature_svg
 
 
 # Direction wording, keyed on paramId rather than label so a label change
@@ -171,16 +173,28 @@ def build_report_response(
     # removed from the report on 10 October 2026 by the founders (Q5): a single
     # score masks a localised finding behind an average, and its weights were
     # never sourced. calculate_global_index stays in scoring.py with nothing
-    # calling it. The founders' replacement, a regional profile, is not built
-    # yet. See docs/decisions.md, 10 October.
+    # calling it. The founders' replacement, the regional profile, is the
+    # "signature" below since 11 October; see signature.py.
+
+    views = {
+        "side": side_view,
+        "front": front_view,
+        "back": back_view,
+    }
 
     return {
         "patient": patient,
         "analysisVersion": ANALYSIS_VERSION,
-        "views": {
-            "side": side_view,
-            "front": front_view,
-            "back": back_view,
-        },
+        "views": views,
         "synthesis": synthesis,
+        "signature": _signature_with_svg(views),
     }
+
+
+def _signature_with_svg(views: dict[str, Any]) -> dict[str, Any]:
+    # The web report shows this SVG as it is. The PDF never reads it: it
+    # redraws from the signature data, so nothing the client sends back to
+    # /report/pdf can put markup into the PDF.
+    signature = build_signature(views)
+    signature["svg"] = render_signature_svg(signature)
+    return signature

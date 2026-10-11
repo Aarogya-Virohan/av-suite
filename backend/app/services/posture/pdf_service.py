@@ -18,6 +18,9 @@ from typing import Any
 
 from weasyprint import HTML
 
+from app.services.posture.classifier import SEVERITY_LABELS
+from app.services.posture.signature_svg import render_signature_svg
+
 CLINIC_NAME = "Aarogya Virohan"
 CLINIC_SUBTITLE = "Clinical Posture Assessment"
 BRAND = "#ff7a00"
@@ -191,6 +194,54 @@ def _view_section(title: str, view: dict) -> str:
         </table>
 
         <p class="interpretation">{interpretation}</p>
+    </section>
+    """
+
+
+def _biomech_signature_section(signature: dict | None) -> str:
+    """
+    Founders' Q5, 10 October 2026: the regional profile that replaces the
+    global score. Redrawn here from the signature data, not taken from any
+    SVG the client sends back. Reports saved before 11 October have no
+    signature and print nothing.
+    """
+
+    if not signature or not signature.get("regions"):
+        return ""
+
+    svg = render_signature_svg(signature, width=360, height=220)
+
+    rows = []
+    for r in signature["regions"]:
+        worst = r.get("worst")
+        if worst is None:
+            text = "No parameter" if not r.get("parameters") else "Not measured"
+            badge = f'<span class="sig-none">{text}</span>'
+        else:
+            colour, background = SEVERITY_STYLES[worst]
+            badge = (
+                f'<span style="color:{colour};background:{background};">'
+                f"{_esc(SEVERITY_LABELS[worst])}</span>"
+            )
+        rows.append(
+            f'<tr><td class="region">{_esc(r.get("label"))}</td>'
+            f'<td class="grade">{badge}</td></tr>'
+        )
+
+    return f"""
+    <section class="bio-signature">
+        <h2>Biomechanical Signature</h2>
+        <table class="bio-signature-grid">
+            <tr>
+                <td class="chart">{svg}</td>
+                <td class="regions">
+                    <table class="region-list">{"".join(rows)}</table>
+                    <p class="key">Each axis is one measurement. Inner ring normal,
+                    then mild and moderate, outer ring severe. A region shows the
+                    worst grade among its measurements.</p>
+                </td>
+            </tr>
+        </table>
     </section>
     """
 
@@ -430,6 +481,61 @@ def build_report_html(report: dict) -> str:
         border-left: 3px solid {BRAND};
     }}
 
+    .bio-signature {{
+        margin-top: 12px;
+        page-break-inside: avoid;
+    }}
+    .bio-signature h2 {{
+        font-size: 12pt;
+        margin: 0 0 6px 0;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 4px;
+    }}
+    .bio-signature-grid {{
+        width: 100%;
+        border-collapse: collapse;
+    }}
+    .bio-signature-grid td {{
+        vertical-align: middle;
+    }}
+    .bio-signature-grid .chart {{
+        width: 50%;
+    }}
+    .bio-signature-grid .chart svg {{
+        width: 100%;
+        height: auto;
+    }}
+    .region-list {{
+        border-collapse: collapse;
+        font-size: 8.5pt;
+        color: #334155;
+        width: 100%;
+    }}
+    .region-list td {{
+        padding: 3px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }}
+    .region-list .grade {{
+        text-align: right;
+    }}
+    .region-list .grade span {{
+        font-size: 7pt;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 3px;
+        white-space: nowrap;
+    }}
+    .region-list .sig-none {{
+        color: #64748b;
+        background: #f8fafc;
+        font-weight: 400;
+    }}
+    .bio-signature .key {{
+        font-size: 7pt;
+        color: #94a3b8;
+        margin: 6px 0 0 0;
+    }}
+
     .synthesis {{
         margin-top: 18px;
         page-break-inside: avoid;
@@ -597,6 +703,8 @@ def build_report_html(report: dict) -> str:
 {_view_section("Sagittal (Side) Plane", views.get("side") or {})}
 {_view_section("Coronal (Front) Plane", views.get("front") or {})}
 {_view_section("Posterior (Back) Plane", views.get("back") or {})}
+
+{_biomech_signature_section(report.get("signature"))}
 
 {_synthesis_section(report.get("synthesis") or {})}
 

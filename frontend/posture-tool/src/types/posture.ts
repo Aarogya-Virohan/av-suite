@@ -70,6 +70,39 @@ export interface PostureReport {
 
   // globalIndex removed 10 October 2026, founders' Q5. Reports saved
   // before then still carry it; nothing reads it.
+
+  // Founders' Q5 replacement, the regional profile, since 11 October 2026.
+  // Optional because earlier reports do not carry it.
+  signature?: BiomechanicalSignature
+}
+
+export interface SignatureParameter {
+  paramId: string
+  label: string
+  view: "side" | "front" | "back"
+  severity: Severity
+  // 0 normal to 3 severe; null when the parameter was not measured.
+  tier: number | null
+  value: number | string | null
+  unit: string
+}
+
+export interface SignatureRegion {
+  id: string
+  label: string
+  // Worst grade among the region's measured parameters; null when none was
+  // measured or the region has no parameter (thoracic).
+  worst: Severity | null
+  worstLabel: string | null
+  measured: number
+  parameters: SignatureParameter[]
+}
+
+export interface BiomechanicalSignature {
+  regions: SignatureRegion[]
+  // Drawn by the server (signature_svg.py) so the web report and the PDF
+  // show the same picture.
+  svg?: string
 }
 
 // Landmark review step, founders' Q6, 10 October 2026.
