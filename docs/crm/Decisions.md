@@ -309,7 +309,7 @@ Each entry follows this structure:
 | L-10 | Permission helpers are not reactive (see D-013); long-term, convert to hooks | Open, low priority | Frontend |
 | L-11 | Recycle bin `deleted_by` is always null: the backend does not record who deleted an item | Open; set deleted_by on soft delete | Sparsh (later) |
 | L-12 | Payroll / salary is not built (fake column removed, D-014) | Product decision needed before building | Onkar + founders |
-| L-13 | Pages that are only correct when reached via the sidebar: fixed for Leads, Therapists, Recycle Bin, Billing (D-013); all 9 dashboard pages pass a direct-load check as of 2026-10-12 | Resolved | - |
+| L-13 | Pages that are only correct when reached via the sidebar: fixed for Leads, Therapists, Recycle Bin, Billing, then Patients, patient workspace, Appointments and the sidebar after a therapist test (D-013). All 9 pages pass a direct-load check as admin and as a therapist with overrides (2026-10-12) | Resolved | - |
 | L-14 | Clinic address, phone, lead doctor and registration no. are not stored (the fake Settings fields were removed). Invoices and prescriptions will need them | Open; add clinic profile fields | Sparsh (later), then frontend |
 | L-15 | Audit log records almost nothing: only patient create and clinic settings updates were seen. Lead delete/restore/stage, invoices, payments are not audited | Open; needed for a healthcare CRM | Sparsh |
 | L-16 | Booking slug: fuzzy clinic-name lookup and a missing `get_by_slug` (D-016). Frontend mitigated with UUID links | **Must fix before launch** | Sparsh |
@@ -323,7 +323,8 @@ Each entry follows this structure:
 | L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Open; add clinic time zone (default Asia/Kolkata) | Sparsh (later) |
 | L-25 | DB enum `specialty_type` has only physiotherapy, chiropractic, osteopathy, massage, acupuncture, other. Migration 38ebc0d87a65 "added" ortho/neuro/cardiopulm/sports/paeds/general with `alter_column`, which does not add Postgres enum values, so saving them returns 500 (verified locally) | Open; `ALTER TYPE specialty_type ADD VALUE ...` migration; then frontend can move `form_data.area` into `specialty` | Sparsh |
 | L-26 | `types/schema.ts` is stale (e.g. SoapAssessment lacks `finalized`) | Open; regenerate from the backend OpenAPI | Frontend |
-| L-27 | Auto-Rx creates a prescription with empty items and the note "Auto-generated prescription." (invented content on a clinical document). Not changed because Rx scope is parked with founders | Decide with Rx scope | Onkar + founders |
+| L-27 | Auto-Rx creates a prescription with empty items and the note "Auto-generated prescription." (invented content on a clinical document), and the button shows even for users without prescription permissions. Not changed because Rx scope is parked with founders | Decide with Rx scope | Onkar + founders |
 | L-28 | Document storage errors reach users as raw text (e.g. "[Errno 111] Connection refused") | Open; backend should return a friendly message and log the detail | Sparsh |
+| L-29 | For non-admin roles every page makes calls they cannot use: `GET /settings/clinic` (AppShell branding) and `GET /patients` (header search) return 403. Nothing breaks, but staff see no clinic branding | Open; public branding endpoint for the shell, search gated by `patients.view` | Frontend + Sparsh |
 
 *Last updated: 2026-10-12 (after patient tabs) | Branch: feat/crm-ui-theme*
