@@ -4,18 +4,18 @@ import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { SlideOver } from '../../../components/ui/SlideOver';
-import { useAuthStore } from '../../../store';
-import { canAccessModule, hasCapability } from '../../../config/permissions';
+import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { useUsers, useCreateUser } from '../../../features/users/api';
 import { User } from '../../../types/api';
-import { AlertCircle, Plus, Edit, DollarSign } from 'lucide-react';
+import { Plus, Mail, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
+import { Avatar, Badge, Button, FieldLabel, PageHeader, inputClass } from '../../../components/ui/brand';
 
 export default function TherapistsPage() {
+  usePermissionSubscription(); // see Decisions.md D-013
   const hasAccess = canAccessModule('therapists');
   const canCreateTherapist = hasCapability('users.create');
-  const canViewSalary = hasCapability('users.edit');
 
   const { data: usersResponse, isLoading } = useUsers(hasAccess);
   const users = usersResponse || [];
@@ -61,40 +61,71 @@ export default function TherapistsPage() {
   };
 
   if (!hasAccess) {
-    return (
-      <AppShell>
-        <AccessRestricted message="Therapists directory and payroll is restricted." />
-      </AppShell>
-    );
+    // AccessRestricted renders its own AppShell.
+    return <AccessRestricted message="Therapists directory is restricted for your role." />;
   }
 
+  // The old "Monthly Salary" column showed a hardcoded Rs 35,000 for every
+  // therapist. Salary is not stored by the backend, so it was removed
+  // (Decisions.md D-014). Add it back only from real data.
   const columns: Column<User>[] = [
-    { key: 'name', header: 'Therapist Name', render: (u) => <span className="font-bold">{u.first_name} {u.last_name}</span> },
-    { key: 'email', header: 'Email' },
-    { key: 'phone', header: 'Phone' },
-    ...(canViewSalary ? [{ key: 'payroll', header: 'Monthly Salary', render: () => <span className="text-rose-600 font-bold">₹35,000 / mo</span> }] : []),
-    { key: 'status', header: 'Status', render: (u) => (u.is_active ? <span className="text-emerald-600 font-bold text-xs">Active</span> : 'Inactive') },
+    {
+      key: 'name',
+      header: 'Therapist',
+      render: (u) => (
+        <div className="flex items-center gap-3">
+          <Avatar name={`${u.first_name} ${u.last_name}`} size={34} />
+          <span className="font-semibold text-ink">
+            {u.first_name} {u.last_name}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      render: (u) => (
+        <span className="flex items-center gap-2">
+          <Mail className="h-3.5 w-3.5 text-slate-400" />
+          {u.email}
+        </span>
+      ),
+    },
+    {
+      key: 'phone',
+      header: 'Phone',
+      render: (u) =>
+        u.phone ? (
+          <span className="flex items-center gap-2 tabular-nums">
+            <Phone className="h-3.5 w-3.5 text-slate-400" />
+            {u.phone}
+          </span>
+        ) : (
+          <span className="text-slate-400">-</span>
+        ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (u) => (u.is_active ? <Badge tone="ok">Active</Badge> : <Badge tone="neutral">Inactive</Badge>),
+    },
   ];
 
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Therapists Directory & Payroll</h1>
-            <p className="text-sm text-slate-500">Manage clinic therapists & monthly compensation</p>
-          </div>
-
-          {canCreateTherapist && (
-            <button
-              onClick={() => setIsSlideOpen(true)}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Therapist</span>
-            </button>
-          )}
-        </div>
+        <PageHeader
+          title="Therapists Directory"
+          subtitle="Practitioners in your clinic"
+          actions={
+            canCreateTherapist ? (
+              <Button onClick={() => setIsSlideOpen(true)}>
+                <Plus className="h-4 w-4" />
+                <span>Add Therapist</span>
+              </Button>
+            ) : null
+          }
+        />
 
         <DataTable columns={columns} data={therapists} />
 
@@ -103,72 +134,68 @@ export default function TherapistsPage() {
           <form onSubmit={handleCreateTherapist} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">First Name *</label>
+                <FieldLabel>First Name *</FieldLabel>
                 <input
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   placeholder="Ananya"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-sm"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Last Name *</label>
+                <FieldLabel>Last Name *</FieldLabel>
                 <input
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   placeholder="Roy"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-sm"
+                  className={inputClass}
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Email Address *</label>
+              <FieldLabel>Email Address *</FieldLabel>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ananya.roy@aarogya.com"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-sm"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Password *</label>
+              <FieldLabel>Password *</FieldLabel>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Minimum 8 characters"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-sm"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number</label>
+              <FieldLabel>Phone Number</FieldLabel>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91 9876543210"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-lg text-sm"
+                className={inputClass}
               />
             </div>
 
-            <div className="pt-4 border-t flex items-center justify-end gap-3">
-              <button type="button" onClick={() => setIsSlideOpen(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">
+            <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
+              <Button type="button" variant="ghost" onClick={() => setIsSlideOpen(false)}>
                 Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={createUser.isPending}
-                className="px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg disabled:opacity-50"
-              >
+              </Button>
+              <Button type="submit" disabled={createUser.isPending}>
                 {createUser.isPending ? 'Creating...' : 'Save Therapist'}
-              </button>
+              </Button>
             </div>
           </form>
         </SlideOver>

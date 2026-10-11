@@ -29,21 +29,23 @@ export function SlideOver({ isOpen, onClose, title, subtitle, children }: SlideO
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-slate-900/60 backdrop-blur-xs transition-opacity animate-fade-in">
+    <div className="fixed inset-0 z-40 flex justify-end bg-midnight/55 backdrop-blur-xs transition-opacity animate-fade-in">
       <div
-        className="w-full md:max-w-xl h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-slide-in-right"
+        className="flex h-full w-full flex-col overflow-hidden border-l border-line bg-card shadow-2xl animate-slide-in-right md:max-w-xl dark:border-slate-800 dark:bg-slate-900"
         role="dialog"
         aria-modal="true"
+        aria-label={title}
       >
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950">
+        <div className="flex items-center justify-between border-b border-line bg-canvas px-6 py-5 dark:border-slate-800 dark:bg-slate-950">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">{title}</h2>
-            {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+            <h2 className="font-display text-lg font-bold text-ink dark:text-white">{title}</h2>
+            {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Close"
+            className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-ink dark:hover:bg-slate-800 dark:hover:text-white"
           >
             <X className="w-5 h-5" />
           </button>

@@ -294,3 +294,15 @@ export function SegmentTab({
     </button>
   );
 }
+
+/** Shared form styles for drawers and settings forms. */
+export const inputClass =
+  'h-10 w-full rounded-[10px] border border-line bg-card px-3 text-sm text-ink placeholder:text-slate-400 transition-colors focus:border-grove focus:outline-none focus:ring-2 focus:ring-grove/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-white';
+
+export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
+  return (
+    <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-semibold text-ink-2 dark:text-slate-300">
+      {children}
+    </label>
+  );
+}
