@@ -309,7 +309,7 @@ Each entry follows this structure:
 | L-19 | Appointments have no type column; the drawer's "Appointment Type" was silently dropped and was removed | Open, product decision (add a column if needed) | Onkar + Sparsh |
 | L-20 | No overpayment check in `record_payment`: paid_amount can exceed total. Frontend now blocks amount > balance | Open; add a backend check | Sparsh |
 | L-21 | Backend requires a client-sent `invoice_number` and has no uniqueness constraint. Frontend suggests the next number and checks duplicates in the loaded list | Open; generate per clinic in the backend with `UNIQUE(clinic_id, invoice_number)` | Sparsh |
-| L-22 | Users created via `POST /users` get no `memberships` row (only the admin has one). If auth moves to memberships (PR B) without a backfill, staff lose access | **Check in PR B** | Sparsh |
+| L-22 | `POST /users` creates no `memberships` row (register does; migration 65d7c21a9d4e backfilled only users that existed when it ran). These users log in today through the legacy `users.clinic_id` fallback; they would be locked out if PR B removes it without a backfill | **Check in PR B** | Sparsh |
 | L-23 | Permissions drawer shows "none" for capabilities without an override (ignores the role template) and saves explicit "none" for all of them (PUT replaces all). Harmless while templates are deny-all; would wipe template access once templates are restored | Fix together with role templates: backend returns effective scopes, drawer sends only real overrides | Sparsh + frontend |
 | L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Open; add clinic time zone (default Asia/Kolkata) | Sparsh (later) |
 
