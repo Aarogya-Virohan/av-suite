@@ -49,30 +49,22 @@ work/capture-flow-03Oct is the branch the 3 October work was done on and
 is merged into dev by fast-forward. fix/posture-gsi-and-labels still
 exists at 097595b and is behind dev. Neither needs anything doing.
 
-Full suite: 115 passed on 11 October, run on the Mac in the real clone
-(114 posture tests plus tests/test_clinic_isolation.py). In the Mac's
+Full suite: 123 passed on 11 October after commit 4315196, run on the
+Mac in the real clone (posture tests plus tests/test_clinic_isolation.py). In the Mac's
 Linux VM that one CRM test errors on SQLite; the Mac run is the one to
 trust.
 
-Recent commits, subjects as they actually read:
-
-    1e18ee3  posture: close the PT-L06 facing direction review, use the shared reference
-    c9a2d43  posture: record whether each photograph was captured in-app or uploaded
-    b6daa1d  capture: write PNG, not JPEG at quality 95
-    ac32619  docs: re-measure the 1 October figures, correct three that do not reproduce
-    519be8f  docs: the two withdrawals are done, not pending
-    a944514  posture: withdraw PT-A08 from the report
-    16ae06d  posture: withdraw PT-P04 from the report
-    3260edc  docs: current state file, read this one first
-    591ecab  docs: millimetre parameters have no sourceable bands, and the unit is why
+Run `git log --oneline -15` for recent commits. The list that used to
+sit here stopped at 2 October and is removed.
 
 ---
 
 ## 2. The three documents that matter
 
 - docs/decisions.md, decisions actually taken, with the reason.
-  18 September and 1 October sections, ending with a "Not decided, still
-  blocked" list.
+  Dated sections from 18 September to 11 October. The "Not decided,
+  still blocked" list sits between 10 and 11 October and every item on
+  it is now settled; each says where.
 - docs/open_questions_research.md, new on 2 October. Four entries:
   PT-A08, PT-P04, PT-A05/A06, and the millimetre parameters. Each records
   the question, what the code does today, and what the evidence says.
@@ -208,6 +200,15 @@ is now 2026-10-11.2.
   (forward tilt near 90), landscape against the frame (side tilt near 90).
   Holding 1.5 degrees by hand is possible but hard; the founders chose a
   tripod as part of the clinic setup, so no auto-capture.
+- Intake screen redesigned: labelled fields, name, age and height
+  required, compact photo slots with Captured or Uploaded badges, errors
+  shown on the screen. Capture screen redesigned: the level check starts
+  by itself from the "Use camera" tap, tilt shown as two pills, round
+  shutter, setup sheet names the tripod.
+- Side and back shoulder and hip points are always marked for checking on
+  the review screen, because those are the joint-centre points.
+- Founders' third reply applied (commit 4315196): no exercises anywhere in
+  the report, saved files keep no photographs. See section 3.
 - Saved report files are uniquely named; a "../" in the case reference
   could previously write outside data/reports, and equal case references
   overwrote each other.
@@ -224,8 +225,12 @@ step is what stands between that error and the report.
   the guessed nose makes back-view millimetres read about 3 percent small,
   at worst 5.7. Deferred on purpose, since point placement errors are
   around thirty times larger (known_limitations.md).
-- UI and report design pass (upload screen, web report, PDF). The review
-  screen was redone on 11 October; the rest was not.
+- Web report and PDF design pass. Review, intake and capture screens were
+  redone on 11 October; the web report and the PDF were not. Onkar is
+  sending reference material for these; do not start before it arrives.
+- Phone checks owed by Onkar: tilt in landscape (side tilt near 90), and a
+  real capture on a tripod.
+- Lawyer's view on consent and data retention (founders' answer 6a).
 - Inter-rater test: two physios placing points on the same photographs.
   Needs people, not code.
 - Deployment. The tool runs from the laptop over quick tunnels; no plan
@@ -253,7 +258,8 @@ step is what stands between that error and the report.
 
 ## 6. Test photographs
 
-/Users/onkardureja/Downloads/Posture-test/, folders po-1 to po-7, each
+/Users/onkardureja/Downloads/Posture-test/ (on the Mac; po-6 and po-7
+use .jpeg), folders po-1 to po-7, each
 with front, side and back, plus subjects.csv. Heights were tape measured
 to the top of the skull. po-3 is bow-legged, po-5 wore slippers, and
 po-7's side view detection is visibly wrong, with the right ankle placed

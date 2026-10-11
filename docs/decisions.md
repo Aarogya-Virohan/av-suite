@@ -866,6 +866,8 @@ These were looked at today and deliberately left alone.
 - **PT-L06 flexion bands.** The label now follows the sign, but any
   non-negative value still grades NONE, so a 40 degree flexion contracture
   reads as normal. Needs clinician-supplied flexion bands.
+  Settled 11 October, founders' second reply: flexion grades on
+  5/10/15. See the 11 October section.
 - **PT-P04 naming.** Settled on 2 October, and not by renaming it. The
   parameter was withdrawn from the report, because it reduces to PT-A04
   exactly when the shoulders are level and contaminates the pelvic row
@@ -885,6 +887,8 @@ These were looked at today and deliberately left alone.
   ceiling is a clinical question, not an engineering one: the asymmetry
   looks deliberate rather than accidental, given the female allowance
   exists on one and not the other.
+  Settled 11 October, founders' first reply: 5/9/13 for both directions,
+  no female allowance. See the 11 October section.
 - **Severity tiers themselves.** Answered 10 October: keep
   mild/moderate/severe, with a four-colour scale. See the 10 October
   section.
