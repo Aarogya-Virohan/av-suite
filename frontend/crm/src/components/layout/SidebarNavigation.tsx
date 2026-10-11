@@ -18,7 +18,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuthStore, useUiStore } from '../../store';
-import { canAccessModule, ModuleVisibility } from '../../config/permissions';
+import { canAccessModule, ModuleVisibility, usePermissionSubscription } from '../../config/permissions';
 import { useClinicSettings } from '../../features/settings/api';
 import { cn } from '../../lib/cn';
 
@@ -63,6 +63,7 @@ function roleLabel(role: string | null | undefined): string {
 }
 
 export function SidebarNavigation() {
+  usePermissionSubscription(); // see Decisions.md D-013
   const pathname = usePathname();
   const role = useAuthStore((s) => s.role);
   const clinic = useAuthStore((s) => s.clinic);

@@ -10,10 +10,11 @@ import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
 import { Patient, PatientStatus } from '../../../types/api';
 import { Plus, Phone } from 'lucide-react';
 import { useAuthStore } from '../../../store';
-import { canAccessModule, canPerformAction } from '../../../config/permissions';
+import { canAccessModule, canPerformAction, usePermissionSubscription } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 
 export default function PatientsPage() {
+  usePermissionSubscription(); // see Decisions.md D-013
   const role = useAuthStore((s) => s.role);
   const router = useRouter();
   const [page, setPage] = useState(1);

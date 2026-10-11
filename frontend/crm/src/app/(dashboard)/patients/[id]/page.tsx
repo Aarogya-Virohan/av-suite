@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { usePatient, useDeletePatient } from '../../../../features/patients/api';
 import { useAuthStore } from '../../../../store';
-import { getPermissionsForRole, canAccessModule } from '../../../../config/permissions';
+import { getPermissionsForRole, canAccessModule, usePermissionSubscription } from '../../../../config/permissions';
 import { AccessRestricted } from '../../../../components/ui/AccessRestricted';
 import { TreatmentsTab } from '../../../../features/patients/components/TreatmentsTab';
 import { SoapNotesTab } from '../../../../features/patients/components/SoapNotesTab';
@@ -25,6 +25,7 @@ import { cn } from '../../../../lib/cn';
 type TabKey = 'timeline' | 'documents' | 'treatments' | 'soapNotes' | 'assessments' | 'progression' | 'rx' | 'billing';
 
 export default function PatientWorkspacePage() {
+  usePermissionSubscription(); // see Decisions.md D-013
   const params = useParams();
   const router = useRouter();
   const patientId = params?.id as string;

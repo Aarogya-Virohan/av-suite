@@ -13,7 +13,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { apiClient } from '../../../lib/api-client';
 import { useAuthStore } from '../../../store';
-import { canAccessModule, canPerformAction, hasCapability } from '../../../config/permissions';
+import { canAccessModule, canPerformAction, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { Avatar, Badge, type BadgeTone, Button, Card, PageHeader, SegmentGroup, SegmentTab } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
@@ -54,6 +54,7 @@ interface BookingRequest {
 type SubTabKey = 'list' | 'requests' | 'bookingLink';
 
 export default function AppointmentsPage() {
+  usePermissionSubscription(); // see Decisions.md D-013
   const role = useAuthStore((s) => s.role);
   const isAllowed = canAccessModule('appointments');
   const { data: appointmentsResponse, isLoading } = useAppointments(undefined, undefined, 1, 10, isAllowed);
