@@ -1023,3 +1023,19 @@ name and photographs on the server's disk with no retention period and no
 consent step. The audits in them are also the only ground truth we have
 for where clinicians actually place landmarks, which would be the data for
 any future landmark model.
+
+### The view summary restates the rows instead of judging them
+The line under each view listed MODERATE and SEVERE rows, and otherwise
+said "Posture appears within acceptable limits." That sentence was ours,
+not the founders', and it was wrong twice: it printed beside rows graded
+MILD DEVIATION, which the founders define as a deviation (10 October,
+answer 1), and beside rows that could not be measured at all. Not asked of
+the founders, because it adds no clinical judgement; it only reads back
+their grades. summarise_view() now writes, in order: "Moderate or severe
+deviation in: ...", or "No moderate or severe deviation." when there is
+only mild; "Mild deviation in: ..."; "All measured parameters graded
+normal." when nothing deviates; and "Not measured: ..." for rows with
+insufficient data. Grades and values are unchanged, so ANALYSIS_VERSION is
+not bumped. Verified: five tests, the seven test subjects' summaries
+checked against their rows, and the longest case (po-7 side view: mild
+plus a row not measured) rendered in the PDF on one line.

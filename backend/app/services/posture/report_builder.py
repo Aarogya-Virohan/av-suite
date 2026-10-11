@@ -70,6 +70,49 @@ def measurement(
     }
 
 
+def summarise_view(measurements: list[dict[str, Any]]) -> str:
+    """
+    One-line summary under each view, built only from the grades in its rows.
+
+    Until 11 October 2026 it listed MODERATE and SEVERE rows and otherwise
+    printed "Posture appears within acceptable limits." That sentence was
+    ours, not the founders', and it was wrong twice over: it appeared beside
+    rows graded MILD DEVIATION, which the founders define as a deviation
+    (10 October, answer 1), and beside rows that could not be measured at
+    all. The summary now restates the rows and makes no judgement of its
+    own: moderate or severe first, then mild, then anything not measured.
+    """
+
+    def labels(severities: tuple[str, ...]) -> list[str]:
+        return [m["label"] for m in measurements if m.get("severity") in severities]
+
+    major = labels(("moderate", "severe"))
+    mild = labels(("mild",))
+    unmeasured = labels(("insufficient_data", "not_available"))
+
+    parts: list[str] = []
+
+    if major:
+        parts.append("Moderate or severe deviation in: " + ", ".join(major) + ".")
+    elif mild:
+        parts.append("No moderate or severe deviation.")
+
+    if mild:
+        parts.append("Mild deviation in: " + ", ".join(mild) + ".")
+
+    if not major and not mild:
+        parts.append(
+            "All measured parameters graded normal."
+            if len(unmeasured) < len(measurements)
+            else "No parameter could be measured on this view."
+        )
+
+    if unmeasured and len(unmeasured) < len(measurements):
+        parts.append("Not measured: " + ", ".join(unmeasured) + ".")
+
+    return " ".join(parts)
+
+
 def build_side_view_result(
     measurements: list[dict[str, Any]],
     photo_url: str,
@@ -77,16 +120,7 @@ def build_side_view_result(
     capture_source: str = "unknown",
 ) -> dict[str, Any]:
 
-    severe_findings = [
-        m["label"] for m in measurements if m["severity"] in ["moderate", "severe"]
-    ]
-
-    if severe_findings:
-        interpretation = "Postural deviations detected in: " + ", ".join(
-            severe_findings
-        )
-    else:
-        interpretation = "Posture appears within acceptable limits."
+    interpretation = summarise_view(measurements)
 
     return {
         "photoUrl": photo_url,
