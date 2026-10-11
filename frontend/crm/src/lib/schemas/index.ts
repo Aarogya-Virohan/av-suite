@@ -46,7 +46,8 @@ export const leadFormSchema = z.object({
   name: z.string().min(1, 'Lead name is required'),
   phone: z.string().min(10, 'Phone number must be at least 10 digits'),
   email: z.string().email('Invalid email address').nullable().optional().or(z.literal('')),
-  source: leadSourceSchema,
+  // Optional, as in the backend; '' (not specified) is sent as null.
+  source: z.union([leadSourceSchema, z.literal('')]).nullable(),
   stage: leadStageSchema,
   assigned_to: z.string().nullable().optional(),
   notes: z.string(),
