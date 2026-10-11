@@ -11,6 +11,7 @@ import { TreatmentsTab } from '../../../../features/patients/components/Treatmen
 import { SoapNotesTab } from '../../../../features/patients/components/SoapNotesTab';
 import { DocumentsTab } from '../../../../features/patients/components/DocumentsTab';
 import { ProgressionTab } from '../../../../features/patients/components/ProgressionTab';
+import { PatientBillingTab } from '../../../../features/patients/components/PatientBillingTab';
 import { EditPatientSlideOver } from '../../../../features/patients/components/EditPatientSlideOver';
 import { WhatsAppButton } from '../../../../components/ui/WhatsAppButton';
 import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, Activity, FileCheck, Camera, Dumbbell, Edit2, Trash2 } from 'lucide-react';
@@ -293,7 +294,7 @@ export default function PatientWorkspacePage() {
                 <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-logo-teal ring-4 ring-logo-teal-wash" aria-hidden="true" />
                 <p className="text-[13px] text-ink-2">
                   Patient record created on{' '}
-                  <strong className="font-semibold text-ink">{new Date(patient.created_at).toLocaleString()}</strong>.
+                  <strong className="font-semibold text-ink">{new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(patient.created_at))}</strong>.
                 </p>
               </div>
             </Card>
@@ -307,7 +308,7 @@ export default function PatientWorkspacePage() {
 
           {activeTab === 'assessments' && <SoapNotesTab patientId={patient.id} isReassessmentOnly={true} />}
 
-          {activeTab === 'progression' && <ProgressionTab patientId={patient.id} />}
+          {activeTab === 'progression' && <ProgressionTab patientId={patient.id} patientName={`${patient.first_name} ${patient.last_name}`} />}
 
           {activeTab === 'rx' && (
             <Card className="space-y-4 p-8 text-center">
@@ -329,13 +330,7 @@ export default function PatientWorkspacePage() {
             </Card>
           )}
 
-          {activeTab === 'billing' && (
-            <Card className="p-6">
-              <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-line bg-canvas text-sm font-medium text-muted">
-                Not implemented yet
-              </div>
-            </Card>
-          )}
+          {activeTab === 'billing' && <PatientBillingTab patientId={patient.id} />}
         </div>
       </div>
       <EditPatientSlideOver isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} patient={patient} />
