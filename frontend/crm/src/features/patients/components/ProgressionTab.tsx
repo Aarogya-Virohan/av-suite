@@ -14,7 +14,14 @@ export function ProgressionTab({ patientId }: { patientId: string }) {
   const { data: assessmentsResponse } = useAssessments(patientId);
   const assessments = assessmentsResponse?.data || [];
 
-  const painScores = sessions
+  // The API does not guarantee order, so sort oldest-first by session date
+  // (then creation time) before taking the initial and current scores.
+  const painScores = [...sessions]
+    .sort(
+      (a: any, b: any) =>
+        String(a.treatment_date ?? '').localeCompare(String(b.treatment_date ?? '')) ||
+        String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')),
+    )
     .filter((s: any) => s.pain_score != null)
     .map((s: any) => s.pain_score as number);
 

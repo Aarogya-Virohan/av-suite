@@ -12,8 +12,8 @@ import { SoapNotesTab } from '../../../../features/patients/components/SoapNotes
 import { DocumentsTab } from '../../../../features/patients/components/DocumentsTab';
 import { ProgressionTab } from '../../../../features/patients/components/ProgressionTab';
 import { EditPatientSlideOver } from '../../../../features/patients/components/EditPatientSlideOver';
-import { WhatsAppButton, openWhatsApp } from '../../../../components/ui/WhatsAppButton';
-import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, TrendingDown, Activity, FileCheck, Camera, Dumbbell, Edit2, Trash2 } from 'lucide-react';
+import { WhatsAppButton } from '../../../../components/ui/WhatsAppButton';
+import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, Activity, FileCheck, Camera, Dumbbell, Edit2, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../../../../lib/api-client';
 import { getStoredToken } from '../../../../lib/auth';
 import { toast } from 'sonner';
@@ -77,11 +77,6 @@ export default function PatientWorkspacePage() {
         toast.error('Failed to delete patient');
       }
     }
-  };
-
-  const handleSendWaSessionReport = () => {
-    const message = `🏥 *Aarogya Virohan — Session Report*\n\nHi ${patient.first_name},\n\nSession completed successfully.\nInitial Pain: 8/10\nCurrent Pain: 3/10 (▼ 5 pts improved)\nTreatment: IFT therapy & core stabilization\nHome Advice: Cat-camel stretches twice daily\n\nThank you for visiting!`;
-    openWhatsApp(patient.phone, `${patient.first_name} ${patient.last_name}`, message);
   };
 
   const handleGenerateRx = async () => {
@@ -158,7 +153,7 @@ export default function PatientWorkspacePage() {
         </button>
 
         {/* Sticky Patient Workspace Header */}
-        <Card className="sticky top-16 z-10 space-y-4 p-6">
+        <Card className="sticky top-0 z-10 space-y-4 p-6">
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-start">
             <div className="flex items-center gap-4">
               <Avatar
@@ -190,18 +185,6 @@ export default function PatientWorkspacePage() {
                     </>
                   )}
                 </div>
-                {/* Pain Improvement Badges */}
-                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-ink-2">
-                    Initial Pain: 8/10
-                  </span>
-                  <span className="rounded-full bg-warn-wash px-2.5 py-0.5 text-[11px] font-semibold text-warn">
-                    Current: 3/10
-                  </span>
-                  <span className="flex items-center gap-1 rounded-full bg-ok-wash px-2.5 py-0.5 text-[11px] font-semibold text-ok">
-                    <TrendingDown className="h-3 w-3" /> ▼ 5 pts improved
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -231,7 +214,14 @@ export default function PatientWorkspacePage() {
 
           {/* Clinical tools */}
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={handleSendWaSessionReport} className={ACTION_CLASS}>
+            {/* Disabled until the report is built from the patient's real finalized
+                session (backend clinical summary). It used to send hardcoded pain
+                scores and treatment text to every patient. */}
+            <button
+              disabled
+              title="Coming soon: the report will be built from the latest finalized session"
+              className={ACTION_CLASS}
+            >
               <MessageSquare className="h-3.5 w-3.5 text-fresh" />
               <span>WA Session Report</span>
             </button>
