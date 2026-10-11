@@ -1,7 +1,7 @@
 # Posture Tool, current state
 
-Written 2 October 2026, updated 3 October, by reading and running,
-not from memory.
+Written 2 October 2026, updated 3, 10 and 11 October, by reading and
+running, not from memory.
 
 This file replaces posture_tool_FULL_STORY_17Sep2026.md and
 posture_tool_handoff_01Oct2026.md as the thing to read first. Both are
@@ -42,15 +42,18 @@ one commit behind the moment it is written. That is how the previous
 version of this section came to name a HEAD three commits stale. Run
 `git log --oneline -5` instead.
 
-dev is pushed and origin is in step as of 3 October.
+dev is pushed and origin is in step as of 11 October (checked with
+git status against origin/dev after the last push that day).
 
 work/capture-flow-03Oct is the branch the 3 October work was done on and
 is merged into dev by fast-forward. fix/posture-gsi-and-labels still
 exists at 097595b and is behind dev. Neither needs anything doing.
 
-Test suite: 34 passed, run 3 October in the real clone. Verified here, not
-carried over. The two new ones are in test_report_builder.py, which did
-not exist before 3 October.
+Posture tests: 114 passed on 11 October (tests/services/posture), run in
+the Mac's Linux VM against the real clone. The full suite there has one
+error, tests/test_clinic_isolation.py, a SQLite OperationalError in that
+VM; it is a CRM test, not posture, and was not investigated. Run the full
+suite on the Mac itself before trusting a full-suite count.
 
 Recent commits, subjects as they actually read:
 
@@ -80,31 +83,34 @@ Recent commits, subjects as they actually read:
 
 ---
 
-## 3. Founder answers, received 10 October
+## 3. Founder answers
 
-The 2 October decisions PDF had seven questions (this section used to say
-six). The founders answered all seven on 10 October, in a document
-recorded in full in the 10 October section of decisions.md, including
-which of its evidence holds up and which does not.
+Three rounds, all recorded in decisions.md with which of their evidence
+holds up:
 
-Applied 10 October: Q1 deviation labels, Q2 CVA bands 50/45/35, Q4
-shoulder bands (already matched), Q5 global score removed, Q6 disclaimer,
-Q7 one view per metric, head tilt from the pupillary line.
+- 10 October, the seven questions of the 2 October document. All applied
+  except Q3 (answered with the Q-angle, which needs landmarks the model
+  does not return) and Q5's regional profile (not built yet, see section 5).
+- 11 October, first reply: knee bands 5/9/13 for both directions with no
+  female allowance, rows renamed "Knee Alignment (Hip-Knee-Ankle)", ear
+  level (PT-A10) withdrawn. This settles Q3.
+- 11 October, second reply: head tilt 5/8/12, pelvic obliquity 3/6/10,
+  trunk shift 10/20/30 mm, trunk lean 4/7/10, and a bent knee now grades
+  on 5/10/15 like hyperextension.
 
-Still open, blocked on the founders:
-- Q3 knee. They answered with the Q-angle, which needs landmarks the
-  model does not return. Limits for the hip-knee-ankle angle we measure
-  are still owed.
-- Not answered at all: PT-L06 flexion bands, the PT-P01 rename and
-  Schroth removal, trunk shift bands, the PT-A01 bands for the new
-  quantity, the mapping moves of 10 October (all FOR REVIEW).
-- PT-A10 ear level: its landmarks sit on the cheeks, and it measures the
-  same head roll as PT-A01. Keep or withdraw is theirs.
+Every graded parameter on the report now has founder-approved bands.
 
-Built 10 October: the Q6 landmark review step. The flow is now
-/detect, review screen, /report; the one-shot /analyze is gone.
-Not built yet, not blocked: the Q5 regional profile that replaces the
-global score.
+Still owed by the founders, collected for one message, nothing blocked:
+- Exercise mappings for a flexed knee and a backward lean. Both grade in
+  their rows but are kept out of the synthesis, because the existing
+  mappings are for the opposite direction.
+- Approval of the whole synthesis table. None of it was ever founder
+  approved, including the 10 October moves for PT-P01 and PT-P02.
+- Stickers on bony landmarks at capture, yes or no.
+- What to save. Saved reports hold the patient's name and photographs
+  with no retention period and no consent step; their own guidelines
+  point at saving points and angles and keeping photos short-term.
+- For Q5: how to show the thoracic region, which has no parameter.
 
 ## 4. Done on 2 October, after the founder document went out
 
@@ -182,11 +188,42 @@ opposite shoulders as higher on six of seven subjects, and Pose's face
 points are too coarse for angles (PT-A01 now uses Face Mesh for that
 reason).
 
+## 4d. Done on 11 October
+
+Six commits, see the 11 October section of decisions.md. analysisVersion
+is now 2026-10-11.2.
+
+- Both founder replies applied, with every new boundary pinned in tests.
+- Landmark review screen redesigned after the first phone test: one view
+  at a time, tap a point for its controls, zoom, skeleton lines, a confirm
+  summary. The side and back views now say where each point belongs.
+- Synthesis only receives the direction each mapping was written for.
+- The view summary restates the rows; "within acceptable limits" is gone.
+- The PDF names whether each photograph was a guided capture or an upload.
+- Saved report files are uniquely named; a "../" in the case reference
+  could previously write outside data/reports, and equal case references
+  overwrote each other.
+
+The day's most important finding, in known_limitations.md under PT-L05:
+the model places joint centres, not bony landmarks, and on one subject
+moving a single back-view shoulder point to the bony tip took a MODERATE
+trunk shift, and the whole synthesis built on it, to NORMAL. The review
+step is what stands between that error and the report.
+
 ## 5. Not started
 
-- PDF report content and design pass.
-- Report UI pass. The capture half of the frontend was worked on
-  3 October, see section 4b; the report half was not.
+- Q5 Biomechanical Signature: the regional profile the founders asked for
+  in place of the global score. The largest piece left.
+- Capture-time tilt lock. The founders' guidelines say plus or minus 1.5
+  degrees; the capture screen warns at 10 and does not block.
+- Back-view millimetre calibration without the nose, which cannot be seen
+  from behind (known_limitations.md).
+- UI and report design pass (upload screen, web report, PDF). The review
+  screen was redone on 11 October; the rest was not.
+- Inter-rater test: two physios placing points on the same photographs.
+  Needs people, not code.
+- Deployment. The tool runs from the laptop over quick tunnels; no plan
+  for hosting it or joining it to AV Suite has been written down.
 - One "Should be reviewed against real photographs" note is still live, in
   calc_elbow_carrying_angle around line 568. It is moot, since PT-A08 was
   withdrawn on 2 October. Left in place deliberately. The facing-direction
@@ -194,8 +231,9 @@ reason).
 - The upload path has no check of any kind. A clinician can choose any
   file, including a screenshot or a photo of a screen, and it is measured
   as if it were a guided capture. 3 October added wording to the upload
-  card and recorded the source in the report, but nothing gates it. A
-  capture-time check was scoped and not built: see section 4b.
+  card and recorded the source in the report, and since 11 October the
+  PDF prints it, but nothing gates it. A capture-time check was scoped and
+  not built: see section 4b.
 - detector.py runs MediaPipe at model_complexity=1. Measured on
   2 October: complexity 2 costs 0.11 seconds more per assessment and
   places landmarks better, but it also reports honest visibility on
