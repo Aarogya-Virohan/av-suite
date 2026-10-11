@@ -263,6 +263,26 @@ Each entry follows this structure:
 
 ---
 
+## [D-017] All Form Dates and Times Go Through lib/datetime.ts
+- **Date**: 2026-10-12
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: Verified with the browser in Asia/Kolkata: Add Appointment sent `datetime-local` values without a zone, so 10:00 am was stored as 10:00 UTC and shown as 3:30 pm. Treatment sessions had the same bug. Defaults came from `toISOString()` (UTC), so forms showed yesterday or a time 5h30m behind before 5:30 am IST.
+- **Decision**: Prefill with `localToday()` / `toLocalDateTimeInput()`; send with `localDateTimeInputToISO()`. Never use `toISOString().slice(...)` for form defaults. Date-only payment dates are sent at "now" for today, otherwise noon local.
+- **Reasoning**: One tested place for time zone handling (`lib/datetime.test.ts` runs in IST, so a regression fails CI).
+- **Affected Files**: `lib/datetime.ts`, appointment drawers, `TreatmentsTab.tsx`, billing drawers, public booking
+
+---
+
+## [D-018] Forms Never Invent Values
+- **Date**: 2026-10-12
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: Forms prefilled values that were saved as if the user chose them: gender "male" and referral "Direct Walk-in" (Edit Patient even overwrote blanks on a plain save, verified), lead source "website", treatment pain 5, payment Rs 1,000, invoice line "Physical Therapy Session Rs 1,000", first patient/therapist/invoice in a list (which also broke submits because the lists loaded later).
+- **Decision**: Optional fields start blank and are sent as `null`; required choices start on a "Select ..." option and show an error; numeric clinical or money fields start empty, except where a real value exists (payment amount defaults to the invoice's actual balance due). Every field that can fail validation renders its error.
+- **Reasoning**: An invented default becomes clinical or financial data the moment someone clicks Save.
+- **Affected Files**: all drawers under `features/*/components/*SlideOver.tsx`, `TreatmentsTab.tsx`, `lib/schemas/index.ts`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -286,5 +306,11 @@ Each entry follows this structure:
 | L-16 | Booking slug: fuzzy clinic-name lookup and a missing `get_by_slug` (D-016). Frontend mitigated with UUID links | **Must fix before launch** | Sparsh |
 | L-17 | Public booking services and time slots are a fixed list, not configured per clinic | Open, product decision | Onkar + founders |
 | L-18 | Prescription PDF falls back to "Aarogya-Virohan Clinic" when the clinic is missing (`prescription_service.py`) | Open, low | Sparsh |
+| L-19 | Appointments have no type column; the drawer's "Appointment Type" was silently dropped and was removed | Open, product decision (add a column if needed) | Onkar + Sparsh |
+| L-20 | No overpayment check in `record_payment`: paid_amount can exceed total. Frontend now blocks amount > balance | Open; add a backend check | Sparsh |
+| L-21 | Backend requires a client-sent `invoice_number` and has no uniqueness constraint. Frontend suggests the next number and checks duplicates in the loaded list | Open; generate per clinic in the backend with `UNIQUE(clinic_id, invoice_number)` | Sparsh |
+| L-22 | Users created via `POST /users` get no `memberships` row (only the admin has one). If auth moves to memberships (PR B) without a backfill, staff lose access | **Check in PR B** | Sparsh |
+| L-23 | Permissions drawer shows "none" for capabilities without an override (ignores the role template) and saves explicit "none" for all of them (PUT replaces all). Harmless while templates are deny-all; would wipe template access once templates are restored | Fix together with role templates: backend returns effective scopes, drawer sends only real overrides | Sparsh + frontend |
+| L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Open; add clinic time zone (default Asia/Kolkata) | Sparsh (later) |
 
-*Last updated: 2026-10-12 (after Settings, invoice, booking) | Branch: feat/crm-ui-theme*
+*Last updated: 2026-10-12 (after drawers) | Branch: feat/crm-ui-theme*
