@@ -88,13 +88,17 @@ export default function AppointmentsPage() {
   // slug with a fuzzy name match, so a name link could open another clinic's
   // form (Decisions.md D-016). There is no fallback slug: until the clinic is
   // known, no link is shown.
-  const { data: clinicSettings } = useClinicSettings();
+  // The clinic from login is used first; settings are only read by roles that
+  // may view them (staff got a 403 here, L-29).
+  const authClinicId = useAuthStore((s) => s.clinic?.id ?? null);
+  const { data: clinicSettings } = useClinicSettings(hasCapability('settings.view'));
+  const bookingClinicId = authClinicId || clinicSettings?.id || null;
   const [bookingUrl, setBookingUrl] = useState<string | null>(null);
   React.useEffect(() => {
-    if (clinicSettings?.id && typeof window !== 'undefined') {
-      setBookingUrl(`${window.location.origin}/booking/${clinicSettings.id}`);
+    if (bookingClinicId && typeof window !== 'undefined') {
+      setBookingUrl(`${window.location.origin}/booking/${bookingClinicId}`);
     }
-  }, [clinicSettings?.id]);
+  }, [bookingClinicId]);
   const [showQr, setShowQr] = useState(false);
 
   const filteredAppointments = appointments.filter((apt) => {

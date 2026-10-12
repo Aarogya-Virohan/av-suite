@@ -33,6 +33,21 @@ export function usePayments(enabled = true) {
   });
 }
 
+/** Payments recorded against one invoice (for the receipt). */
+export function useInvoicePayments(invoiceId: string | null | undefined, enabled = true) {
+  return useQuery<Payment[]>({
+    queryKey: [...BILLING_QUERY_KEY, 'payments', 'invoice', invoiceId],
+    queryFn: async () => {
+      const res = await apiClient.get('/payments', { params: { invoice_id: invoiceId, limit: 500 } });
+      const raw = res.data?.items ?? res.data?.data ?? res.data;
+      if (Array.isArray(raw)) return raw;
+      if (raw && Array.isArray(raw.items)) return raw.items;
+      return [];
+    },
+    enabled: enabled && !!invoiceId,
+  });
+}
+
 export function usePackages(enabled = true) {
   return useQuery<Package[]>({
     queryKey: [...BILLING_QUERY_KEY, 'packages'],

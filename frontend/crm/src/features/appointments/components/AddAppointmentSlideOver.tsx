@@ -8,6 +8,7 @@ import { SlideOver } from '../../../components/ui/SlideOver';
 import { appointmentFormSchema, AppointmentFormValues } from '../../../lib/schemas';
 import { useCreateAppointment, useAppointments } from '../api';
 import { usePatients } from '../../patients/api';
+import { hasCapability } from '../../../config/permissions';
 import { useUsers } from '../../users/api';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
@@ -46,7 +47,7 @@ export function AddAppointmentSlideOver({ isOpen, onClose }: AddAppointmentSlide
   const { data: aptResponse } = useAppointments(undefined, undefined, 1, 100);
   const existingAppointments = aptResponse?.data || [];
 
-  const { data: patientsResponse } = usePatients(undefined, 1, 100);
+  const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
 
   const { data: usersResponse } = useUsers();

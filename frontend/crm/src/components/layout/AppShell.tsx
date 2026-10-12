@@ -8,14 +8,18 @@ import { useUiStore, useAuthStore } from '../../store';
 import { CalendarDays, Search } from 'lucide-react';
 import { useClinicSettings } from '../../features/settings/api';
 import { cn } from '../../lib/cn';
+import { hasCapability, usePermissionSubscription } from '../../config/permissions';
 
 const todayLabel = () =>
   new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date());
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const isSidebarOpen = useUiStore((s) => s.isSidebarOpen);
+  usePermissionSubscription(); // Decisions.md D-013
   const clinic = useAuthStore((s) => s.clinic);
-  const { data: clinicSettings } = useClinicSettings();
+  // Staff without settings.view got a 403 on every page (L-29). The clinic
+  // from login already carries the name, logo and colour.
+  const { data: clinicSettings } = useClinicSettings(hasCapability('settings.view'));
   const effectiveClinic = clinic || clinicSettings;
   const [today, setToday] = React.useState<string | null>(null);
 

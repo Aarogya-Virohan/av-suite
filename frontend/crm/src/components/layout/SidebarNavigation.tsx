@@ -18,7 +18,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuthStore, useUiStore } from '../../store';
-import { canAccessModule, ModuleVisibility, usePermissionSubscription } from '../../config/permissions';
+import { canAccessModule, hasCapability, ModuleVisibility, usePermissionSubscription } from '../../config/permissions';
 import { useClinicSettings } from '../../features/settings/api';
 import { cn } from '../../lib/cn';
 
@@ -69,7 +69,7 @@ export function SidebarNavigation() {
   const clinic = useAuthStore((s) => s.clinic);
   const logout = useAuthStore((s) => s.logout);
   const { isSidebarOpen, toggleSidebar } = useUiStore();
-  const { data: clinicSettings } = useClinicSettings();
+  const { data: clinicSettings } = useClinicSettings(hasCapability('settings.view')); // L-29
 
   const effectiveClinic = clinic || clinicSettings;
   const clinicName = effectiveClinic?.name || 'Your clinic';

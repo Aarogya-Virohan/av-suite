@@ -4,12 +4,17 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Command, X, Users, Calendar, Plus, CreditCard } from 'lucide-react';
 import { usePatients } from '../../features/patients/api';
+import { hasCapability, usePermissionSubscription } from '../../config/permissions';
 
 export function CommandBar() {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const router = useRouter();
-  const { data: response } = usePatients(search, 1, 5);
+  usePermissionSubscription(); // Decisions.md D-013
+  // Only search while the palette is open, and only for roles that can view
+  // patients. It used to call /patients on every page load (403 for staff
+  // without patients.view, L-29).
+  const { data: response } = usePatients(search, 1, 5, isOpen && hasCapability('patients.view'));
   const filteredPatients = response?.data || [];
 
   useEffect(() => {

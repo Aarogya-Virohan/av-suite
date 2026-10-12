@@ -4,6 +4,8 @@ import React from 'react';
 import { Invoice } from '../../../types/api';
 import { usePatients } from '../../patients/api';
 import { useClinicSettings } from '../../settings/api';
+import { useInvoicePayments } from '../api';
+import { hasCapability } from '../../../config/permissions';
 import { useAuthStore } from '../../../store';
 import { formatMoney } from '../../../lib/money';
 import { Printer, X } from 'lucide-react';
@@ -26,6 +28,15 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   issued: 'info',
   draft: 'neutral',
   cancelled: 'neutral',
+};
+
+const METHOD_LABEL: Record<string, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  card: 'Card',
+  bank_transfer: 'Bank transfer',
+  insurance: 'Insurance',
+  other: 'Other',
 };
 
 const dateFormat = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -51,11 +62,17 @@ interface LineItem {
  * so they are left out rather than invented.
  */
 export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice' }: InvoicePreviewModalProps) {
-  const { data: patientsResponse } = usePatients(undefined, 1, 100);
+  const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
   const authClinic = useAuthStore((s) => s.clinic);
-  const { data: clinicSettings } = useClinicSettings();
+  const { data: clinicSettings } = useClinicSettings(!authClinic && hasCapability('settings.view'));
   const clinic = authClinic || clinicSettings;
+  const isReceipt = mode === 'receipt';
+  // A receipt must say how and when the money came in (Decisions.md L-30).
+  const { data: invoicePayments = [], isLoading: isLoadingPayments } = useInvoicePayments(
+    invoice?.id,
+    isOpen && isReceipt,
+  );
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -80,7 +97,6 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
     : ((invoice.line_items as unknown as LineItem[] | undefined) ?? []);
 
   const balance = Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0);
-  const isReceipt = mode === 'receipt';
   const docTitle = isReceipt ? 'Payment Receipt' : 'Invoice';
 
   return (
@@ -140,7 +156,8 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
                 <span className="text-[#5d6380]">Date: </span>
                 {formatDate(invoice.issue_date)}
               </p>
-              {invoice.due_date && (
+              {/* A due date means nothing on a receipt for money already received. */}
+              {invoice.due_date && !isReceipt && (
                 <p>
                   <span className="text-[#5d6380]">Due: </span>
                   {formatDate(invoice.due_date)}
@@ -231,6 +248,40 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
               ) : null}
             </tbody>
           </table>
+
+          {isReceipt && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#767b93]">Payments received</p>
+              {isLoadingPayments ? (
+                <p className="text-[#767b93]">Loading payments...</p>
+              ) : invoicePayments.length === 0 ? (
+                <p className="italic text-[#767b93]">No payments recorded against this invoice.</p>
+              ) : (
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-[#ebe5d8]">
+                      <th className="p-2 text-[10px] font-bold uppercase text-[#5d6380]">Date</th>
+                      <th className="p-2 text-[10px] font-bold uppercase text-[#5d6380]">Mode</th>
+                      <th className="p-2 text-[10px] font-bold uppercase text-[#5d6380]">Reference</th>
+                      <th className="p-2 text-right text-[10px] font-bold uppercase text-[#5d6380]">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f1ece2]">
+                    {[...invoicePayments]
+                      .sort((a, b) => String(a.payment_date).localeCompare(String(b.payment_date)))
+                      .map((p) => (
+                        <tr key={p.id}>
+                          <td className="p-2">{formatDate(p.payment_date)}</td>
+                          <td className="p-2">{METHOD_LABEL[p.payment_method] ?? p.payment_method}</td>
+                          <td className="p-2 font-mono text-[11px]">{p.transaction_reference || '-'}</td>
+                          <td className="p-2 text-right tabular-nums">{money(p.amount)}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
 
           {invoice.notes && (
             <p className="rounded-lg border border-[#ebe5d8] p-3 text-[#454b66]">

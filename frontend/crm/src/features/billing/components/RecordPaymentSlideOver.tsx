@@ -9,6 +9,7 @@ import { SlideOver } from '../../../components/ui/SlideOver';
 import { paymentFormSchema, PaymentFormValues } from '../../../lib/schemas';
 import { useRecordPayment, useInvoices } from '../api';
 import { usePatients } from '../../patients/api';
+import { hasCapability } from '../../../config/permissions';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
 import { formatMoney } from '../../../lib/money';
 import { localDateTimeInputToISO, localToday } from '../../../lib/datetime';
@@ -41,7 +42,7 @@ function balanceOf(inv: { total_amount: number | string; paid_amount: number | s
 export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOverProps) {
   const recordPayment = useRecordPayment();
   const { data: invoices = [] } = useInvoices();
-  const { data: patientsResponse } = usePatients(undefined, 1, 100);
+  const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
 
   const payable = invoices.filter((inv) => inv.status !== 'cancelled' && balanceOf(inv) > 0);

@@ -15,7 +15,7 @@ import { PatientBillingTab } from '../../../../features/patients/components/Pati
 import { EditPatientSlideOver } from '../../../../features/patients/components/EditPatientSlideOver';
 import { WhatsAppButton } from '../../../../components/ui/WhatsAppButton';
 import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, Activity, FileCheck, Camera, Dumbbell, Edit2, Trash2 } from 'lucide-react';
-import { API_BASE_URL } from '../../../../lib/api-client';
+import { API_BASE_URL, apiErrorCode } from '../../../../lib/api-client';
 import { getStoredToken } from '../../../../lib/auth';
 import { toast } from 'sonner';
 import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } from '../../../../features/prescriptions/api';
@@ -36,7 +36,15 @@ export default function PatientWorkspacePage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const deletePatient = useDeletePatient();
 
-  const { data: prescriptions, isLoading: isRxLoading } = usePrescriptions(patientId);
+  const { data: prescriptions, isLoading: isRxLoading, error: rxError } = usePrescriptions(patientId);
+  // Rx is a separate product: a clinic without it gets 403 PRODUCT_NOT_ENTITLED
+  // (Decisions.md L-30). Say so instead of an empty tab and a failing button.
+  const rxBlockedMessage =
+    (rxError as any)?.response?.status === 403
+      ? apiErrorCode(rxError) === 'PRODUCT_NOT_ENTITLED'
+        ? 'Prescriptions (Rx) are not enabled for this clinic.'
+        : 'You do not have permission to use prescriptions.'
+      : null;
   const createRx = useCreatePrescription();
   const generatePdf = useGeneratePrescriptionPdf();
 
@@ -250,7 +258,8 @@ export default function PatientWorkspacePage() {
 
             <Button
               onClick={handleGenerateRx}
-              disabled={isRxLoading || createRx.isPending || generatePdf.isPending}
+              disabled={!!rxBlockedMessage || isRxLoading || createRx.isPending || generatePdf.isPending}
+              title={rxBlockedMessage ?? undefined}
               className="h-9 px-3 text-xs"
             >
               <FileCheck className="h-3.5 w-3.5" />
@@ -317,17 +326,25 @@ export default function PatientWorkspacePage() {
                 <FileCheck className="h-6 w-6" />
               </span>
               <h3 className="font-display text-base font-bold text-ink">Prescription (Rx) Generator</h3>
-              <p className="mx-auto max-w-md text-xs text-muted">
-                Generates a branded PDF prescription containing clinic logo, diagnosis history, and exercise routine.
-              </p>
-              <Button
-                onClick={handleGenerateRx}
-                disabled={generatePdf.isPending || createRx.isPending || isRxLoading}
-                className="mx-auto"
-              >
-                <FileCheck className="h-4 w-4" />
-                <span>{generatePdf.isPending ? 'Generating...' : 'Generate Prescription PDF'}</span>
-              </Button>
+              {rxBlockedMessage ? (
+                <p className="mx-auto max-w-md rounded-xl border border-line bg-canvas px-4 py-3 text-sm text-ink-2">
+                  {rxBlockedMessage}
+                </p>
+              ) : (
+                <>
+                  <p className="mx-auto max-w-md text-xs text-muted">
+                    Generates a branded PDF prescription containing clinic logo, diagnosis history, and exercise routine.
+                  </p>
+                  <Button
+                    onClick={handleGenerateRx}
+                    disabled={generatePdf.isPending || createRx.isPending || isRxLoading}
+                    className="mx-auto"
+                  >
+                    <FileCheck className="h-4 w-4" />
+                    <span>{generatePdf.isPending ? 'Generating...' : 'Generate Prescription PDF'}</span>
+                  </Button>
+                </>
+              )}
             </Card>
           )}
 

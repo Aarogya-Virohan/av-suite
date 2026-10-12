@@ -9,6 +9,9 @@ export function usePrescriptions(patientId: string) {
       return res.data?.data || res.data;
     },
     enabled: !!patientId,
+    // A 403 (Rx not enabled for this clinic, or no permission) will not
+    // change on retry.
+    retry: (count, error: any) => error?.response?.status !== 403 && count < 1,
   });
 }
 

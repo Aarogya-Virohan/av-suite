@@ -4,6 +4,7 @@ import React from 'react';
 import { MessageSquare } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { useClinicSettings } from '../../features/settings/api';
+import { hasCapability } from '../../config/permissions';
 
 interface WhatsAppButtonProps {
   phone?: string | null;
@@ -31,7 +32,7 @@ export function openWhatsApp(
 
 export function WhatsAppButton({ phone, name, message, className = '' }: WhatsAppButtonProps) {
   const authClinic = useAuthStore((s) => s.clinic);
-  const { data: clinicSettings } = useClinicSettings();
+  const { data: clinicSettings } = useClinicSettings(!authClinic?.name && hasCapability('settings.view'));
   const clinicName = authClinic?.name || clinicSettings?.name || null;
   return (
     <button

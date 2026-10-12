@@ -54,6 +54,10 @@ export default function BillingPage() {
   const canViewInvoices = hasCapability('invoices.view');
   const canViewPayments = hasCapability('payments.view');
   const canViewPackages = hasCapability('packages.view');
+  // The backend enforces these; the buttons are hidden so a role without them
+  // does not open a form that can only fail (Decisions.md L-9).
+  const canCreateInvoice = hasCapability('invoices.create');
+  const canRecordPayment = hasCapability('payments.record');
 
   // The default tab is derived on every render, not frozen into useState:
   // capabilities can arrive after the first render, and freezing them made
@@ -78,7 +82,7 @@ export default function BillingPage() {
   const { data: invoices = [], isLoading: isLoadingInvoices } = useInvoices(canViewInvoices);
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments(canViewPayments);
   const { data: packages = [], isLoading: isLoadingPackages } = usePackages(canViewPackages);
-  const { data: patientsResponse } = usePatients(undefined, 1, 100, isAllowed);
+  const { data: patientsResponse } = usePatients(undefined, 1, 100, isAllowed && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
 
   const getPatientName = (patientId: string) => {
@@ -222,14 +226,18 @@ export default function BillingPage() {
           subtitle="Manage patient billing, payments, and packages catalog"
           actions={
             <>
-              <Button variant="secondary" onClick={() => setIsPaymentOpen(true)}>
-                <CreditCard className="h-4 w-4 text-grove" />
-                <span>Record Payment</span>
-              </Button>
-              <Button onClick={() => setIsInvoiceOpen(true)}>
-                <Plus className="h-4 w-4" />
-                <span>Create Invoice</span>
-              </Button>
+              {canRecordPayment && (
+                <Button variant="secondary" onClick={() => setIsPaymentOpen(true)}>
+                  <CreditCard className="h-4 w-4 text-grove" />
+                  <span>Record Payment</span>
+                </Button>
+              )}
+              {canCreateInvoice && (
+                <Button onClick={() => setIsInvoiceOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  <span>Create Invoice</span>
+                </Button>
+              )}
             </>
           }
         />

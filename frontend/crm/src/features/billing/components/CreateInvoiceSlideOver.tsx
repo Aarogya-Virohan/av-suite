@@ -31,6 +31,7 @@ function suggestNextNumber(existing: string[]): string {
 }
 import { useCreateInvoice, useInvoices } from '../api';
 import { usePatients } from '../../patients/api';
+import { hasCapability } from '../../../config/permissions';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
 import { formatMoney } from '../../../lib/money';
 import { localToday } from '../../../lib/datetime';
@@ -69,7 +70,7 @@ const emptyItem = () => ({ description: '', quantity: 1, unit_price: undefined a
  */
 export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOverProps) {
   const createInvoice = useCreateInvoice();
-  const { data: patientsResponse } = usePatients(undefined, 1, 100);
+  const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
   const { data: invoices = [] } = useInvoices();
   const existingNumbers = invoices.map((inv) => inv.invoice_number);
