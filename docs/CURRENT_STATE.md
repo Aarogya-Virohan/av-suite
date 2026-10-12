@@ -219,7 +219,7 @@ moving a single back-view shoulder point to the bony tip took a MODERATE
 trunk shift, and the whole synthesis built on it, to NORMAL. The review
 step is what stands between that error and the report.
 
-## 4e. Done on 11 and 12 October, the report (commits 844dda0, 9774805)
+## 4e. Done on 11 and 12 October, the report (commits 844dda0, 9774805, 378538d, d4f771c)
 
 Details and reasons in decisions.md, end of the 11 October section.
 
@@ -240,6 +240,14 @@ Details and reasons in decisions.md, end of the 11 October section.
   PDF and New assessment in a sticky bottom bar.
 - Phone-tested over tunnels on 12 October with uploads and with guided
   camera capture on all three views.
+- Four report components left unused by the rebuild were removed
+  (d4f771c). 378538d's message claims that removal but only changed this
+  file; d4f771c did the removal and says so.
+- analysisVersion not bumped: no value or grade changed, only how they
+  are drawn and printed. It is still 2026-10-11.2.
+- frontend/posture-tool/.env.local still points NEXT_PUBLIC_API_URL at the
+  12 October quick tunnel, which is dead once the tunnel closes. Set it to
+  http://localhost:8000 (or a fresh tunnel) and rebuild before running.
 
 Direction for later (Onkar): once joined to the marketplace, the clinic's
 own logo and details take the header and Aarogya Virohan stays only in the
@@ -284,9 +292,14 @@ footer. Not built: clinic data belongs to the marketplace and CRM work.
   places landmarks better, but it also reports honest visibility on
   occluded points, so 33 landmarks across the seven subjects stop
   passing the 0.65 guard and whole posterior lower bodies go to not
-  measured. The model choice is clear; the consequence is tied to
-  question 1. Written up in open_questions_research.md, held until
-  that is answered.
+  measured. The model choice is clear; the consequence was held for
+  question 1 of the 2 October founder document (severity tiers; not Q1
+  of the 11 October batch, which is about uploads). That question was
+  answered on 10 October (tiers kept), so the stated reason for holding
+  is gone. Not yet re-checked: how complexity 2 behaves now that the
+  landmark review step lets the clinician place or mark points. Written
+  up in open_questions_research.md; needs a fresh look before the
+  founders are asked anything.
 
 ---
 
