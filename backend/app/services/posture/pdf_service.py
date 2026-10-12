@@ -150,14 +150,14 @@ _TIGHT_UNITS = frozenset({"\u00b0", "%"})
 
 def _number(value: Any) -> str:
     """
-    Two decimals, always. The values arrive rounded to two places, so
-    11.90 came through as 11.9 and sat beside 2.36 in the same column. This
-    only pads; it does not change any value. (How many decimals the report
-    should carry at all is a founder question, see decisions.md.)
+    One decimal, always (founders, 13 October 2026, Q4). The values arrive
+    already rounded to one place by report_builder.display_value, so 12.0
+    would otherwise print as 12 beside 2.4 in the same column. This only
+    pads; it does not round anything the backend has not already rounded.
     """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return _esc(value)
-    return f"{value:.2f}"
+    return f"{value:.1f}"
 
 
 def _value_with_unit(value: Any, unit: str) -> str:

@@ -31,6 +31,27 @@ SIDE_WORDING: dict[str, dict[str, str]] = {
 }
 
 
+# Founders, 13 October 2026, Q4 and Q5. Values print with one decimal, and a
+# row whose label already names the direction prints the size only. No grade
+# moves: classify() decides on the unrounded, signed value before this module
+# sees it, so a value that prints as 4.0 may have been graded on 4.04. The
+# borderline flag (a 2 degree margin) marks exactly those cases. PT-L05 and
+# PT-L06 are the only rows that can come out negative (checked on the 76
+# saved reports), and both pick their label from the sign
+# (_trunk_lean_label and _knee_sagittal_label in api/v1/posture.py).
+DIRECTION_NAMED_PARAMS = frozenset({"PT-L05", "PT-L06"})
+
+
+def display_value(param_id: str, value: Any) -> Any:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return value
+    shown = round(value, 1)
+    if param_id in DIRECTION_NAMED_PARAMS:
+        shown = abs(shown)
+    # Adding 0.0 turns a negative zero into a plain zero.
+    return shown + 0.0
+
+
 def measurement(
     param_id: str,
     label: str,
@@ -50,7 +71,7 @@ def measurement(
     return {
         "paramId": param_id,
         "label": label,
-        "value": round(value, 2) if isinstance(value, (int, float)) else value,
+        "value": display_value(param_id, value),
         "unit": unit,
         "severityLabel": SEVERITY_LABELS.get(severity, severity.upper()),
         "severity": severity,
@@ -159,7 +180,9 @@ def build_side_view_result(
 # directions with no female allowance, knee rows renamed, ear level removed.
 # 2026-10-11.2: founders' second reply the same day. New bands for head
 # tilt, pelvic obliquity, trunk shift and trunk lean; a bent knee now grades.
-ANALYSIS_VERSION = "2026-10-11.2"
+# 2026-10-13.1: founders, Q4 and Q5. Values print with one decimal, and the
+# trunk lean and knee rows print the size without a minus sign. No grade moved.
+ANALYSIS_VERSION = "2026-10-13.1"
 
 
 def build_report_response(

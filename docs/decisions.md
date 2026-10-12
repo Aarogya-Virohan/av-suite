@@ -1322,3 +1322,46 @@ Fourth pass, after the phone test over the tunnels (report PT-20261011-EDEAA04C)
   shorter. A worst-case sample (three plus two muscles, two-line summary,
   upload note) renders on two pages. A longer report still goes to three,
   but with sign-off and disclaimer together on the last page.
+
+## 13 October 2026
+
+### Founders' answers Q4 and Q5: one decimal, no minus sign beside a direction word
+Relayed by Onkar as a screenshot on 13 October, exact selections:
+"Q4: b (One decimal)" and "Q5: b (Show the size only, since the label gives
+the direction)". The other questions of the batch (uploads, muscle columns,
+patient name, footer line, company name, upload note, colours, lawyer,
+inter-rater test, hosting, clinic logo) had no answer at the time of this
+entry and nothing was built for them.
+
+Q4. Every value on the report prints with one decimal (71.3 degrees,
+12.2 mm), web and PDF. The rounding happens once, in
+report_builder.display_value, so the two surfaces cannot round a tie
+differently (Python rounds half to even, JavaScript toFixed does not). The
+PDF and the web only pad to one place. The saved report file now holds the
+one-decimal value, where it held two.
+
+Q5. PT-L05 (trunk lean) and PT-L06 (knee) print the size only. Checked on
+the 76 saved reports: they are the only two rows that ever come out negative
+(PT-L05 74 of 76, PT-L06 34 of 65), and both choose their label from the
+sign ("Backward Trunk Lean", "Knee Hyperextension"), so the direction is
+still on the row. Every other row keeps its sign, so if one ever goes
+negative it will not be hidden.
+
+No grade moved. classify() decides on the unrounded signed value before
+display_value runs. The consequence is that a value can print as 4.0 and
+carry a grade decided on 4.04, so two reports can read 4.0 with different
+grades. The borderline flag (2 degree and 2 mm margin) marks every value
+within 0.05 of a boundary, since 0.05 is far inside that margin, so this
+case is already shown as provisional. Not changed on purpose: grading on the
+rounded value would move grades, which is the founders' call.
+
+ANALYSIS_VERSION moved to 2026-10-13.1, because printed values changed
+precision and the report says values are comparable only within a version.
+
+Verified: new tests in test_display_values_13oct.py (ten, covering rounding,
+the two rows, other rows keeping their sign, negative zero, a missing value,
+the grade on the unrounded value, and the PDF row); the posture test folder
+run on its own passes 87 tests with them; tsc 0 errors and eslint 0 errors;
+a saved report (PT-20261012-5224332B) rendered with the new code reads
+"Backward Trunk Lean 3.4°", "Knee Hyperextension 0.1°", "24.3 mm", on two
+pages. The full backend suite is run by Onkar on the Mac.

@@ -253,21 +253,37 @@ Direction for later (Onkar): once joined to the marketplace, the clinic's
 own logo and details take the header and Aarogya Virohan stays only in the
 footer. Not built: clinic data belongs to the marketplace and CRM work.
 
+## 4f. Done on 13 October, founders' Q4 and Q5
+
+Details and reasons in decisions.md, 13 October.
+
+- Every value prints with one decimal on the PDF and the web report. Rounding
+  happens once, in report_builder.display_value; the two surfaces only pad.
+- PT-L05 and PT-L06 print the size without a minus sign. They are the only
+  rows that ever go negative, and their label already carries the direction.
+- No grade moved (classify runs on the unrounded signed value). A value can
+  print as 4.0 with a grade decided on 4.04; the borderline flag covers it.
+- analysisVersion is now 2026-10-13.1 (it was 2026-10-11.2 when 4e was written).
+- Saved report files now hold one-decimal values.
+
 ## 5. Not started
 
 - Back-view millimetre calibration without the nose. Measured 11 October:
   the guessed nose makes back-view millimetres read about 3 percent small,
   at worst 5.7. Deferred on purpose, since point placement errors are
   around thirty times larger (known_limitations.md).
-- Founder batch, drafted 11 October, not yet sent as far as this file
-  knows: Q1 allow uploads at all (recommend camera only), Q3 keep the
-  "likely hypertonic / inhibited" columns (recommend remove), Q4 keep the
-  patient name in saved files (recommend case reference only). Also for
-  them: value precision (two decimals today) and a negative value beside a
-  direction label ("Backward Trunk Lean -3.23"); the footer tagline says
-  "exercise prescription" on a report that prescribes none; the exact
-  registered company name if a legal line is wanted; the upload note's
-  wording, which is ours.
+- Founder batch, 13 questions drafted 12 October: Q1 allow uploads at all
+  (recommend camera only), Q2 keep the "likely hypertonic / inhibited"
+  columns (recommend remove), Q3 patient name in saved files (recommend case
+  reference only), Q4 decimals, Q5 minus sign beside a direction label, Q6
+  footer tagline ("exercise prescription" on a report that prescribes
+  none), Q7 registered company name, Q8 the upload note (ours, moot if Q1 is
+  camera only), Q9 report colours, Q10 lawyer on consent and retention, Q11
+  inter-rater test (needs two physios), Q12 where the tool runs, Q13 clinic
+  logo after the marketplace. Answered 13 October: Q4 b and Q5 b, built
+  (section 4f). The rest had no answer at the time of writing. Earlier
+  drafts of this file called the muscle columns Q3 and the patient name Q4;
+  that numbering is retired.
 - Report colour scheme (founders said it is still to be discussed) and
   clinic co-branding (after the marketplace).
 - Phone checks owed by Onkar: tilt in landscape (side tilt near 90), and a
