@@ -358,16 +358,16 @@ function Marker({
         <span className="absolute h-[30px] w-[30px] rounded-full border-2 border-[#E8A23A] bg-[#E8A23A]/15" />
       )}
       {selected && (
-        <span className="absolute h-[34px] w-[34px] rounded-full border-2 border-white shadow-[0_0_0_2px_#1E6B57,0_2px_8px_rgba(0,0,0,0.35)]" />
+        <span className="absolute h-[34px] w-[34px] rounded-full border-2 border-white shadow-[0_0_0_2px_#1C7A54,0_2px_8px_rgba(0,0,0,0.35)]" />
       )}
       {p.notVisible ? (
         <span className="h-[14px] w-[14px] rounded-full border-2 border-dashed border-white/85" />
       ) : p.isPupil ? (
         <span className="relative h-[13px] w-[13px] rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.55)]">
-          <span className="absolute left-1/2 top-1/2 h-[3px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+          <span className="absolute left-1/2 top-1/2 h-[3px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#FFFDF7]" />
         </span>
       ) : (
-        <span className="h-[14px] w-[14px] rounded-full border-[2.5px] border-white bg-[#1E6B57] shadow-[0_1px_3px_rgba(0,0,0,0.55)]" />
+        <span className="h-[14px] w-[14px] rounded-full border-[2.5px] border-white bg-[#1C7A54] shadow-[0_1px_3px_rgba(0,0,0,0.55)]" />
       )}
     </button>
   )
@@ -649,26 +649,26 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                 aria-current={active ? "step" : undefined}
                 className={`flex flex-none items-center gap-2 rounded-full p-1 text-[13px] font-medium transition sm:pr-3 ${active ? "pr-3" : ""} ${
                   active
-                    ? "bg-[#15181D] text-white"
+                    ? "bg-[#0B1238] text-white"
                     : reachable
-                      ? "text-[#15181D] hover:bg-[#ECEAE4]"
-                      : "text-[#9AA0A8]"
+                      ? "text-[#141A33] hover:bg-[#EDE6D6]"
+                      : "text-[#8B90A8]"
                 }`}
               >
                 <span
                   className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] tabular-nums ${
                     active
-                      ? "bg-white text-[#15181D]"
+                      ? "bg-[#FFFDF7] text-[#141A33]"
                       : done
-                        ? "bg-[#1E6B57] text-white"
-                        : "border border-[#D5D2CA] bg-white"
+                        ? "bg-[#1C7A54] text-white"
+                        : "border border-[#D9D1BF] bg-[#FFFDF7]"
                   }`}
                 >
                   {done && !active ? <IconCheck className="h-3.5 w-3.5" /> : i + 1}
                 </span>
                 <span className={active ? "" : "hidden sm:inline"}>{STAGE_TITLE[s]}</span>
               </button>
-              {i < STAGES.length - 1 && <span className="h-px flex-1 bg-[#DDDAD2]" />}
+              {i < STAGES.length - 1 && <span className="h-px flex-1 bg-[#E3DCCB]" />}
             </li>
           )
         })}
@@ -677,19 +677,19 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
       {view ? (
         <>
           <header className="mt-6">
-            <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#7A818B]">
+            <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#5D6380]">
               Landmark check · {stageIndex + 1} of 3
             </p>
-            <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight text-[#15181D]">
+            <h1 className="mt-1 font-display text-[26px] font-extrabold leading-tight tracking-tight text-[#141A33]">
               {STAGE_TITLE[view]} view
             </h1>
-            <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-[#5F6672]">
+            <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-[#5D6380]">
               Drag any point that is off its landmark. Tap a point for more options.
             </p>
           </header>
 
           {/* Photograph */}
-          <div className="mt-5 rounded-2xl bg-[#101317] p-2 sm:p-3">
+          <div className="mt-5 rounded-2xl bg-[#0B1238] p-2 sm:p-3">
             <div className="mb-2 flex items-center justify-between gap-3 pl-2">
               <p className="text-[12px] text-white/60">
                 {zoom.on ? "Drag the photo to look around" : `${current.length} points`}
@@ -768,7 +768,7 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                     <span className="absolute bottom-[18%] left-1/2 h-[22%] w-px -translate-x-1/2 bg-white/90" />
                     <span className="absolute left-[18%] top-1/2 h-px w-[22%] -translate-y-1/2 bg-white/90" />
                     <span className="absolute right-[18%] top-1/2 h-px w-[22%] -translate-y-1/2 bg-white/90" />
-                    <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1E6B57] ring-2 ring-white" />
+                    <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1C7A54] ring-2 ring-white" />
                   </div>
                   <p className="mt-1.5 truncate rounded-full bg-black/70 px-2 py-0.5 text-center text-[11px] font-medium text-white">
                     {loupe.name}
@@ -781,11 +781,11 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
           {/* Context panel: selected point, or the view's guidance */}
           <div className="mt-4 min-h-[112px]">
             {selectedPoint ? (
-              <div className="rounded-2xl border border-[#E3E1DA] bg-white p-4">
+              <div className="rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[16px] font-semibold text-[#15181D]">{selectedPoint.name}</p>
-                    <p className="mt-0.5 text-[13px] text-[#5F6672]">
+                    <p className="truncate text-[16px] font-semibold text-[#141A33]">{selectedPoint.name}</p>
+                    <p className="mt-0.5 text-[13px] text-[#5D6380]">
                       {selectedPoint.notVisible
                         ? "Not visible. Measurements that need it are left out."
                         : isMoved(selectedPoint)
@@ -800,7 +800,7 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                   <button
                     type="button"
                     onClick={() => setSelected(null)}
-                    className="flex-none rounded-full px-2 py-1 text-[13px] font-medium text-[#5F6672] hover:bg-[#F1EFEA]"
+                    className="flex-none rounded-full px-2 py-1 text-[13px] font-medium text-[#5D6380] hover:bg-[#F1EFEA]"
                   >
                     Done
                   </button>
@@ -813,17 +813,17 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                     aria-checked={selectedPoint.notVisible}
                     className={`flex h-11 items-center justify-center gap-2 rounded-xl border text-[13px] font-medium transition ${
                       selectedPoint.notVisible
-                        ? "border-[#15181D] bg-[#15181D] text-white"
-                        : "border-[#E3E1DA] text-[#15181D] hover:bg-[#F7F6F2]"
+                        ? "border-[#0B1238] bg-[#0B1238] text-white"
+                        : "border-[#E3DCCB] text-[#141A33] hover:bg-[#F3EEE2]"
                     }`}
                   >
                     <span
                       className={`relative h-4 w-7 rounded-full transition ${
-                        selectedPoint.notVisible ? "bg-white/30" : "bg-[#D9D6CE]"
+                        selectedPoint.notVisible ? "bg-white/30" : "bg-[#D9D1BF]"
                       }`}
                     >
                       <span
-                        className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
+                        className={`absolute top-0.5 h-3 w-3 rounded-full bg-[#FFFDF7] transition-all ${
                           selectedPoint.notVisible ? "left-3.5" : "left-0.5"
                         }`}
                       />
@@ -834,7 +834,7 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                     type="button"
                     disabled={!isMoved(selectedPoint)}
                     onClick={() => update(selectedPoint.key, { x: selectedPoint.origX, y: selectedPoint.origY })}
-                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#E3E1DA] text-[13px] font-medium text-[#15181D] transition hover:bg-[#F7F6F2] disabled:opacity-35"
+                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#E3DCCB] text-[13px] font-medium text-[#141A33] transition hover:bg-[#F3EEE2] disabled:opacity-35"
                   >
                     <IconReset />
                     Reset
@@ -842,7 +842,7 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                   <button
                     type="button"
                     onClick={() => focusOn(selectedPoint.x, selectedPoint.y)}
-                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#E3E1DA] text-[13px] font-medium text-[#15181D] transition hover:bg-[#F7F6F2]"
+                    className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-[#E3DCCB] text-[13px] font-medium text-[#141A33] transition hover:bg-[#F3EEE2]"
                   >
                     <IconZoom />
                     Zoom here
@@ -862,20 +862,20 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                     <button
                       type="button"
                       onClick={checkNext}
-                      className="h-9 flex-none rounded-full bg-[#15181D] px-4 text-[13px] font-medium text-white"
+                      className="h-9 flex-none rounded-full bg-[#4E888F] px-4 text-[13px] font-semibold text-white hover:bg-[#3B6A70]"
                     >
                       Check next
                     </button>
                   </div>
                 )}
-                <p className="px-1 text-[14px] leading-relaxed text-[#5F6672]">{VIEW_HINT[view]}</p>
+                <p className="px-1 text-[14px] leading-relaxed text-[#5D6380]">{VIEW_HINT[view]}</p>
               </div>
             )}
           </div>
 
           {/* Point chips */}
           <div className="mt-3">
-            <p className="mb-2 px-1 text-[12px] font-medium uppercase tracking-[0.12em] text-[#7A818B]">
+            <p className="mb-2 px-1 text-[12px] font-medium uppercase tracking-[0.12em] text-[#5D6380]">
               Points
             </p>
             <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none]">
@@ -888,10 +888,10 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                     onClick={() => select(p.key, zoom.on)}
                     className={`flex h-9 flex-none items-center gap-2 rounded-full border px-3 text-[13px] transition ${
                       p.key === selected
-                        ? "border-[#15181D] bg-[#15181D] text-white"
+                        ? "border-[#0B1238] bg-[#0B1238] text-white"
                         : flagged
                           ? "border-[#F0D9B5] bg-[#FBF3E6] text-[#6B4A12]"
-                          : "border-[#E3E1DA] bg-white text-[#15181D] hover:bg-[#F7F6F2]"
+                          : "border-[#E3DCCB] bg-[#FFFDF7] text-[#141A33] hover:bg-[#F3EEE2]"
                     }`}
                   >
                     <span
@@ -899,7 +899,7 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                         p.notVisible
                           ? "border border-dashed border-current"
                           : isMoved(p)
-                            ? "bg-[#1E6B57] ring-2 ring-[#1E6B57]/25"
+                            ? "bg-[#1C7A54] ring-2 ring-[#1C7A54]/25"
                             : flagged
                               ? "border-2 border-[#E8A23A]"
                               : "bg-current opacity-40"
@@ -916,13 +916,13 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
         /* Summary */
         <>
           <header className="mt-6">
-            <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#7A818B]">
+            <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#5D6380]">
               Landmark check · last step
             </p>
-            <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight text-[#15181D]">
+            <h1 className="mt-1 font-display text-[26px] font-extrabold leading-tight tracking-tight text-[#141A33]">
               Confirm the landmarks
             </h1>
-            <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-[#5F6672]">
+            <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-[#5D6380]">
               The report is calculated only from these points. Tap a view to change anything.
             </p>
           </header>
@@ -937,9 +937,9 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                   type="button"
                   disabled={loading}
                   onClick={() => goTo(v)}
-                  className="group overflow-hidden rounded-2xl border border-[#E3E1DA] bg-white text-left transition hover:border-[#BDB9AF]"
+                  className="group overflow-hidden rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] text-left transition hover:border-[#C9C0AA]"
                 >
-                  <div className="bg-[#101317] p-1.5">
+                  <div className="bg-[#0B1238] p-1.5">
                     <div
                       className="relative mx-auto overflow-hidden rounded-lg"
                       style={{ width: frameWidth(d.widthPx, d.heightPx, 34), aspectRatio: `${d.widthPx} / ${d.heightPx}` }}
@@ -953,7 +953,7 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                           <span
                             key={p.key}
                             className={`absolute h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white ${
-                              p.isPupil ? "bg-transparent" : "bg-[#1E6B57]"
+                              p.isPupil ? "bg-transparent" : "bg-[#1C7A54]"
                             }`}
                             style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
                           />
@@ -961,13 +961,13 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
                     </div>
                   </div>
                   <div className="p-2.5 sm:p-3">
-                    <p className="flex items-center justify-between text-[14px] font-semibold text-[#15181D]">
+                    <p className="flex items-center justify-between text-[14px] font-semibold text-[#141A33]">
                       {STAGE_TITLE[v]}
-                      <span className="text-[12px] font-medium text-[#1E6B57] opacity-0 transition group-hover:opacity-100">
+                      <span className="text-[12px] font-medium text-[#1C7A54] opacity-0 transition group-hover:opacity-100">
                         Edit
                       </span>
                     </p>
-                    <p className="mt-0.5 text-[12px] leading-snug text-[#5F6672]">
+                    <p className="mt-0.5 text-[12px] leading-snug text-[#5D6380]">
                       {s.moved === 0 && s.hidden.length === 0
                         ? "As detected"
                         : [
@@ -989,13 +989,13 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
           </div>
 
           {(VIEW_ORDER.some((v) => stats(v).hidden.length > 0) || totalUnseen > 0) && (
-            <div className="mt-4 space-y-2 rounded-2xl border border-[#E3E1DA] bg-white p-4 text-[14px]">
+            <div className="mt-4 space-y-2 rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-4 text-[14px]">
               {VIEW_ORDER.map((v) => {
                 const hidden = stats(v).hidden
                 if (!hidden.length) return null
                 return (
-                  <p key={v} className="text-[#3A4048]">
-                    <span className="font-medium text-[#15181D]">{STAGE_TITLE[v]}, not visible:</span>{" "}
+                  <p key={v} className="text-[#454B66]">
+                    <span className="font-medium text-[#141A33]">{STAGE_TITLE[v]}, not visible:</span>{" "}
                     {hidden.join(", ")}. Measurements that need these are left out.
                   </p>
                 )
@@ -1011,20 +1011,20 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
             </div>
           )}
 
-          <p className="mt-4 px-1 text-[13px] leading-relaxed text-[#7A818B]">
+          <p className="mt-4 px-1 text-[13px] leading-relaxed text-[#5D6380]">
             By confirming, you are stating that these points sit on the patient&apos;s landmarks.
           </p>
         </>
       )}
 
       {/* Actions: sticky on phones, inline on larger screens */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3E1DA] bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3DCCB] bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <div className="mx-auto flex max-w-3xl gap-3">
           <button
             type="button"
             disabled={loading}
             onClick={() => (prevStage ? goTo(prevStage) : onBack())}
-            className="h-12 flex-none rounded-xl border border-[#E3E1DA] bg-white px-5 text-[15px] font-medium text-[#15181D] transition hover:bg-[#F7F6F2] disabled:opacity-40"
+            className="h-12 flex-none rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-5 text-[15px] font-medium text-[#141A33] transition hover:bg-[#F3EEE2] disabled:opacity-40"
           >
             {prevStage ? "Back" : "Retake photos"}
           </button>
@@ -1032,7 +1032,7 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
             type="button"
             disabled={loading}
             onClick={() => (nextStage ? goTo(nextStage) : onConfirm(toSubmission(points)))}
-            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#15181D] px-5 text-[15px] font-medium text-white transition hover:bg-[#2A2F37] disabled:opacity-60"
+            className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#4E888F] px-5 text-[15px] font-semibold text-white transition hover:bg-[#3B6A70] disabled:opacity-60"
           >
             {loading ? (
               <>

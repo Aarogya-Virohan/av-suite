@@ -33,19 +33,19 @@ export default function SignaturePanel({ data }: Props) {
         <div>
           <ul>
             {data.regions.map((r) => (
-              <li key={r.id} className="flex items-center justify-between border-b border-[#EDF2F2] py-2.5">
-                <span className="text-[14px] text-[#2F3336]">{r.label}</span>
+              <li key={r.id} className="flex items-center justify-between border-b border-[#E3DCCB] py-2.5">
+                <span className="text-[14px] text-[#141A33]">{r.label}</span>
                 {r.worst && r.worstLabel ? (
                   <SeverityBadge severity={r.worst} label={r.worstLabel} />
                 ) : (
-                  <span className="text-[12px] text-[#6B7378]">
+                  <span className="text-[12px] text-[#5D6380]">
                     {r.parameters.length === 0 ? "No parameter" : "Not measured"}
                   </span>
                 )}
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-[12px] leading-relaxed text-[#8A9296]">
+          <p className="mt-3 text-[12px] leading-relaxed text-[#5D6380]">
             Each axis is one measurement. Inner ring normal, then mild and moderate, outer ring
             severe. A region shows the worst grade among its measurements.
           </p>

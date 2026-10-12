@@ -272,8 +272,8 @@ Details in decisions.md, 13 October. Brand direction B on the PDF: clinic
 letterhead from report["branding"] with an Aarogya Virohan fallback (what
 every report shows today), a patient box with every intake field, cream
 page, embedded fonts, footer with patient and report ID on every page.
-heightCm now saved in the patient record. Web report and app screens still
-carry the old look; they are next.
+heightCm now saved in the patient record. The web report and the app
+screens follow the same brand since the same night (see decisions.md).
 
 ## 5. Not started
 

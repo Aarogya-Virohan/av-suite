@@ -56,7 +56,14 @@ export interface PostureReport {
     caseRef: string
     assessmentDate: string
     clinician: string
+    // Since 13 October 2026. Optional because earlier reports do not carry it.
+    heightCm?: number
   }
+
+  // Clinic letterhead, to come from the marketplace (AV Suite core). Absent
+  // today, so every report shows the Aarogya Virohan fallback. Same fields
+  // as report["branding"] in pdf_service.py.
+  branding?: ClinicBranding
 
   views: {
     side: ViewData
@@ -84,6 +91,18 @@ export interface PostureReport {
   // Founders' Q5 replacement, the regional profile, since 11 October 2026.
   // Optional because earlier reports do not carry it.
   signature?: BiomechanicalSignature
+}
+
+export interface ClinicBranding {
+  clinicName?: string
+  logo?: string
+  addressLine?: string
+  phone?: string
+  email?: string
+  website?: string
+  doctorName?: string
+  doctorDegree?: string
+  doctorRegNo?: string
 }
 
 export interface SignatureParameter {

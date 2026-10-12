@@ -1435,3 +1435,26 @@ clinical value on the PDF:
 Still two pages for all three renders.
 
 Still open: colour scheme sign-off by the founders (Q9).
+
+### Web app and web report on brand B
+Same night, Onkar: the app and the web report follow the PDF.
+- Fonts: the same Plus Jakarta Sans and Inter files, via next/font/local
+  (src/app/fonts), so a build needs no network.
+- Cream page, logo teal for the main action buttons, Midnight for selected
+  states and dark photo frames, Grove for landmark points and done steps.
+  Severity colours untouched.
+- App bar: Midnight band, white logo, lime "Posture Tool" chip, and the
+  three steps (Patient & photos, Landmark check, Report). On the report
+  step the bar shows the name in text, since the report carries the logo.
+- Web report: the same letterhead (clinic or Aarogya Virohan fallback,
+  lib/branding.ts mirrors AV_FALLBACK), patient box, centred title, Grove
+  dot headings, zebra rows, footer with the mark. Landmark visibility and
+  the "Viewed from" captions removed here too.
+- Known: logo teal with white button text measures about 4.1:1, a little
+  under the 4.5:1 AA level for normal text (it passes for large text). Kept
+  because Onkar asked for the logo's own teal; darkening it to #3B6A70
+  would pass.
+Verified in Claude's container: tsc and eslint clean, next build, and
+screenshots of the intake screen (desktop and phone) and of the report
+(fallback and clinic letterhead, desktop and phone). The landmark review
+and camera screens only changed colours and were not screenshotted.

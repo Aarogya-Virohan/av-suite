@@ -288,7 +288,7 @@ export default function CameraCapture({
   const guidesOn = layers.lines || layers.grid
   const pill = (ok: boolean) =>
     `rounded-full px-3 py-1.5 text-[12px] font-medium tabular-nums transition ${
-      ok ? "bg-[#1E6B57] text-white" : "bg-white/10 text-white/80"
+      ok ? "bg-[#1C7A54] text-white" : "bg-white/10 text-white/80"
     }`
 
   return (
@@ -309,7 +309,7 @@ export default function CameraCapture({
             onClick={() => setLayers({ lines: !guidesOn, grid: !guidesOn })}
             aria-pressed={guidesOn}
             className={`h-10 rounded-full px-3 text-[13px] font-medium backdrop-blur-md ${
-              guidesOn ? "bg-white text-[#15181D]" : "bg-white/10 text-white"
+              guidesOn ? "bg-white text-[#141A33]" : "bg-white/10 text-white"
             }`}
           >
             Guides
@@ -332,7 +332,7 @@ export default function CameraCapture({
 
         {showSetup && (
           <div className="absolute inset-0 z-10 flex items-end justify-center bg-black/80 p-4 sm:items-center">
-            <div className="w-full max-w-sm space-y-4 rounded-2xl bg-[#15181D] p-5">
+            <div className="w-full max-w-sm space-y-4 rounded-2xl bg-[#0B1238] p-5">
               <h3 className="text-[17px] font-semibold">Before you capture</h3>
               <ul className="space-y-2.5 text-[14px] leading-snug text-white/80">
                 <li>Phone on a tripod, at about half the patient&apos;s height. The tripod is part of the clinic setup: the photo is taken only when the phone is within 1.5&deg; of level.</li>
@@ -350,7 +350,7 @@ export default function CameraCapture({
                   setupSeenThisVisit = true
                   setShowSetup(false)
                 }}
-                className="h-12 w-full rounded-xl bg-white text-[15px] font-medium text-[#15181D]"
+                className="h-12 w-full rounded-xl bg-white text-[15px] font-medium text-[#141A33]"
               >
                 Got it
               </button>

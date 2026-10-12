@@ -11,14 +11,14 @@ interface Props {
 function MuscleList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#3B6A70]">{title}</h3>
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-[#1C7A54]">{title}</h3>
       {items.length === 0 ? (
-        <p className="mt-2 text-[14px] italic text-slate-400">None identified</p>
+        <p className="mt-2 text-[14px] italic text-[#5D6380]">None identified</p>
       ) : (
-        <ul className="mt-2 space-y-1 text-[14px] text-[#2F3336]">
+        <ul className="mt-2 space-y-1 text-[14px] text-[#141A33]">
           {items.map((muscle) => (
             <li key={muscle} className="flex gap-2">
-              <span className="text-[#4E888F]">&bull;</span>
+              <span className="text-[#1C7A54]">&bull;</span>
               {muscle}
             </li>
           ))}

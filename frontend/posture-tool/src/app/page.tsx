@@ -16,28 +16,68 @@ import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@
 // exists until the clinician has confirmed the points.
 type Step = "upload" | "review" | "report"
 
-// On the report step the document below carries the logo itself, so the
-// bar shows only the product name; two logos one above the other read as a
+// App bar, brand direction B (13 October 2026): the Midnight band of the AV
+// Suite CRM with the white logo and the three steps of an assessment. On
+// the report step the report's own letterhead carries the logo, so the bar
+// shows only the product name; two logos one above the other read as a
 // mistake.
-function Header({ showLogo = true }: { showLogo?: boolean }) {
+const STEP_ORDER: { key: Step; label: string }[] = [
+  { key: "upload", label: "Patient & photos" },
+  { key: "review", label: "Landmark check" },
+  { key: "report", label: "Report" },
+]
+
+function Header({ step }: { step: Step }) {
+  const current = STEP_ORDER.findIndex((s) => s.key === step)
   return (
-    <header className="border-b border-[#E3E1DA] bg-white">
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-4">
-        {showLogo && (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/av_logo_wordmark.png" alt="Aarogya Virohan" className="h-6 w-auto" />
-            <span className="h-4 w-px bg-[#E3E1DA]" aria-hidden="true" />
-          </>
+    <header className="bg-[linear-gradient(115deg,#0B1238_0%,#121F4A_60%,#1B4A54_100%)] text-white">
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
+        {step !== "report" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/brand/av_logo_wordmark_white.png" alt="Aarogya Virohan" className="h-6 w-auto" />
+        ) : (
+          <span className="font-display text-[15px] font-bold">Aarogya Virohan</span>
         )}
-        <span className="text-[13px] text-[#7A818B]">Posture assessment</span>
+        <span className="rounded-full bg-[#C1FF72] px-2.5 py-0.5 text-[11.5px] font-bold text-[#0B1238]">
+          Posture Tool
+        </span>
+        <ol className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto" aria-label="Assessment steps">
+          {STEP_ORDER.map((s, i) => {
+            const active = i === current
+            const done = i < current
+            return (
+              <li key={s.key} className="flex flex-1 items-center gap-1.5 sm:flex-none">
+                <span
+                  aria-current={active ? "step" : undefined}
+                  className={`flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold ${
+                    active ? "text-[#C1FF72]" : done ? "text-white" : "text-[#A9B3D6]"
+                  }`}
+                >
+                  <span
+                    className={`flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-bold ${
+                      active
+                        ? "bg-[#C1FF72] text-[#0B1238]"
+                        : done
+                          ? "bg-white/90 text-[#0B1238]"
+                          : "border border-[#4A5585] text-[#A9B3D6]"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className={active ? "" : "hidden sm:inline"}>{s.label}</span>
+                </span>
+                {i < STEP_ORDER.length - 1 && <span aria-hidden="true" className="h-px flex-1 bg-white/20 sm:w-5 sm:flex-none" />}
+              </li>
+            )
+          })}
+        </ol>
       </div>
     </header>
   )
 }
 
 const INPUT_CLASS =
-  "h-11 w-full rounded-xl border border-[#E3E1DA] bg-white px-3 text-[15px] text-[#15181D] outline-none transition placeholder:text-[#A3A8B0] focus:border-[#15181D]"
+  "h-11 w-full rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-3 text-[15px] text-[#141A33] outline-none transition placeholder:text-[#8B90A8] focus:border-[#4E888F]"
 
 function Field({
   label,
@@ -52,12 +92,12 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[13px] font-medium text-[#3A4048]">{label}</span>
+      <span className="mb-1.5 block text-[13px] font-medium text-[#454B66]">{label}</span>
       {children}
       {error ? (
         <span className="mt-1 block text-[12px] text-[#B4231B]">{error}</span>
       ) : hint ? (
-        <span className="mt-1 block text-[12px] text-[#7A818B]">{hint}</span>
+        <span className="mt-1 block text-[12px] text-[#5D6380]">{hint}</span>
       ) : null}
     </label>
   )
@@ -308,29 +348,29 @@ try {
 
 }
 
-return ( <div className="min-h-screen bg-[#F4F3EF]">
+return ( <div className="min-h-screen bg-[#F8F4EA]">
 
-  <Header showLogo={step !== "report"} />
+  <Header step={step} />
 
   <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8">
 
     {step === "upload" && (
       <section className="mx-auto w-full max-w-3xl pb-28 sm:pb-0">
         <header>
-          <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#7A818B]">
+          <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-[#5D6380]">
             New assessment
           </p>
-          <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight text-[#15181D]">
+          <h1 className="mt-1 font-display text-[26px] font-extrabold leading-tight tracking-tight text-[#141A33]">
             Patient and photographs
           </h1>
-          <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-[#5F6672]">
+          <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-[#5D6380]">
             Fill in the patient&apos;s details, then take the three photographs. You will check
             the landmarks before any report is made.
           </p>
         </header>
 
-        <div className="mt-6 rounded-2xl border border-[#E3E1DA] bg-white p-5 sm:p-6">
-          <h2 className="text-[17px] font-semibold text-[#15181D]">Patient</h2>
+        <div className="mt-6 rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-5 sm:p-6">
+          <h2 className="font-display text-[17px] font-bold text-[#141A33]">Patient</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Name">
               <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} className={INPUT_CLASS} autoComplete="off" />
@@ -365,9 +405,9 @@ return ( <div className="min-h-screen bg-[#F4F3EF]">
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-[#E3E1DA] bg-white p-5 sm:p-6">
-          <h2 className="text-[17px] font-semibold text-[#15181D]">Photographs</h2>
-          <p className="mt-1 text-[14px] leading-relaxed text-[#5F6672]">
+        <div className="mt-4 rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-5 sm:p-6">
+          <h2 className="font-display text-[17px] font-bold text-[#141A33]">Photographs</h2>
+          <p className="mt-1 text-[14px] leading-relaxed text-[#5D6380]">
             The camera only takes the photo when the phone is level. An uploaded photo is measured
             the same way, but the report marks it as not checked.
           </p>
@@ -376,8 +416,8 @@ return ( <div className="min-h-screen bg-[#F4F3EF]">
             <UploadZone label="Side" view="side" setImage={setSideImage} setImageFile={setSideFile} setSource={setSideSource} />
             <UploadZone label="Back" view="back" setImage={setBackImage} setImageFile={setBackFile} setSource={setBackSource} />
           </div>
-          <details className="mt-4 rounded-xl bg-[#F7F6F2] px-4 py-3 text-[13px] leading-relaxed text-[#5F6672]">
-            <summary className="cursor-pointer font-medium text-[#15181D]">What makes a good photo?</summary>
+          <details className="mt-4 rounded-xl bg-[#F3EEE2] px-4 py-3 text-[13px] leading-relaxed text-[#5D6380]">
+            <summary className="cursor-pointer font-medium text-[#141A33]">What makes a good photo?</summary>
             <p className="mt-2">
               The whole body in frame from head to feet, the camera level and at about half the
               patient&apos;s height, the same distance each visit, and clothing that leaves the
@@ -387,7 +427,7 @@ return ( <div className="min-h-screen bg-[#F4F3EF]">
           </details>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3E1DA] bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3DCCB] bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
           <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             {shownError && !loading && (
               <p role="alert" className="rounded-xl border border-[#F2C9C5] bg-[#FDF1F0] px-3 py-2 text-center text-[13px] text-[#8C1D18] sm:text-right">
@@ -395,7 +435,7 @@ return ( <div className="min-h-screen bg-[#F4F3EF]">
               </p>
             )}
             {missing.length > 0 && !loading && (
-              <p className="text-center text-[13px] text-[#7A818B] sm:text-right">
+              <p className="text-center text-[13px] text-[#5D6380] sm:text-right">
                 Still needed: {missing.join(", ")}
               </p>
             )}
@@ -403,7 +443,7 @@ return ( <div className="min-h-screen bg-[#F4F3EF]">
               type="button"
               onClick={handleAnalyze}
               disabled={missing.length > 0 || loading}
-              className="h-12 rounded-xl bg-[#15181D] px-6 text-[15px] font-medium text-white transition hover:bg-[#2A2F37] disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-12 rounded-xl bg-[#4E888F] px-6 text-[15px] font-semibold text-white transition hover:bg-[#3B6A70] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading ? "Finding landmarks..." : "Continue to landmark check"}
             </button>
@@ -437,12 +477,12 @@ return ( <div className="min-h-screen bg-[#F4F3EF]">
               At the top (before 12 October) they asked for a download
               before the report had been read; only at the end, a phone
               user scrolled ten screens to reach them. */}
-          <div className="no-print sticky bottom-0 z-20 -mx-4 border-t border-[#D9E3E4] bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border">
+          <div className="no-print sticky bottom-0 z-20 -mx-4 border-t border-[#E3DCCB] bg-[#FFFDF7]/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border">
             <div className="mx-auto flex max-w-4xl gap-2.5 sm:justify-end">
               <button
                 type="button"
                 onClick={resetAll}
-                className="h-10 flex-1 rounded-lg border border-[#D9E3E4] bg-white px-4 text-[14px] font-medium text-[#2F3336] transition hover:bg-[#F3F7F7] sm:flex-none"
+                className="h-11 flex-1 rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-4 text-[14px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2] sm:flex-none"
               >
                 New assessment
               </button>
@@ -459,7 +499,7 @@ return ( <div className="min-h-screen bg-[#F4F3EF]">
                     setPdfBusy(false)
                   }
                 }}
-                className="h-10 flex-1 rounded-lg bg-[#3B6A70] px-5 text-[14px] font-semibold text-white transition hover:bg-[#2F5A60] disabled:opacity-60 sm:flex-none"
+                className="h-11 flex-1 rounded-xl bg-[#4E888F] px-5 text-[14px] font-semibold text-white transition hover:bg-[#3B6A70] disabled:opacity-60 sm:flex-none"
               >
                 {pdfBusy ? "Preparing PDF…" : "Download PDF"}
               </button>

@@ -1,11 +1,13 @@
 import type { ReactNode } from "react"
 
-// Section heading used across the report, matching the PDF: charcoal title
-// with the brand teal bar, optional detail on the right, hairline below.
+// Section heading used across the report, matching the PDF since
+// 13 October 2026: a Grove dot and a Midnight title, optional detail on the
+// right.
 export default function SectionTitle({ title, aside }: { title: string; aside?: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2 border-b border-[#D9E3E4] pb-2.5 sm:flex-row sm:items-end sm:justify-between">
-      <h2 className="border-l-[3px] border-[#4E888F] pl-2.5 text-[19px] font-bold leading-tight tracking-tight text-[#2F3336]">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <h2 className="flex items-center gap-2.5 font-display text-[19px] font-bold leading-tight tracking-tight text-[#0B1238]">
+        <span aria-hidden="true" className="h-2 w-2 flex-none rounded-full bg-[#1C7A54]" />
         {title}
       </h2>
       {aside && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{aside}</div>}

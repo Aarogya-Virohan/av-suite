@@ -43,7 +43,7 @@ function ViewFigure({ view }: { view: CaptureView }) {
           <rect x="32" y="64" width="10" height="46" rx="5" fill="currentColor" />
           <rect x="9" y="28" width="7" height="34" rx="3.5" fill="currentColor" />
           <rect x="44" y="28" width="7" height="34" rx="3.5" fill="currentColor" />
-          {view === "front" && <circle cx="30" cy="16" r="2" fill="#F7F6F2" />}
+          {view === "front" && <circle cx="30" cy="16" r="2" fill="#F3EEE2" />}
         </>
       )}
     </svg>
@@ -77,8 +77,8 @@ export default function UploadZone({
   }
 
   return (
-    <div className="flex flex-row overflow-hidden rounded-2xl border border-[#E3E1DA] bg-white sm:flex-col">
-      <div className="relative flex w-28 flex-none items-center justify-center bg-[#F7F6F2] sm:aspect-[3/4] sm:w-auto">
+    <div className="flex flex-row overflow-hidden rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] sm:flex-col">
+      <div className="relative flex w-28 flex-none items-center justify-center bg-[#F3EEE2] sm:aspect-[3/4] sm:w-auto">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={thumb} alt={`${label} photograph`} className="absolute inset-0 h-full w-full object-cover" />
@@ -88,7 +88,7 @@ export default function UploadZone({
         {thumb && source && (
           <span
             className={`absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium backdrop-blur-md sm:left-2 sm:top-2 sm:px-2.5 sm:py-1 sm:text-[11px] ${
-              source === "camera" ? "bg-[#1E6B57]/90 text-white" : "bg-[#FBF3E6]/95 text-[#6B4A12]"
+              source === "camera" ? "bg-[#1C7A54]/90 text-white" : "bg-[#FBF3E6]/95 text-[#6B4A12]"
             }`}
           >
             {source === "camera" ? "Captured" : "Uploaded"}
@@ -97,7 +97,7 @@ export default function UploadZone({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
-        <p className="text-[15px] font-semibold text-[#15181D]">
+        <p className="text-[15px] font-semibold text-[#141A33]">
           {label}
           {source === "upload" && (
             <span className="ml-2 text-[12px] font-normal text-[#A8670F]">not checked</span>
@@ -110,13 +110,13 @@ export default function UploadZone({
             void requestMotionPermission()
             setCameraOpen(true)
           }}
-          className="h-10 rounded-xl bg-[#15181D] text-[13px] font-medium text-white transition hover:bg-[#2A2F37]"
+          className="h-10 rounded-xl bg-[#4E888F] text-[13px] font-semibold text-white transition hover:bg-[#3B6A70]"
         >
           {thumb ? "Retake with camera" : "Use camera"}
         </button>
         <label
           htmlFor={inputId}
-          className="flex h-10 cursor-pointer items-center justify-center rounded-xl border border-[#E3E1DA] text-[13px] font-medium text-[#15181D] transition hover:bg-[#F7F6F2]"
+          className="flex h-10 cursor-pointer items-center justify-center rounded-xl border border-[#E3DCCB] text-[13px] font-medium text-[#141A33] transition hover:bg-[#F3EEE2]"
         >
           {thumb ? "Replace with upload" : "Upload photo"}
         </label>
