@@ -22,7 +22,6 @@ const STATUS_TONE: Record<PatientStatus, BadgeTone> = {
 
 /*
  * Restyled to the AV Suite theme. Also fixed:
- * - The restricted state rendered without the app shell (no sidebar).
  * - Each row printed the full patient UUID under the name.
  * - The status filter only filters the page that is loaded (the API has no
  *   status filter, Decisions.md L-33). The empty message now says so instead
@@ -46,11 +45,8 @@ export default function PatientsPage() {
   });
 
   if (!isAllowed) {
-    return (
-      <AppShell>
-        <AccessRestricted message="Patients directory access is restricted for your role." />
-      </AppShell>
-    );
+    // AccessRestricted renders its own AppShell.
+    return <AccessRestricted message="Patients directory access is restricted for your role." />;
   }
 
   const columns: Column<Patient>[] = [

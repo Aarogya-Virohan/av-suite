@@ -31,12 +31,15 @@ export default function PatientWorkspacePage() {
   const patientId = params?.id as string;
   const role = useAuthStore((s) => s.role);
 
-  const { data: patient, isLoading } = usePatient(patientId);
+  // Nothing is fetched for roles that cannot open the workspace (L-29).
+  const canOpenWorkspace = canAccessModule('patients');
+  const permissions = getPermissionsForRole(role).patientTabs;
+  const { data: patient, isLoading } = usePatient(patientId, canOpenWorkspace);
   const [activeTab, setActiveTab] = useState<TabKey>('timeline');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const deletePatient = useDeletePatient();
 
-  const { data: prescriptions, isLoading: isRxLoading, error: rxError } = usePrescriptions(patientId);
+  const { data: prescriptions, isLoading: isRxLoading, error: rxError } = usePrescriptions(patientId, canOpenWorkspace && permissions.treatments);
   // Rx is a separate product: a clinic without it gets 403 PRODUCT_NOT_ENTITLED
   // (Decisions.md L-30). Say so instead of an empty tab and a failing button.
   const rxBlockedMessage =
@@ -48,14 +51,9 @@ export default function PatientWorkspacePage() {
   const createRx = useCreatePrescription();
   const generatePdf = useGeneratePrescriptionPdf();
 
-  const permissions = getPermissionsForRole(role).patientTabs;
-
-  if (!canAccessModule('patients')) {
-    return (
-      <AppShell>
-        <AccessRestricted message="Patient workspace access is restricted for your role." />
-      </AppShell>
-    );
+  if (!canOpenWorkspace) {
+    // AccessRestricted renders its own AppShell (wrapping it again drew two sidebars).
+    return <AccessRestricted message="Patient workspace access is restricted for your role." />;
   }
 
   if (isLoading) {
@@ -256,6 +254,7 @@ export default function PatientWorkspacePage() {
               <span>Exercise Library</span>
             </a>
 
+{permissions.treatments && (
             <Button
               onClick={handleGenerateRx}
               disabled={!!rxBlockedMessage || isRxLoading || createRx.isPending || generatePdf.isPending}
@@ -265,6 +264,7 @@ export default function PatientWorkspacePage() {
               <FileCheck className="h-3.5 w-3.5" />
               <span>Auto-Rx</span>
             </Button>
+            )}
           </div>
 
           {/* Chief Complaint Banner */}

@@ -18,14 +18,14 @@ export function usePatients(search?: string, page = 1, page_size = 10, enabled =
   });
 }
 
-export function usePatient(id: string) {
+export function usePatient(id: string, enabled = true) {
   return useQuery<Patient | null>({
     queryKey: [...PATIENTS_QUERY_KEY, id],
     queryFn: async () => {
       const res = await apiClient.get(`/patients/${id}`);
       return res.data?.data || res.data || null;
     },
-    enabled: !!id,
+    enabled: enabled && !!id,
   });
 }
 
