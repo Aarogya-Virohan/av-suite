@@ -1365,3 +1365,73 @@ run on its own passes 87 tests with them; tsc 0 errors and eslint 0 errors;
 a saved report (PT-20261012-5224332B) rendered with the new code reads
 "Backward Trunk Lean 3.4°", "Knee Hyperextension 0.1°", "24.3 mm", on two
 pages. The full backend suite is run by Onkar on the Mac.
+
+### Report letterhead, brand B, patient box (PDF only so far)
+Onkar, 13 October: brand direction B from the brand canvas (Midnight
+letterhead on a cream page, CRM "Midnight & Grove" palette, Plus Jakarta Sans
+and Inter), for the report and the app. From his talk with the founders: the
+clinic's name, logo, doctor's name and degree, phone and so on at the top,
+a rounded box with every intake field under it, the Aarogya Virohan
+watermark kept, "powered by" on every page. Layout reference: a Healthians
+lab report (brand band, then patient details), not copied.
+
+Decided with Onkar the same night:
+- The letterhead names the clinic's head doctor; the assessing
+  physiotherapist goes in the patient box as "Assessed by".
+- Clinic details will come from the marketplace (AV Suite core). Until then
+  the report shows Aarogya Virohan's letterhead, with placeholder contact
+  he gave (+91 88680 00760, aarogayavirohan@gmail.com) and "AV Clinic" as
+  the clinic name. Email corrected by him the same night to
+  aarogyavirohan@gmail.com.
+- Patient box carries what the intake form already asks, nothing more.
+- Clinic logos: ask for a square logo (PNG or SVG, transparent, at least
+  512 px, up to 2 MB), a wide one optional, and the clinic name as text.
+
+Built in pdf_service.py:
+- report["branding"] (clinicName, logo, addressLine, phone, email, website,
+  doctorName, doctorDegree, doctorRegNo) gives the clinic letterhead; absent
+  or without clinicName, the Aarogya Virohan fallback. Nothing sends
+  branding yet. The logo is accepted only as an inline PNG or JPEG data
+  URI, because the PDF endpoint takes the report from the client; anything
+  else shows the clinic's initials, so a report can never make the server
+  fetch or read a file.
+- Patient box: name, age / sex, height, case ref., report ID, assessed on,
+  assessed by (or the clinic, in the fallback), how the photographs were
+  taken. Empty fields are left out.
+- Height is now kept in the report's patient record (heightCm). It was
+  already required at intake but not saved.
+- Footer on every page: the powered-by line as before, then patient name,
+  report ID and page count, since the letterhead no longer names the
+  patient.
+- Fonts embedded from brand/fonts (OFL, licences beside them), so the PDF
+  does not depend on what the server has installed.
+- Photographs 80 mm tall (90 before): the patient box and title take
+  space on page 1, and at 88 mm the front view fell to page 2 and the
+  report ran to three pages.
+
+Verified in Claude's container: 98 posture tests (11 new in
+test_pdf_letterhead_13oct.py), and renders of a real report (po-1 photos,
+values from PT-20261012-5224332B) with the fallback, with clinic branding,
+and a worst case (all uploads, two-line summaries, five plus three muscles,
+a refused remote logo): two pages each. The web report and the app screens
+are not changed yet.
+
+Second pass, Onkar's review the same night, removed what carries no
+clinical value on the PDF:
+- "Photographs: 3 views . guided camera" row in the patient box. Each view
+  still says how its photograph was taken (founders, 10 October), so the
+  fact is not lost.
+- The line under the title. The title itself stays: the letterhead names
+  the clinic, and without the title nothing on the page says what the
+  document is.
+- "Landmark visibility" under each view. It is the model's own visibility
+  score, not an accuracy, and on a report the patient also gets "98.5%"
+  reads as how accurate the test was. It stays in the report data.
+- "Viewed from the side / front / behind" captions: the plane titles
+  already say it.
+- Footer tagline "(A Clinical Exercise Prescription Tool)" removed on
+  Onkar's word (it was Q6 of the 12 October batch). Footer is now the
+  Aarogya Virohan mark and "POWERED BY AAROGYA VIROHAN . AV SUITE".
+Still two pages for all three renders.
+
+Still open: colour scheme sign-off by the founders (Q9).

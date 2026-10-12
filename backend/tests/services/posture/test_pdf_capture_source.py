@@ -8,7 +8,9 @@ def test_uploaded_photo_is_named_on_the_pdf():
     # the explanation is printed once in the notes, not as an amber flag.
     html = _view_section("Front", {**BASE, "captureSource": "upload"})
     assert '<td class="d-label">Photograph</td><td class="d-value">Uploaded photo</td>' in html
-    assert "90.0%" in html
+    # Landmark visibility removed from the PDF on 13 October 2026.
+    assert "Landmark visibility" not in html
+    assert "90.0%" not in html
 
 
 def test_camera_capture_is_named_on_the_pdf():

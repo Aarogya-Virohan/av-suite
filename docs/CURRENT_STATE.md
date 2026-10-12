@@ -266,6 +266,15 @@ Details and reasons in decisions.md, 13 October.
 - analysisVersion is now 2026-10-13.1 (it was 2026-10-11.2 when 4e was written).
 - Saved report files now hold one-decimal values.
 
+## 4g. Done on 13 October, report letterhead (PDF)
+
+Details in decisions.md, 13 October. Brand direction B on the PDF: clinic
+letterhead from report["branding"] with an Aarogya Virohan fallback (what
+every report shows today), a patient box with every intake field, cream
+page, embedded fonts, footer with patient and report ID on every page.
+heightCm now saved in the patient record. Web report and app screens still
+carry the old look; they are next.
+
 ## 5. Not started
 
 - Back-view millimetre calibration without the nose. Measured 11 October:

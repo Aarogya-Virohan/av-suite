@@ -733,6 +733,9 @@ def _report_from_points(
         "caseRef": case_ref,
         "assessmentDate": date.today().isoformat(),
         "clinician": clinician_name,
+        # Printed in the patient box since 13 October 2026. It was already
+        # required at intake (it sets the millimetre scale) but not kept.
+        "heightCm": patient_height_cm,
     }
 
     # ---------------------------------

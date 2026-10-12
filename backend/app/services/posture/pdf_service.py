@@ -16,12 +16,17 @@ rather than a grey footnote, empty intake fields left out, dates written
 the way Indian clinical reports write them, a printed report ID, and a
 separate sign-off block. The web report (frontend/posture-tool, components
 under src/components/report) follows the same layout.
+
+Brand, 13 October 2026: direction B (Midnight letterhead on a cream page)
+with a clinic letterhead that falls back to Aarogya Virohan until clinic
+details come from the marketplace, and a patient box with every intake field.
 """
 
 from __future__ import annotations
 
 import base64
 import html
+import re
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -33,31 +38,46 @@ from app.services.posture.classifier import SEVERITY_LABELS
 from app.services.posture.signature_svg import render_signature_svg
 
 CLINIC_NAME = "Aarogya Virohan"
-CLINIC_SUBTITLE = "Clinical Posture Assessment"
 REPORT_TITLE = "Posture Assessment Report"
 
-# Brand, 11 October 2026. Colours are taken from the logo itself: the
-# charcoal of the wordmark and the teal of the hands. The founders said the
-# full colour scheme is still to be discussed, so everything brand related
-# lives in these constants and nothing else in the file hard codes it.
-# Severity colours are NOT brand colours and stay as they were (the four
-# colour scale the founders confirmed on 10 October).
+# Brand, 13 October 2026: direction B of the brand canvas, chosen by Onkar.
+# The AV Suite CRM palette ("Midnight & Grove") for the letterhead and
+# accents, a cream page, and the logo teal kept for the logo's own world.
+# Everything brand related lives in these constants. Severity colours are
+# NOT brand colours and stay as they were (the four colour scale the
+# founders confirmed on 10 October). The founders have not signed off the
+# colour scheme yet (question Q9 of the 12 October batch).
+MIDNIGHT = "#0b1238"       # letterhead start, headings
+MIDNIGHT_2 = "#121f4a"     # letterhead middle
+DEEP_TEAL = "#1b4a54"      # letterhead end
+GROVE = "#1c7a54"          # section marks, small accent text
+LIME = "#c1ff72"           # only on the dark letterhead
 BRAND = "#4e888f"          # logo teal
-BRAND_DARK = "#3b6a70"     # teal for small text, darker for contrast on white
-INK = "#2f3336"            # logo charcoal, body headings
-MUTED = "#6b7378"          # labels
-FAINT = "#8a9296"          # footnotes
-RULE = "#d9e3e4"           # hairlines
-TINT = "#f3f7f7"           # panel background
+BRAND_DARK = "#3b6a70"     # logo teal, darker, for small text
+INK = "#141a33"            # body text
+MUTED = "#5d6380"          # labels (5.9:1 on the page colour)
+ON_DARK = "#c9d0ea"        # secondary text on the letterhead
+PAGE = "#f8f4ea"           # cream page
+PAPER = "#fffdf7"          # boxes on the page
+RULE = "#e3dccb"           # hairlines
+ZEBRA = "#f3eee2"          # alternate table rows
 
-# Footer wording as given by Onkar, 11 October 2026:
-# "(c) POWERED BY AAROGYA VIROHAN . AV SUITE . (A CLINICAL EXERCISE
-# PRESCRIPTION TOOL)". "Exercise" corrected from "Excercise" in the
-# message. The tagline describes AV Suite as a whole; this report itself
-# prescribes no exercise (founders, 1b).
+# Footer, Onkar 13 October 2026: the Aarogya Virohan mark, then "POWERED BY
+# AAROGYA VIROHAN . AV SUITE". The bracketed tagline "(A Clinical Exercise
+# Prescription Tool)" removed on his word; this report prescribes no
+# exercise (founders, 1b).
 POWERED_BY_COMPANY = "AAROGYA VIROHAN"
 POWERED_BY_PRODUCT = "AV SUITE"
-POWERED_BY_TAGLINE = "(A CLINICAL EXERCISE PRESCRIPTION TOOL)"
+
+# Letterhead fallback, 13 October 2026. Clinic details will come from the
+# marketplace (AV Suite core) once clinics join; until then every report
+# carries these. Values as given by Onkar on 13 October, who called them
+# placeholders: "AV Clinic" stands in for a clinic name.
+AV_FALLBACK = {
+    "clinicName": "AV Clinic",
+    "phone": "+91 88680 00760",
+    "email": "aarogyavirohan@gmail.com",
+}
 
 _BRAND_DIR = Path(__file__).parent / "brand"
 
@@ -76,6 +96,138 @@ def _brand_data_uri(filename: str) -> str:
         return ""
     encoded = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
+
+
+@lru_cache(maxsize=None)
+def _font_faces() -> str:
+    """
+    @font-face rules for the two brand typefaces, embedded as data URIs so
+    the PDF looks the same on every server whatever fonts it has installed.
+    Files and their OFL licences are in brand/fonts. A missing file is left
+    out and the stack falls back to Helvetica or Arial.
+    """
+
+    faces = (
+        ("Plus Jakarta Sans", 700, "plus-jakarta-sans-latin-700-normal.woff"),
+        ("Plus Jakarta Sans", 800, "plus-jakarta-sans-latin-800-normal.woff"),
+        ("Inter", 400, "inter-latin-400-normal.woff"),
+        ("Inter", 600, "inter-latin-600-normal.woff"),
+        ("Inter", 700, "inter-latin-700-normal.woff"),
+    )
+    rules = []
+    for family, weight, filename in faces:
+        path = _BRAND_DIR / "fonts" / filename
+        if not path.is_file():
+            continue
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        rules.append(
+            f"@font-face {{ font-family: '{family}'; font-weight: {weight}; "
+            f"font-style: normal; src: url(data:font/woff;base64,{encoded}) format('woff'); }}"
+        )
+    return "\n".join(rules)
+
+
+# A clinic logo arrives inside the report body the client posts, so only an
+# inline PNG or JPEG is accepted. Anything else (a remote URL, SVG, a file
+# path) is ignored and the clinic's initials are shown instead, so a report
+# can never make the server fetch or read something.
+_LOGO_DATA_URI = re.compile(r"^data:image/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$")
+_LOGO_MAX_CHARS = 3_000_000
+
+
+def _safe_logo(value: Any) -> str:
+    if not isinstance(value, str) or len(value) > _LOGO_MAX_CHARS:
+        return ""
+    return value if _LOGO_DATA_URI.match(value) else ""
+
+
+def _initials(name: str) -> str:
+    words = [w for w in re.split(r"[^A-Za-z0-9]+", name) if w]
+    return "".join(w[0] for w in words[:2]).upper()
+
+
+def _letterhead(report: dict) -> str:
+    """
+    The dark band at the top of every page. With clinic details (report
+    ["branding"], to come from the marketplace) it is the clinic's own
+    letterhead: logo and name on the left, the head doctor in the middle,
+    contact on the right. Without them it is Aarogya Virohan's, with the
+    assessing physiotherapist from the intake form on the right.
+    Empty fields are left out, never printed as blank labels.
+    """
+
+    branding = report.get("branding")
+    branding = branding if isinstance(branding, dict) else {}
+    patient = report.get("patient") or {}
+
+    def col(lines: list[str]) -> str:
+        lines = [line for line in lines if line]
+        return f'<td class="lh-col">{"".join(lines)}</td>' if lines else ""
+
+    sep = '<td class="lh-sep"></td>'
+
+    if _present(branding.get("clinicName")):
+        name = str(branding["clinicName"]).strip()
+        logo = _safe_logo(branding.get("logo"))
+        tile = (
+            f'<img src="{logo}" alt="" />'
+            if logo
+            else f'<span class="initials">{_esc(_initials(name))}</span>'
+        )
+        clinic = (
+            f'<td class="lh-clinic"><table class="lh-id"><tr>'
+            f'<td class="tile">{tile}</td>'
+            f'<td><p class="clinic-name">{_esc(name)}</p>'
+            + (
+                f'<p class="lh-sub">{_esc(branding.get("addressLine"))}</p>'
+                if _present(branding.get("addressLine"))
+                else ""
+            )
+            + "</td></tr></table></td>"
+        )
+        doctor = col([
+            f'<p class="doc-name">{_esc(branding.get("doctorName"))}</p>'
+            if _present(branding.get("doctorName")) else "",
+            f'<p class="doc-degree">{_esc(branding.get("doctorDegree"))}</p>'
+            if _present(branding.get("doctorDegree")) and _present(branding.get("doctorName")) else "",
+            f'<p class="lh-sub">Reg. No. {_esc(branding.get("doctorRegNo"))}</p>'
+            if _present(branding.get("doctorRegNo")) and _present(branding.get("doctorName")) else "",
+        ])
+        contact = col([
+            f'<p class="lh-strong">{_esc(branding.get(k))}</p>' if k == "phone"
+            else f'<p class="lh-sub">{_esc(branding.get(k))}</p>'
+            for k in ("phone", "email", "website")
+            if _present(branding.get(k))
+        ])
+        cells = [clinic] + [c for c in (doctor, contact) if c]
+    else:
+        wordmark = _brand_data_uri("av_logo_wordmark_white.png")
+        mark = (
+            f'<img class="av-wordmark" src="{wordmark}" alt="{CLINIC_NAME}" />'
+            if wordmark
+            else f'<p class="clinic-name">{CLINIC_NAME}</p>'
+        )
+        contact_line = " &nbsp;&middot;&nbsp; ".join(
+            _esc(AV_FALLBACK[k]) for k in ("phone", "email") if AV_FALLBACK.get(k)
+        )
+        clinic = (
+            f'<td class="lh-clinic">{mark}'
+            + (f'<p class="lh-sub av-contact">{contact_line}</p>' if contact_line else "")
+            + "</td>"
+        )
+        assessor = col([
+            '<p class="lh-label">Assessing physiotherapist</p>'
+            if _present(patient.get("clinician")) else "",
+            f'<p class="doc-name">{_esc(patient.get("clinician"))}</p>'
+            if _present(patient.get("clinician")) else "",
+        ])
+        cells = [clinic] + ([assessor] if assessor else [])
+
+    return (
+        '<div class="letterhead"><table class="lh"><tr>'
+        + sep.join(cells)
+        + "</tr></table></div>"
+    )
 
 
 # Severity -> (text colour, background). Deliberately sober: this is printed
@@ -242,11 +394,8 @@ UPLOAD_NOTE = (
     "check. Compare them with later visits with that in mind."
 )
 
-VIEW_CAPTION = {
-    "side": "Viewed from the side",
-    "front": "Viewed from the front",
-    "back": "Viewed from behind",
-}
+# "Viewed from the side" captions removed on 13 October 2026: the plane
+# titles already say which view each is.
 
 
 def _view_section(title: str, view: dict, key: str = "") -> str:
@@ -265,10 +414,6 @@ def _view_section(title: str, view: dict, key: str = "") -> str:
             '<div class="photo-missing">Annotated image unavailable</div>'
         )
 
-    accuracy = view.get("accuracy")
-    accuracy_text = (
-        f"{accuracy * 100:.1f}%" if isinstance(accuracy, (int, float)) else ""
-    )
 
     # Founders, 10 October 2026: a guided camera capture and an uploaded
     # photo are measured the same way, but only the capture is checked
@@ -280,8 +425,6 @@ def _view_section(title: str, view: dict, key: str = "") -> str:
     details = []
     if source_text:
         details.append(("Photograph", source_text))
-    if accuracy_text:
-        details.append(("Landmark visibility", accuracy_text))
     details_html = "".join(
         f'<tr><td class="d-label">{label}</td><td class="d-value">{value}</td></tr>'
         for label, value in details
@@ -297,15 +440,12 @@ def _view_section(title: str, view: dict, key: str = "") -> str:
         else ""
     )
 
-    caption = VIEW_CAPTION.get(key, "")
-    caption_html = f'<span class="caption">{caption}</span>' if caption else ""
 
     return f"""
     <section class="plane">
         <table class="plane-head">
             <tr>
                 <td><h2>{_esc(title)}</h2></td>
-                <td class="meta-right">{caption_html}</td>
             </tr>
         </table>
 
@@ -414,38 +554,66 @@ def _synthesis_section(synthesis: dict) -> str:
     """
 
 
-def _patient_band(patient: dict, report_id: str) -> str:
+def _patient_box(report: dict) -> str:
     """
-    Patient details, three to a row. A field left empty at intake is left
-    out rather than printed as a blank label: an empty "Clinician" on a
-    clinical document reads as an omission, not as "not given".
+    Every intake field, in a rounded box under the letterhead, two columns
+    of label and value. A field left empty at intake is left out rather
+    than printed as a blank label: an empty "Assessed by" on a clinical
+    document reads as an omission, not as "not given".
     """
 
-    age_sex = " / ".join(
-        _esc(v) for v in (patient.get("age"), patient.get("gender")) if _present(v)
+    patient = report.get("patient") or {}
+    report_id = report.get("reportId") or ""
+    branding = report.get("branding")
+    has_clinic = isinstance(branding, dict) and _present(branding.get("clinicName"))
+
+    age = patient.get("age")
+    age_text = f"{_esc(age)} Y" if _present(age) else ""
+    age_sex = " / ".join(v for v in (age_text, _esc(patient.get("gender"))) if _present(v))
+
+    height = patient.get("heightCm")
+    height_text = (
+        f"{height:g}&nbsp;cm" if isinstance(height, (int, float)) and not isinstance(height, bool) else ""
     )
 
-    items = [
-        ("Patient", _esc(patient.get("name"))),
+    name = _esc(patient.get("name"))
+    left = [
+        ("Patient name", f'<span class="pname">{name}</span>' if _present(name) else ""),
         ("Age / Sex", age_sex),
+        ("Height", height_text),
         ("Case ref.", _esc(patient.get("caseRef"))),
-        ("Clinician", _esc(patient.get("clinician"))),
-        ("Assessed", _display_date(patient.get("assessmentDate"))),
+    ]
+    right = [
         ("Report ID", f'<span class="nowrap">{_esc(report_id)}</span>' if report_id else ""),
+        ("Assessed on", _display_date(patient.get("assessmentDate"))),
+        # With a clinic letterhead the head doctor is in the band and the
+        # assessing physiotherapist is here. In the Aarogya Virohan fallback
+        # the assessing physiotherapist is already in the band, so this row
+        # names the clinic instead (13 October 2026, Onkar).
+        ("Assessed by", _esc(patient.get("clinician"))) if has_clinic
+        else ("Clinic", _esc(AV_FALLBACK.get("clinicName"))),
     ]
-    items = [(label, value) for label, value in items if value]
 
-    cells = [
-        f'<td class="label">{label}</td><td class="value">{value}</td>'
-        for label, value in items
-    ]
-    while len(cells) % 3:
-        cells.append('<td class="label"></td><td class="value"></td>')
+    def half(rows: list[tuple[str, str]]) -> str:
+        body = "".join(
+            f'<tr><td class="pb-label">{label}</td><td class="pb-value">{value}</td></tr>'
+            for label, value in rows
+            if value
+        )
+        return f'<table class="pb-half">{body}</table>'
 
-    rows = "".join(
-        "<tr>" + "".join(cells[i:i + 3]) + "</tr>" for i in range(0, len(cells), 3)
-    )
-    return f'<table class="meta-table">{rows}</table>'
+    return f"""
+    <table class="patient-box">
+        <tr>
+            <td class="pb-col">{half(left)}</td>
+            <td class="pb-divider"></td>
+            <td class="pb-col">{half(right)}</td>
+        </tr>
+    </table>
+    <div class="doc-title">
+        <p class="t">{REPORT_TITLE.upper()}</p>
+    </div>
+    """
 
 
 def build_report_html(report: dict) -> str:
@@ -466,28 +634,27 @@ def build_report_html(report: dict) -> str:
     # stays in scoring.py with nothing calling it. Its replacement is the
     # Biomechanical Signature below.
 
-    # Under the title on every page, so a loose second page still says whose
-    # report it is.
-    header_sub = " &nbsp;&middot;&nbsp; ".join(
-        v
-        for v in (_esc(patient.get("name")), _display_date(patient.get("assessmentDate")))
-        if v
-    ) or CLINIC_SUBTITLE
-
-    logo = _brand_data_uri("av_logo_wordmark.png")
-    logo_block = (
-        f'<img src="{logo}" alt="{CLINIC_NAME}" />'
-        if logo
-        else f'<span class="logo-text">{CLINIC_NAME}</span>'
+    # In the footer of every page, so a loose second page still says whose
+    # report it is (the letterhead names the clinic, not the patient).
+    footer_who = " &nbsp;&middot;&nbsp; ".join(
+        v for v in (_esc(patient.get("name")), _esc(report_id)) if _present(v)
     )
+    footer_who_html = (
+        f'<span class="who">{footer_who}</span>&nbsp;&nbsp;&middot;&nbsp;&nbsp;'
+        if footer_who
+        else ""
+    )
+
+    mark = _brand_data_uri("av_mark.png")
+    footer_mark = f'<img class="mark" src="{mark}" alt="" />' if mark else ""
 
     # The logo mark, already faded in the file itself, centred behind every
     # page. WeasyPrint has no background opacity, so the fading is baked
     # into the PNG (2.5 percent since 11 October; 4.5 crossed the tables).
     watermark = _brand_data_uri("av_watermark.png")
-    page_background = (
-        f'background: url("{watermark}") no-repeat center 50%; '
-        f"background-size: 95mm auto;"
+    watermark_css = (
+        f'background-image: url("{watermark}"); background-repeat: no-repeat; '
+        f"background-position: center 55%; background-size: 95mm auto;"
         if watermark
         else ""
     )
@@ -511,188 +678,306 @@ def build_report_html(report: dict) -> str:
 <head>
 <meta charset="utf-8" />
 <style>
+    {_font_faces()}
+
+    /* Side margins are zero so the letterhead runs edge to edge; the body
+       carries the 14 mm side margins instead. */
     @page {{
         size: A4;
-        margin: 27mm 14mm 22mm 14mm;
-        {page_background}
+        margin: 31mm 0 20mm 0;
+        background-color: {PAGE};
+        {watermark_css}
 
-        @top-left {{
-            content: element(runningHeader);
+        @top-center {{
+            content: element(letterhead);
             width: 100%;
-            vertical-align: bottom;
-            padding-bottom: 4mm;
+            vertical-align: top;
         }}
         @bottom-center {{
             content: element(runningFooter);
             width: 100%;
             vertical-align: top;
-            padding-top: 3mm;
         }}
     }}
 
     body {{
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
         color: {INK};
         margin: 0;
-        padding: 0;
+        padding: 0 14mm;
         line-height: 1.45;
-        font-size: 9.5pt;
+        font-size: 9.3pt;
     }}
 
-    /* Repeated on every page: logo left, document title right. */
-    .running-header {{
-        position: running(runningHeader);
+    /* Letterhead, repeated on every page. */
+    .letterhead {{
+        position: running(letterhead);
+        width: 100%;
+        background: linear-gradient(115deg, {MIDNIGHT} 0%, {MIDNIGHT_2} 55%, {DEEP_TEAL} 100%);
+        padding: 5mm 14mm 4.6mm 14mm;
+        color: #ffffff;
+    }}
+    .lh {{
         width: 100%;
         border-collapse: collapse;
-        border-bottom: 1.5px solid {BRAND};
     }}
-    .running-header td {{
-        padding: 0 0 7px 0;
-        vertical-align: bottom;
+    .lh td {{
+        vertical-align: middle;
+        padding: 0;
     }}
-    .running-header .logo img {{
-        height: 9.5mm;
+    .lh p {{
+        margin: 0;
+    }}
+    .lh-clinic {{
+        width: 46%;
+        padding-right: 5mm !important;
+    }}
+    .lh-col {{
+        padding: 0 4mm !important;
+    }}
+    .lh-sep {{
+        width: 0.3mm;
+        background: rgba(255, 255, 255, 0.22);
+    }}
+    .lh-id {{
+        border-collapse: collapse;
+    }}
+    .lh-id td {{
+        vertical-align: middle;
+    }}
+    .lh-id .tile {{
+        width: 13mm;
+        height: 13mm;
+        background: #ffffff;
+        border-radius: 3.2mm;
+        text-align: center;
+        padding: 0 !important;
+    }}
+    .lh-id .tile img {{
+        max-width: 11mm;
+        max-height: 11mm;
+        vertical-align: middle;
+    }}
+    .lh-id .tile .initials {{
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 13pt;
+        color: {GROVE};
+    }}
+    .lh-id td + td {{
+        padding-left: 3.5mm !important;
+    }}
+    .clinic-name {{
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 12.5pt;
+        line-height: 1.2;
+        color: #ffffff;
+    }}
+    .av-wordmark {{
+        height: 8.5mm;
         width: auto;
         display: block;
     }}
-    .running-header .logo .logo-text {{
-        font-size: 16pt;
-        color: {INK};
-        letter-spacing: 0.3px;
+    .av-contact {{
+        margin-top: 2mm !important;
     }}
-    .running-header .doc {{
-        text-align: right;
+    .lh-sub {{
+        font-size: 7.6pt;
+        color: {ON_DARK};
+        line-height: 1.5;
+        margin-top: 0.6mm !important;
     }}
-    .running-header .doc-title {{
-        font-size: 10.5pt;
+    .lh-strong {{
+        font-size: 7.8pt;
+        font-weight: 600;
+        color: #ffffff;
+    }}
+    .lh-label {{
+        font-size: 6.4pt;
         font-weight: 700;
-        color: {INK};
-        letter-spacing: 0.2px;
-        margin: 0;
-    }}
-    .running-header .doc-sub {{
-        font-size: 7pt;
-        color: {BRAND_DARK};
+        letter-spacing: 1.1px;
         text-transform: uppercase;
-        letter-spacing: 1.4px;
-        margin: 2px 0 0 0;
+        color: {ON_DARK};
+        margin-bottom: 1mm !important;
+    }}
+    .doc-name {{
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+        font-weight: 700;
+        font-size: 10pt;
+        color: #ffffff;
+    }}
+    .doc-degree {{
+        font-size: 7.8pt;
+        font-weight: 600;
+        color: {LIME};
+        margin-top: 0.4mm !important;
     }}
 
-    /* Repeated on every page: centred "Powered by", then the page count. */
+    /* Footer, repeated on every page: "powered by", then whose report and
+       the page count. */
     .running-footer {{
         position: running(runningFooter);
         width: 100%;
-        border-top: 1px solid {RULE};
-        padding-top: 5px;
+        padding: 0 14mm;
         text-align: center;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }}
+    .running-footer .inner {{
+        border-top: 1px solid {RULE};
+        padding-top: 2.4mm;
+    }}
+    .running-footer p {{
+        margin: 0;
     }}
     .running-footer .powered {{
-        margin: 0;
-        font-size: 8pt;
-        color: {INK};
+        font-size: 7pt;
         letter-spacing: 0.9px;
+        color: {MUTED};
     }}
     .running-footer .powered .by {{
-        font-size: 7pt;
         font-weight: 700;
-        color: {BRAND_DARK};
+        color: {MUTED};
     }}
     .running-footer .powered .company {{
-        font-size: 7pt;
         font-weight: 700;
-        color: {INK};
+        color: {MIDNIGHT};
     }}
     .running-footer .powered .dot {{
-        color: {BRAND};
+        color: {GROVE};
         margin: 0 3px;
     }}
     .running-footer .powered .product {{
-        font-size: 8.5pt;
         font-weight: 700;
-        color: {BRAND_DARK};
+        color: {GROVE};
     }}
-    .running-footer .powered .tagline {{
-        font-size: 6.5pt;
+    .running-footer .powered .mark {{
+        height: 3.6mm;
+        width: auto;
+        vertical-align: -0.9mm;
+        margin-right: 1.6mm;
+    }}
+    .running-footer .meta {{
+        margin-top: 1.2mm;
+        font-size: 6.8pt;
         color: {MUTED};
     }}
-    .running-footer .legal {{
-        margin: 3px 0 0 0;
-        font-size: 6.5pt;
-        color: {FAINT};
-    }}
-    .running-footer .legal .page::after {{
+    .running-footer .meta .page::after {{
         content: "Page " counter(page) " of " counter(pages);
     }}
 
-    /* Patient band. */
-    .meta-table {{
+    /* Patient box. */
+    .patient-box {{
         width: 100%;
+        border-collapse: separate;
+        border: 1.3px solid #d9d1bf;
+        border-radius: 4mm;
+        background: {PAPER};
+        margin: 0 0 3.4mm 0;
+    }}
+    .patient-box .pb-col {{
+        width: 50%;
+        vertical-align: top;
+        padding: 2.6mm 5mm;
+    }}
+    .patient-box .pb-divider {{
+        width: 0.3mm;
+        background: {RULE};
+        padding: 0;
+    }}
+    .pb-half {{
         border-collapse: collapse;
-        margin: 2px 0 14px 0;
-        background: {TINT};
-        border: 1px solid {RULE};
+        width: 100%;
     }}
-    .meta-table td {{
-        padding: 6px 10px;
+    .pb-half td {{
+        padding: 0.7mm 0;
         vertical-align: baseline;
-        font-size: 9pt;
     }}
-    .meta-table .label {{
-        color: {MUTED};
-        width: 10%;
-        white-space: nowrap;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-        font-size: 6.8pt;
-    }}
-    .meta-table .nowrap {{
-        white-space: nowrap;
-    }}
-    .meta-table .value {{
-        color: {INK};
+    .pb-label {{
+        width: 27mm;
+        font-size: 6.6pt;
         font-weight: 700;
-        width: 23%;
+        letter-spacing: 0.9px;
+        text-transform: uppercase;
+        color: {MUTED};
+        white-space: nowrap;
+    }}
+    .pb-value {{
+        font-size: 9pt;
+        font-weight: 600;
+        color: {INK};
+    }}
+    .pb-value .pname {{
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+        font-weight: 700;
+        font-size: 10.5pt;
+    }}
+    .nowrap {{
+        white-space: nowrap;
     }}
 
-    /* Section headings, one style throughout. */
-    h2 {{
-        font-size: 12pt;
-        color: {INK};
+    .doc-title {{
+        text-align: center;
+        margin: 0 0 3.6mm 0;
+    }}
+    .doc-title p {{
         margin: 0;
-        padding-left: 8px;
-        border-left: 3px solid {BRAND};
+    }}
+    .doc-title .t {{
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 12.5pt;
+        letter-spacing: 2.2px;
+        color: {MIDNIGHT};
+    }}
+    .doc-title .s {{
+        font-size: 7.8pt;
+        color: {MUTED};
+        margin-top: 0.8mm;
+    }}
+
+    /* Section headings, one style throughout: a Grove dot, Midnight text. */
+    h2 {{
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+        font-weight: 700;
+        font-size: 11.5pt;
+        color: {MIDNIGHT};
+        margin: 0;
         line-height: 1.15;
+    }}
+    h2::before {{
+        content: "";
+        display: inline-block;
+        width: 2.1mm;
+        height: 2.1mm;
+        border-radius: 50%;
+        background: {GROVE};
+        margin-right: 2.4mm;
+        vertical-align: 0.4mm;
     }}
 
     .plane {{
-        margin-bottom: 12px;
+        margin-bottom: 3.4mm;
         page-break-inside: avoid;
     }}
     .plane-head {{
         width: 100%;
         border-collapse: collapse;
-        border-bottom: 1px solid {RULE};
-        margin-bottom: 8px;
+        margin-bottom: 2.6mm;
     }}
     .plane-head td {{
-        padding: 0 0 5px 0;
+        padding: 0;
         vertical-align: bottom;
     }}
     .plane-head .meta-right {{
         text-align: right;
         white-space: nowrap;
     }}
-    .plane-head .accuracy {{
-        font-size: 7.5pt;
-        color: {MUTED};
-        margin-left: 6px;
-    }}
     .plane-head .caption {{
-        font-size: 7pt;
+        font-size: 6.6pt;
+        font-weight: 700;
         color: {MUTED};
         text-transform: uppercase;
-        letter-spacing: 0.9px;
+        letter-spacing: 1px;
     }}
 
     .plane-body {{
@@ -704,20 +989,21 @@ def build_report_html(report: dict) -> str:
     .photo-cell {{
         width: 1%;
         vertical-align: top;
-        padding-right: 16px;
+        padding-right: 5mm;
         text-align: center;
     }}
     .plane-photo {{
-        height: 90mm;
+        height: 80mm;
         width: auto;
-        max-width: 80mm;
-        border: 0.8px solid {RULE};
-        border-radius: 3px;
+        max-width: 72mm;
+        border-radius: 3mm;
     }}
     .photo-missing {{
-        border: 1px dashed #cbd5e1;
-        color: #94a3b8;
-        font-size: 8pt;
+        width: 45mm;
+        border: 1px dashed #c9c1ad;
+        border-radius: 3mm;
+        color: {MUTED};
+        font-size: 7.6pt;
         text-align: center;
         padding: 30px 8px;
     }}
@@ -731,83 +1017,81 @@ def build_report_html(report: dict) -> str:
     }}
     .measurements th {{
         text-align: left;
-        font-size: 6.8pt;
+        font-size: 6.5pt;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.7px;
+        letter-spacing: 0.9px;
         color: {MUTED};
-        border-bottom: 1px solid {RULE};
-        padding: 3px 6px 4px 6px;
+        padding: 0 2.5mm 1.8mm 2.5mm;
     }}
     .measurements td {{
-        padding: 5px 6px;
-        border-bottom: 1px solid #edf2f2;
+        padding: 2.2mm 2.5mm;
         font-size: 9pt;
         vertical-align: middle;
+    }}
+    .measurements tbody tr:nth-child(even) td {{
+        background: {ZEBRA};
     }}
     .measurements .param {{
         color: {INK};
         width: 52%;
     }}
     .measurements .value {{
+        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
         font-weight: 700;
+        font-size: 9.8pt;
+        color: {MIDNIGHT};
         width: 16%;
         white-space: nowrap;
         text-align: right;
-        padding-right: 14px;
+        padding-right: 4mm;
     }}
     .measurements th.num {{
         text-align: right;
-        padding-right: 14px;
+        padding-right: 4mm;
     }}
     .measurements .severity span {{
         display: inline-block;
-        padding: 1.5px 7px;
-        border-radius: 3px;
-        font-size: 7pt;
+        padding: 1.6px 8px;
+        border-radius: 8px;
+        font-size: 6.8pt;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.4px;
     }}
     .measurements .empty {{
-        color: #94a3b8;
+        color: {MUTED};
         font-style: italic;
     }}
 
-    .data-cell {{
-        padding-left: 4px;
-    }}
-    .measurements td {{
-        padding-top: 7px;
-        padding-bottom: 7px;
-    }}
     .interpretation {{
-        margin: 12px 0 0 0;
-        padding: 8px 11px;
-        background: {TINT};
-        border-radius: 3px;
+        margin: 3mm 0 0 0;
+        padding: 2.4mm 3.2mm;
+        background: {PAPER};
+        border: 1px solid {RULE};
+        border-radius: 2.5mm;
     }}
     .interpretation p {{
         margin: 0;
-        font-size: 8.8pt;
+        font-size: 8.6pt;
         color: {INK};
         line-height: 1.45;
     }}
     .interpretation .tag {{
-        font-size: 6.5pt;
+        font-size: 6.4pt;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: {BRAND_DARK};
-        margin-bottom: 2px;
+        letter-spacing: 0.9px;
+        color: {GROVE};
+        margin-bottom: 0.6mm;
     }}
     .photo-details {{
-        margin-top: 12px;
+        margin-top: 2.6mm;
         border-collapse: collapse;
-        font-size: 7.6pt;
+        font-size: 7.4pt;
     }}
     .photo-details td {{
-        padding: 1.5px 0;
+        padding: 0.4mm 0;
     }}
     .photo-details .d-label {{
         color: {MUTED};
@@ -819,15 +1103,12 @@ def build_report_html(report: dict) -> str:
     }}
 
     .bio-signature {{
-        margin-top: 12px;
+        margin-top: 3mm;
         page-break-inside: avoid;
     }}
     .bio-signature h2,
     .synthesis h2 {{
-        margin-bottom: 8px;
-    }}
-    .section-rule {{
-        border-bottom: 1px solid {RULE};
+        margin-bottom: 2.4mm;
     }}
     .bio-signature-grid {{
         width: 100%;
@@ -853,34 +1134,34 @@ def build_report_html(report: dict) -> str:
     }}
     .region-list td {{
         padding: 3px 0;
-        border-bottom: 1px solid #edf2f2;
+        border-bottom: 1px solid {RULE};
     }}
     .region-list .grade {{
         text-align: right;
     }}
     .region-list .grade span {{
-        font-size: 7pt;
+        font-size: 6.8pt;
         font-weight: 700;
-        padding: 2px 6px;
-        border-radius: 3px;
+        padding: 2px 7px;
+        border-radius: 8px;
         white-space: nowrap;
         text-transform: uppercase;
         letter-spacing: 0.3px;
     }}
     .region-list .sig-none {{
-        color: #64748b;
-        background: #f8fafc;
+        color: {MUTED};
+        background: transparent;
         font-weight: 400 !important;
         text-transform: none !important;
     }}
     .bio-signature .key {{
         font-size: 7pt;
-        color: {FAINT};
+        color: {MUTED};
         margin: 7px 0 0 0;
     }}
 
     .synthesis {{
-        margin-top: 12px;
+        margin-top: 3mm;
         page-break-inside: avoid;
     }}
     .synthesis-grid {{
@@ -894,10 +1175,10 @@ def build_report_html(report: dict) -> str:
         padding: 8px 8px 0 0;
     }}
     .synthesis-grid h3 {{
-        font-size: 7pt;
+        font-size: 6.6pt;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: {BRAND_DARK};
+        letter-spacing: 0.9px;
+        color: {GROVE};
         margin: 0 0 5px 0;
     }}
     /* Muscles run inline, separated by commas: one per line cost a line of
@@ -913,20 +1194,16 @@ def build_report_html(report: dict) -> str:
     .synthesis-grid li {{
         display: inline-block;
         white-space: nowrap;
-    }}
-    .synthesis-grid li {{
         margin-right: 5px;
     }}
     .synthesis-grid li:not(:last-child)::after {{
         content: ",";
     }}
     .synthesis-grid .empty {{
-        color: #94a3b8;
+        color: {MUTED};
         font-style: italic;
     }}
 
-    /* Sign-off, kept well apart from the synthesis above so its lines can
-       not be read as underlines of the muscle lists. */
     /* Sign-off and notes travel together. When a long report pushes them
        off page 2, both move to the next page as one closing block, instead
        of the disclaimer sitting alone on a page (seen 12 October 2026). */
@@ -949,7 +1226,7 @@ def build_report_html(report: dict) -> str:
     }}
     .sign-off .space {{
         height: 9mm;
-        border-bottom: 1px solid #aeb8bb;
+        border-bottom: 1px solid #b9b1a0;
     }}
     .sign-off .caption {{
         font-size: 7.5pt;
@@ -968,16 +1245,17 @@ def build_report_html(report: dict) -> str:
     .notes {{
         margin-top: 10px;
         border: 1px solid {RULE};
-        border-radius: 3px;
-        padding: 7px 11px;
+        background: {PAPER};
+        border-radius: 2.5mm;
+        padding: 2.4mm 3.4mm;
         page-break-inside: avoid;
     }}
     .notes .disclaimer-tag {{
-        font-size: 6.5pt;
+        font-size: 6.4pt;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: {BRAND_DARK};
+        letter-spacing: 0.9px;
+        color: {GROVE};
         margin: 0 0 3px 0;
     }}
     /* The founders' wording, unchanged. Set in the regular weight: a block
@@ -999,31 +1277,25 @@ def build_report_html(report: dict) -> str:
     .analysis-version {{
         margin: 6px 0 0 0;
         font-size: 6.5pt;
-        color: {FAINT};
+        color: {MUTED};
     }}
 </style>
 </head>
 <body>
 
-<table class="running-header">
-    <tr>
-        <td class="logo">{logo_block}</td>
-        <td class="doc">
-            <p class="doc-title">{REPORT_TITLE}</p>
-            <p class="doc-sub">{header_sub}</p>
-        </td>
-    </tr>
-</table>
+{_letterhead(report)}
 
 <div class="running-footer">
-    <p class="powered">
-        <span class="by">&copy; POWERED BY</span>
-        <span class="company">{POWERED_BY_COMPANY}</span><span class="dot">&bull;</span><span class="product">{POWERED_BY_PRODUCT}</span><span class="dot">&bull;</span><span class="tagline">{POWERED_BY_TAGLINE}</span>
-    </p>
-    <p class="legal"><span class="page"></span></p>
+    <div class="inner">
+        <p class="powered">
+            {footer_mark}<span class="by">POWERED BY</span>
+            <span class="company">{POWERED_BY_COMPANY}</span><span class="dot">&bull;</span><span class="product">{POWERED_BY_PRODUCT}</span>
+        </p>
+        <p class="meta">{footer_who_html}<span class="page"></span></p>
+    </div>
 </div>
 
-{_patient_band(patient, report_id)}
+{_patient_box(report)}
 
 {_view_section("Sagittal (Side) Plane", views.get("side") or {}, "side")}
 {_view_section("Coronal (Front) Plane", views.get("front") or {}, "front")}
