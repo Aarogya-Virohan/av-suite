@@ -115,8 +115,8 @@ function Field({
   )
 }
 
-// Why height matters, said once and short. Every millimetre on the report is
-// scaled from it, so a guessed height moves every millimetre value with it.
+// Short on purpose (Onkar, 13 October 2026). Every millimetre on the report
+// is scaled from the height, so a guessed height moves every mm value.
 function HeightHint() {
   return (
     <span className="flex items-start gap-1.5">
@@ -125,7 +125,7 @@ function HeightHint() {
         <path d="M8 7.2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         <circle cx="8" cy="4.9" r="0.9" fill="currentColor" />
       </svg>
-      <span>Measure, do not ask. Every mm value on the report is scaled from it.</span>
+      <span>Must be accurate. Every mm value depends on it.</span>
     </span>
   )
 }
