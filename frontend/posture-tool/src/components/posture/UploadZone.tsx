@@ -23,12 +23,15 @@ interface UploadZoneProps {
   setImage: (image: string) => void
   setImageFile: (file: File) => void
   setSource: (source: "camera" | "upload") => void
+  required?: boolean
+  // "Front photo is required", shown after a Continue with this slot empty.
+  error?: string | null
 }
 
 function ViewFigure({ view }: { view: CaptureView }) {
   // A plain figure so an empty slot shows which way the patient faces.
   return (
-    <svg viewBox="0 0 60 120" className="h-20 w-10 text-[#C9C5BB]" aria-hidden>
+    <svg viewBox="0 0 60 120" className="h-20 w-10 text-[#C9C0AA]" aria-hidden>
       <circle cx="30" cy="14" r="9" fill="currentColor" />
       {view === "side" ? (
         <>
@@ -56,6 +59,8 @@ export default function UploadZone({
   setImage,
   setImageFile,
   setSource,
+  required = false,
+  error = null,
 }: UploadZoneProps) {
   const [cameraOpen, setCameraOpen] = useState(false)
   const [thumb, setThumb] = useState<string | null>(null)
@@ -77,7 +82,7 @@ export default function UploadZone({
   }
 
   return (
-    <div className="flex flex-row overflow-hidden rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] sm:flex-col">
+    <div className={`flex flex-row overflow-hidden rounded-2xl border bg-[#FFFDF7] sm:flex-col ${error ? "border-[#B4231B]" : "border-[#E3DCCB]"}`}>
       <div className="relative flex w-28 flex-none items-center justify-center bg-[#F3EEE2] sm:aspect-[3/4] sm:w-auto">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -99,6 +104,11 @@ export default function UploadZone({
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
         <p className="text-[15px] font-semibold text-[#141A33]">
           {label}
+          {required && (
+            <span className="ml-0.5 text-[#B4231B]" aria-hidden="true">
+              *
+            </span>
+          )}
           {source === "upload" && (
             <span className="ml-2 text-[12px] font-normal text-[#A8670F]">not checked</span>
           )}
@@ -121,6 +131,11 @@ export default function UploadZone({
           {thumb ? "Replace with upload" : "Upload photo"}
         </label>
         <input id={inputId} type="file" accept="image/*" onChange={handleChange} className="sr-only" />
+        {error && (
+          <p role="alert" className="text-[12px] font-medium text-[#B4231B]">
+            {error}
+          </p>
+        )}
       </div>
 
       {cameraOpen && (

@@ -41,17 +41,12 @@ export default function ReportCard({
 
       <Letterhead patient={data.patient} reportId={data.reportId} branding={data.branding} />
 
-      <div className="relative px-4 py-6 sm:px-10 sm:py-8">
-
-        {/* Logo mark as a watermark, same as the PDF. Purely decorative,
-            behind everything and ignored by pointer and screen reader. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/brand/av_mark.png"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-[38%] w-[55%] max-w-[380px] -translate-x-1/2 select-none opacity-[0.03]"
-        />
+      {/* Watermark, 13 October 2026: the logo mark tiled over the whole
+          report body, so a screenshot of any part of the report still
+          carries it (one centred mark appeared only in the middle). The
+          fade is baked into the PNG. Decorative, so it is a background,
+          invisible to screen readers. */}
+      <div className="relative bg-[url('/brand/av_watermark_tile.png')] bg-[length:320px_auto] bg-repeat px-4 py-6 sm:px-10 sm:py-8">
 
         <div className="relative space-y-10">
 

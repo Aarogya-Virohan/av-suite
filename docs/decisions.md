@@ -1458,3 +1458,21 @@ Verified in Claude's container: tsc and eslint clean, next build, and
 screenshots of the intake screen (desktop and phone) and of the report
 (fallback and clinic letterhead, desktop and phone). The landmark review
 and camera screens only changed colours and were not screenshotted.
+
+### Intake wording, required fields, watermark strength (Onkar's review, 13 October)
+- Intake heading "Patient details & photographs"; the line under it no
+  longer says landmarks will be checked (not relevant on that screen).
+- Height hint replaced by an info icon and "Measure, do not ask. Every mm
+  value on the report is scaled from it."
+- Required fields (name, age, height, the three photographs) carry a red
+  asterisk; "(optional)" labels removed. Continue is no longer disabled:
+  pressed with something missing, each missing field shows "<field> is
+  required" in red under it and the page scrolls to the first one. The
+  "Still needed: ..." line is gone.
+- PDF watermark 5.5 percent (was 2.5, could not be seen on the cream page).
+- Web report watermark tiled over the whole report body at 3 percent, so a
+  screenshot of any part carries it. A first try at 6 percent was too loud
+  and was not shipped.
+Verified in Claude's container: tsc, eslint, next build, screenshots of the
+intake error state (desktop and phone) and the report; PDF renders still
+two pages; 99 posture tests.

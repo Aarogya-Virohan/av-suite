@@ -650,7 +650,9 @@ def build_report_html(report: dict) -> str:
 
     # The logo mark, already faded in the file itself, centred behind every
     # page. WeasyPrint has no background opacity, so the fading is baked
-    # into the PNG (2.5 percent since 11 October; 4.5 crossed the tables).
+    # into the PNG: 5.5 percent since 13 October 2026, darker on Onkar's
+    # word (2.5 could not be seen on the cream page). Boxes and table rows
+    # are opaque, so it shows only between them.
     watermark = _brand_data_uri("av_watermark.png")
     watermark_css = (
         f'background-image: url("{watermark}"); background-repeat: no-repeat; '

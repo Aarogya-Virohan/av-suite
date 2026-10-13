@@ -1018,7 +1018,7 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
       )}
 
       {/* Actions: sticky on phones, inline on larger screens */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3DCCB] bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3DCCB] bg-[#FFFDF7]/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <div className="mx-auto flex max-w-3xl gap-3">
           <button
             type="button"

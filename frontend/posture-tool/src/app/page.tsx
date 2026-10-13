@@ -79,27 +79,54 @@ function Header({ step }: { step: Step }) {
 const INPUT_CLASS =
   "h-11 w-full rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-3 text-[15px] text-[#141A33] outline-none transition placeholder:text-[#8B90A8] focus:border-[#4E888F]"
 
+// Required fields carry a red asterisk; their "is required" message shows
+// only after the clinician has tried to continue (13 October 2026, in place
+// of the "Still needed: ..." line beside the button).
 function Field({
   label,
+  required = false,
   hint,
   error,
   children,
 }: {
   label: string
-  hint?: string
+  required?: boolean
+  hint?: React.ReactNode
   error?: string | null
   children: React.ReactNode
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[13px] font-medium text-[#454B66]">{label}</span>
+      <span className="mb-1.5 block text-[13px] font-medium text-[#454B66]">
+        {label}
+        {required && (
+          <span className="ml-0.5 text-[#B4231B]" aria-hidden="true">
+            *
+          </span>
+        )}
+      </span>
       {children}
       {error ? (
-        <span className="mt-1 block text-[12px] text-[#B4231B]">{error}</span>
+        <span role="alert" className="mt-1 block text-[12px] font-medium text-[#B4231B]">{error}</span>
       ) : hint ? (
         <span className="mt-1 block text-[12px] text-[#5D6380]">{hint}</span>
       ) : null}
     </label>
+  )
+}
+
+// Why height matters, said once and short. Every millimetre on the report is
+// scaled from it, so a guessed height moves every millimetre value with it.
+function HeightHint() {
+  return (
+    <span className="flex items-start gap-1.5">
+      <svg viewBox="0 0 16 16" className="mt-[1px] h-3.5 w-3.5 flex-none text-[#4E888F]" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M8 7.2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="8" cy="4.9" r="0.9" fill="currentColor" />
+      </svg>
+      <span>Measure, do not ask. Every mm value on the report is scaled from it.</span>
+    </span>
   )
 }
 
@@ -196,6 +223,27 @@ age.trim() !== "" &&
 Number.isInteger(ageNumber) &&
 ageNumber >= 1 &&
 ageNumber <= 120
+
+// Set when the clinician presses Continue with something missing; until
+// then no field is marked, so an empty form does not open full of errors.
+const [showErrors, setShowErrors] =
+useState(false)
+
+const nameError = showErrors && patientName.trim() === "" ? "Name is required" : null
+const ageError =
+  age.trim() !== "" && !isAgeValid
+    ? "Enter a whole number between 1 and 120."
+    : showErrors && age.trim() === ""
+      ? "Age is required"
+      : null
+const heightError =
+  patientHeightCm.trim() !== "" && !isHeightValid
+    ? "Enter the height in centimetres, between 50 and 250."
+    : showErrors && patientHeightCm.trim() === ""
+      ? "Height is required"
+      : null
+const photoError = (image: string | null, view: string) =>
+  showErrors && !image ? `${view} photo is required` : null
 
 const shownError =
 detectError &&
@@ -294,6 +342,7 @@ const resetAll = () => {
                 setCaseRef("")
                 setPatientHeightCm("")
                 setClinicianName("")
+                setShowErrors(false)
 
                 setReport(
                   null
@@ -361,34 +410,26 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
             New assessment
           </p>
           <h1 className="mt-1 font-display text-[26px] font-extrabold leading-tight tracking-tight text-[#141A33]">
-            Patient and photographs
+            Patient details &amp; photographs
           </h1>
           <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-[#5D6380]">
-            Fill in the patient&apos;s details, then take the three photographs. You will check
-            the landmarks before any report is made.
+            Enter the patient&apos;s details, then take three photographs: front, side and back.
           </p>
         </header>
 
         <div className="mt-6 rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-5 sm:p-6">
           <h2 className="font-display text-[17px] font-bold text-[#141A33]">Patient</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Name">
+            <Field label="Name" required error={nameError}>
               <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} className={INPUT_CLASS} autoComplete="off" />
             </Field>
-            <Field
-              label="Age"
-              error={age.trim() !== "" && !isAgeValid ? "Enter a whole number between 1 and 120." : null}
-            >
+            <Field label="Age" required error={ageError}>
               <input type="number" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} className={INPUT_CLASS} />
             </Field>
-            <Field
-              label="Height (cm)"
-              hint="Used to turn the photo into millimetres. Measure it, do not ask."
-              error={patientHeightCm.trim() !== "" && !isHeightValid ? "Enter the height in centimetres, between 50 and 250." : null}
-            >
+            <Field label="Height (cm)" required hint={<HeightHint />} error={heightError}>
               <input type="number" inputMode="decimal" value={patientHeightCm} onChange={(e) => setPatientHeightCm(e.target.value)} className={INPUT_CLASS} />
             </Field>
-            <Field label="Gender (optional)">
+            <Field label="Gender">
               <select value={gender} onChange={(e) => setGender(e.target.value)} className={INPUT_CLASS}>
                 <option value="">Not given</option>
                 <option value="Male">Male</option>
@@ -396,10 +437,10 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
                 <option value="Other">Other</option>
               </select>
             </Field>
-            <Field label="Case reference (optional)">
+            <Field label="Case reference">
               <input type="text" value={caseRef} onChange={(e) => setCaseRef(e.target.value)} className={INPUT_CLASS} autoComplete="off" />
             </Field>
-            <Field label="Clinician (optional)">
+            <Field label="Clinician">
               <input type="text" value={clinicianName} onChange={(e) => setClinicianName(e.target.value)} className={INPUT_CLASS} />
             </Field>
           </div>
@@ -412,9 +453,9 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
             the same way, but the report marks it as not checked.
           </p>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <UploadZone label="Front" view="front" setImage={setFrontImage} setImageFile={setFrontFile} setSource={setFrontSource} />
-            <UploadZone label="Side" view="side" setImage={setSideImage} setImageFile={setSideFile} setSource={setSideSource} />
-            <UploadZone label="Back" view="back" setImage={setBackImage} setImageFile={setBackFile} setSource={setBackSource} />
+            <UploadZone label="Front" view="front" required error={photoError(frontImage, "Front")} setImage={setFrontImage} setImageFile={setFrontFile} setSource={setFrontSource} />
+            <UploadZone label="Side" view="side" required error={photoError(sideImage, "Side")} setImage={setSideImage} setImageFile={setSideFile} setSource={setSideSource} />
+            <UploadZone label="Back" view="back" required error={photoError(backImage, "Back")} setImage={setBackImage} setImageFile={setBackFile} setSource={setBackSource} />
           </div>
           <details className="mt-4 rounded-xl bg-[#F3EEE2] px-4 py-3 text-[13px] leading-relaxed text-[#5D6380]">
             <summary className="cursor-pointer font-medium text-[#141A33]">What makes a good photo?</summary>
@@ -427,22 +468,33 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
           </details>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3DCCB] bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E3DCCB] bg-[#FFFDF7]/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mt-6 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
           <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             {shownError && !loading && (
               <p role="alert" className="rounded-xl border border-[#F2C9C5] bg-[#FDF1F0] px-3 py-2 text-center text-[13px] text-[#8C1D18] sm:text-right">
                 {shownError}
               </p>
             )}
-            {missing.length > 0 && !loading && (
-              <p className="text-center text-[13px] text-[#5D6380] sm:text-right">
-                Still needed: {missing.join(", ")}
+            {showErrors && missing.length > 0 && !loading && (
+              <p role="alert" className="text-center text-[13px] font-medium text-[#B4231B] sm:text-right">
+                Fill in the fields marked in red to continue.
               </p>
             )}
             <button
               type="button"
-              onClick={handleAnalyze}
-              disabled={missing.length > 0 || loading}
+              onClick={() => {
+                if (missing.length > 0) {
+                  setShowErrors(true)
+                  // Bring the first missing field into view, so on a phone
+                  // the clinician sees what is wrong, not just the button.
+                  requestAnimationFrame(() => {
+                    document.querySelector('[role="alert"]')?.scrollIntoView({ behavior: "smooth", block: "center" })
+                  })
+                  return
+                }
+                void handleAnalyze()
+              }}
+              disabled={loading}
               className="h-12 rounded-xl bg-[#4E888F] px-6 text-[15px] font-semibold text-white transition hover:bg-[#3B6A70] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading ? "Finding landmarks..." : "Continue to landmark check"}
