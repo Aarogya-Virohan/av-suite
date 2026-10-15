@@ -157,6 +157,9 @@ class InvoiceBase(BaseModel):
 class InvoiceCreate(InvoiceBase):
     """Payload to create an invoice with line items."""
 
+    # Accepted only for request compatibility. BillingService always generates
+    # the persisted invoice number itself.
+    invoice_number: str | None = None
     items: list[InvoiceItemCreate] = Field(default_factory=list)
     line_items: list[dict[str, Any]] = Field(default_factory=list)
 

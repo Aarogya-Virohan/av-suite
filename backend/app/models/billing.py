@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -163,12 +164,15 @@ class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     """Clinic-scoped billing invoice."""
 
     __tablename__: str = "invoices"
-    __table_args__: tuple[Index, ...] = (
+    __table_args__ = (
         Index("ix_invoices_clinic_id", "clinic_id"),
         Index("ix_invoices_patient_id", "patient_id"),
         Index("ix_invoices_appointment_id", "appointment_id"),
         Index("ix_invoices_invoice_number", "invoice_number"),
         Index("ix_invoices_status", "status"),
+        UniqueConstraint(
+            "clinic_id", "invoice_number", name="uq_invoices_clinic_invoice_number"
+        ),
     )
 
     clinic_id: Mapped[UUID] = mapped_column(

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
+
+from sqlalchemy.exc import IntegrityError
 
 from app.enums.billing import InvoiceStatus
 from app.enums.package import PackageStatus
@@ -276,7 +278,9 @@ class BillingService:
         if total_amount < Decimal("0.00"):
             raise BillingValidationError("Total invoice amount cannot be negative.")
 
-        invoice_data = payload.model_dump(exclude={"items", "line_items"})
+        invoice_data = payload.model_dump(
+            exclude={"items", "line_items", "invoice_number"}
+        )
         invoice_data.update(
             {
                 "clinic_id": clinic_id,
@@ -288,7 +292,27 @@ class BillingService:
             }
         )
 
-        invoice = await self.invoice_repository.create(invoice_data)
+        # The invoice ID is server-generated and supplies a concurrency-safe
+        # number. The clinic-scoped unique constraint remains the final guard.
+        for attempt in range(3):
+            invoice_id = uuid4()
+            invoice_data.update(
+                {
+                    "id": invoice_id,
+                    "invoice_number": f"INV-{invoice_id.hex.upper()}",
+                }
+            )
+            try:
+                invoice = await self.invoice_repository.create(invoice_data)
+                break
+            except IntegrityError as exc:
+                if not self._is_invoice_number_conflict(exc):
+                    raise
+                await self.invoice_repository.session.rollback()
+                if attempt == 2:
+                    raise BillingValidationError(
+                        "Could not allocate a unique invoice number. Please retry."
+                    ) from exc
 
         for item_dict in items_data:
             item_dict["invoice_id"] = invoice.id
@@ -360,10 +384,30 @@ class BillingService:
 
     # --- Payment Methods ---
 
+    @staticmethod
+    def _is_invoice_number_conflict(exc: IntegrityError) -> bool:
+        """Recognize only the clinic-scoped invoice-number unique violation."""
+        original = exc.orig
+        constraint_name = getattr(
+            getattr(original, "diag", None), "constraint_name", None
+        )
+        if constraint_name == "uq_invoices_clinic_invoice_number":
+            return True
+        return (
+            "unique constraint failed: invoices.clinic_id, invoices.invoice_number"
+            in str(original).lower()
+        )
+
     async def record_payment(self, clinic_id: UUID, payload: PaymentCreate) -> Payment:
         """Record a payment against an invoice and update invoice status."""
 
-        invoice = await self.get_invoice(clinic_id, payload.invoice_id)
+        invoice = await self.invoice_repository.get_by_id_with_items(
+            payload.invoice_id, clinic_id=clinic_id, for_update=True
+        )
+        if invoice is None:
+            raise BillingNotFoundError(
+                f"Invoice '{payload.invoice_id}' not found for clinic '{clinic_id}'."
+            )
         patient = await self.patient_repository.get_by_patient_id(payload.patient_id, clinic_id=clinic_id)
 
         if patient is None:
@@ -374,6 +418,12 @@ class BillingService:
         if invoice.patient_id != payload.patient_id:
             raise BillingValidationError(
                 f"Invoice '{payload.invoice_id}' belongs to patient '{invoice.patient_id}', not '{payload.patient_id}'."
+            )
+
+        remaining_balance = invoice.total_amount - invoice.paid_amount
+        if payload.amount > remaining_balance:
+            raise BillingValidationError(
+                f"Payment amount ({payload.amount}) exceeds the remaining invoice balance ({remaining_balance})."
             )
 
         payment_data = payload.model_dump()

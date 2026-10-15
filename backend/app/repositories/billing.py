@@ -87,7 +87,13 @@ class InvoiceRepository(BaseRepository[Invoice]):
 
         super().__init__(session, Invoice)
 
-    async def get_by_id_with_items(self, invoice_id: UUID, *, clinic_id: UUID | None = None) -> Invoice | None:
+    async def get_by_id_with_items(
+        self,
+        invoice_id: UUID,
+        *,
+        clinic_id: UUID | None = None,
+        for_update: bool = False,
+    ) -> Invoice | None:
         """Retrieve an invoice with loaded items and payments ensuring clinic isolation."""
 
         statement = (
@@ -96,6 +102,8 @@ class InvoiceRepository(BaseRepository[Invoice]):
             .where(Invoice.id == invoice_id)
         )
         statement = self._apply_clinic_scope(statement, clinic_id)
+        if for_update:
+            statement = statement.with_for_update()
         result = await self.session.scalars(statement)
         return result.first()
 
