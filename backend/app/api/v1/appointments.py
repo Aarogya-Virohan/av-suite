@@ -184,7 +184,7 @@ async def soft_cancel_appointment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only cancel your own appointments.",
             )
-        appointment = await service.soft_cancel(clinic.id, id)
+        appointment = await service.soft_cancel(clinic.id, id, deleted_by=user.id)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

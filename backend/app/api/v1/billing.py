@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import (
     get_async_session,
     get_current_clinic,
+    get_current_user,
     require_capability,
 )
 from app.enums.permission import CapabilityScope
@@ -71,6 +72,7 @@ async def get_billing_service(
 
 BillingServiceDep = Annotated[BillingService, Depends(get_billing_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
 # --- Package Catalog Endpoints ---
 
 
@@ -417,13 +419,14 @@ async def update_invoice(
 async def delete_invoice(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: BillingServiceDep,
     scope: CapabilityScope = Depends(require_capability("invoices.delete")),
 ) -> None:
     """Delete or soft-cancel an invoice."""
 
     try:
-        await service.delete_invoice(clinic.id, id)
+        await service.delete_invoice(clinic.id, id, deleted_by=user.id)
     except BillingNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)

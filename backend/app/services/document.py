@@ -101,9 +101,11 @@ class DocumentService:
         await self.document_repository.session.commit()
         return updated
 
-    async def delete_document(self, clinic_id: UUID, document_id: UUID) -> None:
+    async def delete_document(
+        self, clinic_id: UUID, document_id: UUID, deleted_by: UUID | None = None
+    ) -> None:
         """Delete a document metadata record for the clinic."""
 
         document = await self.get_document(clinic_id, document_id)
-        await self.document_repository.delete(document)
+        await self.document_repository.delete(document, deleted_by=deleted_by)
         await self.document_repository.session.commit()

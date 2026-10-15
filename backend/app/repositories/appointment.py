@@ -69,7 +69,12 @@ class AppointmentRepository(BaseRepository[Appointment]):
         result = await self.session.scalars(statement)
         return list(result.all())
 
-    async def soft_cancel(self, db_obj: Appointment) -> Appointment:
-        """Soft-cancel an appointment by setting status to CANCELLED."""
+    async def soft_cancel(
+        self, db_obj: Appointment, deleted_by: UUID | None = None
+    ) -> Appointment:
+        """Cancel and soft-delete an appointment, recording its deleting user."""
 
-        return await self.update(db_obj, {"status": AppointmentStatus.CANCELLED})
+        db_obj.status = AppointmentStatus.CANCELLED
+        await self.delete(db_obj, deleted_by=deleted_by)
+        await self.session.refresh(db_obj)
+        return db_obj
