@@ -94,7 +94,7 @@ class BookingService:
     ) -> AppointmentRequest:
         """Create a new public appointment request using clinic slug."""
 
-        clinic = await self.clinic_repository.get_by_slug(clinic_slug)
+        clinic = await self.clinic_repository.get_by_slug_or_id(clinic_slug)
         if clinic is None:
             raise BookingNotFoundError(f"Clinic with slug '{clinic_slug}' not found.")
 

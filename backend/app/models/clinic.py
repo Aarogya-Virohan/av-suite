@@ -1,6 +1,8 @@
 import uuid
+import re
+import unicodedata
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Enum, Boolean, Text
+from sqlalchemy import String, Enum, Boolean, Text, event
 from app.enums.clinic import ClinicPlanTier, ClinicType
 from app.models.base import Base, TimestampMixin
 
@@ -10,6 +12,7 @@ class Clinic(Base, TimestampMixin):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
     type: Mapped[ClinicType] = mapped_column(
         Enum(
             ClinicType,
@@ -53,3 +56,16 @@ class Clinic(Base, TimestampMixin):
     workspace_products = relationship(
         "WorkspaceProduct", back_populates="clinic", cascade="all, delete-orphan"
     )
+
+
+@event.listens_for(Clinic, "init")
+def _set_default_clinic_slug(target, args, kwargs) -> None:
+    """Give newly constructed clinics a stable, unique public slug by default."""
+    if kwargs.get("slug"):
+        return
+    clinic_id = kwargs.get("id") or uuid.uuid4()
+    kwargs.setdefault("id", clinic_id)
+    name = kwargs.get("name", "clinic")
+    normalized = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode()
+    base = re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-") or "clinic"
+    kwargs["slug"] = f"{base[:107].rstrip('-')}-{str(clinic_id).replace('-', '')[:12]}"
