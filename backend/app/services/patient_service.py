@@ -18,7 +18,7 @@ Features:
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
-from app.models.patient import Patient
+from app.models.patient import Patient, PatientStatus
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.common import PaginationParams
 from typing import Optional, List, Tuple
@@ -55,7 +55,8 @@ async def get_patients(
     clinic_id: str,
     pagination: PaginationParams,
     scope: CapabilityScope = None,
-    user_id: str = None
+    user_id: str = None,
+    status: Optional[PatientStatus] = None,
 ) -> Tuple[List[Patient], int]:
     """
     Function ka purpose: Clinic ke sare patients ko list karna pagination ke saath
@@ -112,6 +113,8 @@ async def get_patients(
         # Clinic ID se filter karte hain (security)
         # UUID format mein convert karte hain string se
         query = select(Patient).where(Patient.clinic_id == uuid.UUID(clinic_id))
+        if status is not None:
+            query = query.where(Patient.status == status)
         if scope:
             query = apply_patient_scope(query, scope, user_id)
 
@@ -373,7 +376,8 @@ async def search_patients(
     search: str,
     pagination: PaginationParams,
     scope: CapabilityScope = None,
-    user_id: str = None
+    user_id: str = None,
+    status: Optional[PatientStatus] = None,
 ) -> Tuple[List[Patient], int]:
     from app.repositories.patient import PatientRepository
     try:
@@ -390,6 +394,9 @@ async def search_patients(
             query = select(Patient).where(Patient.email.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
         else:
             query = select(Patient).where(Patient.full_name.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
+
+        if status is not None:
+            query = query.where(Patient.status == status)
             
         if scope:
             query = apply_patient_scope(query, scope, user_id)

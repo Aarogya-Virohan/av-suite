@@ -1,9 +1,15 @@
 import logging
 from typing import BinaryIO
+import httpx
 from supabase import create_client, Client
+from storage3.utils import StorageException
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+class StorageUnavailableError(Exception):
+    """Raised when the storage provider or its network request is unavailable."""
 
 class SupabaseStorageClient:
     """Wrapper for Supabase Storage API using the service role key for private bucket access."""
@@ -30,9 +36,9 @@ class SupabaseStorageClient:
             )
             logger.info(f"Successfully uploaded file to {self.bucket_name}/{path}")
             return path
-        except Exception as e:
-            logger.error(f"Failed to upload file to Supabase: {e}")
-            raise e
+        except (StorageException, httpx.HTTPError, OSError) as exc:
+            logger.warning("Supabase storage upload failed")
+            raise StorageUnavailableError from exc
 
     def download_file(self, path: str) -> bytes:
         """
@@ -42,9 +48,9 @@ class SupabaseStorageClient:
         try:
             res = self.client.storage.from_(self.bucket_name).download(path)
             return res
-        except Exception as e:
-            logger.error(f"Failed to download file from Supabase: {e}")
-            raise e
+        except (StorageException, httpx.HTTPError, OSError) as exc:
+            logger.warning("Supabase storage download failed")
+            raise StorageUnavailableError from exc
 
     def create_signed_download_url(self, path: str, expires_in: int = 60) -> str:
         """
@@ -61,9 +67,9 @@ class SupabaseStorageClient:
             elif isinstance(res, str):
                 return res
             raise Exception("No signedURL found in Supabase response.")
-        except Exception as e:
-            logger.error(f"Failed to generate signed URL for {path}: {e}")
-            raise e
+        except (StorageException, httpx.HTTPError, OSError) as exc:
+            logger.warning("Supabase storage signed URL request failed")
+            raise StorageUnavailableError from exc
 
 # Create a global instance
 storage_client = SupabaseStorageClient()

@@ -85,3 +85,34 @@ async def test_patients_crud_frontdesk(client: AsyncClient, frontdesk_auth_heade
     # Front desk cannot delete
     delete_res = await client.delete(f"{settings.API_V1_PREFIX}/patients/{patient_id}", headers=frontdesk_auth_headers)
     assert delete_res.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_patient_list_status_filter_applies_to_search_and_rejects_invalid(
+    client: AsyncClient, auth_headers: dict
+):
+    created_ids = {}
+    for first_name, status_value in (("StatusActive", "active"), ("StatusInactive", "inactive")):
+        response = await client.post(
+            f"{settings.API_V1_PREFIX}/patients",
+            json={"first_name": first_name, "last_name": "Filter", "status": status_value},
+            headers=auth_headers,
+        )
+        assert response.status_code in (200, 201)
+        created_ids[first_name] = response.json()["data"]["id"]
+
+    for params in ({"status": "inactive"}, {"status": "inactive", "search": "Status"}):
+        response = await client.get(
+            f"{settings.API_V1_PREFIX}/patients", params=params, headers=auth_headers
+        )
+        assert response.status_code == 200
+        result_ids = {patient["id"] for patient in response.json()["data"]}
+        assert created_ids["StatusInactive"] in result_ids
+        assert created_ids["StatusActive"] not in result_ids
+
+    invalid = await client.get(
+        f"{settings.API_V1_PREFIX}/patients",
+        params={"status": "archived"},
+        headers=auth_headers,
+    )
+    assert invalid.status_code == 422
