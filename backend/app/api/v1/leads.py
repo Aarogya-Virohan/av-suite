@@ -174,13 +174,14 @@ async def convert_lead(
 async def delete_lead(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: LeadServiceDep,
     scope: CapabilityScope = Depends(require_capability("leads.delete")),
 ) -> None:
     """Delete a lead record for the clinic."""
 
     try:
-        await service.delete_lead(clinic.id, id)
+        await service.delete_lead(clinic.id, id, deleted_by=user.id)
     except LeadNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)

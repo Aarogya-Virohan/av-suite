@@ -351,11 +351,13 @@ class BillingService:
         await self.invoice_repository.session.commit()
         return updated
 
-    async def delete_invoice(self, clinic_id: UUID, invoice_id: UUID) -> None:
+    async def delete_invoice(
+        self, clinic_id: UUID, invoice_id: UUID, deleted_by: UUID | None = None
+    ) -> None:
         """Delete or cancel an invoice for the clinic."""
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
-        await self.invoice_repository.delete(invoice)
+        await self.invoice_repository.delete(invoice, deleted_by=deleted_by)
         await self.invoice_repository.session.commit()
 
     # --- Payment Methods ---

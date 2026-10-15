@@ -132,9 +132,11 @@ class LeadService:
 
         return updated_lead, patient
 
-    async def delete_lead(self, clinic_id: UUID, lead_id: UUID) -> None:
+    async def delete_lead(
+        self, clinic_id: UUID, lead_id: UUID, deleted_by: UUID | None = None
+    ) -> None:
         """Delete a lead record for the clinic."""
 
         lead = await self.get_lead(clinic_id, lead_id)
-        await self.lead_repository.delete(lead)
+        await self.lead_repository.delete(lead, deleted_by=deleted_by)
         await self.lead_repository.session.commit()

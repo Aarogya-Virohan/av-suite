@@ -134,10 +134,14 @@ class AppointmentService:
         await self.appointment_repository.session.commit()
         return updated
 
-    async def soft_cancel(self, clinic_id: UUID, appointment_id: UUID) -> Appointment:
+    async def soft_cancel(
+        self, clinic_id: UUID, appointment_id: UUID, deleted_by: UUID | None = None
+    ) -> Appointment:
         """Soft-cancel an appointment for a clinic."""
 
         appointment = await self.get_appointment(clinic_id, appointment_id)
-        canceled = await self.appointment_repository.soft_cancel(appointment)
+        canceled = await self.appointment_repository.soft_cancel(
+            appointment, deleted_by=deleted_by
+        )
         await self.appointment_repository.session.commit()
         return canceled

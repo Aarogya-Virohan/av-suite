@@ -289,13 +289,14 @@ async def update_document(
 async def delete_document(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: DocumentServiceDep,
     scope: CapabilityScope = Depends(require_capability("documents.delete")),
 ) -> None:
     """Delete a patient document record."""
 
     try:
-        await service.delete_document(clinic.id, id)
+        await service.delete_document(clinic.id, id, deleted_by=user.id)
     except DocumentNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
