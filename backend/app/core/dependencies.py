@@ -43,7 +43,7 @@ from app.enums.permission import CapabilityScope
 from app.enums.product import EntitlementStatus
 from app.exceptions import ProductNotEntitledError
 from app.models.clinic import Clinic
-from app.enums.user import UserRole, normalize_user_role
+from app.enums.user import UserRole
 from app.models.membership import Membership
 from app.models.product import WorkspaceProduct
 from app.models.user import User
@@ -71,14 +71,12 @@ class AuthenticatedContext:
 
     user: User
     clinic: Clinic
-    membership: Membership | None = None
+    membership: Membership
 
     @property
     def membership_role(self) -> UserRole:
-        """Return the role for the active workspace membership, falling back to the legacy user role."""
-        if self.membership is not None:
-            return self.membership.role
-        return self.user.role
+        """Return the role assigned in the active workspace membership."""
+        return self.membership.role
 
 
 @dataclass(slots=True)
@@ -87,17 +85,14 @@ class PermissionContext:
 
     user: User
     clinic: Clinic
-    membership: Membership | None = None
+    membership: Membership
     overrides: dict[str, CapabilityScope] | None = None
     enabled_product_ids: set[str] | None = None
 
     def effective_scope(self, capability_key: str) -> CapabilityScope:
         """Resolve the effective scope for a capability using cached overrides."""
-        effective_role = (
-            self.membership.role if self.membership is not None else self.user.role
-        )
         return resolve_capability_scope(
-            role=effective_role,
+            role=self.membership.role,
             capability_key=capability_key,
             user_permissions=self.overrides or {},
         )
@@ -107,10 +102,12 @@ class PermissionContext:
         return product_id in (self.enabled_product_ids or set())
 
 
-def _require_user_roles(current_user: User, roles: tuple[UserRole, ...]) -> User:
+def _require_user_roles(
+    current_user: User, effective_role: UserRole, roles: tuple[UserRole, ...]
+) -> User:
     """Ensure the authenticated user has one of the allowed roles."""
 
-    if current_user.role not in roles:
+    if effective_role not in roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to perform this action.",
@@ -128,7 +125,6 @@ async def get_authenticated_context(
         claims = decode_token(token)
         user_id = UUID(claims["sub"])
         clinic_id = UUID(claims["clinic_id"])
-        role = normalize_user_role(claims["role"])
     except (ValueError, KeyError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -166,19 +162,10 @@ async def get_authenticated_context(
         )
     )
 
-    legacy_match = user.clinic_id == clinic.id
-    if membership is None and not legacy_match:
+    if membership is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="User is not a member of this clinic/workspace",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    effective_role = membership.role if membership is not None else user.role
-    if normalize_user_role(effective_role) != role:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Role mismatch: {effective_role} != {role}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -267,11 +254,7 @@ def require_roles(*roles: UserRole) -> RoleDependency:
     async def dependency(auth_context: AuthenticatedContextDep) -> User:
         """Validate the active workspace membership role for the authenticated user."""
 
-        effective_role = (
-            auth_context.membership_role
-            if auth_context.membership is not None
-            else auth_context.user.role
-        )
+        effective_role = auth_context.membership_role
         if effective_role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -283,24 +266,30 @@ def require_roles(*roles: UserRole) -> RoleDependency:
 
 
 async def require_admin(
-    current_user: Annotated[User, Depends(get_current_user)],
+    auth_context: AuthenticatedContextDep,
 ) -> User:
     """Require the authenticated user to have the admin role."""
 
-    return _require_user_roles(current_user, (UserRole.ADMIN,))
+    return _require_user_roles(
+        auth_context.user, auth_context.membership_role, (UserRole.ADMIN,)
+    )
 
 
 async def require_therapist(
-    current_user: Annotated[User, Depends(get_current_user)],
+    auth_context: AuthenticatedContextDep,
 ) -> User:
     """Require the authenticated user to have the therapist role."""
 
-    return _require_user_roles(current_user, (UserRole.THERAPIST,))
+    return _require_user_roles(
+        auth_context.user, auth_context.membership_role, (UserRole.THERAPIST,)
+    )
 
 
 async def require_front_desk(
-    current_user: Annotated[User, Depends(get_current_user)],
+    auth_context: AuthenticatedContextDep,
 ) -> User:
     """Require the authenticated user to have the front desk role."""
 
-    return _require_user_roles(current_user, (UserRole.FRONT_DESK,))
+    return _require_user_roles(
+        auth_context.user, auth_context.membership_role, (UserRole.FRONT_DESK,)
+    )

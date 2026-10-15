@@ -6,7 +6,7 @@ from sqlalchemy import Enum, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.enums.user import UserRole, normalize_user_role
+from app.enums.user import UserRole
 from app.models.base import Base, TimestampMixin, UUIDMixin
 from app.models.clinic import Clinic
 from app.models.user import User
@@ -48,14 +48,3 @@ class Membership(UUIDMixin, TimestampMixin, Base):
         ),
         nullable=False,
     )
-
-    @classmethod
-    def from_legacy_user(cls, user: User) -> Membership | None:
-        """Create a membership record from the legacy single-clinic user row when available."""
-        if user.clinic_id is None:
-            return None
-        return cls(
-            user_id=user.id,
-            clinic_id=user.clinic_id,
-            role=normalize_user_role(user.role),
-        )

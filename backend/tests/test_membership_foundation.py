@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -151,7 +152,7 @@ async def test_same_user_can_have_different_roles_in_different_clinics(db_sessio
 
 
 @pytest.mark.asyncio
-async def test_legacy_user_data_migrates_to_membership(db_session):
+async def test_membership_role_is_authoritative_over_legacy_user_fields(db_session):
     clinic = Clinic(name="Legacy Clinic", type=ClinicType.CLINIC)
     db_session.add(clinic)
     await db_session.flush()
@@ -161,7 +162,7 @@ async def test_legacy_user_data_migrates_to_membership(db_session):
         clinic_id=clinic.id,
         email="legacy@avtest.com",
         password_hash="hash",
-        role=UserRole.THERAPIST,
+        role=UserRole.ADMIN,
         first_name="Legacy",
         last_name="User",
         is_active=True,
@@ -169,25 +170,16 @@ async def test_legacy_user_data_migrates_to_membership(db_session):
     db_session.add(user)
     await db_session.flush()
 
-    membership = Membership.from_legacy_user(user)
-    assert membership.user_id == user.id
-    assert membership.clinic_id == clinic.id
-    assert membership.role == UserRole.THERAPIST
+    membership = Membership(user_id=user.id, clinic_id=clinic.id, role=UserRole.THERAPIST)
+    db_session.add(membership)
+    await db_session.commit()
 
-
-@pytest.mark.asyncio
-async def test_users_without_clinic_do_not_get_membership(db_session):
-    user = User(
-        id=uuid.uuid4(),
-        clinic_id=None,
-        email="noclinic@avtest.com",
-        password_hash="hash",
-        role=UserRole.ADMIN,
-        first_name="No",
-        last_name="Clinic",
-        is_active=True,
+    token = create_access_token(
+        subject=user.id, clinic_id=clinic.id, role=UserRole.ADMIN.value
     )
-    assert Membership.from_legacy_user(user) is None
+    ctx = await get_authenticated_context(token, db_session)
+
+    assert ctx.membership_role == UserRole.THERAPIST
 
 
 @pytest.mark.asyncio
@@ -219,6 +211,31 @@ async def test_authenticated_context_resolves_working_membership(db_session):
     assert ctx.clinic.id == clinic.id
     assert ctx.membership.id == membership.id
     assert ctx.membership_role == UserRole.ADMIN
+
+
+@pytest.mark.asyncio
+async def test_authenticated_context_rejects_legacy_user_without_membership(db_session):
+    clinic = Clinic(name="Legacy-only Clinic", type=ClinicType.CLINIC)
+    user = User(
+        id=uuid.uuid4(),
+        clinic_id=None,
+        email="legacy-only@avtest.com",
+        password_hash="hash",
+        role=UserRole.ADMIN,
+        first_name="Legacy",
+        last_name="Only",
+        is_active=True,
+    )
+    db_session.add_all([clinic, user])
+    await db_session.commit()
+
+    token = create_access_token(
+        subject=user.id, clinic_id=clinic.id, role=UserRole.ADMIN.value
+    )
+    with pytest.raises(HTTPException) as error:
+        await get_authenticated_context(token, db_session)
+
+    assert error.value.status_code == 403
 
 
 @pytest.mark.asyncio

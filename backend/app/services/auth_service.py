@@ -143,8 +143,8 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
         # Subject: User ID, Clinic ID, aur Role token mein include hote hain
         access_token = create_access_token(
             subject=new_user.id,
-            clinic_id=new_clinic.id,
-            role=new_user.role.value,  # Enum value se string le lete hain
+            clinic_id=str(new_clinic.id),
+            role=UserRole.ADMIN.value,
         )
 
         logger.info(f"Access token generated for new user: {new_user.id}")
@@ -224,20 +224,41 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
                 detail="Incorrect email or password",  # Generic message - no specificity
             )
 
-        # Generate JWT token after successful authentication using the active membership
-        # role when present. We keep the legacy user.role as a fallback for older data.
-        active_membership = await db.scalar(
-            select(Membership).where(
-                Membership.user_id == user.id,
-                Membership.clinic_id == user.clinic_id,
+        memberships = (
+            await db.scalars(
+                select(Membership)
+                .where(Membership.user_id == user.id)
+                .order_by(Membership.created_at, Membership.clinic_id)
             )
-        )
-        role = active_membership.role if active_membership is not None else user.role
+        ).all()
+        if not memberships:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="This account has no workspace memberships",
+            )
+
+        active_membership = None
+        if request.clinic_id is not None:
+            active_membership = next(
+                (m for m in memberships if m.clinic_id == request.clinic_id), None
+            )
+            if active_membership is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of the requested workspace",
+                )
+        elif len(memberships) == 1:
+            active_membership = memberships[0]
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Select a workspace by providing clinic_id",
+            )
 
         access_token = create_access_token(
             subject=user.id,
-            clinic_id=user.clinic_id,
-            role=role.value,  # Enum value se string
+            clinic_id=str(active_membership.clinic_id),
+            role=active_membership.role.value,
         )
 
         logger.info(f"Successful login for user: {user.id}")

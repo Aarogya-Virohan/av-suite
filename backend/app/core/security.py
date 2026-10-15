@@ -164,8 +164,8 @@ def create_access_token(
     Usage:
     token = create_access_token(
         subject=user.id,
-        clinic_id=user.clinic_id,
-        role=user.role
+        clinic_id=membership.clinic_id,
+        role=membership.role.value,
     )
     return {"access_token": token, "token_type": "bearer"}
     """
