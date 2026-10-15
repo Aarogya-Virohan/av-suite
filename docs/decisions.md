@@ -1462,8 +1462,10 @@ and camera screens only changed colours and were not screenshotted.
 ### Intake wording, required fields, watermark strength (Onkar's review, 13 October)
 - Intake heading "Patient details & photographs"; the line under it no
   longer says landmarks will be checked (not relevant on that screen).
-- Height hint replaced by an info icon and "Measure, do not ask. Every mm
-  value on the report is scaled from it."
+- Height hint replaced by an info icon and a short line. First "Measure,
+  do not ask. Every mm value on the report is scaled from it."; Onkar found
+  it too long, now "Must be accurate. Every mm value depends on it."
+  (commit eade86f).
 - Required fields (name, age, height, the three photographs) carry a red
   asterisk; "(optional)" labels removed. Continue is no longer disabled:
   pressed with something missing, each missing field shows "<field> is

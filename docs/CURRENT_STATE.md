@@ -1,7 +1,7 @@
 # Posture Tool, current state
 
-Written 2 October 2026, updated 3, 10, 11 and 12 October, by reading and
-running, not from memory.
+Written 2 October 2026, updated 3, 10, 11, 12, 13 and 15 October, by
+reading and running, not from memory.
 
 This file replaces posture_tool_FULL_STORY_17Sep2026.md and
 posture_tool_handoff_01Oct2026.md as the thing to read first. Both are
@@ -42,14 +42,14 @@ one commit behind the moment it is written. That is how the previous
 version of this section came to name a HEAD three commits stale. Run
 `git log --oneline -5` instead.
 
-dev is pushed and origin is in step as of 11 October (checked with
-git status against origin/dev after the last push that day).
+dev is pushed and origin is in step as of 13 October (eade86f was the last
+push; checked with git log against origin/dev on 15 October).
 
 work/capture-flow-03Oct is the branch the 3 October work was done on and
 is merged into dev by fast-forward. fix/posture-gsi-and-labels still
 exists at 097595b and is behind dev. Neither needs anything doing.
 
-Full suite: 123 passed on 11 October after commit 4315196, run on the
+Full suite: 146 passed on 13 October after commit 45f2fa8, run on the
 Mac in the real clone (posture tests plus tests/test_clinic_isolation.py). In the Mac's
 Linux VM that one CRM test errors on SQLite; the Mac run is the one to
 trust.
@@ -62,7 +62,7 @@ sit here stopped at 2 October and is removed.
 ## 2. The three documents that matter
 
 - docs/decisions.md, decisions actually taken, with the reason.
-  Dated sections from 18 September to 11 October. The "Not decided,
+  Dated sections from 18 September to 13 October. The "Not decided,
   still blocked" list sits between 10 and 11 October and every item on
   it is now settled; each says where.
 - docs/open_questions_research.md, new on 2 October. Four entries:
@@ -96,7 +96,12 @@ Every graded parameter on the report now has founder-approved bands.
   tripod required (no auto-capture), no stickers for now, saved files no
   longer keep photographs. Details in decisions.md.
 
-Nothing is owed by the founders now. Open from that reply:
+- 13 October, Q4 b (one decimal) and Q5 b (no minus sign beside a
+  direction word), relayed by Onkar as a screenshot. Built, section 4f.
+  The other questions of the 12 October batch were not answered as of
+  15 October (section 5).
+
+Open from the third reply:
 - Lawyer's view on consent and how long to keep data (their answer 6a).
 - Whether the patient name should also leave saved files (6a named photos only).
 - Old files in backend/data/reports from before 11 October still contain
@@ -275,6 +280,27 @@ page, embedded fonts, footer with patient and report ID on every page.
 heightCm now saved in the patient record. The web report and the app
 screens follow the same brand since the same night (see decisions.md).
 
+Second pass the same night (Onkar's review): photographs row, title
+subline, landmark visibility, "Viewed from" captions and the footer
+tagline removed from the PDF; footer is the AV mark plus "POWERED BY
+AAROGYA VIROHAN . AV SUITE". Email fixed to aarogyavirohan@gmail.com.
+
+## 4h. Done on 13 October, web app and intake (commits abea49a, 45f2fa8, eade86f)
+
+- App bar: Midnight band, white logo, lime "Posture Tool" chip, three
+  steps. Cream pages, logo teal main buttons, Midnight selected states,
+  Grove landmark points. Fonts via next/font/local (src/app/fonts).
+- Web report mirrors the PDF: letterhead (lib/branding.ts mirrors
+  AV_FALLBACK), patient box, title, Grove dot headings, zebra rows, footer
+  mark. Watermark tiled over the report body at 3 percent; PDF watermark
+  5.5 percent.
+- Intake: heading "Patient details & photographs"; red asterisk on name,
+  age, height and the three photos; "<field> is required" under each
+  missing one after Continue, page scrolls to it; "Still needed" line
+  gone; height hint "Must be accurate. Every mm value depends on it."
+- Tested by Onkar in the laptop browser on 13 October (reports for himself
+  and Ayush Gupta, both two pages, layout correct).
+
 ## 5. Not started
 
 - Back-view millimetre calibration without the nose. Measured 11 October:
@@ -290,16 +316,36 @@ screens follow the same brand since the same night (see decisions.md).
   camera only), Q9 report colours, Q10 lawyer on consent and retention, Q11
   inter-rater test (needs two physios), Q12 where the tool runs, Q13 clinic
   logo after the marketplace. Answered 13 October: Q4 b and Q5 b, built
-  (section 4f). The rest had no answer at the time of writing. Earlier
+  (section 4f). Q6 settled by Onkar on 13 October (tagline removed). Q9:
+  Onkar chose brand direction B and it is built; founders' sign-off still
+  owed. The rest had no answer as of 15 October. Earlier
   drafts of this file called the muscle columns Q3 and the patient name Q4;
   that numbering is retired.
-- Report colour scheme (founders said it is still to be discussed) and
-  clinic co-branding (after the marketplace).
+- Clinic letterhead data: report["branding"] is built and tested but
+  nothing sends it. It should come from the marketplace (AV Suite core)
+  once clinics join. Ask clinics for a square logo (PNG/SVG, transparent,
+  512 px or more, up to 2 MB), a wide one optional, clinic name as text.
+- AV fallback values are Onkar's placeholders: "AV Clinic", +91 88680
+  00760, aarogyavirohan@gmail.com (pdf_service.AV_FALLBACK and
+  frontend lib/branding.ts, change both together).
+- Proposed 13 October, not answered by Onkar: treat "NA", "N/A", "Nil",
+  "None", "-" in optional fields as empty on the report (both of the
+  13 October phone reports printed "Assessing physiotherapist: Na/NA").
+- Form says "Gender", report says "Age / Sex". Not aligned; Onkar's call.
+- Logo teal with white button text is about 4.1:1, under AA 4.5:1 for
+  normal text. Kept on Onkar's word; #3B6A70 would pass.
+- Not screenshotted by Claude: the landmark review and camera screens
+  (colour changes only); Onkar's own screenshots on 13 October looked right.
 - Phone checks owed by Onkar: tilt in landscape (side tilt near 90), and a
   real capture on a tripod.
 - Lawyer's view on consent and data retention (founders' answer 6a).
 - Inter-rater test: two physios placing points on the same photographs.
   Needs people, not code.
+- Clean-up owed by Onkar: backend/data/reports (79 files on 15 October,
+  older ones still hold photos, test leftovers like x.json) and
+  Downloads/Posture-test/_render (Claude's renders, plus
+  posture-tool-src.tgz from 13 October). .env.local is back at
+  http://localhost:8000 since 13 October.
 - Deployment. The tool runs from the laptop over quick tunnels; no plan
   for hosting it or joining it to AV Suite has been written down.
 - One "Should be reviewed against real photographs" note is still live, in
