@@ -4,13 +4,14 @@ from types import MappingProxyType
 from typing import Mapping
 
 
-CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
+CANONICAL_PRODUCTS: tuple[dict[str, object], ...] = (
     {
         "id": "crm",
         "slug": "crm",
         "name": "CRM",
         "description": "Patient management, scheduling and clinic operations.",
         "category": "Patient Management",
+        "allowed_clinic_types": ["clinic"],
     },
     {
         "id": "exercise-library",
@@ -18,6 +19,7 @@ CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
         "name": "Exercise Library",
         "description": "Clinical exercise resources and structured exercise programs.",
         "category": "Clinical",
+        "allowed_clinic_types": ["clinic", "solo", "personal"],
     },
     {
         "id": "exercise-prescription",
@@ -25,6 +27,7 @@ CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
         "name": "Exercise Prescription",
         "description": "Build and manage personalized exercise programs.",
         "category": "Clinical",
+        "allowed_clinic_types": ["clinic", "solo", "personal"],
     },
     {
         "id": "posture-tool",
@@ -32,6 +35,7 @@ CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
         "name": "Posture Tool",
         "description": "Posture assessment and movement analysis.",
         "category": "Clinical",
+        "allowed_clinic_types": ["clinic", "solo", "personal"],
     },
     {
         "id": "clinical-decision-support",
@@ -39,6 +43,7 @@ CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
         "name": "Clinical Decision Support",
         "description": "Structured clinical insights for better decision-making.",
         "category": "Clinical",
+        "allowed_clinic_types": ["clinic", "solo", "personal"],
     },
     {
         "id": "psycho-social-screening",
@@ -46,6 +51,7 @@ CANONICAL_PRODUCTS: tuple[dict[str, str], ...] = (
         "name": "Psycho-social Screening",
         "description": "Screening and tracking for psycho-social factors.",
         "category": "Clinical",
+        "allowed_clinic_types": ["clinic", "solo", "personal"],
     },
 )
 
