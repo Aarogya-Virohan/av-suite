@@ -10,7 +10,6 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-
 revision: str = "b72a91c4d605"
 down_revision: Union[str, Sequence[str], None] = "a91c2d7e4f60"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -26,8 +25,9 @@ def upgrade() -> None:
         sa.column("invoice_number", sa.String(length=64)),
     )
     rows = bind.execute(
-        sa.select(invoices.c.id, invoices.c.clinic_id, invoices.c.invoice_number)
-        .order_by(invoices.c.clinic_id, invoices.c.invoice_number, invoices.c.id)
+        sa.select(
+            invoices.c.id, invoices.c.clinic_id, invoices.c.invoice_number
+        ).order_by(invoices.c.clinic_id, invoices.c.invoice_number, invoices.c.id)
     ).all()
 
     reserved = {(row.clinic_id, row.invoice_number) for row in rows}
@@ -65,6 +65,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "uq_invoices_clinic_invoice_number", "invoices", type_="unique"
-    )
+    op.drop_constraint("uq_invoices_clinic_invoice_number", "invoices", type_="unique")

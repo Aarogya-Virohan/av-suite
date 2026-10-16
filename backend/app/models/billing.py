@@ -38,7 +38,9 @@ class InvoiceCounter(Base):
     __tablename__ = "invoice_counters"
 
     clinic_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), primary_key=True
+        PGUUID(as_uuid=True),
+        ForeignKey("clinics.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     last_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -177,7 +179,9 @@ class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     __tablename__: str = "invoices"
     __table_args__ = (
-        UniqueConstraint("clinic_id", "invoice_number", name="uq_invoices_clinic_invoice_number"),
+        UniqueConstraint(
+            "clinic_id", "invoice_number", name="uq_invoices_clinic_invoice_number"
+        ),
         Index("ix_invoices_clinic_id", "clinic_id"),
         Index("ix_invoices_patient_id", "patient_id"),
         Index("ix_invoices_appointment_id", "appointment_id"),

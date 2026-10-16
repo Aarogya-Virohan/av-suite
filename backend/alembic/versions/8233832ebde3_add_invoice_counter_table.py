@@ -8,10 +8,9 @@ Create Date: 2026-10-16
 from alembic import op
 import sqlalchemy as sa
 
-
 # revision identifiers, used by Alembic.
-revision = '8233832ebde3'
-down_revision = 'a0b1c2d3e4f5'
+revision = "8233832ebde3"
+down_revision = "a0b1c2d3e4f5"
 branch_labels = None
 depends_on = None
 
@@ -19,11 +18,11 @@ depends_on = None
 def upgrade():
     # Create the invoice_counters table if it doesn't exist
     op.create_table(
-        'invoice_counters',
-        sa.Column('clinic_id', sa.UUID(), nullable=False),
-        sa.Column('last_number', sa.Integer(), nullable=False, server_default='0'),
-        sa.PrimaryKeyConstraint('clinic_id', name='pk_invoice_counters'),
-        sa.ForeignKeyConstraint(['clinic_id'], ['clinics.id'], ondelete='CASCADE')
+        "invoice_counters",
+        sa.Column("clinic_id", sa.UUID(), nullable=False),
+        sa.Column("last_number", sa.Integer(), nullable=False, server_default="0"),
+        sa.PrimaryKeyConstraint("clinic_id", name="pk_invoice_counters"),
+        sa.ForeignKeyConstraint(["clinic_id"], ["clinics.id"], ondelete="CASCADE"),
     )
 
     # Populate the counter table with the max invoice number per clinic
@@ -63,4 +62,4 @@ def upgrade():
 
 def downgrade():
     # Drop the invoice_counters table
-    op.drop_table('invoice_counters')
+    op.drop_table("invoice_counters")

@@ -1,4 +1,5 @@
 """Extend specialty_type with canonical CRM specialties."""
+
 from alembic import op
 
 revision = "a0b1c2d3e4f5"

@@ -85,9 +85,13 @@ class BillingService:
     async def get_package(self, clinic_id: UUID, package_id: UUID) -> Package:
         """Retrieve a package from the catalogue ensuring clinic isolation."""
 
-        package = await self.package_repository.get_by_id(package_id, clinic_id=clinic_id)
+        package = await self.package_repository.get_by_id(
+            package_id, clinic_id=clinic_id
+        )
         if package is None:
-            raise BillingNotFoundError(f"Package '{package_id}' not found for clinic '{clinic_id}'.")
+            raise BillingNotFoundError(
+                f"Package '{package_id}' not found for clinic '{clinic_id}'."
+            )
         return package
 
     async def list_packages(
@@ -107,7 +111,9 @@ class BillingService:
             limit=limit,
         )
 
-    async def update_package(self, clinic_id: UUID, package_id: UUID, payload: PackageUpdate) -> Package:
+    async def update_package(
+        self, clinic_id: UUID, package_id: UUID, payload: PackageUpdate
+    ) -> Package:
         """Update a package in the clinic catalogue."""
 
         package = await self.get_package(clinic_id, package_id)
@@ -127,17 +133,23 @@ class BillingService:
 
     # --- Patient Package Methods ---
 
-    async def sell_package(self, clinic_id: UUID, payload: PatientPackageCreate) -> PatientPackage:
+    async def sell_package(
+        self, clinic_id: UUID, payload: PatientPackageCreate
+    ) -> PatientPackage:
         """Sell or assign a treatment package to a patient."""
 
-        patient = await self.patient_repository.get_by_patient_id(payload.patient_id, clinic_id=clinic_id)
+        patient = await self.patient_repository.get_by_patient_id(
+            payload.patient_id, clinic_id=clinic_id
+        )
         if patient is None:
             raise BillingValidationError(
                 f"Patient '{payload.patient_id}' does not exist or does not belong to clinic '{clinic_id}'."
             )
 
         if payload.package_id is not None:
-            catalog_package = await self.package_repository.get_by_id(payload.package_id, clinic_id=clinic_id)
+            catalog_package = await self.package_repository.get_by_id(
+                payload.package_id, clinic_id=clinic_id
+            )
             if catalog_package is None:
                 raise BillingValidationError(
                     f"Catalogue package '{payload.package_id}' does not exist or does not belong to clinic '{clinic_id}'."
@@ -156,12 +168,18 @@ class BillingService:
         await self.patient_package_repository.session.commit()
         return sold
 
-    async def get_patient_package(self, clinic_id: UUID, patient_package_id: UUID) -> PatientPackage:
+    async def get_patient_package(
+        self, clinic_id: UUID, patient_package_id: UUID
+    ) -> PatientPackage:
         """Retrieve a patient package ensuring clinic scoping."""
 
-        package = await self.patient_package_repository.get_by_id(patient_package_id, clinic_id=clinic_id)
+        package = await self.patient_package_repository.get_by_id(
+            patient_package_id, clinic_id=clinic_id
+        )
         if package is None:
-            raise BillingNotFoundError(f"Patient package '{patient_package_id}' not found for clinic '{clinic_id}'.")
+            raise BillingNotFoundError(
+                f"Patient package '{patient_package_id}' not found for clinic '{clinic_id}'."
+            )
         return package
 
     async def list_patient_packages(
@@ -208,7 +226,9 @@ class BillingService:
         await self.patient_package_repository.session.commit()
         return updated
 
-    async def delete_patient_package(self, clinic_id: UUID, patient_package_id: UUID) -> None:
+    async def delete_patient_package(
+        self, clinic_id: UUID, patient_package_id: UUID
+    ) -> None:
         """Delete a patient package record for the clinic."""
 
         package = await self.get_patient_package(clinic_id, patient_package_id)
@@ -220,14 +240,18 @@ class BillingService:
     async def create_invoice(self, clinic_id: UUID, payload: InvoiceCreate) -> Invoice:
         """Create a clinic-scoped invoice with line items, calculating subtotal and total."""
 
-        patient = await self.patient_repository.get_by_patient_id(payload.patient_id, clinic_id=clinic_id)
+        patient = await self.patient_repository.get_by_patient_id(
+            payload.patient_id, clinic_id=clinic_id
+        )
         if patient is None:
             raise BillingValidationError(
                 f"Patient '{payload.patient_id}' does not exist or does not belong to clinic '{clinic_id}'."
             )
 
         if payload.appointment_id is not None:
-            appointment = await self.appointment_repository.get_by_id(payload.appointment_id, clinic_id=clinic_id)
+            appointment = await self.appointment_repository.get_by_id(
+                payload.appointment_id, clinic_id=clinic_id
+            )
             if appointment is None:
                 raise BillingValidationError(
                     f"Appointment '{payload.appointment_id}' does not exist or does not belong to clinic '{clinic_id}'."
@@ -279,14 +303,20 @@ class BillingService:
         if total_amount < Decimal("0.00"):
             raise BillingValidationError("Total invoice amount cannot be negative.")
 
-        counter_stmt = pg_insert(InvoiceCounter).values(clinic_id=clinic_id, last_number=1)
+        counter_stmt = pg_insert(InvoiceCounter).values(
+            clinic_id=clinic_id, last_number=1
+        )
         counter_stmt = counter_stmt.on_conflict_do_update(
             index_elements=[InvoiceCounter.clinic_id],
             set_={"last_number": InvoiceCounter.last_number + 1},
         ).returning(InvoiceCounter.last_number)
-        invoice_number = (await self.invoice_repository.session.execute(counter_stmt)).scalar_one()
+        invoice_number = (
+            await self.invoice_repository.session.execute(counter_stmt)
+        ).scalar_one()
 
-        invoice_data = payload.model_dump(exclude={"items", "line_items", "invoice_number"})
+        invoice_data = payload.model_dump(
+            exclude={"items", "line_items", "invoice_number"}
+        )
         invoice_data.update(
             {
                 "clinic_id": clinic_id,
@@ -325,18 +355,26 @@ class BillingService:
             item_dict["invoice_id"] = invoice.id
             await self.invoice_item_repository.create(item_dict)
 
-        loaded_invoice = await self.invoice_repository.get_by_id_with_items(invoice.id, clinic_id=clinic_id)
+        loaded_invoice = await self.invoice_repository.get_by_id_with_items(
+            invoice.id, clinic_id=clinic_id
+        )
         if loaded_invoice is None:
-            raise BillingNotFoundError(f"Created invoice '{invoice.id}' could not be reloaded.")
+            raise BillingNotFoundError(
+                f"Created invoice '{invoice.id}' could not be reloaded."
+            )
         await self.invoice_repository.session.commit()
         return loaded_invoice
 
     async def get_invoice(self, clinic_id: UUID, invoice_id: UUID) -> Invoice:
         """Retrieve a clinic-scoped invoice."""
 
-        invoice = await self.invoice_repository.get_by_id_with_items(invoice_id, clinic_id=clinic_id)
+        invoice = await self.invoice_repository.get_by_id_with_items(
+            invoice_id, clinic_id=clinic_id
+        )
         if invoice is None:
-            raise BillingNotFoundError(f"Invoice '{invoice_id}' not found for clinic '{clinic_id}'.")
+            raise BillingNotFoundError(
+                f"Invoice '{invoice_id}' not found for clinic '{clinic_id}'."
+            )
         return invoice
 
     async def list_invoices(
@@ -362,14 +400,18 @@ class BillingService:
             limit=limit,
         )
 
-    async def update_invoice(self, clinic_id: UUID, invoice_id: UUID, payload: InvoiceUpdate) -> Invoice:
+    async def update_invoice(
+        self, clinic_id: UUID, invoice_id: UUID, payload: InvoiceUpdate
+    ) -> Invoice:
         """Update an invoice for the clinic."""
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
         update_data = payload.model_dump(exclude_unset=True)
 
         if payload.appointment_id is not None:
-            appointment = await self.appointment_repository.get_by_id(payload.appointment_id, clinic_id=clinic_id)
+            appointment = await self.appointment_repository.get_by_id(
+                payload.appointment_id, clinic_id=clinic_id
+            )
             if appointment is None:
                 raise BillingValidationError(
                     f"Appointment '{payload.appointment_id}' does not exist or does not belong to clinic '{clinic_id}'."
@@ -417,7 +459,9 @@ class BillingService:
             raise BillingNotFoundError(
                 f"Invoice '{payload.invoice_id}' not found for clinic '{clinic_id}'."
             )
-        patient = await self.patient_repository.get_by_patient_id(payload.patient_id, clinic_id=clinic_id)
+        patient = await self.patient_repository.get_by_patient_id(
+            payload.patient_id, clinic_id=clinic_id
+        )
 
         if patient is None:
             raise BillingValidationError(
@@ -458,9 +502,13 @@ class BillingService:
     async def get_payment(self, clinic_id: UUID, payment_id: UUID) -> Payment:
         """Retrieve a single payment by ID ensuring clinic scoping."""
 
-        payment = await self.payment_repository.get_by_id(payment_id, clinic_id=clinic_id)
+        payment = await self.payment_repository.get_by_id(
+            payment_id, clinic_id=clinic_id
+        )
         if payment is None:
-            raise BillingNotFoundError(f"Payment '{payment_id}' not found for clinic '{clinic_id}'.")
+            raise BillingNotFoundError(
+                f"Payment '{payment_id}' not found for clinic '{clinic_id}'."
+            )
         return payment
 
     async def list_payments(
@@ -517,19 +565,27 @@ class BillingService:
             f"{pdf_url}"
         )
 
-    async def generate_invoice_pdf_response(self, clinic_id: UUID, invoice_id: UUID) -> dict[str, object]:
+    async def generate_invoice_pdf_response(
+        self, clinic_id: UUID, invoice_id: UUID
+    ) -> dict[str, object]:
         """Generate an invoice PDF and return the download link plus WhatsApp deep link."""
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
-        patient = await self.patient_repository.get_by_patient_id(invoice.patient_id, clinic_id=clinic_id)
+        patient = await self.patient_repository.get_by_patient_id(
+            invoice.patient_id, clinic_id=clinic_id
+        )
         if patient is None:
-            raise BillingNotFoundError(f"Patient '{invoice.patient_id}' not found for clinic '{clinic_id}'.")
+            raise BillingNotFoundError(
+                f"Patient '{invoice.patient_id}' not found for clinic '{clinic_id}'."
+            )
 
         pdf_url = f"/api/v1/billing/invoices/{invoice_id}/pdf/download"
         _ = await self.generate_invoice_pdf(clinic_id, invoice_id)
 
         patient_name = getattr(patient, "full_name", "Patient")
-        whatsapp_link = build_whatsapp_link(patient.phone or "", self._build_invoice_message(patient_name, pdf_url))
+        whatsapp_link = build_whatsapp_link(
+            patient.phone or "", self._build_invoice_message(patient_name, pdf_url)
+        )
 
         return {
             "invoice_id": str(invoice.id),
@@ -538,7 +594,9 @@ class BillingService:
             "whatsapp_link": whatsapp_link,
         }
 
-    async def get_outstanding_balance(self, clinic_id: UUID, patient_id: UUID | None = None) -> Decimal:
+    async def get_outstanding_balance(
+        self, clinic_id: UUID, patient_id: UUID | None = None
+    ) -> Decimal:
         """Calculate total outstanding unpaid balance for a patient or clinic."""
 
         invoices = await self.invoice_repository.list_invoices(
@@ -547,7 +605,12 @@ class BillingService:
         )
         total_outstanding = Decimal("0.00")
         for inv in invoices:
-            if inv.status in (InvoiceStatus.ISSUED, InvoiceStatus.UNPAID, InvoiceStatus.PARTIAL, InvoiceStatus.OVERDUE):
+            if inv.status in (
+                InvoiceStatus.ISSUED,
+                InvoiceStatus.UNPAID,
+                InvoiceStatus.PARTIAL,
+                InvoiceStatus.OVERDUE,
+            ):
                 outstanding = inv.total_amount - inv.paid_amount
                 if outstanding > Decimal("0.00"):
                     total_outstanding += outstanding
