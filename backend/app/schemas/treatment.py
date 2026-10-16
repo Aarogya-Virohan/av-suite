@@ -5,6 +5,7 @@ from typing import Any, ClassVar
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.enums.shared import Specialty
 
 
 # --- Treatment Session Schemas ---
@@ -70,7 +71,7 @@ class SoapAssessmentBase(BaseModel):
     patient_id: UUID
     appointment_id: UUID | None = None
     therapist_id: UUID | None = None
-    specialty: str
+    specialty: Specialty
     diagnosis: str | None = None
     is_reassessment: bool = False
     finalized: bool = False
@@ -88,7 +89,7 @@ class SoapAssessmentUpdate(BaseModel):
 
     appointment_id: UUID | None = None
     therapist_id: UUID | None = None
-    specialty: str | None = None
+    specialty: Specialty | None = None
     diagnosis: str | None = None
     is_reassessment: bool | None = None
     finalized: bool | None = None

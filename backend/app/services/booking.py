@@ -64,7 +64,7 @@ class BookingService:
         return PublicClinicBrandingResponse(
             clinic_id=clinic.id,
             name=clinic.name,
-            slug=clinic_slug_or_id,
+            slug=clinic.slug,
             logo_url=clinic.branding_logo_url,
             brand_color=clinic.branding_color,
         )

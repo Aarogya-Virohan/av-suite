@@ -52,6 +52,7 @@ router = APIRouter()
 async def list_patients(
     request: Request,
     search: Optional[str] = None,
+    status: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db),
     scope: CapabilityScope = Depends(require_capability("patients.view"))
@@ -134,9 +135,9 @@ async def list_patients(
         user_id = request.state.user_id if hasattr(request.state, "user_id") else None
         
         if search:
-            patients, total = await patient_service.search_patients(db, clinic_id, search, pagination, scope=scope, user_id=user_id)
+            patients, total = await patient_service.search_patients(db, clinic_id, search, pagination, scope=scope, user_id=user_id, status=status)
         else:
-            patients, total = await patient_service.get_patients(db, clinic_id, pagination, scope=scope, user_id=user_id)
+            patients, total = await patient_service.get_patients(db, clinic_id, pagination, scope=scope, user_id=user_id, status=status)
         
         # Pagination metadata prepare karte hain
         # Frontend pagination UI ke liye total aur current page info

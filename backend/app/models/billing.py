@@ -20,6 +20,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy import JSON
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -29,6 +30,17 @@ from app.enums.package import PackageStatus
 from app.models.appointment import Appointment
 from app.models.clinic import Clinic
 from app.models.patient import Patient
+
+
+class InvoiceCounter(Base):
+    """Transactional per-clinic invoice sequence state."""
+
+    __tablename__ = "invoice_counters"
+
+    clinic_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), primary_key=True
+    )
+    last_number: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
 def _invoice_status_values(enum_cls: type[InvoiceStatus]) -> list[str]:
@@ -165,6 +177,7 @@ class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     __tablename__: str = "invoices"
     __table_args__ = (
+        UniqueConstraint("clinic_id", "invoice_number", name="uq_invoices_clinic_invoice_number"),
         Index("ix_invoices_clinic_id", "clinic_id"),
         Index("ix_invoices_patient_id", "patient_id"),
         Index("ix_invoices_appointment_id", "appointment_id"),

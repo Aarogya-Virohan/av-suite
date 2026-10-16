@@ -55,7 +55,8 @@ async def get_patients(
     clinic_id: str,
     pagination: PaginationParams,
     scope: CapabilityScope = None,
-    user_id: str = None
+    user_id: str = None,
+    status: Optional[str] = None,
 ) -> Tuple[List[Patient], int]:
     """
     Function ka purpose: Clinic ke sare patients ko list karna pagination ke saath
@@ -111,7 +112,11 @@ async def get_patients(
         # Clinic-specific query - Multi-tenant isolation
         # Clinic ID se filter karte hain (security)
         # UUID format mein convert karte hain string se
-        query = select(Patient).where(Patient.clinic_id == uuid.UUID(clinic_id))
+        query = select(Patient).where(
+            Patient.clinic_id == uuid.UUID(clinic_id), Patient.deleted_at.is_(None)
+        )
+        if status:
+            query = query.where(Patient.status == status)
         if scope:
             query = apply_patient_scope(query, scope, user_id)
 
@@ -373,7 +378,8 @@ async def search_patients(
     search: str,
     pagination: PaginationParams,
     scope: CapabilityScope = None,
-    user_id: str = None
+    user_id: str = None,
+    status: Optional[str] = None,
 ) -> Tuple[List[Patient], int]:
     from app.repositories.patient import PatientRepository
     try:
@@ -391,6 +397,9 @@ async def search_patients(
         else:
             query = select(Patient).where(Patient.full_name.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
             
+        query = query.where(Patient.deleted_at.is_(None))
+        if status:
+            query = query.where(Patient.status == status)
         if scope:
             query = apply_patient_scope(query, scope, user_id)
             

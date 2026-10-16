@@ -8,7 +8,8 @@ from sqlalchemy.exc import IntegrityError
 
 from app.enums.billing import InvoiceStatus
 from app.enums.package import PackageStatus
-from app.models.billing import Invoice, Package, PatientPackage, Payment
+from app.models.billing import Invoice, Package, PatientPackage, Payment, InvoiceCounter
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.billing import (
     InvoiceItemRepository,
@@ -278,12 +279,18 @@ class BillingService:
         if total_amount < Decimal("0.00"):
             raise BillingValidationError("Total invoice amount cannot be negative.")
 
-        invoice_data = payload.model_dump(
-            exclude={"items", "line_items", "invoice_number"}
-        )
+        counter_stmt = pg_insert(InvoiceCounter).values(clinic_id=clinic_id, last_number=1)
+        counter_stmt = counter_stmt.on_conflict_do_update(
+            index_elements=[InvoiceCounter.clinic_id],
+            set_={"last_number": InvoiceCounter.last_number + 1},
+        ).returning(InvoiceCounter.last_number)
+        invoice_number = (await self.invoice_repository.session.execute(counter_stmt)).scalar_one()
+
+        invoice_data = payload.model_dump(exclude={"items", "line_items", "invoice_number"})
         invoice_data.update(
             {
                 "clinic_id": clinic_id,
+                "invoice_number": f"INV-{invoice_number:04d}",
                 "subtotal": subtotal,
                 "total_amount": total_amount,
                 "paid_amount": Decimal("0.00"),
@@ -299,7 +306,7 @@ class BillingService:
             invoice_data.update(
                 {
                     "id": invoice_id,
-                    "invoice_number": f"INV-{invoice_id.hex.upper()}",
+                    # Keep the invoice_number from the counter, only update the ID
                 }
             )
             try:
