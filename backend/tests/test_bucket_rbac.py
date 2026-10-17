@@ -4,6 +4,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.user import User
+from app.models.membership import Membership
 from app.enums.user import UserRole
 from app.core.security import get_password_hash
 
@@ -30,6 +31,13 @@ async def patient_auth_headers(client: AsyncClient, db_session: AsyncSession):
         is_active=True
     )
     db_session.add(patient_user)
+    db_session.add(
+        Membership(
+            user_id=patient_user.id,
+            clinic_id=clinic_id,
+            role=UserRole.PATIENT,
+        )
+    )
     await db_session.commit()
 
     login_res = await client.post(f"{settings.API_V1_PREFIX}/auth/login", json={

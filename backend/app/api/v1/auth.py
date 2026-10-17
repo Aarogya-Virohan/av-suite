@@ -12,14 +12,21 @@ Response Format:
 All responses ResponseEnvelope mein wrapped hote hain consistency ke liye.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import PermissionContextDep
+from app.core.dependencies import (
+    AuthenticatedContextDep,
+    PermissionContextDep,
+    SessionDep,
+)
+from app.core.security import create_access_token
 from app.core.rbac import CAPABILITY_REGISTRY
 from app.schemas.auth import (
     RegisterRequest,
     LoginRequest,
+    WorkspaceSwitchRequest,
     TokenResponse,
     AuthMeResponse,
     UserInfoResponse,
@@ -27,6 +34,7 @@ from app.schemas.auth import (
 )
 from app.schemas.envelope import ResponseEnvelope
 from app.services import auth_service
+from app.models.membership import Membership
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,11 +60,7 @@ async def get_me(
         key: perm_ctx.effective_scope(key).value for key in CAPABILITY_REGISTRY
     }
 
-    active_role = (
-        perm_ctx.membership.role
-        if perm_ctx.membership is not None
-        else perm_ctx.user.role
-    )
+    active_role = perm_ctx.membership.role
 
     user_info = UserInfoResponse(
         id=perm_ctx.user.id,
@@ -251,3 +255,29 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
         # FastAPI automatically error responses generate karta hai
         logger.error(f"Login failed: {str(e)}")
         raise
+
+
+@router.post("/switch-workspace", response_model=ResponseEnvelope[TokenResponse])
+async def switch_workspace(
+    payload: WorkspaceSwitchRequest,
+    auth_context: AuthenticatedContextDep,
+    db: SessionDep,
+) -> ResponseEnvelope[TokenResponse]:
+    membership = await db.scalar(
+        select(Membership).where(
+            Membership.user_id == auth_context.user.id,
+            Membership.clinic_id == payload.clinic_id,
+        )
+    )
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of the requested workspace",
+        )
+
+    token = create_access_token(
+        subject=auth_context.user.id,
+        clinic_id=str(membership.clinic_id),
+        role=membership.role.value,
+    )
+    return ResponseEnvelope(data=TokenResponse(access_token=token))

@@ -7,7 +7,7 @@ Middleware request flow mein token validate karta hai aur request context set ka
 Key Components:
 - ClinicGateMiddleware class: BaseHTTPMiddleware extend karta hai
 - JWT token verification: Authorization header se token extract aur validate
-- Request context setting: clinic_id, user_id, role set karte hain request.state mein
+- Request context setting: token clinic_id aur user_id request.state mein set karte hain
 
 Security Considerations:
 - Bearer token validation: Proper format check
@@ -21,7 +21,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from jose import jwt, JWTError
 from app.core.config import settings
-from app.enums.user import normalize_user_role
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,7 +43,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
     2. Public endpoints skip karte hain (PUBLIC_PATH_PREFIXES)
     3. Protected endpoints ke liye token check karte hain
     4. Token verify karte hain aur claim extract karte hain
-    5. request.state mein clinic_id, user_id, role set karte hain
+    5. request.state mein clinic_id aur user_id set karte hain
     6. Endpoint execution ko allow karte hain (token valid ho to)
     
     Middleware Chain Position:
@@ -84,7 +83,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
         2. Authorization header extract karte hain
         3. Bearer token validate karte hain
         4. JWT token decode aur verify karte hain
-        5. Claims extract karte hain (clinic_id, user_id, role)
+        5. Claims extract karte hain (clinic_id, user_id)
         6. Request state populate karte hain
         7. Next endpoint/middleware ko call karte hain
         
@@ -155,23 +154,15 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             # Extract claims from JWT payload
             # "clinic_id": Multi-tenant isolation key
             # "sub": Subject = user_id (unique user identifier)
-            # "role": User role (admin, physio, patient, nurse, etc.)
             clinic_id = payload.get("clinic_id")
             user_id = payload.get("sub")
-            raw_role = payload.get("role")
             
             # Validate all required claims present
             # Required claims ensure karte hain complete user context available
             # Missing claims = corrupted token
-            if not clinic_id or not user_id or not raw_role:
+            if not clinic_id or not user_id:
                 logger.warning(f"Missing required JWT claims for {path}")
                 raise JWTError("Invalid token payload")
-
-            try:
-                role = normalize_user_role(raw_role)
-            except ValueError as exc:
-                logger.warning(f"Invalid user role in token for {path}: {raw_role}")
-                raise JWTError("Invalid token payload") from exc
 
             # Set request context
             # request.state mein middleware data store karte hain
@@ -179,9 +170,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             # Multi-tenant isolation: clinic_id har query mein filter karte hain
             request.state.clinic_id = clinic_id
             request.state.user_id = user_id
-            request.state.role = role
-            
-            logger.info(f"Authorization successful - user: {user_id}, clinic: {clinic_id}, role: {role}")
+            logger.info(f"Authorization token accepted - user: {user_id}, clinic: {clinic_id}")
 
         except JWTError as e:
             # JWT validation failed
@@ -205,7 +194,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             )
 
         # Call next middleware/endpoint
-        # Request context (clinic_id, user_id, role) available endpoints mein
+        # Request context (clinic_id, user_id) available endpoints mein
         # Endpoints use karte hain clinic_id multi-tenant filtering ke liye
         response = await call_next(request)
         return response

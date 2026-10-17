@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
 from uuid import UUID
+
+from pydantic import BaseModel, EmailStr
 
 class RegisterRequest(BaseModel):
     clinic_name: str
@@ -12,6 +13,10 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     clinic_id: UUID | None = None
+
+
+class WorkspaceSwitchRequest(BaseModel):
+    clinic_id: UUID
 
 class TokenResponse(BaseModel):
     access_token: str
