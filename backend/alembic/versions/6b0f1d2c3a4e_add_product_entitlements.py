@@ -232,6 +232,12 @@ def upgrade() -> None:
         ],
     )
 
+    # Clinics that exist when this runs were using the tools that predate the
+    # CRM (Exercise Library, prescriptions, Posture Tool). Granting only "crm"
+    # cut them off from those tools (exercises and prescriptions returned 403
+    # after upgrading a production-shaped database), so they keep them.
+    # Clinics created later get their products through the app.
+    legacy_products = ("crm", "exercise-library", "exercise-prescription", "posture-tool")
     clinic_rows = bind.execute(sa.text("SELECT id FROM clinics")).fetchall()
     if clinic_rows:
         op.bulk_insert(
@@ -250,7 +256,7 @@ def upgrade() -> None:
                 {
                     "id": uuid.uuid4(),
                     "clinic_id": uuid.UUID(str(row[0])),
-                    "product_id": "crm",
+                    "product_id": product_id,
                     "status": "enabled",
                     "source": "direct",
                     "bundle_id": None,
@@ -258,6 +264,7 @@ def upgrade() -> None:
                     "updated_at": now,
                 }
                 for row in clinic_rows
+                for product_id in legacy_products
             ],
         )
 

@@ -51,7 +51,9 @@ async def create_prescription(
         physio_id = user.id
 
         prescription = await prescription_service.create_prescription(
-            db, uuid.UUID(clinic_id), uuid.UUID(physio_id), prescription_in
+            # user.id is already a UUID object; uuid.UUID() only accepts a string,
+            # so this returned 500 for every new prescription.
+            db, uuid.UUID(str(clinic_id)), uuid.UUID(str(physio_id)), prescription_in
         )
         return ResponseEnvelope(data=prescription)
     except HTTPException:

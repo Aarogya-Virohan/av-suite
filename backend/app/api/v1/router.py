@@ -8,7 +8,6 @@ from app.api.v1 import (
     auth,
     exercises,
     patients,
-    posture,
     prescriptions,
     leads,
     appointments,
@@ -36,7 +35,8 @@ api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(exercises.router, prefix="/exercises", tags=["Exercises"])
 api_router.include_router(patients.router, prefix="/patients", tags=["Patients"])
-api_router.include_router(posture.router, prefix="/posture", tags=["Posture"])
+# Posture is mounted once in main.py at /posture (the include that was
+# here served a duplicate /api/v1/posture/posture/* path; dev removed it).
 api_router.include_router(
     prescriptions.router, prefix="/prescriptions", tags=["Prescriptions"]
 )

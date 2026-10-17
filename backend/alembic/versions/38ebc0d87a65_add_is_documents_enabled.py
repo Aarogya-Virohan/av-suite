@@ -28,7 +28,10 @@ def upgrade() -> None:
                postgresql_using='gender::gender_type')
     op.drop_column('appointment_requests', 'date_of_birth')
     op.drop_column('appointments', 'appointment_type')
-    op.add_column('clinics', sa.Column('is_documents_enabled', sa.Boolean(), nullable=False))
+    # server_default: existing clinics need a value for a NOT NULL column, or
+    # this fails on any database that already has clinics (production). True
+    # matches the model default for new clinics.
+    op.add_column('clinics', sa.Column('is_documents_enabled', sa.Boolean(), nullable=False, server_default=sa.true()))
     op.alter_column('leads', 'source',
                existing_type=sa.VARCHAR(length=100),
                type_=sa.Enum('website', 'referral', 'social_media', 'walk_in', 'advertisement', 'other', name='lead_source_type'),
