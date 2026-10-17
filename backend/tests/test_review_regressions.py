@@ -243,12 +243,16 @@ async def test_invoice_numbers_are_per_clinic_sequential_seeded_and_unique(db_se
     db_session.add(clinic_existing)
     await db_session.flush()
     patient_existing = await _patient(db_session, clinic_existing.id, "Existing Invoice Patient")
-    legacy = Invoice(
-        clinic_id=clinic_existing.id, patient_id=patient_existing.id, invoice_number="INV-0007",
-        issue_date=datetime.now(timezone.utc), subtotal=Decimal("0"),
-        total_amount=Decimal("0"), paid_amount=Decimal("0"), status="issued",
-    )
-    db_session.add_all([legacy, InvoiceCounter(clinic_id=clinic_existing.id, last_number=7)])
+    legacy_invoices = [
+        Invoice(
+            clinic_id=clinic_existing.id, patient_id=patient_existing.id,
+            invoice_number=f"INV-{number:04d}", issue_date=datetime.now(timezone.utc),
+            subtotal=Decimal("0"), total_amount=Decimal("0"),
+            paid_amount=Decimal("0"), status="issued",
+        )
+        for number in (1, 2, 7)
+    ]
+    db_session.add_all(legacy_invoices + [InvoiceCounter(clinic_id=clinic_existing.id, last_number=7)])
     await db_session.commit()
 
     async with sessionmaker() as session:
@@ -256,7 +260,9 @@ async def test_invoice_numbers_are_per_clinic_sequential_seeded_and_unique(db_se
             clinic_existing.id, _invoice_payload(patient_existing.id)
         )
     assert next_existing.invoice_number == "INV-0008"
-    assert legacy.invoice_number == "INV-0007"
+    assert {invoice.invoice_number for invoice in legacy_invoices} == {
+        "INV-0001", "INV-0002", "INV-0007"
+    }
 
     duplicate = Invoice(
         clinic_id=clinic_existing.id, patient_id=patient_existing.id, invoice_number="INV-0007",
@@ -269,7 +275,7 @@ async def test_invoice_numbers_are_per_clinic_sequential_seeded_and_unique(db_se
     await db_session.rollback()
 
 
-async def test_concurrent_invoice_number_generation_is_unique(db_session, sessionmaker):
+async def test_twenty_concurrent_invoice_number_creations_are_unique_and_ordered(db_session, sessionmaker):
     clinic = Clinic(name=f"Concurrent invoice clinic {uuid.uuid4()}")
     db_session.add(clinic)
     await db_session.flush()
@@ -283,8 +289,49 @@ async def test_concurrent_invoice_number_generation_is_unique(db_session, sessio
             )
             return invoice.invoice_number
 
-    numbers = await asyncio.gather(*(create_one() for _ in range(8)))
-    assert sorted(numbers) == [f"INV-{n:04d}" for n in range(1, 9)]
+    numbers = await asyncio.gather(*(create_one() for _ in range(20)))
+    assert sorted(numbers) == [f"INV-{n:04d}" for n in range(1, 21)]
+
+
+async def test_invoice_number_retry_advances_past_number_created_after_allocation(
+    db_session, sessionmaker
+):
+    clinic = Clinic(name=f"Invoice retry clinic {uuid.uuid4()}")
+    db_session.add(clinic)
+    await db_session.flush()
+    patient = await _patient(db_session, clinic.id, "Invoice Retry Patient")
+    db_session.add(Invoice(
+        clinic_id=clinic.id, patient_id=patient.id, invoice_number="INV-0001",
+        issue_date=datetime.now(timezone.utc), subtotal=Decimal("0"),
+        total_amount=Decimal("0"), paid_amount=Decimal("0"), status="issued",
+    ))
+    db_session.add(InvoiceCounter(clinic_id=clinic.id, last_number=1))
+    await db_session.commit()
+
+    async with sessionmaker() as session:
+        service = await _billing_service(session)
+        original_create = service.invoice_repository.create
+        failed_numbers = []
+
+        async def collide_once(invoice_data):
+            if not failed_numbers:
+                failed_numbers.append(invoice_data["invoice_number"])
+                async with sessionmaker() as concurrent_session:
+                    concurrent_session.add(Invoice(
+                        clinic_id=clinic.id, patient_id=patient.id,
+                        invoice_number=invoice_data["invoice_number"],
+                        issue_date=datetime.now(timezone.utc), subtotal=Decimal("0"),
+                        total_amount=Decimal("0"), paid_amount=Decimal("0"),
+                        status="issued",
+                    ))
+                    await concurrent_session.commit()
+            return await original_create(invoice_data)
+
+        service.invoice_repository.create = collide_once
+        created = await service.create_invoice(clinic.id, _invoice_payload(patient.id))
+
+    assert failed_numbers == ["INV-0002"]
+    assert created.invoice_number == "INV-0003"
 
 
 async def test_auth_me_includes_clinic_slug(client, db_session):

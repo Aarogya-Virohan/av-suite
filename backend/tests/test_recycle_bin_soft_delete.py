@@ -28,6 +28,16 @@ async def test_patient_delete_attribution_recycle_bin_and_restore(client, auth_h
     )
     assert deleted.status_code == 200, deleted.text
 
+    deleted_get = await client.get(
+        f"{settings.API_V1_PREFIX}/patients/{patient_id}", headers=auth_headers
+    )
+    assert deleted_get.status_code == 404
+    deleted_patch = await client.patch(
+        f"{settings.API_V1_PREFIX}/patients/{patient_id}",
+        json={"first_name": "Should Not Persist"}, headers=auth_headers,
+    )
+    assert deleted_patch.status_code == 404
+
     recycle = await client.get(
         f"{settings.API_V1_PREFIX}/recycle-bin",
         params={"resource_type": "patient"},
@@ -56,6 +66,12 @@ async def test_patient_delete_attribution_recycle_bin_and_restore(client, auth_h
         f"{settings.API_V1_PREFIX}/patients/{patient_id}", headers=auth_headers
     )
     assert active.status_code == 200
+    active_patch = await client.patch(
+        f"{settings.API_V1_PREFIX}/patients/{patient_id}",
+        json={"first_name": "Restored Patient"}, headers=auth_headers,
+    )
+    assert active_patch.status_code == 200, active_patch.text
+    assert active_patch.json()["data"]["first_name"] == "Restored Patient"
 
 
 @pytest.mark.asyncio

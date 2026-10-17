@@ -121,8 +121,9 @@ async def test_invoice_numbers_are_backend_generated_and_clinic_unique(
     second = await _create_invoice(client, auth_headers, patient_id, total="25.00")
 
     assert first["invoice_number"] != "CLIENT-CONTROLLED"
-    assert first["invoice_number"] == f"INV-{UUID(first['id']).hex.upper()}"
-    assert second["invoice_number"] == f"INV-{UUID(second['id']).hex.upper()}"
+    assert first["invoice_number"].startswith("INV-")
+    assert first["invoice_number"][4:].isdigit()
+    assert second["invoice_number"] == f"INV-{int(first['invoice_number'][4:]) + 1:04d}"
     assert first["invoice_number"] != second["invoice_number"]
 
     stored = await db_session.get(Invoice, UUID(first["id"]))

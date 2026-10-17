@@ -25,38 +25,18 @@ def upgrade():
         sa.ForeignKeyConstraint(["clinic_id"], ["clinics.id"], ondelete="CASCADE"),
     )
 
-    # Populate the counter table with the max invoice number per clinic
-    bind = op.get_bind()
-    # We assume the invoice_number format is INV- followed by digits.
-    # We extract the numeric part and take the max per clinic.
-    # If there are no invoices for a clinic, we set last_number to 0.
-    # We'll do this in two steps: first, insert a row for each clinic with last_number=0.
-    # Then, update it with the max invoice number.
-    # However, note that the invoice_number might not be in the format INV-<digits> if there are legacy values.
-    # We'll follow the same logic as in the original migration: we extract the number from the pattern ^INV-([0-9]+)$.
-    # If the invoice_number does not match, we ignore it (treat as 0 for the max?).
-    # But note: the unique constraint on (clinic_id, invoice_number) ensures that we can have at most one invoice per clinic with a given number.
-    # We want to find the maximum numeric suffix for each clinic.
-
-    # We'll use a SQL query to update the counter table.
-    # We'll update the counter table by joining with a subquery that computes the max invoice number per clinic.
-    # We'll only consider invoice_numbers that match the pattern.
-    # We'll use the regexp to extract the digits.
-    # Note: This is specific to PostgreSQL.
+    # Seed only clinics that already have invoices. Ignore legacy invoice
+    # formats when choosing the sequential counter value.
     op.execute("""
-        UPDATE invoice_counters ic
-        SET last_number = COALESCE((
-            SELECT MAX(
-                CASE
-                    WHEN invoice_number ~ '^INV-([0-9]+)$' THEN
-                        substring(invoice_number from '^INV-([0-9]+)$')::integer
-                    ELSE
-                        0
-                END
-            )
-            FROM invoices i
-            WHERE i.clinic_id = ic.clinic_id
-        ), 0)
+        INSERT INTO invoice_counters (clinic_id, last_number)
+        SELECT clinic_id,
+               COALESCE(MAX(CASE
+                   WHEN invoice_number ~ '^INV-[0-9]+$'
+                   THEN substring(invoice_number from '^INV-([0-9]+)$')::integer
+                   ELSE 0
+               END), 0)
+        FROM invoices
+        GROUP BY clinic_id
     """)
 
 

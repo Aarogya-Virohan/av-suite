@@ -1,7 +1,7 @@
 """add unique clinic slug
 
 Revision ID: 8a4c1e6b2d90
-Revises: 7899ed1701fb
+Revises: 8233832ebde3
 Create Date: 2026-10-15
 """
 
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 
 revision: str = "8a4c1e6b2d90"
-down_revision: Union[str, Sequence[str], None] = "7899ed1701fb"
+down_revision: Union[str, Sequence[str], None] = "8233832ebde3"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -29,8 +29,14 @@ def _valid_slug(value: str | None) -> bool:
 
 
 def upgrade() -> None:
-    op.add_column("clinics", sa.Column("slug", sa.String(length=120), nullable=True))
     bind = op.get_bind()
+    # Databases upgraded through the previous branch order already ran this
+    # revision before 8233832ebde3. Keep those schemas upgradeable after moving
+    # this revision behind the invoice-counter migration.
+    if "slug" in {column["name"] for column in sa.inspect(bind).get_columns("clinics")}:
+        return
+
+    op.add_column("clinics", sa.Column("slug", sa.String(length=120), nullable=True))
     clinics = sa.table(
         "clinics",
         sa.column("id", sa.Uuid()),

@@ -1,7 +1,7 @@
 """make invoice numbers unique within each clinic
 
 Revision ID: b72a91c4d605
-Revises: 7899ed1701fb
+Revises: a91c2d7e4f60
 Create Date: 2026-10-15
 """
 

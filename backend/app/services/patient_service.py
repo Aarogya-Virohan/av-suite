@@ -285,7 +285,8 @@ async def get_patient_by_id(
         # Patient ID aur Clinic ID both check karte hain (security)
         query = select(Patient).where(
             Patient.id == uuid.UUID(patient_id),
-            Patient.clinic_id == uuid.UUID(clinic_id)
+            Patient.clinic_id == uuid.UUID(clinic_id),
+            Patient.deleted_at.is_(None),
         )
         if scope:
             query = apply_patient_scope(query, scope, user_id)
@@ -327,7 +328,8 @@ async def update_patient(
         # Check using query to apply scope
         query = select(Patient).where(
             Patient.id == uuid.UUID(patient_id),
-            Patient.clinic_id == uuid.UUID(clinic_id)
+            Patient.clinic_id == uuid.UUID(clinic_id),
+            Patient.deleted_at.is_(None),
         )
         if scope:
             query = apply_patient_scope(query, scope, user_id)

@@ -5,6 +5,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text, func
 
 from app.enums.billing import InvoiceStatus
 from app.enums.package import PackageStatus
@@ -303,24 +304,12 @@ class BillingService:
         if total_amount < Decimal("0.00"):
             raise BillingValidationError("Total invoice amount cannot be negative.")
 
-        counter_stmt = pg_insert(InvoiceCounter).values(
-            clinic_id=clinic_id, last_number=1
-        )
-        counter_stmt = counter_stmt.on_conflict_do_update(
-            index_elements=[InvoiceCounter.clinic_id],
-            set_={"last_number": InvoiceCounter.last_number + 1},
-        ).returning(InvoiceCounter.last_number)
-        invoice_number = (
-            await self.invoice_repository.session.execute(counter_stmt)
-        ).scalar_one()
-
         invoice_data = payload.model_dump(
             exclude={"items", "line_items", "invoice_number"}
         )
         invoice_data.update(
             {
                 "clinic_id": clinic_id,
-                "invoice_number": f"INV-{invoice_number:04d}",
                 "subtotal": subtotal,
                 "total_amount": total_amount,
                 "paid_amount": Decimal("0.00"),
@@ -332,6 +321,37 @@ class BillingService:
         # The invoice ID is server-generated and supplies a concurrency-safe
         # number. The clinic-scoped unique constraint remains the final guard.
         for attempt in range(3):
+            counter_stmt = pg_insert(InvoiceCounter).values(
+                clinic_id=clinic_id,
+                last_number=text("""(
+                    SELECT COALESCE(MAX(
+                        substring(invoice_number from '^INV-([0-9]+)$')::integer
+                    ), 0) + 1
+                    FROM invoices
+                    WHERE clinic_id = :seed_clinic_id
+                      AND invoice_number ~ '^INV-[0-9]+$'
+                )""").bindparams(seed_clinic_id=clinic_id),
+            )
+            counter_stmt = counter_stmt.on_conflict_do_update(
+                index_elements=[InvoiceCounter.clinic_id],
+                set_={
+                    "last_number": func.greatest(
+                        InvoiceCounter.last_number + 1,
+                        text("""(
+                            SELECT COALESCE(MAX(
+                                substring(invoice_number from '^INV-([0-9]+)$')::integer
+                            ), 0) + 1
+                            FROM invoices
+                            WHERE clinic_id = EXCLUDED.clinic_id
+                              AND invoice_number ~ '^INV-[0-9]+$'
+                        )"""),
+                    )
+                },
+            ).returning(InvoiceCounter.last_number)
+            invoice_number = (
+                await self.invoice_repository.session.execute(counter_stmt)
+            ).scalar_one()
+            invoice_data["invoice_number"] = f"INV-{invoice_number:04d}"
             invoice_id = uuid4()
             invoice_data.update(
                 {
@@ -442,10 +462,13 @@ class BillingService:
         constraint_name = getattr(
             getattr(original, "diag", None), "constraint_name", None
         )
+        constraint_name = constraint_name or getattr(original, "constraint_name", None)
         if constraint_name == "uq_invoices_clinic_invoice_number":
             return True
         return (
             "unique constraint failed: invoices.clinic_id, invoices.invoice_number"
+            in str(original).lower()
+            or 'unique constraint "uq_invoices_clinic_invoice_number"'
             in str(original).lower()
         )
 
