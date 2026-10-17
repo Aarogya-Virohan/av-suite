@@ -41,7 +41,7 @@ apiClient.interceptors.response.use(
     // message was lost and the console showed "{}".
     const responseData = error.response?.data as
       | {
-          detail?: string | Array<{ msg?: string }>;
+          detail?: string | Array<{ msg?: string }> | { code?: string; message?: string };
           message?: string;
           meta?: { error?: { code?: string; message?: string } } | null;
         }
@@ -58,6 +58,12 @@ apiClient.interceptors.response.use(
           // Pydantic prefixes custom validator messages with "Value error, ".
           .map((item) => (typeof item === 'object' && item && item.msg ? item.msg.replace(/^Value error, /, '') : JSON.stringify(item)))
           .join(', ');
+      } else if (responseData.detail && typeof responseData.detail === 'object') {
+        // Structured errors such as {code: 'WORKSPACE_SELECTION_REQUIRED',
+        // message, workspaces} from login. Without this the user saw only
+        // "Request failed with status code 400".
+        if (typeof responseData.detail.message === 'string') detailMessage = responseData.detail.message;
+        if (typeof responseData.detail.code === 'string') error.apiErrorCode = responseData.detail.code;
       } else if (envelopeError && typeof envelopeError.message === 'string') {
         detailMessage = envelopeError.message;
       } else if (typeof responseData.message === 'string') {

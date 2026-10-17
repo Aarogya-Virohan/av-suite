@@ -3,6 +3,7 @@
 import React from 'react';
 import { SidebarNavigation } from './SidebarNavigation';
 import { CommandBar } from './CommandBar';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { AuthGuard } from '../auth/AuthGuard';
 import { useUiStore, useAuthStore } from '../../store';
 import { CalendarDays, Search } from 'lucide-react';
@@ -70,10 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {today}
                 </span>
               )}
-              <span className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-line bg-card px-3 text-sm font-semibold text-ink-2">
-                <span className="h-2 w-2 rounded-full bg-logo-teal" aria-hidden="true" />
-                {effectiveClinic?.name || 'Your clinic'}
-              </span>
+              <WorkspaceSwitcher fallbackName={effectiveClinic?.name} />
             </div>
           </header>
 

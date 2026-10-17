@@ -6,30 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { SlideOver } from '../../../components/ui/SlideOver';
-import { z } from 'zod';
-import { invoiceFormSchema, InvoiceFormValues as BaseInvoiceFormValues } from '../../../lib/schemas';
-
-// The backend requires invoice_number but the old drawer never sent it, so
-// every create failed with 422 "Field required" (L-21). Until the backend
-// numbers invoices itself, the user confirms a suggested next number.
-const createInvoiceSchema = invoiceFormSchema.extend({
-  invoice_number: z.string().trim().min(1, 'Invoice number is required').max(64),
-});
-type InvoiceFormValues = BaseInvoiceFormValues & { invoice_number: string };
-
-/** Next number after the highest numbered invoice, keeping its prefix (INV-104 -> INV-105). */
-function suggestNextNumber(existing: string[]): string {
-  let best: { prefix: string; n: number; width: number } | null = null;
-  for (const value of existing) {
-    const m = /^(.*?)(\d+)$/.exec(value.trim());
-    if (!m) continue;
-    const n = parseInt(m[2], 10);
-    if (!best || n > best.n) best = { prefix: m[1], n, width: m[2].length };
-  }
-  if (!best) return 'INV-001';
-  return `${best.prefix}${String(best.n + 1).padStart(best.width, '0')}`;
-}
-import { useCreateInvoice, useInvoices } from '../api';
+import { invoiceFormSchema, InvoiceFormValues } from '../../../lib/schemas';
+// The invoice number is assigned by the backend (per clinic, INV-0001,
+// INV-0002, ...) and any number sent by the client is ignored, so the form
+// has no number field. The number is shown after the invoice is created.
+import { useCreateInvoice } from '../api';
 import { usePatients } from '../../patients/api';
 import { hasCapability } from '../../../config/permissions';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
@@ -72,11 +53,8 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   const createInvoice = useCreateInvoice();
   const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
-  const { data: invoices = [] } = useInvoices();
-  const existingNumbers = invoices.map((inv) => inv.invoice_number);
 
   const freshValues = (): InvoiceFormValues => ({
-    invoice_number: suggestNextNumber(existingNumbers),
     patient_id: '',
     issue_date: localToday(),
     due_date: localToday(),
@@ -95,10 +73,9 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
     watch,
     reset,
     setError,
-    setValue,
-    formState: { errors, dirtyFields },
+    formState: { errors },
   } = useForm<InvoiceFormValues>({
-    resolver: zodResolver(createInvoiceSchema),
+    resolver: zodResolver(invoiceFormSchema),
     defaultValues: freshValues(),
   });
 
@@ -106,16 +83,6 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
     if (isOpen) reset(freshValues());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, reset]);
-
-  // If the invoice list arrives or changes while the drawer is open, refresh
-  // only the suggested number, and only if the user has not edited it.
-  const suggestedNumber = suggestNextNumber(existingNumbers);
-  React.useEffect(() => {
-    if (isOpen && !dirtyFields.invoice_number) {
-      setValue('invoice_number', suggestedNumber);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, suggestedNumber]);
 
   const { fields, append, remove } = useFieldArray({ control, name: 'items' });
 
@@ -129,11 +96,6 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   const totalAmount = paise(Math.max(0, subtotal - discountAmount + taxAmount));
 
   const onSubmit = async (values: InvoiceFormValues) => {
-    const number = values.invoice_number.trim();
-    if (existingNumbers.some((n) => n.trim().toLowerCase() === number.toLowerCase())) {
-      setError('invoice_number', { message: `${number} already exists` });
-      return;
-    }
     if (discountAmount > subtotal) {
       setError('discount_amount', { message: 'Discount cannot be more than the subtotal' });
       return;
@@ -145,7 +107,6 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
     try {
       const payload: InvoiceFormValues = {
         ...values,
-        invoice_number: number,
         discount_amount: paise(discountAmount),
         tax_amount: paise(taxAmount),
         subtotal,
@@ -157,8 +118,9 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
           total_price: paise(num(i.quantity || 1) * num(i.unit_price)),
         })),
       };
-      await createInvoice.mutateAsync(payload as BaseInvoiceFormValues);
-      toast.success('Invoice created successfully');
+      const created = await createInvoice.mutateAsync(payload);
+      const number = typeof created?.invoice_number === 'string' ? created.invoice_number : null;
+      toast.success(number ? `Invoice ${number} created` : 'Invoice created successfully');
       onClose();
     } catch (err: any) {
       console.error(err);
@@ -169,16 +131,6 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   return (
     <SlideOver isOpen={isOpen} onClose={onClose} title="Create Invoice" subtitle="Generate invoice for patient services">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-4">
-          <div>
-            <FieldLabel htmlFor="inv-number">Invoice No. *</FieldLabel>
-            <input
-              id="inv-number"
-              {...register('invoice_number')}
-              className={cn(inputClass, 'font-mono', errors.invoice_number && 'border-danger')}
-            />
-            {errors.invoice_number && <p className={errorText}>{errors.invoice_number.message}</p>}
-          </div>
         <div>
           <FieldLabel htmlFor="inv-patient">Patient *</FieldLabel>
           <select id="inv-patient" {...register('patient_id')} className={cn(inputClass, errors.patient_id && 'border-danger')}>
@@ -190,7 +142,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
             ))}
           </select>
           {errors.patient_id && <p className={errorText}>{errors.patient_id.message}</p>}
-        </div>
+          <p className="mt-1.5 text-xs text-muted">The invoice number is assigned automatically when the invoice is created.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

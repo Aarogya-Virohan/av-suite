@@ -84,21 +84,22 @@ export default function AppointmentsPage() {
     fetchRequests();
   }, [canViewBookingRequests]);
 
-  // Booking link uses the clinic's UUID. The backend resolves a name-based
-  // slug with a fuzzy name match, so a name link could open another clinic's
-  // form (Decisions.md D-016). There is no fallback slug: until the clinic is
-  // known, no link is shown.
+  // Booking link uses the clinic's unique slug from /auth/me (exact match on
+  // the backend; the old fuzzy name match is gone, so D-016 is retired). If the
+  // slug is not available the UUID is used; both resolve to this clinic only,
+  // and links already shared with the UUID keep working.
   // The clinic from login is used first; settings are only read by roles that
   // may view them (staff got a 403 here, L-29).
+  const authClinicSlug = useAuthStore((s) => s.clinic?.slug ?? null);
   const authClinicId = useAuthStore((s) => s.clinic?.id ?? null);
   const { data: clinicSettings } = useClinicSettings(hasCapability('settings.view'));
-  const bookingClinicId = authClinicId || clinicSettings?.id || null;
+  const bookingKey = authClinicSlug || authClinicId || clinicSettings?.id || null;
   const [bookingUrl, setBookingUrl] = useState<string | null>(null);
   React.useEffect(() => {
-    if (bookingClinicId && typeof window !== 'undefined') {
-      setBookingUrl(`${window.location.origin}/booking/${bookingClinicId}`);
+    if (bookingKey && typeof window !== 'undefined') {
+      setBookingUrl(`${window.location.origin}/booking/${encodeURIComponent(bookingKey)}`);
     }
-  }, [bookingClinicId]);
+  }, [bookingKey]);
   const [showQr, setShowQr] = useState(false);
 
   const filteredAppointments = appointments.filter((apt) => {

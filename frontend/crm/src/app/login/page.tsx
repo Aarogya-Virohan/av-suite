@@ -9,9 +9,10 @@ import { toast } from 'sonner';
 import { useAuthStore } from '../../store';
 import { setStoredToken, getStoredToken, isTokenExpired } from '../../lib/auth';
 import { apiClient } from '../../lib/api-client';
-import { Check, Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Check, Lock, Mail, Loader2, Eye, EyeOff, Building2, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/brand';
 import { cn } from '../../lib/cn';
+import { ROLE_LABEL, workspacesFromError, type WorkspaceOption } from '../../lib/workspaces';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -26,6 +27,9 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  // Set when the account belongs to more than one clinic.
+  const [workspaces, setWorkspaces] = useState<WorkspaceOption[] | null>(null);
+  const [pendingClinicId, setPendingClinicId] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -39,37 +43,61 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    getValues,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
   });
 
+  const signIn = async (data: LoginFormValues, clinicId?: string) => {
+    // Direct POST to /auth/login sending plaintext credentials matching backend verification
+    const res = await apiClient.post('/auth/login', {
+      email: data.email.trim(),
+      password: data.password,
+      ...(clinicId ? { clinic_id: clinicId } : {}),
+    });
+
+    const token = res.data?.access_token || res.data?.data?.access_token;
+    if (!token) {
+      throw new Error('Invalid authentication response from server.');
+    }
+
+    setStoredToken(token);
+    setToken(token);
+    await useAuthStore.getState().fetchMe();
+    toast.success('Successfully logged in');
+    router.replace('/dashboard');
+  };
+
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
-      // Direct POST to /auth/login sending plaintext credentials matching backend verification
-      const res = await apiClient.post('/auth/login', {
-        email: data.email.trim(),
-        password: data.password,
-      });
-
-      const token = res.data?.access_token || res.data?.data?.access_token;
-      if (!token) {
-        throw new Error('Invalid authentication response from server.');
-      }
-
-      setStoredToken(token);
-      setToken(token);
-      await useAuthStore.getState().fetchMe();
-      toast.success('Successfully logged in');
-      router.replace('/dashboard');
+      await signIn(data);
     } catch (err: unknown) {
+      const options = workspacesFromError(err);
+      if (options) {
+        // Not a failure: the account belongs to several clinics.
+        setWorkspaces(options);
+        return;
+      }
       console.error('Login error:', err);
       const errorMessage =
         err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const chooseWorkspace = async (clinicId: string) => {
+    setPendingClinicId(clinicId);
+    try {
+      await signIn(getValues(), clinicId);
+    } catch (err: unknown) {
+      console.error('Login error:', err);
+      toast.error(err instanceof Error ? err.message : 'Could not open this workspace.');
+    } finally {
+      setPendingClinicId(null);
     }
   };
 
@@ -139,64 +167,107 @@ export default function LoginPage() {
             <p className="mt-1 text-sm text-muted">Sign in to access your clinic portal</p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-            <div>
-              <label htmlFor="login-email" className="mb-1.5 block text-xs font-semibold text-ink-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="login-email"
-                  {...register('email')}
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@clinic.com"
-                  aria-invalid={!!errors.email}
-                  className={cn(fieldClass, 'pr-4', errors.email && 'border-danger')}
-                />
+          {workspaces ? (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-ink">Choose a workspace</p>
+                <p className="mt-1 text-xs text-muted">This account belongs to more than one clinic.</p>
               </div>
-              {errors.email && <p className="mt-1.5 text-xs font-medium text-danger">{errors.email.message}</p>}
+              <ul className="space-y-2">
+                {workspaces.map((w) => (
+                  <li key={w.clinic_id}>
+                    <button
+                      type="button"
+                      onClick={() => chooseWorkspace(w.clinic_id)}
+                      disabled={pendingClinicId !== null}
+                      className="flex w-full cursor-pointer items-center gap-3 rounded-[10px] border border-line bg-card px-4 py-3 text-left transition-colors hover:border-grove disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-grove/10 text-grove">
+                        <Building2 className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-ink">{w.name}</span>
+                        <span className="block text-xs text-muted">{ROLE_LABEL[w.role] ?? w.role}</span>
+                      </span>
+                      {pendingClinicId === w.clinic_id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-grove" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => setWorkspaces(null)}
+                disabled={pendingClinicId !== null}
+                className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-grove hover:text-grove-hover disabled:opacity-60"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Use a different account</span>
+              </button>
             </div>
-
-            <div>
-              <label htmlFor="login-password" className="mb-1.5 block text-xs font-semibold text-ink-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="login-password"
-                  {...register('password')}
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  aria-invalid={!!errors.password}
-                  className={cn(fieldClass, 'pr-11', errors.password && 'border-danger')}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors hover:text-ink"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+          ) : (
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+              <div>
+                <label htmlFor="login-email" className="mb-1.5 block text-xs font-semibold text-ink-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="login-email"
+                    {...register('email')}
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@clinic.com"
+                    aria-invalid={!!errors.email}
+                    className={cn(fieldClass, 'pr-4', errors.email && 'border-danger')}
+                  />
+                </div>
+                {errors.email && <p className="mt-1.5 text-xs font-medium text-danger">{errors.email.message}</p>}
               </div>
-              {errors.password && <p className="mt-1.5 text-xs font-medium text-danger">{errors.password.message}</p>}
-            </div>
 
-            <Button type="submit" disabled={isLoading} className="h-11 w-full">
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <span>Sign In to Dashboard</span>
-              )}
-            </Button>
-          </form>
+              <div>
+                <label htmlFor="login-password" className="mb-1.5 block text-xs font-semibold text-ink-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="login-password"
+                    {...register('password')}
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    aria-invalid={!!errors.password}
+                    className={cn(fieldClass, 'pr-11', errors.password && 'border-danger')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors hover:text-ink"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.password && <p className="mt-1.5 text-xs font-medium text-danger">{errors.password.message}</p>}
+              </div>
+
+              <Button type="submit" disabled={isLoading} className="h-11 w-full">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <span>Sign In to Dashboard</span>
+                )}
+              </Button>
+            </form>
+          )}
         </div>
       </div>
     </div>

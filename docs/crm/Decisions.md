@@ -260,6 +260,7 @@ Each entry follows this structure:
 - **Reasoning**: A UUID cannot match another clinic, so the leak path is closed without waiting on the backend. Nothing is deployed, so no name-based links exist in the wild.
 - **Trade-offs**: Booking URLs are long until the backend slug exists. The fuzzy lookup still exists server-side (anyone typing a word gets some clinic's page), so the backend fix is still required before launch.
 - **Affected Files**: `app/(dashboard)/appointments/page.tsx`, `app/(public)/booking/[clinicSlug]/page.tsx`; backend: `repositories/clinic.py`, `services/booking.py`, `models/clinic.py`
+- **Status (2026-10-17)**: Retired. The backend now has a unique `clinics.slug` with exact lookup and sends it in `/auth/me`, so the booking link uses the slug. The UUID is still accepted, so links already shared keep working.
 
 ---
 
@@ -292,6 +293,16 @@ Each entry follows this structure:
 
 ---
 
+## [D-020] Accounts in Several Clinics Choose a Workspace at Login and Can Switch
+- **Date**: 2026-10-17
+- **Session / Model**: Claude (Claude Code session, reviewed by Onkar)
+- **Context**: With membership auth (#26 merged into `integration/crm-merge`), an account can belong to more than one clinic. Login without a clinic then returns 400 with `detail = {code: "WORKSPACE_SELECTION_REQUIRED", message, workspaces: [{clinic_id, name, role}]}`. The login page showed only "Request failed with status code 400", so such a user could not sign in.
+- **Decision**: The API client reads structured `detail` objects (message and code). The login page shows the workspaces from that error and signs in again with the chosen `clinic_id`. The top bar lists the account's workspaces from `GET /api/v1/me` and switches through `POST /auth/switch-workspace`; after a switch the app does a full reload to /dashboard so no cached data from the previous clinic stays in memory. Accounts with one clinic see the same plain clinic name as before.
+- **Trade-offs**: The password stays in the login form state while the picker is shown (it is needed to sign in again with the clinic). The top bar shows the plain name until `/me` loads, then the switcher.
+- **Affected Files**: `lib/api-client.ts`, `lib/workspaces.ts`, `app/login/page.tsx`, `components/layout/WorkspaceSwitcher.tsx`, `components/layout/AppShell.tsx`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -302,33 +313,33 @@ Each entry follows this structure:
 | L-3 | Prescriptions return 403 for CRM-only clinics; is Rx part of CRM or a separate tool? | **Deferred**: Onkar to discuss with founders. Onkar leans to "separate tool". | Onkar + founders |
 | L-4 | Patient consent (DPDP) before sending clinical info (pain, treatment) on WhatsApp | **Deferred**: founders to decide, must be settled before launch | Onkar + founders |
 | L-5 | Role templates are deny-all, contradicting the founders' 13 Aug decision | Open, queued after PR B | Sparsh |
-| L-6 | Auth still reads `users.clinic_id`; no workspace switch; membership auth incomplete | In progress (PR B) | Sparsh |
+| L-6 | Auth still reads `users.clinic_id`; no workspace switch; membership auth incomplete | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): login uses memberships; more than one membership returns `WORKSPACE_SELECTION_REQUIRED` with the workspace list; `POST /auth/switch-workspace` issues a token for another clinic. Frontend: login shows a workspace picker and the top bar switches workspace (D-020) | - |
 | L-7 | Frontend lint config is broken (pre-existing) | Open | Unassigned |
 | L-8 | Billing resolves patient names from only the first 100 patients; others show a short reference | Open; fix with patient name in the invoice/payment API response | Sparsh (later) |
 | L-9 | "Create Invoice" and "Record Payment" buttons showed for every role | Fixed 2026-10-12: hidden without `invoices.create` / `payments.record` (verified with a front desk user given view-only billing overrides) | Frontend |
 | L-10 | Permission helpers are not reactive (see D-013); long-term, convert to hooks | Open, low priority | Frontend |
-| L-11 | Recycle bin `deleted_by` is always null: the backend does not record who deleted an item | Open; set deleted_by on soft delete | Sparsh (later) |
+| L-11 | Recycle bin `deleted_by` is always null: the backend does not record who deleted an item | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): patients and leads record `deleted_by`, and the recycle bin shows it | - |
 | L-12 | Payroll / salary is not built (fake column removed, D-014) | Product decision needed before building | Onkar + founders |
 | L-13 | Pages that are only correct when reached via the sidebar: fixed for Leads, Therapists, Recycle Bin, Billing, then Patients, patient workspace, Appointments and the sidebar after a therapist test (D-013). All 9 pages pass a direct-load check as admin and as a therapist with overrides (2026-10-12) | Resolved | - |
 | L-14 | Clinic address, phone, lead doctor and registration no. are not stored (the fake Settings fields were removed). Invoices and prescriptions will need them | Open; add clinic profile fields | Sparsh (later), then frontend |
-| L-15 | Audit log records almost nothing: only patient create and clinic settings updates were seen. Lead delete/restore/stage, invoices, payments are not audited | Open; needed for a healthcare CRM | Sparsh |
-| L-16 | Booking slug: fuzzy clinic-name lookup and a missing `get_by_slug` (D-016). Frontend mitigated with UUID links | **Must fix before launch** | Sparsh |
+| L-15 | Audit log is incomplete. `log_event` covers patient create/update/delete, user permission grant/revoke and delete, clinic settings updates and marketplace actions. Leads, appointments, invoices, payments and user creation are not audited | Open; needed for a healthcare CRM (follow-up PR) | Sparsh |
+| L-16 | Booking slug: fuzzy clinic-name lookup and a missing `get_by_slug` (D-016) | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): unique `clinics.slug`, exact lookup (a partial name returns 404), slug in `/auth/me`. Frontend links by slug (D-016 retired) | - |
 | L-17 | Public booking services and time slots are a fixed list, not configured per clinic | Open, product decision | Onkar + founders |
 | L-18 | Prescription PDF falls back to "Aarogya-Virohan Clinic" when the clinic is missing (`prescription_service.py`) | Open, low | Sparsh |
 | L-19 | Appointments have no type column; the drawer's "Appointment Type" was silently dropped and was removed | Open, product decision (add a column if needed) | Onkar + Sparsh |
-| L-20 | No overpayment check in `record_payment`: paid_amount can exceed total. Frontend now blocks amount > balance | Open; add a backend check | Sparsh |
-| L-21 | Backend requires a client-sent `invoice_number` and has no uniqueness constraint. Frontend suggests the next number and checks duplicates in the loaded list | Open; generate per clinic in the backend with `UNIQUE(clinic_id, invoice_number)` | Sparsh |
-| L-22 | `POST /users` creates no `memberships` row (register does; migration 65d7c21a9d4e backfilled only users that existed when it ran). These users log in today through the legacy `users.clinic_id` fallback; they would be locked out if PR B removes it without a backfill | **Check in PR B** | Sparsh |
+| L-20 | No overpayment check in `record_payment`: paid_amount can exceed total | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): a payment above the balance is rejected (600 of 1000 accepted, then 500 rejected, 400 accepted, then 0.01 rejected) | - |
+| L-21 | Backend required a client-sent `invoice_number` with no uniqueness | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): backend numbers invoices per clinic (INV-0001, INV-0002, ...), unique per clinic, safe under concurrent requests, client value ignored. Frontend number field removed; the created number is shown | - |
+| L-22 | `POST /users` created no `memberships` row | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): user creation creates a membership, an existing email gets a membership in the new clinic, and migration a8c4e2f1d903 backfills users without one | - |
 | L-23 | Permissions drawer shows "none" for capabilities without an override (ignores the role template) and saves explicit "none" for all of them (PUT replaces all). Harmless while templates are deny-all; would wipe template access once templates are restored | Fix together with role templates: backend returns effective scopes, drawer sends only real overrides | Sparsh + frontend |
 | L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Open; add clinic time zone (default Asia/Kolkata) | Sparsh (later) |
-| L-25 | DB enum `specialty_type` has only physiotherapy, chiropractic, osteopathy, massage, acupuncture, other. Migration 38ebc0d87a65 "added" ortho/neuro/cardiopulm/sports/paeds/general with `alter_column`, which does not add Postgres enum values, so saving them returns 500 (verified locally) | Open; `ALTER TYPE specialty_type ADD VALUE ...` migration; then frontend can move `form_data.area` into `specialty` | Sparsh |
+| L-25 | DB enum `specialty_type` lacked ortho/neuro/cardiopulm/sports/paeds/general, so saving them returned 500 | Backend fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it) (12 enum values, all save). Frontend still stores pain area in `form_data.area`; moving it into `specialty` is open | Frontend |
 | L-26 | `types/schema.ts` is stale (e.g. SoapAssessment lacks `finalized`) | Open; regenerate from the backend OpenAPI | Frontend |
 | L-27 | Auto-Rx creates a prescription with empty items and the note "Auto-generated prescription." (invented content on a clinical document), and the button shows even for users without prescription permissions. Not changed because Rx scope is parked with founders | Decide with Rx scope | Onkar + founders |
-| L-28 | Document storage errors reach users as raw text (e.g. "[Errno 111] Connection refused") | Open; backend should return a friendly message and log the detail | Sparsh |
+| L-28 | Document storage errors reached users as raw text (e.g. "[Errno 111] Connection refused") | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): storage failures return 503 "Document storage is temporarily unavailable." | - |
 | L-29 | For non-admin roles every page called `GET /settings/clinic` and `GET /patients` and got 403 | Frontend part fixed 2026-10-12: settings are read only with `settings.view` (name/logo/colour/booking link come from `/auth/me`), patient lookups only with `patients.view` and only while a search or form is open. Verified: front desk dashboard and billing make no 403 calls | Frontend |
 | L-30 | A newly registered clinic gets only the CRM entitlement, so Rx calls return 403 `PRODUCT_NOT_ENTITLED`; the tab was empty, Auto-Rx failed, and the console showed "{}" because the client ignored the `meta.error` envelope. Receipts had no payment details and showed a due date | Fixed 2026-10-12: client reads `meta.error` (message + code), Rx tab and Auto-Rx say "not enabled for this clinic" (no retry), receipt lists each payment (date, mode, reference, amount) and drops "Due". 403s are logged as warnings | Frontend |
-| L-31 | Recycle Bin returns 500 as soon as any patient is soft-deleted: `recycle_bin.py` reads `patient.deleted_by`, but the `patients` table and model have no `deleted_by` column (`AttributeError`). Reproduced on a fresh DB at migration head | Open; add the column (or use SoftDeleteMixin) via migration, or stop reading it for patients | Sparsh |
-| L-32 | `patient_service.py` never filters `deleted_at`: `get_patients`, `get_patient_by_id`, `update_patient` and `search_patients` all return soft-deleted patients. A deleted patient stays in the Patients list, in the invoice/appointment patient pickers, and its page opens; a second Delete returns 404 | Open; add `Patient.deleted_at.is_(None)` to every query (the repository `get_by_id` already does) | Sparsh |
-| L-33 | `GET /patients` has no status filter, so the Patients page status dropdown only filters the 10 rows already loaded | Open; add `status` to the list endpoint, then send it from the page (the empty message says "on this page" until then) | Sparsh, then frontend |
+| L-31 | Recycle Bin returned 500 once a patient was soft-deleted (`patients.deleted_by` did not exist) | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): column added; recycle bin lists deleted patients and restore works | - |
+| L-32 | `patient_service.py` never filtered `deleted_at` | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): deleted patients are hidden from the list and search, and GET and PATCH by id return 404 | - |
+| L-33 | `GET /patients` had no status filter, so the Patients page filtered only the loaded page | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): `?status=` on the API (invalid value returns 422); the Patients page sends it and resets to page 1 | - |
 
 *Last updated: 2026-10-12 (L-9, L-29, L-30 fixed; Patients list and command palette restyled) | Branch: feat/crm-ui-theme*

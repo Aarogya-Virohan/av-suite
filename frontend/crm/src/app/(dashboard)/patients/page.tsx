@@ -23,9 +23,9 @@ const STATUS_TONE: Record<PatientStatus, BadgeTone> = {
 /*
  * Restyled to the AV Suite theme. Also fixed:
  * - Each row printed the full patient UUID under the name.
- * - The status filter only filters the page that is loaded (the API has no
- *   status filter, Decisions.md L-33). The empty message now says so instead
- *   of implying there are no such patients at all.
+ * - The status filter used to filter only the loaded page (L-33). The API
+ *   now filters by status, so the filter covers the whole list and the
+ *   pagination counts match it.
  */
 export default function PatientsPage() {
   usePermissionSubscription(); // see Decisions.md D-013
@@ -33,16 +33,17 @@ export default function PatientsPage() {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const isAllowed = canAccessModule('patients');
-  const { data: response, isLoading } = usePatients(searchTerm, page, 10, isAllowed);
+  const [statusFilter, setStatusFilter] = useState<PatientStatus | 'all'>('all');
+  const { data: response, isLoading } = usePatients(
+    searchTerm,
+    page,
+    10,
+    isAllowed,
+    statusFilter === 'all' ? undefined : statusFilter,
+  );
   const patients = response?.data || [];
   const meta = response?.meta;
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  const filteredPatients = patients.filter((p) => {
-    if (statusFilter === 'all') return true;
-    return p.status === statusFilter;
-  });
 
   if (!isAllowed) {
     // AccessRestricted renders its own AppShell.
@@ -102,7 +103,10 @@ export default function PatientsPage() {
               <select
                 aria-label="Filter by status"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value as PatientStatus | 'all');
+                  setPage(1); // a new filter starts on page 1
+                }}
                 className={cn(inputClass, 'w-auto')}
               >
                 <option value="all">All Statuses</option>
@@ -123,18 +127,14 @@ export default function PatientsPage() {
 
         <DataTable
           columns={columns}
-          data={filteredPatients}
+          data={patients}
           isLoading={isLoading}
           onSearchChange={(term) => {
             setSearchTerm(term);
             setPage(1); // Reset to page 1 on new search
           }}
           searchPlaceholder="Search by patient name or phone number..."
-          emptyMessage={
-            statusFilter !== 'all' && patients.length > 0
-              ? `No ${statusFilter} patients on this page.`
-              : 'No patients found.'
-          }
+          emptyMessage={statusFilter !== 'all' ? `No ${statusFilter} patients found.` : 'No patients found.'}
           onRowClick={(patient) => router.push(`/patients/${patient.id}`)}
           totalItems={meta?.total}
           currentPage={meta?.page}

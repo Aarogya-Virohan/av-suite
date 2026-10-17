@@ -6,6 +6,8 @@ import { apiClient } from '../lib/api-client';
 export interface ClinicBranding {
   id: string;
   name: string;
+  /** Public booking slug (from /auth/me). Older backends do not send it. */
+  slug?: string | null;
   branding_logo_url: string | null;
   branding_color: string | null;
 }
