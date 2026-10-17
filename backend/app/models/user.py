@@ -1,25 +1,48 @@
 import uuid
-import enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Enum, ForeignKey
+from sqlalchemy import String, Enum, ForeignKey, Boolean
+from app.enums.user import UserRole
 from app.models.base import Base, TimestampMixin
 
-class UserRole(str, enum.Enum):
-    admin = "admin"
-    physio = "physio"
-    patient = "patient"
 
 class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    clinic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinics.id", ondelete="CASCADE"))
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    clinic_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("clinics.id", ondelete="CASCADE"), nullable=True
+    )
+    email: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False
+    )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(
+            UserRole,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+            name="user_role",
+            length=50,
+        ),
+        nullable=False,
+    )
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    clinic = relationship("Clinic", back_populates="users")
+    clinic = relationship("Clinic", back_populates="users", foreign_keys=[clinic_id])
+    memberships = relationship(
+        "Membership",
+        back_populates="user",
+        foreign_keys="Membership.user_id",
+        cascade="all, delete-orphan",
+    )
     patient_profile = relationship("Patient", back_populates="user", uselist=False)
     prescriptions_given = relationship("Prescription", back_populates="physio")
+    permission_overrides = relationship(
+        "UserPermission",
+        foreign_keys="UserPermission.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

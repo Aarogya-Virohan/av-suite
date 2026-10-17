@@ -1,10 +1,17 @@
 import pytest
 from httpx import AsyncClient
 from app.core.config import settings
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.clinic import Clinic
+from app.models.product import Product
+from app.models.user import User
+from app.models.product import WorkspaceProduct
+from app.enums.product import EntitlementStatus, EntitlementSource
 
 pytestmark = pytest.mark.asyncio
 
-async def test_clinic_isolation(client: AsyncClient):
+async def test_clinic_isolation(client: AsyncClient, db_session: AsyncSession):
     # 1. Register Clinic A and User A (admin)
     reg_response_a = await client.post(f"{settings.API_V1_PREFIX}/auth/register", json={
         "clinic_name": "Clinic A",
@@ -26,6 +33,62 @@ async def test_clinic_isolation(client: AsyncClient):
     })
     assert reg_response_b.status_code == 201
     token_b = reg_response_b.json()["data"]["access_token"]
+
+    # Ensure both clinics have exercise-library entitlement
+    # Get the exercise-library product
+    result = await db_session.execute(select(Product).where(Product.slug == "exercise-library"))
+    exercise_lib_product = result.scalar_one_or_none()
+    assert exercise_lib_product is not None, "exercise-library product should exist"
+
+    # Get clinic A by email of its admin user
+    result_a = await db_session.execute(
+        select(Clinic).join(User).where(User.email == "admin_a@test.com")
+    )
+    clinic_a = result_a.scalar_one_or_none()
+    assert clinic_a is not None, "Clinic A should exist"
+
+    # Get clinic B by email of its admin user
+    result_b = await db_session.execute(
+        select(Clinic).join(User).where(User.email == "admin_b@test.com")
+    )
+    clinic_b = result_b.scalar_one_or_none()
+    assert clinic_b is not None, "Clinic B should exist"
+
+    # Add exercise-library entitlement to clinic A if not already present
+    result_ap = await db_session.execute(
+        select(WorkspaceProduct).where(
+            WorkspaceProduct.clinic_id == clinic_a.id,
+            WorkspaceProduct.product_id == exercise_lib_product.id
+        )
+    )
+    existing_ap = result_ap.scalar_one_or_none()
+    if not existing_ap:
+        workspace_product_a = WorkspaceProduct(
+            clinic_id=clinic_a.id,
+            product_id=exercise_lib_product.id,
+            status=EntitlementStatus.ENABLED,
+            source=EntitlementSource.DIRECT
+        )
+        db_session.add(workspace_product_a)
+
+    # Add exercise-library entitlement to clinic B if not already present
+    result_bp = await db_session.execute(
+        select(WorkspaceProduct).where(
+            WorkspaceProduct.clinic_id == clinic_b.id,
+            WorkspaceProduct.product_id == exercise_lib_product.id
+        )
+    )
+    existing_bp = result_bp.scalar_one_or_none()
+    if not existing_bp:
+        workspace_product_b = WorkspaceProduct(
+            clinic_id=clinic_b.id,
+            product_id=exercise_lib_product.id,
+            status=EntitlementStatus.ENABLED,
+            source=EntitlementSource.DIRECT
+        )
+        db_session.add(workspace_product_b)
+
+    await db_session.commit()
 
     # 3. Create an exercise in Clinic A
     headers_a = {"Authorization": f"Bearer {token_a}"}

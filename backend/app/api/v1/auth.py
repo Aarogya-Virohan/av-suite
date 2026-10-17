@@ -12,12 +12,29 @@ Response Format:
 All responses ResponseEnvelope mein wrapped hote hain consistency ke liye.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
+from app.core.dependencies import (
+    AuthenticatedContextDep,
+    PermissionContextDep,
+    SessionDep,
+)
+from app.core.security import create_access_token
+from app.core.rbac import CAPABILITY_REGISTRY
+from app.schemas.auth import (
+    RegisterRequest,
+    LoginRequest,
+    WorkspaceSwitchRequest,
+    TokenResponse,
+    AuthMeResponse,
+    UserInfoResponse,
+    ClinicInfoResponse,
+)
 from app.schemas.envelope import ResponseEnvelope
 from app.services import auth_service
+from app.models.membership import Membership
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,16 +44,58 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get(
+    "/me",
+    response_model=ResponseEnvelope[AuthMeResponse],
+    tags=["Authentication"],
+)
+async def get_me(
+    perm_ctx: PermissionContextDep,
+) -> ResponseEnvelope[AuthMeResponse]:
+    """
+    Get the currently authenticated user's details, clinic branding, and full effective capabilities.
+    Accessible to any active authenticated user.
+    """
+    capabilities = {
+        key: perm_ctx.effective_scope(key).value for key in CAPABILITY_REGISTRY
+    }
+
+    active_role = perm_ctx.membership.role
+
+    user_info = UserInfoResponse(
+        id=perm_ctx.user.id,
+        clinic_id=perm_ctx.clinic.id,
+        email=perm_ctx.user.email,
+        first_name=perm_ctx.user.first_name,
+        last_name=perm_ctx.user.last_name,
+        role=str(active_role),
+        is_active=perm_ctx.user.is_active,
+    )
+
+    clinic_info = ClinicInfoResponse(
+        id=perm_ctx.clinic.id,
+        name=perm_ctx.clinic.name,
+        slug=perm_ctx.clinic.slug,
+        branding_logo_url=perm_ctx.clinic.branding_logo_url,
+        branding_color=perm_ctx.clinic.branding_color,
+    )
+
+    return ResponseEnvelope(
+        data=AuthMeResponse(
+            user=user_info,
+            clinic=clinic_info,
+            capabilities=capabilities,
+        )
+    )
+
+
 @router.post(
     "/register",
     response_model=ResponseEnvelope[TokenResponse],
     status_code=201,
-    tags=["Authentication"]
+    tags=["Authentication"],
 )
-async def register(
-    request: RegisterRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
     Endpoint ka purpose: New user aur clinic ko register karna signup flow mein
     Yeh endpoint signup process handle karta hai jo:
@@ -92,19 +151,19 @@ async def register(
         "clinic_name": "City Medical Clinic"
       }'
     """
-    
+
     logger.info(f"Registration request received for email: {request.email}")
-    
+
     try:
         # Service layer ko call karte hain registration logic ke liye
         # Service database operations handle karta hai
         token_response = await auth_service.register_user(db, request)
-        
+
         # ResponseEnvelope mein wrap karte hain consistent format ke liye
         # All API responses same structure follow karte hain
         logger.info(f"User registered successfully: {request.email}")
         return ResponseEnvelope(data=token_response)
-        
+
     except Exception as e:
         # Exceptions service layer se propagate hote hain
         # FastAPI automatically error responses generate karta hai
@@ -113,14 +172,9 @@ async def register(
 
 
 @router.post(
-    "/login",
-    response_model=ResponseEnvelope[TokenResponse],
-    tags=["Authentication"]
+    "/login", response_model=ResponseEnvelope[TokenResponse], tags=["Authentication"]
 )
-async def login(
-    request: LoginRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Endpoint ka purpose: Existing user ko authenticate karna login flow mein
     Yeh endpoint login process handle karta hai jo:
@@ -184,21 +238,46 @@ async def login(
     curl -X GET http://localhost:8000/api/v1/patients \\
       -H "Authorization: Bearer eyJhbGc..."
     """
-    
+
     logger.info(f"Login request received for email: {request.email}")
-    
+
     try:
         # Service layer ko call karte hain authentication logic ke liye
         # Service password verification aur token generation handle karta hai
         token_response = await auth_service.login_user(db, request)
-        
+
         # ResponseEnvelope mein wrap karte hain consistent format ke liye
         logger.info(f"User logged in successfully: {request.email}")
         return ResponseEnvelope(data=token_response)
-        
+
     except Exception as e:
         # Exceptions service layer se propagate hote hain
         # FastAPI automatically error responses generate karta hai
         logger.error(f"Login failed: {str(e)}")
         raise
 
+
+@router.post("/switch-workspace", response_model=ResponseEnvelope[TokenResponse])
+async def switch_workspace(
+    payload: WorkspaceSwitchRequest,
+    auth_context: AuthenticatedContextDep,
+    db: SessionDep,
+) -> ResponseEnvelope[TokenResponse]:
+    membership = await db.scalar(
+        select(Membership).where(
+            Membership.user_id == auth_context.user.id,
+            Membership.clinic_id == payload.clinic_id,
+        )
+    )
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of the requested workspace",
+        )
+
+    token = create_access_token(
+        subject=auth_context.user.id,
+        clinic_id=str(membership.clinic_id),
+        role=membership.role.value,
+    )
+    return ResponseEnvelope(data=TokenResponse(access_token=token))

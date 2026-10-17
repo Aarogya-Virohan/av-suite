@@ -20,9 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import HTTPException, status
 from app.models.clinic import Clinic
-from app.models.user import User, UserRole
+from app.models.membership import Membership
+from app.models.user import User
+from app.enums.user import UserRole
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from app.core.security import get_password_hash, verify_password, create_access_token
+from app.services.product_entitlements import ensure_crm_entitlement
 import logging
 import uuid
 
@@ -34,38 +37,38 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
     Function ka purpose: New user aur clinic ko register karna
     Yeh function signup flow handle karta hai - new clinic create karta hai,
     admin user add karta hai, aur authentication token return karta hai.
-    
+
     Input:
     - db (AsyncSession): Database session connection
     - request (RegisterRequest): User registration details
       - email: User email (unique identifier)
       - password: Plain password (hash mein convert hoga)
       - clinic_name: Naye clinic ka name
-    
+
     Output: TokenResponse
     - access_token: JWT token authentication ke liye
-    
+
     Error:
     - HTTPException 409: Email already registered hai (duplicate email)
     - HTTPException 500: Database transaction failure
-    
+
     Business Logic Flow:
     1. Email uniqueness check - duplicate registration prevent karte hain
     2. Clinic creation - naya clinic record create karte hain
     3. Admin user creation - clinic owner user banate hain
     4. Token generation - authentication token issue karte hain
-    
+
     Security Notes:
     - Password immediately hash ho jata hai (plain text kabhi save nahi hota)
     - Clinic automatically create hota hai (admin user = clinic owner)
     - First user hamesha admin role se create hota hai
     - Token 24 hours validity se create hota hai (default)
-    
+
     Transaction Handling:
     - flush() use karte hain clinic ID get karne ke liye
     - commit() transaction finalize karte hain
     - Agar koi error aaye to transaction automatically rollback hota hai
-    
+
     Usage:
     request = RegisterRequest(
         email="user@hospital.com",
@@ -75,19 +78,20 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
     token_response = await register_user(db, request)
     return token_response
     """
-    
+
     try:
         logger.info(f"Attempting registration for email: {request.email}")
-        
+
         # Email uniqueness validation
         # Duplicate email check karte hain database mein
         # Yeh prevent karta hai multiple accounts same email se
         result = await db.execute(select(User).where(User.email == request.email))
         if result.scalars().first():
-            logger.warning(f"Registration failed: Email already exists - {request.email}")
+            logger.warning(
+                f"Registration failed: Email already exists - {request.email}"
+            )
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Email already registered"
+                status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
             )
 
         # Create new clinic
@@ -95,7 +99,7 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
         # Multi-tenant architecture: Har clinic isolated data rakhta hai
         new_clinic = Clinic(name=request.clinic_name)
         db.add(new_clinic)
-        
+
         # flush() call karte hain clinic ID get karne ke liye
         # Flush: Database mein temporary add karta hai ID generation ke liye
         # Commit nahi karte, sirf ID generate karne ke liye
@@ -109,17 +113,26 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
         new_user = User(
             clinic_id=new_clinic.id,
             email=request.email,
-            password_hash=get_password_hash(request.password),  # Hash karte hain, plain nahi store
-            role=UserRole.admin,  # First user = admin
+            password_hash=get_password_hash(
+                request.password
+            ),  # Hash karte hain, plain nahi store
+            role=UserRole.ADMIN,  # First user = admin
             first_name=request.first_name,
-            last_name=request.last_name
+            last_name=request.last_name,
         )
         db.add(new_user)
-        
+        await db.flush()
+
+        membership = Membership(
+            user_id=new_user.id, clinic_id=new_clinic.id, role=UserRole.ADMIN
+        )
+        db.add(membership)
+        await ensure_crm_entitlement(db, new_clinic.id)
+
         # commit() transaction finalize karte hain
         # Database mein permanent add hota hai clinic aur user
         await db.commit()
-        
+
         # refresh() user ko latest database values se load karte hain
         # ID aur other auto-generated fields ensure karte hain
         await db.refresh(new_user)
@@ -130,13 +143,13 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
         # Subject: User ID, Clinic ID, aur Role token mein include hote hain
         access_token = create_access_token(
             subject=new_user.id,
-            clinic_id=new_clinic.id,
-            role=new_user.role.value  # Enum value se string le lete hain
+            clinic_id=str(new_clinic.id),
+            role=UserRole.ADMIN.value,
         )
-        
+
         logger.info(f"Access token generated for new user: {new_user.id}")
         return TokenResponse(access_token=access_token)
-        
+
     except HTTPException:
         # Already processed exceptions ko re-raise karte hain
         raise
@@ -146,7 +159,7 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
         await db.rollback()  # Transaction rollback karte hain
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Registration failed"
+            detail="Registration failed",
         )
 
 
@@ -155,35 +168,35 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
     Function ka purpose: Existing user ko authenticate karna aur token issue karna
     Yeh function login flow handle karta hai - email/password verify karta hai,
     credentials match hone par JWT token return karta hai.
-    
+
     Input:
     - db (AsyncSession): Database session connection
     - request (LoginRequest): Login credentials
       - email: User email address
       - password: Plain password (comparison ke liye)
-    
+
     Output: TokenResponse
     - access_token: JWT token authentication ke liye
-    
+
     Error:
     - HTTPException 401: Incorrect email or password (combined message)
-    
+
     Authentication Flow:
     1. Email se user database mein search karte hain
     2. Password verification (bcrypt constant-time comparison)
     3. Token generation successful credentials par
-    
+
     Security Notes:
     - Generic error message (email OR password) - specific info leak prevent karte hain
     - Password hashing: Plain password bytes convert karke compare karte hain
     - Constant-time comparison: Timing attacks prevent karte hain
     - Failed login attempt log hota hai security auditing ke liye
-    
+
     Token Generation:
     - Subject: User ID (who is logging in)
     - Clinic ID: User's clinic association (multi-tenant)
     - Role: User's access level (authorization)
-    
+
     Usage:
     request = LoginRequest(
         email="user@hospital.com",
@@ -192,10 +205,10 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
     token_response = await login_user(db, request)
     return token_response
     """
-    
+
     try:
         logger.info(f"Login attempt for email: {request.email}")
-        
+
         # Email se user fetch karte hain
         # Database query execute karte hain email match par
         result = await db.execute(select(User).where(User.email == request.email))
@@ -208,20 +221,58 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
             logger.warning(f"Failed login attempt for email: {request.email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password"  # Generic message - no specificity
+                detail="Incorrect email or password",  # Generic message - no specificity
             )
 
-        # Generate JWT token after successful authentication
-        # Token user ke clinic aur role information include karta hai
+        memberships = (
+            await db.scalars(
+                select(Membership)
+                .where(Membership.user_id == user.id)
+                .order_by(Membership.created_at, Membership.clinic_id)
+            )
+        ).all()
+        if not memberships:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="This account has no workspace memberships",
+            )
+
+        active_membership = None
+        if request.clinic_id is not None:
+            active_membership = next(
+                (m for m in memberships if m.clinic_id == request.clinic_id), None
+            )
+            if active_membership is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of the requested workspace",
+                )
+        elif len(memberships) == 1:
+            active_membership = memberships[0]
+        else:
+            workspaces = []
+            for membership in memberships:
+                clinic = await db.get(Clinic, membership.clinic_id)
+                if clinic:
+                    workspaces.append({"clinic_id": str(clinic.id), "name": clinic.name, "role": membership.role.value})
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "code": "WORKSPACE_SELECTION_REQUIRED",
+                    "message": "Select a workspace to continue.",
+                    "workspaces": workspaces,
+                },
+            )
+
         access_token = create_access_token(
             subject=user.id,
-            clinic_id=user.clinic_id,
-            role=user.role.value  # Enum value se string
+            clinic_id=str(active_membership.clinic_id),
+            role=active_membership.role.value,
         )
-        
+
         logger.info(f"Successful login for user: {user.id}")
         return TokenResponse(access_token=access_token)
-        
+
     except HTTPException:
         # Already processed exceptions ko re-raise karte hain
         raise
@@ -229,7 +280,5 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
         # Unexpected errors ko log karte hain
         logger.error(f"Login error: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Login failed"
         )
-

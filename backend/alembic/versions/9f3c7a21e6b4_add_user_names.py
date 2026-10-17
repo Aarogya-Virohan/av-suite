@@ -19,8 +19,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('users', sa.Column('first_name', sa.String(length=100), nullable=False))
-    op.add_column('users', sa.Column('last_name', sa.String(length=100), nullable=False))
+    # Add as nullable first to allow backfill on existing rows
+    op.add_column('users', sa.Column('first_name', sa.String(length=100), nullable=True))
+    op.add_column('users', sa.Column('last_name', sa.String(length=100), nullable=True))
+    # Backfill existing rows with a placeholder value
+    op.execute("UPDATE users SET first_name = 'Admin', last_name = 'User' WHERE first_name IS NULL")
+    # Now enforce NOT NULL
+    op.alter_column('users', 'first_name', nullable=False)
+    op.alter_column('users', 'last_name', nullable=False)
 
 
 def downgrade() -> None:

@@ -1,85 +1,69 @@
 """
 Module: router.py
-Purpose: API V1 endpoints को consolidate aur organize karna
-Yeh module API V1 routes ko combine karta hai aur main application mein include karta hai.
-Router hierarchy ke through endpoint organization manage hota hai.
-
-API Structure:
-/api/v1/
-├── /auth (Authentication endpoints)
-│   ├── POST /register - New user registration
-│   └── POST /login - User login
-├── /exercises (Exercise management)
-│   ├── GET / - List exercises with filters
-│   ├── POST / - Create new exercise (admin only)
-│   └── GET /{id} - Get exercise details
-└── /patients (Patient management)
-    ├── GET / - List clinic patients
-    ├── POST / - Create new patient
-    └── GET /{id} - Get patient details
-
-Router Composition:
-- Authentication routes: auth.router
-- Exercise routes: exercises.router
-- Patient routes: patients.router
-
-Each router independently defined aur yahan combined hota hai.
+Purpose: API V1 endpoints ko consolidate aur organize karna.
 """
 
 from fastapi import APIRouter
-from app.api.v1 import auth, exercises, patients, prescriptions
+from app.api.v1 import (
+    auth,
+    exercises,
+    patients,
+    prescriptions,
+    leads,
+    appointments,
+    billing,
+    booking,
+    documents,
+    treatments,
+    assessments,
+    audit,
+    recycle_bin,
+    settings,
+    analytics,
+    users,
+    marketplace,
+    me,
+    # memory,
+)
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Main API V1 Router
-# Sab V1 endpoints yahan organize hote hain
-# Main app mein prefix ke saath include hota hai (/api/v1)
 api_router = APIRouter()
 
-# Authentication Router
-# Prefix: /api/v1/auth
-# Endpoints: /register, /login (public, no authentication required)
+# --- Existing routers (unchanged) ---
+api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(exercises.router, prefix="/exercises", tags=["Exercises"])
+api_router.include_router(patients.router, prefix="/patients", tags=["Patients"])
+# Posture is mounted once in main.py at /posture (the include that was
+# here served a duplicate /api/v1/posture/posture/* path; dev removed it).
 api_router.include_router(
-    auth.router,
-    prefix="/auth",
-    tags=["Authentication"]
+    prescriptions.router, prefix="/prescriptions", tags=["Prescriptions"]
 )
-logger.info("Auth router included: /api/v1/auth")
 
-# Exercises Router
-# Prefix: /api/v1/exercises
-# Endpoints: GET /, POST /, GET /{id}
-# Authentication: Required (JWT token)
-# Authorization: All authenticated users can list/read, admin only create
+# --- New CRM routers: paths start empty (""), so they need an explicit prefix ---
+api_router.include_router(leads.router, prefix="/leads", tags=["Leads"])
 api_router.include_router(
-    exercises.router,
-    prefix="/exercises",
-    tags=["Exercises"]
+    appointments.router, prefix="/appointments", tags=["Appointments"]
 )
-logger.info("Exercises router included: /api/v1/exercises")
-
-# Patients Router
-# Prefix: /api/v1/patients
-# Endpoints: GET /, POST /, GET /{id}
-# Authentication: Required (JWT token)
-# Authorization: Admin and physio roles only
+api_router.include_router(treatments.router, prefix="/treatments", tags=["Treatments"])
 api_router.include_router(
-    patients.router,
-    prefix="/patients",
-    tags=["Patients"]
+    assessments.router, prefix="/assessments", tags=["Assessments"]
 )
-logger.info("Patients router included: /api/v1/patients")
+api_router.include_router(users.router, prefix="/users", tags=["Users"])
 
-# Prescriptions Router
-# Prefix: /api/v1/prescriptions
-# Endpoints: POST /, GET /, GET /{id}, PATCH /{id}, POST /{id}/pdf
-# Authentication: Required (JWT token)
+# --- New CRM routers: paths already include their own full resource path, NO extra prefix ---
+api_router.include_router(billing.router, tags=["Billing"])
+api_router.include_router(booking.router, tags=["Booking"])
+api_router.include_router(documents.router, tags=["Documents"])
+api_router.include_router(audit.router, tags=["Audit"])
+api_router.include_router(recycle_bin.router, tags=["Recycle Bin"])
+api_router.include_router(settings.router, tags=["Settings"])
+api_router.include_router(analytics.router, tags=["Analytics"])
 api_router.include_router(
-    prescriptions.router,
-    prefix="/prescriptions",
-    tags=["Prescriptions"]
+    marketplace.router, prefix="/marketplace", tags=["Marketplace"]
 )
-logger.info("Prescriptions router included: /api/v1/prescriptions")
+api_router.include_router(me.router, tags=["Platform Context"])
+# api_router.include_router(memory.router, prefix="/memory", tags=["Memory"])
 
-
+logger.info("All API v1 routers registered (existing + CRM)")
