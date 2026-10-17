@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.products import CANONICAL_PRODUCTS
 from app.core.dependencies import require_capability
 from app.core.security import create_access_token
 from app.enums.permission import CapabilityScope
@@ -18,12 +19,36 @@ import sqlalchemy as sa
 from app.main import app
 from app.models.clinic import Clinic
 from app.models.membership import Membership
-from app.models.product import WorkspaceProduct
+from app.models.product import Product, WorkspaceProduct
 from app.models.user import User
 from app.services.product_entitlements import ensure_crm_entitlement
 
 
 pytestmark = pytest.mark.asyncio
+
+
+async def test_seeded_canonical_products_use_canonical_clinic_types(
+    db_session: AsyncSession,
+) -> None:
+    all_workspace_types = ["clinic", "solo", "personal"]
+    assert {
+        product["id"]: product["allowed_clinic_types"]
+        for product in CANONICAL_PRODUCTS
+    } == {
+        product["id"]: (["clinic"] if product["id"] == "crm" else all_workspace_types)
+        for product in CANONICAL_PRODUCTS
+    }
+    expected_types = {
+        product["id"]: product["allowed_clinic_types"]
+        for product in CANONICAL_PRODUCTS
+    }
+    products = (
+        await db_session.scalars(select(Product).where(Product.id.in_(expected_types)))
+    ).all()
+
+    assert {
+        product.id: product.allowed_clinic_types for product in products
+    } == expected_types
 
 
 router = APIRouter()

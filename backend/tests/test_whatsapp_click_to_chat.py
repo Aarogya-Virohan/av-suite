@@ -25,6 +25,10 @@ def test_build_whatsapp_link_normalizes_and_encodes_phone_and_message() -> None:
 class _BookingRequestRepo:
     def __init__(self, request: SimpleNamespace) -> None:
         self.request = request
+        self.session = SimpleNamespace(commit=self._commit)
+
+    async def _commit(self) -> None:
+        pass
 
     async def get_by_id(
         self, request_id: UUID, clinic_id: UUID | None = None
