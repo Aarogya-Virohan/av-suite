@@ -40,6 +40,15 @@ async def test_patients_crud_admin(client: AsyncClient, auth_headers: dict):
 
 
 @pytest.mark.asyncio
+async def test_invalid_patient_status_filter_returns_422(client: AsyncClient, auth_headers: dict):
+    response = await client.get(
+        f"{settings.API_V1_PREFIX}/patients", params={"status": "zzz"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
 async def test_patients_crud_therapist_scope(client: AsyncClient, therapist_auth_headers: dict, auth_headers: dict):
     # Therapist has create=ALL, view=OWN, edit=OWN, delete=NONE
     

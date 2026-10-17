@@ -107,6 +107,28 @@ async def test_bucket_upload_frontdesk(client: AsyncClient, frontdesk_auth_heade
     )
     assert res.status_code == 201
 
+
+@pytest.mark.asyncio
+async def test_bucket_upload_returns_503_for_storage_unavailability(
+    client: AsyncClient, auth_headers: dict, seeded_patient: str, monkeypatch
+):
+    from app.core.storage import StorageUnavailableError, storage_client
+
+    def unavailable(*args, **kwargs):
+        raise StorageUnavailableError
+
+    monkeypatch.setattr(storage_client, "upload_file", unavailable)
+    headers = auth_headers.copy()
+    headers.pop("Content-Type", None)
+    response = await client.post(
+        f"{settings.API_V1_PREFIX}/patients/{seeded_patient}/documents",
+        data={"label": "Unavailable storage", "category": "medical_report"},
+        files={"file": ("test.pdf", b"dummy", "application/pdf")},
+        headers=headers,
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Document storage is temporarily unavailable."
+
 async def test_bucket_upload_patient_forbidden(client: AsyncClient, patient_auth_headers: dict, seeded_patient: str):
     """Patient should NOT be able to upload documents to the clinic bucket directly via this endpoint."""
     headers = patient_auth_headers.copy()

@@ -71,6 +71,7 @@ async def get_me(
     clinic_info = ClinicInfoResponse(
         id=perm_ctx.clinic.id,
         name=perm_ctx.clinic.name,
+        slug=perm_ctx.clinic.slug,
         branding_logo_url=perm_ctx.clinic.branding_logo_url,
         branding_color=perm_ctx.clinic.branding_color,
     )

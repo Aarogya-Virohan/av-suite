@@ -18,12 +18,13 @@ Response Format:
 All responses ResponseEnvelope mein wrapped hote hain with pagination metadata.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import uuid
 import logging
 from app.enums.user import UserRole
+from app.models.patient import PatientStatus
 
 from app.core.database import get_db
 from app.core.dependencies import require_capability
@@ -52,6 +53,7 @@ router = APIRouter()
 async def list_patients(
     request: Request,
     search: Optional[str] = None,
+    status_filter: Optional[PatientStatus] = Query(default=None, alias="status"),
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db),
     scope: CapabilityScope = Depends(require_capability("patients.view"))
@@ -134,9 +136,9 @@ async def list_patients(
         user_id = request.state.user_id if hasattr(request.state, "user_id") else None
         
         if search:
-            patients, total = await patient_service.search_patients(db, clinic_id, search, pagination, scope=scope, user_id=user_id)
+            patients, total = await patient_service.search_patients(db, clinic_id, search, pagination, scope=scope, user_id=user_id, status=status_filter)
         else:
-            patients, total = await patient_service.get_patients(db, clinic_id, pagination, scope=scope, user_id=user_id)
+            patients, total = await patient_service.get_patients(db, clinic_id, pagination, scope=scope, user_id=user_id, status=status_filter)
         
         # Pagination metadata prepare karte hain
         # Frontend pagination UI ke liye total aur current page info

@@ -1,6 +1,7 @@
 import uuid
 import enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy import String, Date, ForeignKey, Text, Enum, DateTime
 from sqlalchemy.ext.hybrid import hybrid_property
 from datetime import date, datetime
@@ -35,6 +36,7 @@ class Patient(Base, TimestampMixin):
     referral_source: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[PatientStatus] = mapped_column(Enum(PatientStatus), nullable=False, default=PatientStatus.active)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    deleted_by: Mapped[Optional[uuid.UUID]] = mapped_column(PGUUID(as_uuid=True), nullable=True, default=None)
 
     clinic = relationship("Clinic", back_populates="patients")
     user = relationship("User", back_populates="patient_profile")

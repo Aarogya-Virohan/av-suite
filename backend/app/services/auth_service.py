@@ -224,19 +224,45 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
                 detail="Incorrect email or password",  # Generic message - no specificity
             )
 
+        memberships = (await db.scalars(
+            select(Membership).where(Membership.user_id == user.id)
+        )).all()
+        # Legacy single-clinic accounts may predate membership rows.
+        if not memberships and user.clinic_id is not None:
+            memberships = [None]
+        chosen = None
+        if request.clinic_id is not None:
+            chosen = next((m for m in memberships if m and m.clinic_id == request.clinic_id), None)
+            if chosen is None and not (not memberships and user.clinic_id == request.clinic_id):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of this workspace")
+        elif len(memberships) > 1:
+            workspaces = []
+            for membership in memberships:
+                clinic = await db.get(Clinic, membership.clinic_id)
+                if clinic:
+                    workspaces.append({"clinic_id": str(clinic.id), "name": clinic.name, "role": membership.role.value})
+            raise HTTPException(status_code=400, detail={
+                "code": "WORKSPACE_SELECTION_REQUIRED",
+                "message": "Select a workspace to continue.",
+                "workspaces": workspaces,
+            })
+        elif memberships:
+            chosen = memberships[0]
+        active_clinic_id = chosen.clinic_id if chosen else user.clinic_id
+
         # Generate JWT token after successful authentication using the active membership
         # role when present. We keep the legacy user.role as a fallback for older data.
         active_membership = await db.scalar(
             select(Membership).where(
                 Membership.user_id == user.id,
-                Membership.clinic_id == user.clinic_id,
+                Membership.clinic_id == active_clinic_id,
             )
         )
         role = active_membership.role if active_membership is not None else user.role
 
         access_token = create_access_token(
             subject=user.id,
-            clinic_id=user.clinic_id,
+            clinic_id=active_clinic_id,
             role=role.value,  # Enum value se string
         )
 

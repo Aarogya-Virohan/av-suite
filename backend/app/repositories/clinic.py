@@ -18,15 +18,12 @@ class ClinicRepository(BaseRepository[Clinic]):
         super().__init__(session, Clinic)
 
     async def get_by_slug_or_id(self, identifier: str) -> Clinic | None:
-        """Find a clinic by UUID string or name/slug match."""
+        """Find a clinic by UUID or exact public slug."""
 
         try:
             clinic_uuid = UUID(identifier)
             return await self.get_by_id(clinic_uuid)
-        except ValueError:
+        except (ValueError, AttributeError):
             pass
-
-        cleaned_identifier = identifier.replace("-", " ").strip()
-        statement = select(Clinic).where(Clinic.name.ilike(f"%{cleaned_identifier}%"))
-        result = await self.session.scalars(statement)
-        return result.first()
+        statement = select(Clinic).where(Clinic.slug == identifier)
+        return await self.session.scalar(statement)

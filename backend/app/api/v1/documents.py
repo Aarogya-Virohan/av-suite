@@ -82,7 +82,7 @@ async def upload_patient_document(
     """Upload and register a document for a specific patient."""
 
     try:
-        from app.core.storage import storage_client
+        from app.core.storage import StorageUnavailableError, storage_client
         import uuid
 
         file_bytes = await file.read()
@@ -114,9 +114,10 @@ async def upload_patient_document(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
-    except Exception as exc:
+    except StorageUnavailableError as exc:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document storage is temporarily unavailable.",
         ) from exc
 
 
@@ -226,6 +227,8 @@ async def download_document(
 ) -> Response:
     """Download or retrieve private document location (authenticated, clinic-scoped)."""
 
+    from app.core.storage import StorageUnavailableError
+
     try:
         document = await service.get_document(clinic.id, id)
 
@@ -254,9 +257,10 @@ async def download_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
-    except Exception as exc:
+    except StorageUnavailableError as exc:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document storage is temporarily unavailable.",
         ) from exc
 
 
@@ -289,13 +293,14 @@ async def update_document(
 async def delete_document(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: DocumentServiceDep,
     scope: CapabilityScope = Depends(require_capability("documents.delete")),
 ) -> None:
     """Delete a patient document record."""
 
     try:
-        await service.delete_document(clinic.id, id)
+        await service.delete_document(clinic.id, id, deleted_by=user.id)
     except DocumentNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
