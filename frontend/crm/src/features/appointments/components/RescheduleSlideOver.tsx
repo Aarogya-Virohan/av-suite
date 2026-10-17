@@ -7,6 +7,8 @@ import { SlideOver } from '../../../components/ui/SlideOver';
 import { useUpdateAppointment } from '../api';
 import { Loader2 } from 'lucide-react';
 import { Appointment } from '../../../types/api';
+import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
+import { localDateTimeInputToISO, toLocalDateTimeInput } from '../../../lib/datetime';
 
 interface RescheduleSlideOverProps {
   isOpen: boolean;
@@ -22,14 +24,7 @@ interface RescheduleFormValues {
 export function RescheduleSlideOver({ isOpen, onClose, appointment }: RescheduleSlideOverProps) {
   const updateAppointment = useUpdateAppointment();
 
-  // Convert the ISO date from the appointment into something we can plug into datetime-local
-  const getDefaultDateTime = () => {
-    if (!appointment?.scheduled_at) return '';
-    const d = new Date(appointment.scheduled_at);
-    // Remove the trailing 'Z' and just use local time for the input
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
+  const getDefaultDateTime = () => (appointment?.scheduled_at ? toLocalDateTimeInput(appointment.scheduled_at) : '');
 
   const {
     register,
@@ -57,7 +52,7 @@ export function RescheduleSlideOver({ isOpen, onClose, appointment }: Reschedule
       // Send datetime string as ISO so backend parses it correctly
       const payload = {
         ...values,
-        scheduled_at: new Date(values.scheduled_at).toISOString(),
+        scheduled_at: localDateTimeInputToISO(values.scheduled_at),
       };
       await updateAppointment.mutateAsync({ id: appointment.id, data: payload });
       toast.success('Appointment rescheduled successfully');
@@ -72,50 +67,42 @@ export function RescheduleSlideOver({ isOpen, onClose, appointment }: Reschedule
   if (!appointment) return null;
 
   return (
-    <SlideOver isOpen={isOpen} onClose={onClose} title="Reschedule Appointment" subtitle={`Reschedule for ${appointment.patient_name || 'Patient ' + appointment.patient_id}`}>
+    <SlideOver isOpen={isOpen} onClose={onClose} title="Reschedule Appointment" subtitle={`Reschedule for ${appointment.patient_name || 'patient'}`}>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              New Date & Time *
-            </label>
+            <FieldLabel htmlFor="rs-time">New Date & Time *</FieldLabel>
             <input
               {...register('scheduled_at', { required: 'Date and time are required' })}
+              id="rs-time"
               type="datetime-local"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
+              className={inputClass}
             />
-            {errors.scheduled_at && <p className="text-xs text-rose-500 mt-1">{errors.scheduled_at.message}</p>}
+            {errors.scheduled_at && <p className="mt-1.5 text-xs font-medium text-danger">{errors.scheduled_at.message}</p>}
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-              Duration (Minutes) *
-            </label>
+            <FieldLabel htmlFor="rs-duration">Duration (Minutes) *</FieldLabel>
             <input
               {...register('duration_minutes', { valueAsNumber: true, required: 'Duration is required', min: 15 })}
+              id="rs-duration"
               type="number"
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-sm"
+              min={15}
+              step={15}
+              className={inputClass}
             />
-            {errors.duration_minutes && <p className="text-xs text-rose-500 mt-1">{errors.duration_minutes.message}</p>}
+            {errors.duration_minutes && <p className="mt-1.5 text-xs font-medium text-danger">{errors.duration_minutes.message || 'Minimum 15 minutes'}</p>}
           </div>
         </div>
 
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
-          >
+        <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={updateAppointment.isPending}
-            className="px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg flex items-center gap-2 disabled:opacity-50"
-          >
-            {updateAppointment.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+          </Button>
+          <Button type="submit" disabled={updateAppointment.isPending}>
+            {updateAppointment.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             <span>Confirm Reschedule</span>
-          </button>
+          </Button>
         </div>
       </form>
     </SlideOver>

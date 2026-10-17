@@ -1,16 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api-client';
-import { Patient } from '../../types/api';
+import { Patient, PatientStatus } from '../../types/api';
 import { PatientFormValues } from '../../lib/schemas';
 
 export const PATIENTS_QUERY_KEY = ['patients'];
 
-export function usePatients(search?: string, page = 1, page_size = 10, enabled = true) {
+/** status filters on the server (whole list, not one page); omit for all statuses. */
+export function usePatients(search?: string, page = 1, page_size = 10, enabled = true, status?: PatientStatus) {
   return useQuery({
-    queryKey: [...PATIENTS_QUERY_KEY, { search, page, page_size }],
+    queryKey: [...PATIENTS_QUERY_KEY, { search, page, page_size, status }],
     queryFn: async () => {
       const res = await apiClient.get('/patients', {
-        params: { search: search || undefined, page, page_size },
+        params: { search: search || undefined, page, page_size, status: status || undefined },
       });
       return res.data as { data: Patient[]; meta: { total: number; page: number; page_size: number } };
     },
@@ -18,14 +19,14 @@ export function usePatients(search?: string, page = 1, page_size = 10, enabled =
   });
 }
 
-export function usePatient(id: string) {
+export function usePatient(id: string, enabled = true) {
   return useQuery<Patient | null>({
     queryKey: [...PATIENTS_QUERY_KEY, id],
     queryFn: async () => {
       const res = await apiClient.get(`/patients/${id}`);
       return res.data?.data || res.data || null;
     },
-    enabled: !!id,
+    enabled: enabled && !!id,
   });
 }
 

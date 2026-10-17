@@ -3,12 +3,14 @@
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { useAnalyticsOverview, useMyPerformance } from '../../../features/analytics/api';
-import { ActivitySquare, Stethoscope, ClipboardList, TrendingUp, Users, Calendar, DollarSign, ArrowDownRight } from 'lucide-react';
+import { Stethoscope, ClipboardList, TrendingUp, Users, Calendar, IndianRupee, Wallet, ArrowDownRight, Info } from 'lucide-react';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { formatMoney } from '../../../lib/money';
 import { useAuthStore } from '../../../store';
 import type { AnalyticsPeriod, PatientRevenueSort } from '../../../types/api';
 import { canAccessModule, hasCapability } from '../../../config/permissions';
+import { Avatar, Card, CardHeader, KpiCard, PageHeader, type IconTone } from '../../../components/ui/brand';
+import { cn } from '../../../lib/cn';
 
 export default function AnalyticsPage() {
   const capabilities = useAuthStore((state) => state.capabilities);
@@ -37,46 +39,36 @@ export default function AnalyticsPage() {
   // If user only has personal performance permission, show personal performance
   if (!canViewFinancials && canViewMyPerf) {
     const perf = myPerformance;
+    const perfCards: { label: string; value: number; icon: React.ElementType; tone: IconTone }[] = [
+      { label: "Today's Appointments", value: perf?.today_appointments ?? 0, icon: Calendar, tone: 'grove' },
+      { label: `Completed (${selectedPeriodLabel})`, value: perf?.completed_appointments_in_period ?? 0, icon: TrendingUp, tone: 'grove' },
+      { label: `Cancelled (${selectedPeriodLabel})`, value: perf?.cancelled_appointments_in_period ?? 0, icon: ArrowDownRight, tone: 'danger' },
+      { label: `Treatment Sessions (${selectedPeriodLabel})`, value: perf?.treatment_sessions_in_period ?? 0, icon: Stethoscope, tone: 'teal' },
+      { label: `SOAP Notes (${selectedPeriodLabel})`, value: perf?.soap_notes_in_period ?? 0, icon: ClipboardList, tone: 'info' },
+      { label: `Patients Seen (${selectedPeriodLabel})`, value: perf?.patients_seen_in_period ?? 0, icon: Users, tone: 'warn' },
+    ];
     return (
       <AppShell>
-        <div className="p-6 space-y-6">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/40">
-              <ActivitySquare className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white">My Performance</h1>
-              <p className="text-xs text-slate-400">Your own activity for the selected reporting period</p>
-            </div>
-            <PeriodSelector period={period} onChange={setPeriod} />
-          </div>
+        <div className="space-y-6">
+          <PageHeader
+            title="My Performance"
+            subtitle="Your own activity for the selected reporting period"
+            actions={<PeriodSelector period={period} onChange={setPeriod} />}
+          />
           {performanceEnvelope?.meta.period === period && (
-            <p className="text-xs text-slate-400">
-              UTC range: {performanceEnvelope.meta.start.slice(0, 10)} – {performanceEnvelope.meta.end.slice(0, 10)} (end exclusive)
-            </p>
+            <RangeNote start={performanceEnvelope.meta.start} end={performanceEnvelope.meta.end} />
           )}
 
           {myPerfLoading ? (
-            <div className="text-slate-400 text-sm">Loading your performance data...</div>
+            <Card className="p-6 text-sm text-muted">Loading your performance data...</Card>
           ) : myPerfError ? (
-            <div role="alert" className="text-rose-600 text-sm">Unable to load your performance data.</div>
+            <Card role="alert" className="border-danger/30 bg-danger-wash p-4 text-sm font-medium text-danger">
+              Unable to load your performance data.
+            </Card>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                { label: "Today's Appointments", value: perf?.today_appointments ?? 0, icon: Calendar },
-                { label: `Completed (${selectedPeriodLabel})`, value: perf?.completed_appointments_in_period ?? 0, icon: TrendingUp },
-                { label: `Cancelled (${selectedPeriodLabel})`, value: perf?.cancelled_appointments_in_period ?? 0, icon: ArrowDownRight },
-                { label: `Treatment Sessions (${selectedPeriodLabel})`, value: perf?.treatment_sessions_in_period ?? 0, icon: Stethoscope },
-                { label: `SOAP Notes (${selectedPeriodLabel})`, value: perf?.soap_notes_in_period ?? 0, icon: ClipboardList },
-                { label: `Patients Seen (${selectedPeriodLabel})`, value: perf?.patients_seen_in_period ?? 0, icon: Users },
-              ].map(({ label, value, icon: Icon }) => (
-                <div key={label} className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-slate-100 dark:border-slate-700">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Icon className="w-4 h-4 text-indigo-500" />
-                    <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
-                  </div>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
-                </div>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+              {perfCards.map(({ label, value, icon, tone }, index) => (
+                <KpiCard key={label} label={label} value={value} icon={icon} tone={tone} hero={index === 0} />
               ))}
             </div>
           )}
@@ -85,81 +77,136 @@ export default function AnalyticsPage() {
     );
   }
 
+  const patientRevenue = analyticsOverview?.patient_revenue ?? [];
+  const maxRanked = Math.max(
+    0,
+    ...patientRevenue.map((p) => Number(patientRevenueSort === 'billed_amount' ? p.billed_amount : p.collected_amount) || 0),
+  );
+
   return (
     <AppShell>
       <div className="space-y-6">
-        {/* Header & Period Tabs */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Analytics & Financial Summary</h1>
-            <p className="text-sm text-slate-500">Clinic financial activity for the selected reporting period</p>
-          </div>
-
-          <PeriodSelector period={period} onChange={setPeriod} />
-        </div>
+        <PageHeader
+          title="Analytics & Financial Summary"
+          subtitle="Clinic financial activity for the selected reporting period"
+          actions={<PeriodSelector period={period} onChange={setPeriod} />}
+        />
         {overviewEnvelope?.meta.period === period && (
-          <p className="text-xs text-slate-400">
-            UTC range: {overviewEnvelope.meta.start.slice(0, 10)} – {overviewEnvelope.meta.end.slice(0, 10)} (end exclusive)
-          </p>
+          <RangeNote start={overviewEnvelope.meta.start} end={overviewEnvelope.meta.end} />
         )}
 
         {overviewLoading ? (
-          <div role="status" className="text-sm text-slate-500">Loading analytics for {period}...</div>
+          <Card role="status" className="p-6 text-sm text-muted">Loading analytics for {period}...</Card>
         ) : overviewError ? (
-          <div role="alert" className="text-sm text-rose-600">Unable to load clinic analytics.</div>
+          <Card role="alert" className="border-danger/30 bg-danger-wash p-4 text-sm font-medium text-danger">
+            Unable to load clinic analytics.
+          </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <MetricCard label={`Billed (${selectedPeriodLabel})`} value={formatMoney(analyticsOverview?.revenue.billed_amount_in_period)} icon={DollarSign} />
-              <MetricCard label={`Collected (${selectedPeriodLabel})`} value={formatMoney(analyticsOverview?.revenue.collected_amount_in_period)} icon={DollarSign} />
-              <MetricCard label="Outstanding balance (all time)" value={formatMoney(analyticsOverview?.revenue.outstanding_amount)} icon={ArrowDownRight} />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <KpiCard
+                hero
+                label={`Collected (${selectedPeriodLabel})`}
+                value={formatMoney(analyticsOverview?.revenue.collected_amount_in_period)}
+                icon={Wallet}
+              />
+              <KpiCard
+                label={`Billed (${selectedPeriodLabel})`}
+                value={formatMoney(analyticsOverview?.revenue.billed_amount_in_period)}
+                icon={IndianRupee}
+                tone="grove"
+              />
+              <KpiCard
+                label="Outstanding balance (all time)"
+                value={formatMoney(analyticsOverview?.revenue.outstanding_amount)}
+                icon={ArrowDownRight}
+                tone="warn"
+              />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <section className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">Running costs & net profit unavailable</h2>
-                <p className="text-sm text-slate-500">Expense and salary data is not persisted by the backend, so no expense or profit estimate is shown.</p>
-              </section>
-
-              <section className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Top Patients by Revenue</h2>
-                  <label className="flex items-center gap-2 text-xs text-slate-500">
-                    Rank by
-                    <select
-                      aria-label="Rank patients by"
-                      value={patientRevenueSort}
-                      onChange={(event) => setPatientRevenueSort(event.target.value as PatientRevenueSort)}
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-950"
-                    >
-                      <option value="collected_amount">Collected</option>
-                      <option value="billed_amount">Billed</option>
-                    </select>
-                  </label>
-                </div>
-                {overviewLoading ? (
-                  <p role="status" className="text-sm text-slate-500">Loading patient revenue...</p>
-                ) : overviewError ? (
-                  <p role="alert" className="text-sm text-rose-600">Unable to load patient revenue.</p>
-                ) : !analyticsOverview?.patient_revenue.length ? (
-                  <p className="text-sm text-slate-500">No patient financial activity for this period.</p>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+              <Card className="p-6">
+                <CardHeader
+                  title="Top Patients by Revenue"
+                  action={
+                    <label className="flex items-center gap-2 text-xs font-medium text-muted">
+                      Rank by
+                      <select
+                        aria-label="Rank patients by"
+                        value={patientRevenueSort}
+                        onChange={(event) => setPatientRevenueSort(event.target.value as PatientRevenueSort)}
+                        className="h-8 cursor-pointer rounded-lg border border-line bg-card px-2 text-xs font-semibold text-ink-2 focus:border-grove focus:outline-none dark:border-slate-700 dark:bg-slate-950"
+                      >
+                        <option value="collected_amount">Collected</option>
+                        <option value="billed_amount">Billed</option>
+                      </select>
+                    </label>
+                  }
+                />
+                {!patientRevenue.length ? (
+                  <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+                    No patient financial activity for this period.
+                  </p>
                 ) : (
-                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {analyticsOverview.patient_revenue.map((patient) => (
-                      <div key={patient.patient_id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 py-3 text-xs">
-                        <p className="font-bold text-slate-900 dark:text-white">{patient.patient_name}</p>
-                        <p className="text-right"><span className="block text-[10px] text-slate-400">Billed</span>{formatMoney(patient.billed_amount)}</p>
-                        <p className="text-right"><span className="block text-[10px] text-slate-400">Collected</span>{formatMoney(patient.collected_amount)}</p>
-                      </div>
-                    ))}
+                  <div className="divide-y divide-line-soft">
+                    {patientRevenue.map((patient, index) => {
+                      const ranked =
+                        Number(patientRevenueSort === 'billed_amount' ? patient.billed_amount : patient.collected_amount) || 0;
+                      const width = maxRanked > 0 && ranked > 0 ? Math.max(4, Math.round((ranked / maxRanked) * 100)) : 0;
+                      return (
+                        <div
+                          key={patient.patient_id}
+                          className="grid grid-cols-[20px_minmax(0,1fr)_104px_104px] items-center gap-4 py-3 text-sm"
+                        >
+                          <span className="text-xs font-bold tabular-nums text-slate-400">{index + 1}</span>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar name={patient.patient_name} size={32} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-semibold text-ink">{patient.patient_name}</p>
+                              <div className="mt-1.5 h-1.5 rounded-full bg-line-soft" aria-hidden="true">
+                                <div className="h-full rounded-full bg-gradient-to-r from-grove to-fresh" style={{ width: `${width}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-right tabular-nums text-ink-2">
+                            <span className="block text-[10.5px] font-medium text-muted">Billed</span>
+                            {formatMoney(patient.billed_amount)}
+                          </p>
+                          <p className="text-right font-semibold tabular-nums text-ink">
+                            <span className="block text-[10.5px] font-medium text-muted">Collected</span>
+                            {formatMoney(patient.collected_amount)}
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-              </section>
+              </Card>
+
+              <Card className="h-fit space-y-2 p-6">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-info-wash text-info">
+                    <Info className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <h2 className="font-display text-[15.5px] font-bold text-ink">Running costs & net profit unavailable</h2>
+                </div>
+                <p className="text-sm leading-relaxed text-muted">
+                  Expense and salary data is not persisted by the backend, so no expense or profit estimate is shown.
+                </p>
+              </Card>
             </div>
           </>
         )}
       </div>
     </AppShell>
+  );
+}
+
+function RangeNote({ start, end }: { start: string; end: string }) {
+  return (
+    <p className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-xs text-muted">
+      UTC range: {start.slice(0, 10)} – {end.slice(0, 10)} (end exclusive)
+    </p>
   );
 }
 
@@ -174,7 +221,7 @@ function PeriodSelector({
     <div
       role="group"
       aria-label="Reporting period"
-      className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800"
+      className="flex items-center gap-1 rounded-xl border border-line bg-card p-1 shadow-card dark:border-slate-800 dark:bg-slate-900"
     >
       {(['today', 'week', 'month', 'year'] as const).map((value) => (
         <button
@@ -182,35 +229,14 @@ function PeriodSelector({
           type="button"
           aria-pressed={period === value}
           onClick={() => onChange(value)}
-          className={`px-3 py-1.5 text-xs font-bold uppercase rounded-lg transition-all cursor-pointer ${
-            period === value
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-          }`}
+          className={cn(
+            'cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-semibold capitalize transition-colors',
+            period === value ? 'bg-midnight text-white shadow-sm' : 'text-muted hover:bg-canvas hover:text-ink',
+          )}
         >
           {value}
         </button>
       ))}
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold uppercase text-slate-400">{label}</span>
-        <Icon className="w-5 h-5 text-teal-600" />
-      </div>
-      <p className="text-2xl font-extrabold text-slate-900 dark:text-white mt-2">{value}</p>
     </div>
   );
 }

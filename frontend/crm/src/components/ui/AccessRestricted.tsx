@@ -13,14 +13,17 @@ interface AccessRestrictedProps {
  * Used for route-level RBAC enforcement on routed pages.
  * Sidebar hides nav items, but with real Next.js routes a user can type
  * a URL directly — this component is the last line of defence.
+ * It renders its own AppShell, so callers must not wrap it in another one.
  */
 export function AccessRestricted({ message = 'You do not have permission to access this page.' }: AccessRestrictedProps) {
   return (
     <AppShell>
-      <div className="p-8 max-w-md mx-auto text-center space-y-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-        <ShieldAlert className="w-12 h-12 text-rose-500 mx-auto" />
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Access Restricted</h2>
-        <p className="text-xs text-slate-500">{message}</p>
+      <div className="mx-auto max-w-md space-y-3 rounded-2xl border border-line bg-card p-8 text-center shadow-[0_1px_2px_rgba(11,18,56,0.04)]">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-danger-wash text-danger">
+          <ShieldAlert className="h-6 w-6" />
+        </span>
+        <h2 className="font-display text-lg font-bold text-ink">Access Restricted</h2>
+        <p className="text-xs text-muted">{message}</p>
       </div>
     </AppShell>
   );

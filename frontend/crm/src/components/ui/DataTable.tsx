@@ -93,44 +93,44 @@ export function DataTable<T extends { id: string }>({
                 handlePageChange(1);
               }}
               placeholder={searchPlaceholder}
-              className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="h-10 w-full rounded-[10px] border border-line bg-card pl-9 pr-4 text-sm text-ink placeholder:text-slate-400 transition-colors focus:border-grove focus:outline-none focus:ring-2 focus:ring-grove/15 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
             />
           </div>
-          <span className="text-xs text-slate-500 font-medium">
+          <span className="text-xs font-medium text-muted">
             Showing {isServerSide ? totalItems : filteredData.length} entries
           </span>
         </div>
       )}
 
       {/* Table Container */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+      <div className="overflow-hidden rounded-2xl border border-line bg-card shadow-card dark:border-slate-800 dark:bg-slate-900">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
+              <tr className="border-b border-line bg-canvas/60 dark:border-slate-800 dark:bg-slate-950">
                 {columns.map((col) => (
                   <th
                     key={col.key}
-                    className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"
+                    className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted dark:text-slate-400"
                   >
                     {col.header}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
+            <tbody className="divide-y divide-line-soft text-sm dark:divide-slate-800">
               {isLoading ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={columns.length} className="px-5 py-10 text-center text-muted">
                     <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-5 h-5 animate-spin text-teal-600" />
+                      <Loader2 className="h-5 w-5 animate-spin text-grove" />
                       <span>Loading records...</span>
                     </div>
                   </td>
                 </tr>
               ) : paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={columns.length} className="px-5 py-10 text-center text-muted">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -139,12 +139,12 @@ export function DataTable<T extends { id: string }>({
                   <tr
                     key={item.id}
                     onClick={() => onRowClick && onRowClick(item)}
-                    className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors ${
+                    className={`transition-colors hover:bg-canvas/70 dark:hover:bg-slate-800/50 ${
                       onRowClick ? 'cursor-pointer' : ''
                     }`}
                   >
                     {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-3.5 text-slate-700 dark:text-slate-200">
+                      <td key={col.key} className="px-5 py-3.5 text-ink-2 dark:text-slate-200">
                         {col.render
                           ? col.render(item)
                           : (item as Record<string, unknown>)[col.key] != null
@@ -160,22 +160,24 @@ export function DataTable<T extends { id: string }>({
         </div>
 
         {/* Pagination Footer */}
-        <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/50 text-xs">
-          <span className="text-slate-500">
+        <div className="flex items-center justify-between border-t border-line px-5 py-3 text-xs dark:border-slate-800 dark:bg-slate-950/50">
+          <span className="text-muted">
             Page {currentPage} of {totalPages}
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
-              className="p-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100"
+              aria-label="Previous page"
+              className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-line bg-card text-ink-2 transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
-              className="p-1 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100"
+              aria-label="Next page"
+              className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-line bg-card text-ink-2 transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800"
             >
               <ChevronRight className="w-4 h-4" />
             </button>

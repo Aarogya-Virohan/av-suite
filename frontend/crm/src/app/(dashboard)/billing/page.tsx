@@ -8,25 +8,70 @@ import { CreateInvoiceSlideOver } from '../../../features/billing/components/Cre
 import { RecordPaymentSlideOver } from '../../../features/billing/components/RecordPaymentSlideOver';
 import { InvoicePreviewModal } from '../../../features/billing/components/InvoicePreviewModal';
 import { Invoice, Payment, Package, InvoiceStatus } from '../../../types/api';
-import { Plus, Download, CreditCard, FileText, Package as PackageIcon, Eye, Printer } from 'lucide-react';
-import { toast } from 'sonner';
+import { Plus, CreditCard, FileText, Package as PackageIcon, Eye, Printer } from 'lucide-react';
 import { usePatients } from '../../../features/patients/api';
-import { useAuthStore } from '../../../store';
-import { canAccessModule, canPerformAction, hasCapability } from '../../../config/permissions';
+import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
+import { Avatar, Badge, type BadgeTone, Button, PageHeader, SegmentGroup, SegmentTab } from '../../../components/ui/brand';
+import { formatMoney } from '../../../lib/money';
+import { cn } from '../../../lib/cn';
 
 type TabKey = 'invoices' | 'payments' | 'packages';
 
+/** API money fields are Decimal strings; older code paths may still pass numbers. */
+const money = (value: number | string | null | undefined) => formatMoney(value == null ? '0' : String(value));
+
+const INVOICE_TONE: Record<InvoiceStatus, BadgeTone> = {
+  paid: 'ok',
+  partial: 'warn',
+  unpaid: 'danger',
+  overdue: 'danger',
+  issued: 'info',
+  draft: 'neutral',
+  cancelled: 'neutral',
+};
+
+const paymentDateFormat = new Intl.DateTimeFormat('en-IN', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+function formatPaymentDate(value: string | null | undefined) {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : paymentDateFormat.format(date);
+}
+
+const SMALL_ACTION =
+  'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors';
+
 export default function BillingPage() {
-  const role = useAuthStore((s) => s.role);
+  usePermissionSubscription(); // see Decisions.md D-013
   const isAllowed = canAccessModule('billing');
   const canViewInvoices = hasCapability('invoices.view');
   const canViewPayments = hasCapability('payments.view');
   const canViewPackages = hasCapability('packages.view');
+  // The backend enforces these; the buttons are hidden so a role without them
+  // does not open a form that can only fail (Decisions.md L-9).
+  const canCreateInvoice = hasCapability('invoices.create');
+  const canRecordPayment = hasCapability('payments.record');
 
-  const [activeTab, setActiveTab] = useState<TabKey>(
-    canViewInvoices ? 'invoices' : canViewPayments ? 'payments' : 'packages'
-  );
+  // The default tab is derived on every render, not frozen into useState:
+  // capabilities can arrive after the first render, and freezing them made
+  // admins land on the (empty) package tab.
+  const tabs: { key: TabKey; label: string; icon: React.ElementType; visible: boolean }[] = [
+    { key: 'invoices', label: 'Invoices', icon: FileText, visible: canViewInvoices },
+    { key: 'payments', label: 'Payments Log', icon: CreditCard, visible: canViewPayments },
+    { key: 'packages', label: 'Package Catalog', icon: PackageIcon, visible: canViewPackages },
+  ];
+  const visibleTabs = tabs.filter((t) => t.visible);
+  const [selectedTab, setSelectedTab] = useState<TabKey | null>(null);
+  const activeTab: TabKey | null =
+    selectedTab && visibleTabs.some((t) => t.key === selectedTab) ? selectedTab : visibleTabs[0]?.key ?? null;
+
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
@@ -37,12 +82,19 @@ export default function BillingPage() {
   const { data: invoices = [], isLoading: isLoadingInvoices } = useInvoices(canViewInvoices);
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments(canViewPayments);
   const { data: packages = [], isLoading: isLoadingPackages } = usePackages(canViewPackages);
-  const { data: patientsResponse, isLoading: isLoadingPatients } = usePatients(undefined, 1, 100, isAllowed);
+  const { data: patientsResponse } = usePatients(undefined, 1, 100, isAllowed && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
 
   const getPatientName = (patientId: string) => {
     const p = patients.find((patient) => patient.id === patientId);
-    return p ? `${p.first_name} ${p.last_name}` : patientId;
+    // Only the first 100 patients are loaded here (known limitation L-8).
+    return p ? `${p.first_name} ${p.last_name}` : `Patient #${patientId.slice(0, 8).toUpperCase()}`;
+  };
+
+  const counts: Record<TabKey, number> = {
+    invoices: invoices.length,
+    payments: payments.length,
+    packages: packages.length,
   };
 
   if (!isAllowed) {
@@ -52,49 +104,40 @@ export default function BillingPage() {
   const invoiceColumns: Column<Invoice>[] = [
     {
       key: 'invoice_number',
-      header: 'Invoice Number',
-      render: (inv) => (
-        <span className="font-bold text-slate-900 dark:text-white">{inv.invoice_number}</span>
-      ),
+      header: 'Invoice',
+      render: (inv) => <span className="font-semibold text-ink">{inv.invoice_number}</span>,
     },
     {
       key: 'patient',
       header: 'Patient',
-      render: (inv) => getPatientName(inv.patient_id),
+      render: (inv) => {
+        const name = getPatientName(inv.patient_id);
+        return (
+          <div className="flex items-center gap-2.5">
+            <Avatar name={name} size={30} />
+            <span className="font-medium text-ink">{name}</span>
+          </div>
+        );
+      },
     },
     {
       key: 'total_amount',
-      header: 'Total Amount',
-      render: (inv) => `₹${inv.total_amount.toLocaleString('en-IN')}`,
+      header: 'Total',
+      render: (inv) => <span className="tabular-nums">{money(inv.total_amount)}</span>,
     },
     {
       key: 'paid_amount',
-      header: 'Paid Amount',
-      render: (inv) => `₹${Number(inv.paid_amount || 0).toLocaleString('en-IN')}`,
+      header: 'Paid',
+      render: (inv) => <span className="font-semibold tabular-nums text-ink">{money(inv.paid_amount)}</span>,
     },
     {
       key: 'status',
       header: 'Status',
-      render: (inv) => {
-        const colors: Record<InvoiceStatus, string> = {
-          paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-          unpaid: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300',
-          partial: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-          draft: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300',
-          issued: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
-          cancelled: 'bg-slate-100 text-slate-500 line-through',
-          overdue: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
-        };
-        return (
-          <span
-            className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-              colors[inv.status]
-            }`}
-          >
-            {inv.status}
-          </span>
-        );
-      },
+      render: (inv) => (
+        <Badge tone={INVOICE_TONE[inv.status] ?? 'neutral'} className={cn('capitalize', inv.status === 'cancelled' && 'line-through')}>
+          {inv.status}
+        </Badge>
+      ),
     },
     {
       key: 'actions',
@@ -106,9 +149,9 @@ export default function BillingPage() {
               setPreviewInvoice(inv);
               setPreviewMode('invoice');
             }}
-            className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer"
+            className={cn(SMALL_ACTION, 'border border-line bg-card text-ink-2 hover:bg-canvas')}
           >
-            <Eye className="w-3.5 h-3.5" />
+            <Eye className="h-3.5 w-3.5" />
             <span>Invoice</span>
           </button>
           {inv.status === 'paid' && (
@@ -117,9 +160,9 @@ export default function BillingPage() {
                 setPreviewInvoice(inv);
                 setPreviewMode('receipt');
               }}
-              className="px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950 hover:bg-emerald-200 text-emerald-800 dark:text-emerald-300 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer"
+              className={cn(SMALL_ACTION, 'bg-ok-wash text-ok hover:bg-[#d3eedc]')}
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Printer className="h-3.5 w-3.5" />
               <span>Receipt</span>
             </button>
           )}
@@ -129,88 +172,93 @@ export default function BillingPage() {
   ];
 
   const paymentColumns: Column<Payment>[] = [
-    { key: 'id', header: 'Payment ID' },
-    { key: 'patient', header: 'Patient', render: (p) => getPatientName(p.patient_id) },
-    { key: 'amount', header: 'Amount', render: (p) => `₹${p.amount.toLocaleString('en-IN')}` },
+    {
+      key: 'id',
+      header: 'Reference',
+      render: (p) => (
+        <span title={p.id} className="font-mono text-xs font-semibold text-ink-2">
+          #{p.id.slice(0, 8).toUpperCase()}
+        </span>
+      ),
+    },
+    {
+      key: 'patient',
+      header: 'Patient',
+      render: (p) => {
+        const name = getPatientName(p.patient_id);
+        return (
+          <div className="flex items-center gap-2.5">
+            <Avatar name={name} size={30} />
+            <span className="font-medium text-ink">{name}</span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (p) => <span className="font-semibold tabular-nums text-ink">{money(p.amount)}</span>,
+    },
     {
       key: 'payment_method',
       header: 'Method',
-      render: (p) => <span className="uppercase text-xs font-semibold text-teal-600">{p.payment_method}</span>,
+      render: (p) => (
+        <Badge tone="active" className="uppercase">
+          {p.payment_method}
+        </Badge>
+      ),
     },
-    { key: 'payment_date', header: 'Date' },
+    { key: 'payment_date', header: 'Date', render: (p) => <span className="tabular-nums">{formatPaymentDate(p.payment_date)}</span> },
   ];
 
   const packageColumns: Column<Package>[] = [
-    { key: 'name', header: 'Package Name', render: (pkg) => <span className="font-bold">{pkg.name}</span> },
-    { key: 'total_sessions', header: 'Sessions', render: (pkg) => `${pkg.total_sessions} Sessions` },
-    { key: 'price', header: 'Price', render: (pkg) => `₹${pkg.price.toLocaleString('en-IN')}` },
-    { key: 'validity_days', header: 'Validity', render: (pkg) => `${pkg.validity_days} Days` },
+    { key: 'name', header: 'Package', render: (pkg) => <span className="font-semibold text-ink">{pkg.name}</span> },
+    { key: 'total_sessions', header: 'Sessions', render: (pkg) => `${pkg.total_sessions} sessions` },
+    { key: 'price', header: 'Price', render: (pkg) => <span className="font-semibold tabular-nums text-ink">{money(pkg.price)}</span> },
+    { key: 'validity_days', header: 'Validity', render: (pkg) => `${pkg.validity_days} days` },
   ];
 
   return (
     <AppShell>
       <div className="space-y-6">
-        {/* Header & Actions */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Billing & Invoices</h1>
-            <p className="text-sm text-slate-500">Manage patient billing, payments, and packages catalog</p>
-          </div>
+        <PageHeader
+          title="Billing & Invoices"
+          subtitle="Manage patient billing, payments, and packages catalog"
+          actions={
+            <>
+              {canRecordPayment && (
+                <Button variant="secondary" onClick={() => setIsPaymentOpen(true)}>
+                  <CreditCard className="h-4 w-4 text-grove" />
+                  <span>Record Payment</span>
+                </Button>
+              )}
+              {canCreateInvoice && (
+                <Button onClick={() => setIsInvoiceOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  <span>Create Invoice</span>
+                </Button>
+              )}
+            </>
+          }
+        />
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsPaymentOpen(true)}
-              className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-medium text-xs rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <CreditCard className="w-4 h-4 text-emerald-600" />
-              <span>Record Payment</span>
-            </button>
-            <button
-              onClick={() => setIsInvoiceOpen(true)}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium text-sm rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Invoice</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Selection */}
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800">
-          <button
-            onClick={() => setActiveTab('invoices')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeTab === 'invoices'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>Invoices ({invoices.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('payments')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeTab === 'payments'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            <span>Payments Log ({payments.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('packages')}
-            className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-              activeTab === 'packages'
-                ? 'border-teal-600 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <PackageIcon className="w-4 h-4" />
-            <span>Package Catalog ({packages.length})</span>
-          </button>
-        </div>
+        {visibleTabs.length > 0 && (
+          <SegmentGroup>
+            {visibleTabs.map((tab) => (
+              <SegmentTab
+                key={tab.key}
+                active={activeTab === tab.key}
+                onClick={() => setSelectedTab(tab.key)}
+                icon={tab.icon}
+              >
+                {tab.label}
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-muted">
+                  {counts[tab.key]}
+                </span>
+              </SegmentTab>
+            ))}
+          </SegmentGroup>
+        )}
 
         {/* Tab Content */}
         {activeTab === 'invoices' && (

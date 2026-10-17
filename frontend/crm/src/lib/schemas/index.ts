@@ -9,7 +9,9 @@ export const packageStatusSchema = z.enum(['active', 'inactive', 'completed', 'e
 export const invoiceStatusSchema = z.enum(['unpaid', 'paid', 'partial', 'draft', 'issued', 'cancelled', 'overdue']);
 export const paymentMethodSchema = z.enum(['cash', 'upi', 'card', 'bank_transfer', 'insurance', 'other']);
 export const paymentStatusSchema = z.enum(['completed', 'voided']);
-export const documentCategorySchema = z.enum(['medical_report', 'prescription', 'lab_result', 'consent', 'other']);
+// Must match backend DocumentCategory (app/enums/document.py). 'consent' was wrong and every
+// consent-form upload failed with 422.
+export const documentCategorySchema = z.enum(['medical_report', 'prescription', 'lab_result', 'consent_form', 'x_ray_scan', 'id_proof', 'other']);
 export const genderSchema = z.enum(['male', 'female', 'other']);
 
 // Patient Form Schema
@@ -18,19 +20,36 @@ export const patientFormSchema = z.object({
   last_name: z.string().min(1, 'Last name is required'),
   date_of_birth: z.string().nullable().optional(),
   phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-  gender: genderSchema,
+  // Optional, as in the backend. Blank ('') means "not recorded"; forms send it
+  // as null via toPatientPayload(). The forms used to default to 'male' and
+  // 'Direct Walk-in', which stored invented values (and overwrote blanks on edit).
+  gender: z.union([genderSchema, z.literal('')]).nullable(),
   chief_complaint: z.string().min(1, 'Chief complaint is required'),
-  referral_source: z.string().min(1, 'Referral source is required'),
+  referral_source: z.string().nullable(),
   status: patientStatusSchema,
 });
 export type PatientFormValues = z.infer<typeof patientFormSchema>;
+
+/** Form values to API payload: blanks become null so nothing is invented. */
+export function toPatientPayload(values: PatientFormValues) {
+  return {
+    ...values,
+    first_name: values.first_name.trim(),
+    last_name: values.last_name.trim(),
+    phone: values.phone.trim(),
+    gender: values.gender ? values.gender : null,
+    referral_source: values.referral_source?.trim() ? values.referral_source.trim() : null,
+    date_of_birth: values.date_of_birth ? values.date_of_birth : null,
+  };
+}
 
 // Lead Form Schema
 export const leadFormSchema = z.object({
   name: z.string().min(1, 'Lead name is required'),
   phone: z.string().min(10, 'Phone number must be at least 10 digits'),
   email: z.string().email('Invalid email address').nullable().optional().or(z.literal('')),
-  source: leadSourceSchema,
+  // Optional, as in the backend; '' (not specified) is sent as null.
+  source: z.union([leadSourceSchema, z.literal('')]).nullable(),
   stage: leadStageSchema,
   assigned_to: z.string().nullable().optional(),
   notes: z.string(),
