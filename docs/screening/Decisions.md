@@ -102,3 +102,22 @@ Format: context, choice, reason, decided by. Status "pending sign-off" means it 
 - Limiter: in-process sliding window in `app/screening/rate_limit.py`, on the public routes only. Two keys per request: per link token 200 requests per 15 minutes, per client IP 600 per 15 minutes. All three screeners on one link take about 50 requests, so a real patient stays far below both. Memory is capped at 20,000 tracked keys. A blocked call gets 429 `RATE_LIMITED` with `Retry-After`.
 - Client IP: the shared `get_client_ip()` trusts `CF-Connecting-IP` and the leftmost `X-Forwarded-For` from any caller, so it is not used. The limiter reads only the header named in the new optional setting `SCREENER_CLIENT_IP_HEADER`, otherwise `request.client.host`. Checked by running uvicorn with the Dockerfile flags (`--proxy-headers --forwarded-allow-ips=*`): `request.client.host` becomes the leftmost `X-Forwarded-For` entry. That is the real client only if Railway's edge replaces any client-sent `X-Forwarded-For`. Railway staff answers on this disagree. A Railway moderator says `X-Real-IP` is written at the edge and cannot be spoofed. Recommendation: set `SCREENER_CLIENT_IP_HEADER=X-Real-IP` on Railway before merge (Pending P-04). Spoofed IPs can only dodge the per-IP limit. The per-token limit and the 32-byte token still hold.
 - Decided by: Onkar (in-process, no dependency, per token and per IP); header choice is a proposal pending Onkar.
+
+## S-D-019 Standalone app `frontend/psychosocial` with CRM tokens copied verbatim
+- Approved by Onkar (20 Oct): separate app, local build and test only. Onkar adds the Vercel project and the CORS origin at deploy time.
+- `globals.css`, `brand.tsx`, `SlideOver.tsx` and `cn.ts` are verbatim copies from `frontend/crm` at commit `619502675d60dacd0226c074cb1b506258c9f955`, so a diff shows any drift. App-only CSS is in `app.css`. The CRM SlideOver uses `animate-fade-in` and `animate-slide-in-right`, which the CRM never defines. This app defines them in `app.css`.
+- Same login and token storage key (`token`) as the CRM and Exercise Library. Gating comes from `/me` (`capabilities`, `active_products`).
+- Pages: Screenings worklist (Needs attention includes unsubmitted risk answers), patient page (send screener, history, new link, cancel), result page (risk banner, score, severity, baseline, every answer, referral log), Access (SRS 4.3.1, because the CRM grid lacks the new keys), Add patient (for clinics without the CRM), public screener.
+- Decided by: Onkar (app), proposal for the page set.
+
+## S-D-020 Frontend tooling versions
+- Shared dependencies are pinned to the CRM lockfile versions (Next 16.3.2, React 19.2.4, Tailwind 4.3.3, TanStack Query 5.101.4).
+- Two deliberate differences. `vitest` is 3.2.4: npm 10.9 crashes (`Cannot read properties of null (reading 'edgesOut')`) on install with vitest 4 or 5. And `@types/node` is 22: vitest needs it, and the CRM lockfile has the same peer conflict with 20. Unit tests cover pure logic only. UI behaviour is covered by Playwright 1.56.0.
+- Decided by: proposal, pending Onkar sign-off.
+
+## S-D-021 Patient screener behaviour
+- One question per screen. Large option buttons work as a radio group (arrow keys, screen reader). The patient picks an option, then presses Next. Next saves the answer, and from then on it cannot change (SRS 4.2.2).
+- Answers save in the background in order, so the next question shows at once (SRS 3.5). A dropped call retries with backoff, and Send waits until every answer is saved. If the server disagrees (`ANSWER_LOCKED` or `OUT_OF_ORDER`), the page reloads its state from the server.
+- The patient never sees a score. After submit they see a calm message when a referral flag is set. When the PHQ-9 item 9 risk flag is set, they also see Tele-MANAS (14416 or 1-800-891-4416, 24x7, verified on PIB 11 Feb 2026) and 112 for immediate danger (F2 default, pending founder sign-off).
+- Patient-facing titles are plain ("How you have been feeling"). Question and option text is the published wording. The DASS website reference shows on DASS-21 screens.
+- Decided by: proposal, pending founder sign-off for F2 wording.
