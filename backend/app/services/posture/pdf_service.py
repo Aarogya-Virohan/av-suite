@@ -400,9 +400,11 @@ UPLOAD_NOTE = (
 
 def _view_section(title: str, view: dict, key: str = "") -> str:
     """
-    Render one anatomical plane. Since 11 October 2026 two planes share a
-    page, so the annotated photograph, the evidence every number comes
-    from, is printed large (92 mm tall) beside the measurements.
+    Render one anatomical plane, the annotated photograph beside its
+    measurements. 19 October 2026, founders asked for bigger photographs:
+    the side plane has page 1 to itself under the patient box (photo
+    128 mm), front and back share page 2 (photo 108 mm each), and the
+    signature and closing block go to page 3.
     """
 
     photo = view.get("photoUrl") or ""
@@ -442,7 +444,7 @@ def _view_section(title: str, view: dict, key: str = "") -> str:
 
 
     return f"""
-    <section class="plane">
+    <section class="plane plane-{key}">
         <table class="plane-head">
             <tr>
                 <td><h2>{_esc(title)}</h2></td>
@@ -485,7 +487,8 @@ def _biomech_signature_section(signature: dict | None) -> str:
     if not signature or not signature.get("regions"):
         return ""
 
-    svg = render_signature_svg(signature, width=380, height=175)
+    # Default size, the same drawing the web report shows.
+    svg = render_signature_svg(signature)
 
     rows = []
     for r in signature["regions"]:
@@ -504,18 +507,25 @@ def _biomech_signature_section(signature: dict | None) -> str:
             f'<td class="grade">{badge}</td></tr>'
         )
 
+    # 19 October 2026: the chart takes the full width of the page (founders
+    # asked for a bigger diagram) and the regions sit under it in two
+    # columns, head to toe down the left column first.
+    half = (len(rows) + 1) // 2
+    left, right = rows[:half], rows[half:]
+
     return f"""
     <section class="bio-signature">
         <h2>Biomechanical Signature</h2>
-        <table class="bio-signature-grid">
+        <div class="sig-chart">{svg}</div>
+        <p class="key">Each axis is one measurement. A point sits on the ring of
+        its grade, normal at the centre and severe at the edge, so a smaller
+        shape is a better result. A region shows the worst grade among its
+        measurements.</p>
+        <table class="sig-regions">
             <tr>
-                <td class="chart">{svg}</td>
-                <td class="regions">
-                    <table class="region-list">{"".join(rows)}</table>
-                    <p class="key">Each axis is one measurement. Inner ring normal,
-                    then mild and moderate, outer ring severe. A region shows the
-                    worst grade among its measurements.</p>
-                </td>
+                <td class="sig-col"><table class="region-list">{"".join(left)}</table></td>
+                <td class="sig-gap"></td>
+                <td class="sig-col"><table class="region-list">{"".join(right)}</table></td>
             </tr>
         </table>
     </section>
@@ -994,11 +1004,25 @@ def build_report_html(report: dict) -> str:
         padding-right: 5mm;
         text-align: center;
     }}
+    /* 19 October 2026: bigger photographs, on the founders' word. Front
+       and back share page 2 at 108 mm; the side plane is alone on page 1
+       under the patient box, so it gets the room that is left there. */
     .plane-photo {{
-        height: 80mm;
+        height: 108mm;
         width: auto;
-        max-width: 72mm;
+        max-width: 92mm;
         border-radius: 3mm;
+    }}
+    .plane-side .plane-photo {{
+        height: 128mm;
+        max-width: 94mm;
+    }}
+    .plane-front {{
+        page-break-before: always;
+    }}
+    /* Signature, synthesis and the closing block always start page 3. */
+    .summary-page {{
+        page-break-before: always;
     }}
     .photo-missing {{
         width: 45mm;
@@ -1054,6 +1078,7 @@ def build_report_html(report: dict) -> str:
     }}
     .measurements .severity span {{
         display: inline-block;
+        white-space: nowrap;
         padding: 1.6px 8px;
         border-radius: 8px;
         font-size: 6.8pt;
@@ -1112,30 +1137,41 @@ def build_report_html(report: dict) -> str:
     .synthesis h2 {{
         margin-bottom: 2.4mm;
     }}
-    .bio-signature-grid {{
+    .sig-chart {{
+        text-align: center;
+        border-top: 1px solid {RULE};
+        padding-top: 1.5mm;
+    }}
+    /* 128 mm wide, 98 mm tall: the largest that still keeps a report with
+       long summaries and a full synthesis on three pages. Labels print at
+       about 9 pt. */
+    .sig-chart svg {{
+        width: 128mm;
+        height: auto;
+    }}
+    .sig-regions {{
         width: 100%;
         border-collapse: collapse;
-        border-top: 1px solid {RULE};
+        margin-top: 3mm;
     }}
-    .bio-signature-grid td {{
-        vertical-align: middle;
-        padding-top: 6px;
+    .sig-regions td {{
+        vertical-align: top;
+        padding: 0;
     }}
-    .bio-signature-grid .chart {{
-        width: 50%;
+    .sig-col {{
+        width: 47%;
     }}
-    .bio-signature-grid .chart svg {{
-        width: 100%;
-        height: auto;
+    .sig-gap {{
+        width: 6%;
     }}
     .region-list {{
         border-collapse: collapse;
-        font-size: 8.8pt;
+        font-size: 9.4pt;
         color: {INK};
         width: 100%;
     }}
     .region-list td {{
-        padding: 3px 0;
+        padding: 1.3mm 0;
         border-bottom: 1px solid {RULE};
     }}
     .region-list .grade {{
@@ -1157,9 +1193,10 @@ def build_report_html(report: dict) -> str:
         text-transform: none !important;
     }}
     .bio-signature .key {{
-        font-size: 7pt;
+        font-size: 8pt;
         color: {MUTED};
-        margin: 7px 0 0 0;
+        text-align: center;
+        margin: 1.5mm 12mm 0 12mm;
     }}
 
     .synthesis {{
@@ -1303,6 +1340,7 @@ def build_report_html(report: dict) -> str:
 {_view_section("Coronal (Front) Plane", views.get("front") or {}, "front")}
 {_view_section("Posterior (Back) Plane", views.get("back") or {}, "back")}
 
+<div class="summary-page">
 {_biomech_signature_section(report.get("signature"))}
 
 {_synthesis_section(report.get("synthesis") or {})}
@@ -1322,6 +1360,7 @@ def build_report_html(report: dict) -> str:
     <p class="side-note">{SIDE_NOTE}</p>
     {upload_note}
     {version_line}
+</div>
 </div>
 </div>
 

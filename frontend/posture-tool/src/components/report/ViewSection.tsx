@@ -41,13 +41,16 @@ export default function ViewSection({ viewName, data }: Props) {
           and finding columns line up across rows and a long badge cannot
           spill past the edge. */}
       <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-start md:gap-7">
-        <div className="flex shrink-0 justify-center">
+        {/* 19 October 2026, founders asked for bigger photographs: up to
+            720 px tall (was 560), and at most about half the row on wider
+            screens so the table keeps room for its three columns. */}
+        <div className="flex shrink-0 justify-center md:max-w-[52%]">
           {data.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={data.photoUrl}
               alt={`${viewName}, annotated`}
-              className="h-auto max-h-[560px] w-auto max-w-full rounded-xl"
+              className="h-auto max-h-[720px] w-auto max-w-full rounded-xl"
             />
           ) : (
             <div className="flex h-56 w-44 items-center justify-center rounded-xl border border-dashed border-[#C9C0AA] text-center text-sm text-[#5D6380]">

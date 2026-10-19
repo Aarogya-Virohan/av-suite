@@ -1478,3 +1478,35 @@ and camera screens only changed colours and were not screenshotted.
 Verified in Claude's container: tsc, eslint, next build, screenshots of the
 intake error state (desktop and phone) and the report; PDF renders still
 two pages; 99 posture tests.
+
+## 19 October 2026
+
+### Bigger photographs and a bigger signature chart, report now three pages
+Founders asked for the annotated photographs and the Biomechanical
+Signature diagram to be larger, pointing at a lab report (another product)
+whose charts take half a page each. Onkar agreed the report going from two
+pages to three, on both the PDF and the web report.
+- PDF page 1: letterhead, patient box, title, side plane alone with its
+  photograph 128 mm tall (was 80). Page 2: front and back planes, photos
+  108 mm each. Page 3 always starts with the signature, then synthesis,
+  sign-off and notes (forced page breaks, `.plane-front` and
+  `.summary-page`).
+- Signature chart across the full width, drawn 128 mm wide (was half the
+  width at about 75 mm, with the rings using a fifth of it). The rings sit
+  on light solid bands in the severity colours and carry their names
+  (Normal, Mild, Moderate, Severe) up the centre line, so the chart reads
+  without the key. Labels 13 units, about 9 pt on paper. Regions listed
+  under the chart in two columns. Key text reworded to say a smaller shape
+  is a better result (no clinical claim added).
+- Severity badges no longer wrap ("MILD DEVIATION" broke over two lines in
+  the narrower table beside the larger photo).
+- Web report: photographs up to 720 px tall (was 560), at most about half
+  the row on wide screens; signature laid out as on PDF page 3. The web
+  chart uses the same server drawing (new default size 520 x 400).
+- Not copied from the reference: its tiny MAX/MIN labels, unitless numbers
+  and its data, which is not usable (age 90, every gait value 0.0).
+Verified in Claude's container: renders of a real report, a worst case
+(long summaries, 13 muscles) and a clinic letterhead report, all three
+pages; 37 PDF, signature and report builder tests; tsc, eslint, next build
+and screenshots at 1280 and 390 px. Labels on a phone print at about
+8.5 px, readable but small; pinch zoom works.
