@@ -100,6 +100,11 @@ export function SidebarNavigation() {
             src={effectiveClinic?.branding_logo_url || '/brand/av-logo-mark.png'}
             alt={effectiveClinic?.branding_logo_url ? 'Clinic logo' : 'AV Suite'}
             className="h-full w-full object-contain"
+            onError={(e) => {
+              // A saved logo URL that no longer loads falls back to the AV Suite mark.
+              const img = e.currentTarget;
+              if (!img.src.endsWith('/brand/av-logo-mark.png')) img.src = '/brand/av-logo-mark.png';
+            }}
           />
         </span>
         {isSidebarOpen && (
@@ -112,7 +117,9 @@ export function SidebarNavigation() {
           onClick={toggleSidebar}
           className={cn(
             'cursor-pointer rounded-md p-1 text-[#aab2d6] hover:bg-white/10 hover:text-white',
-            !isSidebarOpen && 'absolute -right-0 top-[76px]',
+            // z-10: when collapsed the button sits over the nav list, which
+            // otherwise paints on top of it and swallows the click.
+            !isSidebarOpen && 'absolute -right-0 top-[76px] z-10',
           )}
           aria-label="Toggle Sidebar"
         >
