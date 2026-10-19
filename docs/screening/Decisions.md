@@ -70,3 +70,20 @@ Format: context, choice, reason, decided by. Status "pending sign-off" means it 
 - Therapists start at None for everything, like every other module in this repo. An admin grants the screening keys per physio. Every grant is audited by the existing permissions endpoint.
 - Gap found: the CRM permission grid (`frontend/crm/src/config/permissions.ts`) is a hardcoded list of 64 keys, so the new keys do not show there. The Tool 03 app will carry its own small access page for this (SRS 4.3.1). The CRM list needs the 3 keys later (Pending P-08).
 - Decided by: F3 safe default, pending founder sign-off.
+
+## S-D-014 Staff API shape
+- Assign: `POST /api/v1/patients/{id}/psychosocial/sessions` with `{instruments, expires_in_days}` (1 to 30, default 7, F5). Returns the assignment and `screener_path` (`/screener/{token}`), path only. The app that hosts the screener adds its own origin, so the backend needs no frontend URL setting.
+- Review: patient list, clinic worklist (`GET /psychosocial/sessions`, filter by status and flagged, risk-item rows first, which covers the F4 default "flagged badge in the session list"), session detail with every item, the answer label, the reasons for any flag and the baseline compare (first completed session of the same screener).
+- Cancel only while nothing is answered (SRS 4.1.1 "not yet started"). Re-issue link kills the old token.
+- Referral action log only on a completed, flagged session. Actions: referred_gp, referred_psychologist, referred_psychiatrist, already_under_care, patient_declined, monitor_and_rescreen, other, plus an optional note.
+- CDSS read contract v1: `GET /patients/{id}/psychosocial/summary` gives the latest completed session per screener plus `referral_flag` and `risk_item_flag` (SRS 5.1). Supporting input only.
+- Decided by: proposal, pending Onkar sign-off.
+
+## S-D-015 Audit events carry no clinical values
+- Events: `psychosocial.assigned`, `.cancelled`, `.link_reissued`, `.consent_granted`, `.consent_withdrawn`, `.completed`, `.result_viewed`, `.referral_logged`. Details hold ids and screener names only, never a score, band or flag, because admins can read the audit log (SRS 3.2). Opening a result is audited because it is sensitive data.
+- Decided by: proposal, pending Onkar sign-off.
+
+## S-D-017 Risk answer visible before submit
+- Context: if a patient answers PHQ-9 item 9 above zero and then closes the page, the session never completes and no flag would show.
+- Choice: every staff view computes `partial_risk` for in-progress sessions from the saved answers, so the physio sees it without a submit. The final flags are still written only on submit.
+- Decided by: proposal, pending founder sign-off with F1.
