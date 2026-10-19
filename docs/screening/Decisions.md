@@ -46,3 +46,20 @@ Format: context, choice, reason, decided by. Status "pending sign-off" means it 
 - Context: a clinic may buy Tool 03 without CRM.
 - Finding (verified in `core/products.py`): `patients.*` capabilities are platform-core and are not in `CAPABILITY_PRODUCT_MAP`, so a screening-only clinic can still list and pick patients. No change needed for the patient picker.
 - Decided by: verified fact, recorded for the build.
+
+## S-D-010 Data model: one link, one session per screener
+- Context: a physio can assign several screeners at once (SRS 4.1.1). One link per screener would mean several WhatsApp messages for one patient.
+- Choice: `psychosocial_assignments` is the link (hashed token, expiry, status). Each assigned screener is a row in `psychosocial_sessions` with its own status, raw responses (JSONB), `instrument_id`, `instrument_version` and computed result. The patient fills them in the assigned order on one link.
+- The token is `secrets.token_urlsafe(32)` and only its SHA-256 is stored, so a database leak does not expose working links. The link is shown once when it is created. If it is lost, the physio issues a new link, which kills the old one.
+- Consent (`psychosocial_consents`) and referral actions (`psychosocial_referral_actions`) are append-only logs.
+- Decided by: proposal, pending Onkar sign-off.
+
+## S-D-012 No entitlement granted by migration
+- Context: CRM lesson, new products need an explicit grant decision.
+- Choice: migration `b3d7e1f0c2a9` creates tables only. A clinic gets `psycho-social-screening` through the existing marketplace install flow (`services/marketplace.py install_product`), the same as other add-on tools. No existing clinic gets it silently.
+- Decided by: proposal, pending Onkar sign-off.
+
+## S-D-013 Immutability enforced in the database too
+- Choice: a Postgres trigger (`trg_psychosocial_sessions_immutable`) rejects any UPDATE of a session row whose status is already `completed`. DELETE stays allowed, which the deletion-on-request flow needs. The same SQL is attached to the model, so test databases built with `create_all()` have the trigger as well.
+- Verified: the API test tries a raw UPDATE on a completed row and expects the error, and a manual check on a database built through the full Alembic chain gave the same error, while cascade DELETE still worked.
+- Decided by: proposal, pending Onkar sign-off.
