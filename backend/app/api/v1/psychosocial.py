@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.core.dependencies import AuthenticatedContextDep, SessionDep, require_capability
 from app.enums.permission import CapabilityScope
+from app.models.patient import Patient
 from app.models.psychosocial import PsychosocialAssignment, PsychosocialSession
 from app.schemas.envelope import MetaPagination, ResponseEnvelope
 from app.schemas.psychosocial import (
@@ -300,6 +301,7 @@ async def session_detail(
         db, clinic_id=ctx.clinic.id, session_id=session_id, scope=scope, user_id=ctx.user.id
     )
     instrument = get_instrument(session.instrument_id, session.instrument_version)
+    patient = await db.get(Patient, session.patient_id)
     responses = session.responses or {}
     response_rows = []
     for item in instrument.items:
@@ -335,6 +337,7 @@ async def session_detail(
     names = await svc.user_names(db, {a.recorded_by for a in actions})
     detail = SessionDetailOut(
         session=session_summary(session),
+        patient_name=f"{patient.first_name} {patient.last_name}".strip() if patient else "",
         instrument_name=instrument.name,
         citation=instrument.citation,
         reasons=list((session.result or {}).get("reasons", [])),

@@ -235,6 +235,7 @@ async def test_full_flow_phq9_then_gad7(client, db_session, env, therapist_auth_
     assert detail.status_code == 200
     d = detail.json()["data"]
     assert d["is_baseline"] is True and d["baseline"] is None
+    assert d["patient_name"] == f"Meera {patient.last_name}"
     assert d["responses"][0]["answer_label"] == "More than half the days"
     assert d["responses"][9]["item_id"] == "phq9_difficulty" and d["responses"][9]["scored"] is False
     assert any("item 9" in r for r in d["reasons"])

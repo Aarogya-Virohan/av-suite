@@ -143,6 +143,7 @@ class BaselineOut(BaseModel):
 
 class SessionDetailOut(BaseModel):
     session: SessionSummaryOut
+    patient_name: str
     instrument_name: str
     citation: str
     reasons: list[str]
