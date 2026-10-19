@@ -75,6 +75,7 @@ PRODUCT_CAPABILITY_PREFIXES: Mapping[str, tuple[str, ...]] = MappingProxyType(
         "exercise-library": ("exercises.",),
         "posture-tool": ("posture.",),
         "exercise-prescription": ("prescriptions.",),
+        "psycho-social-screening": ("screening.",),
     }
 )
 

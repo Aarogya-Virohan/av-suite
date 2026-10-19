@@ -63,3 +63,10 @@ Format: context, choice, reason, decided by. Status "pending sign-off" means it 
 - Choice: a Postgres trigger (`trg_psychosocial_sessions_immutable`) rejects any UPDATE of a session row whose status is already `completed`. DELETE stays allowed, which the deletion-on-request flow needs. The same SQL is attached to the model, so test databases built with `create_all()` have the trigger as well.
 - Verified: the API test tries a raw UPDATE on a completed row and expects the error, and a manual check on a database built through the full Alembic chain gave the same error, while cascade DELETE still worked.
 - Decided by: proposal, pending Onkar sign-off.
+
+## S-D-011 Capabilities and the admin default (founder question F3)
+- New keys in `core/rbac.py`: `screening.assign` (None/All), `screening.view` (None/Own/All), `screening.refer` (None/Own/All). Own means sessions the user assigned. All three map to the `psycho-social-screening` product in `core/products.py`, so a clinic without the product gets `PRODUCT_NOT_ENTITLED`.
+- Shared file change: `_admin_template()` now leaves `screening.view` and `screening.refer` at None (`ADMIN_TEMPLATE_EXCLUDED`). SRS 3.2 says administrators never see individual responses. Admins keep `screening.assign`, so they can send links (F5 default) but cannot open results.
+- Therapists start at None for everything, like every other module in this repo. An admin grants the screening keys per physio. Every grant is audited by the existing permissions endpoint.
+- Gap found: the CRM permission grid (`frontend/crm/src/config/permissions.ts`) is a hardcoded list of 64 keys, so the new keys do not show there. The Tool 03 app will carry its own small access page for this (SRS 4.3.1). The CRM list needs the 3 keys later (Pending P-08).
+- Decided by: F3 safe default, pending founder sign-off.
