@@ -87,3 +87,18 @@ Format: context, choice, reason, decided by. Status "pending sign-off" means it 
 - Context: if a patient answers PHQ-9 item 9 above zero and then closes the page, the session never completes and no flag would show.
 - Choice: every staff view computes `partial_risk` for in-progress sessions from the saved answers, so the physio sees it without a submit. The final flags are still written only on submit.
 - Decided by: proposal, pending founder sign-off with F1.
+
+## S-D-016 Consent (founder question F6)
+- The consent text lives in the backend (`app/screening/consent.py`) with a version string. Every consent row stores that version, so we can always show which wording a patient agreed to. A new version asks the patient again on their next link.
+- Consent is per patient, asked before the first screener and again only when the text version changes (SRS 4.2.1). No answer is saved without it (`CONSENT_REQUIRED`).
+- Withdrawal from the screener page records a `withdrawn` row, cancels every open link for that patient and blocks new links (`CONSENT_WITHDRAWN`). Completed results stay until a deletion request (S-L-005).
+- Text status: draft `2026-10-20.draft1`, pending founder approval.
+- Decided by: F6 safe default, pending founder sign-off.
+
+## S-D-018 Public screener routes and rate limiting
+- Routes under `/api/v1/screener/{token}`: GET (questions and saved answers, no patient identity, no session ids, no scores), `/consent`, `/withdraw`, `/answers` (auto-save, one call per answer), `/submit`. Added to the ClinicGate public allowlist (shared file change).
+- Answers are accepted strictly in order: only the next unanswered item. Re-sending the same answer is a no-op (safe retry). A different value for a saved item gets `ANSWER_LOCKED` (SRS 4.2.2). A row lock stops two fast taps from both claiming the next item. Re-sending a submit that already went through returns the same reply, so a dropped response loses nothing.
+- Repo check first, as asked: there is no rate limiter in the repo, and the Turnstile check in `api/v1/booking.py` is a form CAPTCHA, not a rate limiter, so there was nothing to reuse. No new dependency was added (Onkar, 20 Oct).
+- Limiter: in-process sliding window in `app/screening/rate_limit.py`, on the public routes only. Two keys per request: per link token 200 requests per 15 minutes, per client IP 600 per 15 minutes. All three screeners on one link take about 50 requests, so a real patient stays far below both. Memory is capped at 20,000 tracked keys. A blocked call gets 429 `RATE_LIMITED` with `Retry-After`.
+- Client IP: the shared `get_client_ip()` trusts `CF-Connecting-IP` and the leftmost `X-Forwarded-For` from any caller, so it is not used. The limiter reads only the header named in the new optional setting `SCREENER_CLIENT_IP_HEADER`, otherwise `request.client.host`. Checked by running uvicorn with the Dockerfile flags (`--proxy-headers --forwarded-allow-ips=*`): `request.client.host` becomes the leftmost `X-Forwarded-For` entry. That is the real client only if Railway's edge replaces any client-sent `X-Forwarded-For`. Railway staff answers on this disagree. A Railway moderator says `X-Real-IP` is written at the edge and cannot be spoofed. Recommendation: set `SCREENER_CLIENT_IP_HEADER=X-Real-IP` on Railway before merge (Pending P-04). Spoofed IPs can only dodge the per-IP limit. The per-token limit and the 32-byte token still hold.
+- Decided by: Onkar (in-process, no dependency, per token and per IP); header choice is a proposal pending Onkar.

@@ -29,6 +29,8 @@ PUBLIC_PATH_PREFIXES = (
     f"{settings.API_V1_PREFIX}/auth",
     f"{settings.API_V1_PREFIX}/booking/branding",
     f"{settings.API_V1_PREFIX}/booking/request",
+    # Tool 03 patient screener: authorised by the link token, rate-limited.
+    f"{settings.API_V1_PREFIX}/screener/",
 )
 
 
