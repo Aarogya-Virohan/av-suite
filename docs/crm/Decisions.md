@@ -303,6 +303,21 @@ Each entry follows this structure:
 
 ---
 
+## [D-021] Exercise Library Redesigned to the AV Suite Brand; Prescription PDF Rebuilt
+
+- **Date**: 2026-10-20
+- **Context**: The Exercise Library still had the old look (dark serif login, shadcn defaults, no logo; the Geist font never loaded because `--font-sans` pointed at itself). Body part chips needed a second click on "Apply Filters". Login showed "[object Object]" for structured errors and accounts in two clinics could not sign in. The prescription PDF took about 18 s and 2.8 MB live: WeasyPrint downloaded every exercise image one after another at full size, inside the async route, blocking the server. The file sat on Railway's local disk (wiped on every redeploy), and the WhatsApp text carried a login-only relative download path.
+- **Decision** (scope and the four product answers by Onkar, 20 Oct):
+  - Frontend `frontend/exercise-library`: CRM tokens and fonts (copied from `frontend/crm/src/app/globals.css` at 6195026), AV logo, CRM-style login with the workspace picker, header with clinic and user, chips filter on click (multi-select, "All" clears), search debounced with stale requests aborted, image thumbnails on cards, searchable patient picker, previous prescriptions of a patient can be opened and edited, one primary action "Save & download PDF" (direct download, proper file name), toasts instead of `alert()`, phone layout with Library / Prescription tabs. The unused browser print view (`A4PrintView`, never reachable) and unused shadcn components were removed.
+  - Frontend fixes found on the way: the Frequency select had no "Daily" (the default) and showed blank; number fields clamped on every keystroke so a value could not be cleared and retyped.
+  - Backend: new `services/prescription_pdf.py` on the posture report's brand system (helpers imported, posture module untouched). Images fetched in parallel (https and public hosts only, 6 s timeout, 8 MB cap), shrunk with Pillow, cached, embedded as data URIs. Render in a worker thread. Stored in the `documents` bucket under `prescriptions/<clinic_id>/<rx_id>.pdf`; local disk only as fallback; the download regenerates a missing file instead of 404 and sends `Rx_<Patient>_<date>.pdf`. Dates in IST.
+  - WhatsApp text has no link; the physiotherapist attaches the PDF. A public or signed link would put health data on an open URL.
+- **Trade-offs**: API shapes unchanged except an added `filename` in the POST `/pdf` response. A PDF is regenerated on every download click (cheap now). Thumbnails load straight from the image host in the browser.
+- **Verified**: backend suite 309 pass, the same 10 known environment failures as before (302 + 7 new PDF tests). Exercise Library `tsc`, `eslint` (0 problems, 15 before) and `next build` clean. Playwright end to end at 1440 and 390 px against a local backend: picker login, chips, search, add, dosage edits, save, download, edit and save again, reopen from history, add-patient validation, logout; no page errors and no failing API calls. Not verified in the sandbox: exercise images (the image host is blocked there), so live PDF time with images is still to be measured.
+- **Affected Files**: `frontend/exercise-library/**`, `backend/app/services/prescription_pdf.py`, `backend/app/services/prescription_service.py`, `backend/app/api/v1/prescriptions.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_whatsapp_click_to_chat.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -325,7 +340,7 @@ Each entry follows this structure:
 | L-15 | Audit log is incomplete. `log_event` covers patient create/update/delete, user permission grant/revoke and delete, clinic settings updates and marketplace actions. Leads, appointments, invoices, payments and user creation are not audited | Open; needed for a healthcare CRM (follow-up PR) | Sparsh |
 | L-16 | Booking slug: fuzzy clinic-name lookup and a missing `get_by_slug` (D-016) | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): unique `clinics.slug`, exact lookup (a partial name returns 404), slug in `/auth/me`. Frontend links by slug (D-016 retired) | - |
 | L-17 | Public booking services and time slots are a fixed list, not configured per clinic | Open, product decision | Onkar + founders |
-| L-18 | Prescription PDF falls back to "Aarogya-Virohan Clinic" when the clinic is missing (`prescription_service.py`) | Open, low | Sparsh |
+| L-18 | Prescription PDF fell back to "Aarogya-Virohan Clinic" when the clinic is missing (`prescription_service.py`) | Fixed 2026-10-20 (D-021): the clinic name comes from the prescription's clinic; "AV Clinic" (the posture report's fallback) only if that row is missing | - |
 | L-19 | Appointments have no type column; the drawer's "Appointment Type" was silently dropped and was removed | Open, product decision (add a column if needed) | Onkar + Sparsh |
 | L-20 | No overpayment check in `record_payment`: paid_amount can exceed total | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): a payment above the balance is rejected (600 of 1000 accepted, then 500 rejected, 400 accepted, then 0.01 rejected) | - |
 | L-21 | Backend required a client-sent `invoice_number` with no uniqueness | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): backend numbers invoices per clinic (INV-0001, INV-0002, ...), unique per clinic, safe under concurrent requests, client value ignored. Frontend number field removed; the created number is shown | - |
@@ -341,5 +356,10 @@ Each entry follows this structure:
 | L-31 | Recycle Bin returned 500 once a patient was soft-deleted (`patients.deleted_by` did not exist) | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): column added; recycle bin lists deleted patients and restore works | - |
 | L-32 | `patient_service.py` never filtered `deleted_at` | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): deleted patients are hidden from the list and search, and GET and PATCH by id return 404 | - |
 | L-33 | `GET /patients` had no status filter, so the Patients page filtered only the loaded page | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): `?status=` on the API (invalid value returns 422); the Patients page sends it and resets to page 1 | - |
+| L-34 | Exercise Library: an account in several clinics picks the clinic at login, but there is no switcher after that (sign out to change) | Open; comes with the marketplace SSO phase | Frontend |
+| L-35 | Exercise Library loads at most 100 exercises and 100 patients per request (`page_size=100`), and the body part chips come from the first unfiltered load. Fine for today's library (13 exercises), wrong once it grows | Open; add paging or a body part list endpoint before the library passes 100 | Frontend + backend |
+| L-36 | Prescription PDF letterhead shows the clinic name with initials; the clinic logo and contact details are not printed (no clinic profile fields yet, see L-14) | Open | Frontend + Sparsh |
+| L-37 | "Therapist guidance" on a prescription is the fixed default text from the builder; there is no field to write it | Open, product decision | Onkar |
+| L-38 | Exercise images are cached in the server's memory only; the first PDF after a deploy downloads them again (parallel, 6 s cap). An image that fails prints "Image not available" | Accepted for now; move images into our own storage with the exercise image pipeline | Backend |
 
-*Last updated: 2026-10-12 (L-9, L-29, L-30 fixed; Patients list and command palette restyled) | Branch: feat/crm-ui-theme*
+*Last updated: 2026-10-20 (D-021, L-18 fixed, L-34 to L-38 added) | Branch: feat/exercise-ui-redesign*
