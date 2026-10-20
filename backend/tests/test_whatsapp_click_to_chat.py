@@ -183,7 +183,11 @@ async def test_prescription_pdf_response_includes_whatsapp_link(
     prescription_id = uuid4()
     clinic_id = uuid4()
     patient = SimpleNamespace(first_name="Jane", last_name="Doe", phone="9876543210")
-    rx = SimpleNamespace(patient=patient)
+    rx = SimpleNamespace(
+        patient=patient,
+        clinic=SimpleNamespace(name="Grove Physio"),
+        created_at=datetime(2026, 10, 19, 20, 0, tzinfo=timezone.utc),
+    )
 
     async def fake_generate_prescription_pdf(db, clinic_id_arg, prescription_id_arg):
         return f"/api/v1/prescriptions/{prescription_id_arg}/pdf/download"
@@ -208,4 +212,11 @@ async def test_prescription_pdf_response_includes_whatsapp_link(
         response["pdf_url"] == f"/api/v1/prescriptions/{prescription_id}/pdf/download"
     )
     assert response["whatsapp_link"].startswith("https://wa.me/919876543210?text=")
-    assert "Your%20prescription%20is%20ready." in response["whatsapp_link"]
+    link = response["whatsapp_link"]
+    assert "Grove%20Physio" in link
+    assert "attached%20as%20a%20PDF" in link
+    # No download path in the message: it needs a login and would be useless
+    # to the patient (decided 20 October 2026).
+    assert "%2Fapi%2Fv1" not in link and "/api/v1" not in link
+    # 20:00 UTC on 19 Oct is 01:30 IST on 20 Oct: the file name uses the IST date.
+    assert response["filename"] == "Rx_JaneDoe_20Oct2026.pdf"

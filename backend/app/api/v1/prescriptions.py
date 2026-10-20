@@ -18,8 +18,7 @@ from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
 from app.services import prescription_service
-from fastapi.responses import FileResponse
-import os
+from fastapi.responses import Response
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +273,18 @@ async def download_pdf(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only download your own prescription PDF.",
         )
-    file_path = os.path.join("static", "prescriptions", rx.pdf_key)
-    if not os.path.exists(file_path):
+    try:
+        pdf_bytes = await prescription_service.load_prescription_pdf(
+            db, uuid.UUID(clinic_id), rx
+        )
+    except ValueError:
         raise HTTPException(status_code=404, detail="PDF file not found on server")
-    return FileResponse(file_path, media_type="application/pdf", filename=rx.pdf_key)
+    filename = prescription_service.prescription_pdf_filename(rx)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+        },
+    )

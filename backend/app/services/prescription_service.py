@@ -1,19 +1,20 @@
 import logging
 import uuid
 import os
-import html
-from datetime import datetime
+import asyncio
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.prescription import Prescription
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
 from app.repositories.prescription import PrescriptionRepository
 from app.utils.whatsapp import build_whatsapp_link
-
-try:
-    from weasyprint import HTML
-except (ImportError, OSError):
-    HTML = None
+from app.services.prescription_pdf import (
+    RxDoc,
+    RxItem,
+    ist_date,
+    pdf_filename,
+    render_prescription_pdf,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -138,379 +139,183 @@ async def patch_prescription(
         raise
 
 
+PDF_LOCAL_DIR = os.path.join("static", "prescriptions")
+PDF_STORAGE_PREFIX = "prescriptions"
+
+
+def _storage_key(rx: Prescription) -> str:
+    return f"{PDF_STORAGE_PREFIX}/{rx.clinic_id}/{rx.id}.pdf"
+
+
+def _storage_client():
+    """The shared Supabase client, or None when storage is not configured
+    (local runs, tests). Imported lazily, as in api/v1/documents.py."""
+    try:
+        from app.core.storage import storage_client
+
+        return storage_client
+    except Exception as exc:  # bad or missing Supabase settings
+        logger.warning("Document storage not available: %s", type(exc).__name__)
+        return None
+
+
+def _rx_doc(rx: Prescription) -> RxDoc:
+    patient = rx.patient
+    physio = rx.physio
+    physio_name = (
+        f"{physio.first_name or ''} {physio.last_name or ''}".strip() or physio.email
+        if physio
+        else ""
+    )
+    items = []
+    for item in rx.items:
+        ex = item.exercise
+        items.append(
+            RxItem(
+                title=(ex.title if ex and ex.title else "Exercise"),
+                body_part=(ex.body_part if ex and ex.body_part else "General"),
+                instructions=(ex.description if ex and ex.description else ""),
+                sets=item.sets,
+                reps=item.reps,
+                hold=item.hold,
+                frequency=item.frequency,
+                note=item.note,
+                image_url=(ex.video_url if ex and ex.video_url else None),
+            )
+        )
+    return RxDoc(
+        rx_id=str(rx.id),
+        clinic_name=(rx.clinic.name if rx.clinic else "AV Clinic"),
+        physio_name=physio_name,
+        patient_name=(
+            f"{patient.first_name} {patient.last_name}".strip() if patient else "Patient"
+        ),
+        patient_phone=(patient.phone if patient else None),
+        patient_dob=(patient.date_of_birth if patient else None),
+        prescribed_on=rx.created_at,
+        physio_notes=rx.physio_notes,
+        items=items,
+    )
+
+
+def prescription_pdf_filename(rx: Prescription) -> str:
+    """Name the browser saves the file under, e.g. Rx_PriyaSharma_20Oct2026.pdf."""
+    name = (
+        f"{rx.patient.first_name} {rx.patient.last_name}" if rx.patient else "Patient"
+    )
+    return pdf_filename(name, ist_date(rx.created_at))
+
+
 async def generate_prescription_pdf(
     db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID
 ) -> str:
     """
-    Generates a professional PDF using WeasyPrint and saves it to static files.
-    Returns the file path / static URL path.
+    Render the prescription PDF and store it. Returns the authenticated
+    download path.
+
+    Stored in the Supabase bucket under prescriptions/<clinic_id>/<rx_id>.pdf
+    so it survives redeploys (Railway's disk is wiped on every deploy). When
+    storage is unavailable the file goes to the local disk instead, as before,
+    and the download endpoint regenerates it if it is gone later.
     """
-    try:
-        rx = await get_prescription_by_id(db, clinic_id, prescription_id)
-        if not rx:
-            raise ValueError("Prescription not found")
+    rx = await get_prescription_by_id(db, clinic_id, prescription_id)
+    if not rx:
+        raise ValueError("Prescription not found")
 
-        # Create output directory
-        os.makedirs("static/prescriptions", exist_ok=True)
-        pdf_filename = f"prescription_{rx.id}.pdf"
-        pdf_path = os.path.join("static/prescriptions", pdf_filename)
+    pdf_bytes = await render_prescription_pdf(_rx_doc(rx))
+    pdf_key = await _store_pdf(rx, pdf_bytes)
 
-        # Formulate HTML content
-        # Inline SVG fallback (no network dependency — avoids relying on external
-        # placeholder services that can be slow, down, or removed in production)
-        FALLBACK_IMG_SRC = (
-            "data:image/svg+xml;utf8,"
-            "<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'>"
-            "<rect width='150' height='150' fill='%23f1f5f9'/>"
-            "<text x='50%25' y='50%25' font-family='Helvetica, Arial, sans-serif' "
-            "font-size='12' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'>"
-            "No Image</text></svg>"
+    repo = PrescriptionRepository(db)
+    await repo.update_pdf_key(rx, pdf_key)
+    logger.info(
+        "Prescription PDF generated: %s (%d bytes, key %s)", rx.id, len(pdf_bytes), pdf_key
+    )
+    return f"/api/v1/prescriptions/{rx.id}/pdf/download"
+
+
+async def _store_pdf(rx: Prescription, pdf_bytes: bytes) -> str:
+    client = _storage_client()
+    if client is not None:
+        from app.core.storage import StorageUnavailableError
+
+        key = _storage_key(rx)
+        try:
+            await asyncio.to_thread(client.upload_file, key, pdf_bytes, "application/pdf")
+            return key
+        except StorageUnavailableError:
+            logger.warning("Prescription PDF upload failed, keeping it on local disk")
+
+    os.makedirs(PDF_LOCAL_DIR, exist_ok=True)
+    filename = f"prescription_{rx.id}.pdf"
+    path = os.path.join(PDF_LOCAL_DIR, filename)
+    await asyncio.to_thread(_write_file, path, pdf_bytes)
+    return filename
+
+
+def _write_file(path: str, data: bytes) -> None:
+    with open(path, "wb") as fh:
+        fh.write(data)
+
+
+def _read_file(path: str) -> bytes:
+    with open(path, "rb") as fh:
+        return fh.read()
+
+
+async def load_prescription_pdf(
+    db: AsyncSession, clinic_id: uuid.UUID, rx: Prescription
+) -> bytes:
+    """
+    Bytes of the stored PDF. A key with a "/" lives in the bucket, a bare
+    filename on the local disk (older prescriptions). If the file is gone
+    (redeploy, storage outage) it is generated again rather than failing.
+    """
+    key = rx.pdf_key
+    if key and "/" in key:
+        client = _storage_client()
+        if client is not None:
+            from app.core.storage import StorageUnavailableError
+
+            try:
+                return await asyncio.to_thread(client.download_file, key)
+            except StorageUnavailableError:
+                logger.warning("Prescription PDF download from storage failed, regenerating")
+    elif key:
+        path = os.path.join(PDF_LOCAL_DIR, os.path.basename(key))
+        if os.path.exists(path):
+            return await asyncio.to_thread(_read_file, path)
+
+    await generate_prescription_pdf(db, clinic_id, rx.id)
+    fresh = await get_prescription_by_id(db, clinic_id, rx.id)
+    if fresh and fresh.pdf_key and "/" not in fresh.pdf_key:
+        return await asyncio.to_thread(
+            _read_file, os.path.join(PDF_LOCAL_DIR, fresh.pdf_key)
         )
-
-        items_html = ""
-        for index, item in enumerate(rx.items):
-            ex = item.exercise
-            img_src = ex.video_url if ex and ex.video_url else FALLBACK_IMG_SRC
-
-            # Escape all user-supplied / DB text before interpolating into HTML,
-            # since WeasyPrint renders raw HTML — unescaped text could break the
-            # layout or inject markup (e.g. via a note field with "<" or ">").
-            ex_title = html.escape(ex.title) if ex and ex.title else "Rehab Exercise"
-            ex_body_part = (
-                html.escape(ex.body_part) if ex and ex.body_part else "General"
-            )
-            ex_description = (
-                html.escape(ex.description)
-                if ex and ex.description
-                else "Perform as advised by therapist."
-            )
-            item_note_escaped = html.escape(item.note) if item.note else None
-
-            note_text = (
-                f"<p class='note'><strong>Special Notes:</strong> {item_note_escaped}</p>"
-                if item_note_escaped
-                else ""
-            )
-            items_html += f"""
-            <div class="exercise-card">
-                <div class="exercise-header">
-                    <span class="exercise-num">#{index + 1}</span>
-                    <span class="exercise-title">{ex_title}</span>
-                    <span class="exercise-part">{ex_body_part}</span>
-                </div>
-                <div class="exercise-body">
-                    <div class="exercise-img-container">
-                        <img src="{img_src}" class="exercise-img" alt="{ex_title}" />
-                    </div>
-                    <div class="exercise-details">
-                        <div class="dosage-grid">
-                            <div class="dosage-cell"><span class="label">Sets</span><span class="value">{item.sets}</span></div>
-                            <div class="dosage-cell"><span class="label">Reps</span><span class="value">{item.reps}</span></div>
-                            <div class="dosage-cell"><span class="label">Hold Time</span><span class="value">{item.hold}s</span></div>
-                            <div class="dosage-cell"><span class="label">Frequency</span><span class="value">{item.frequency}</span></div>
-                        </div>
-                        <p class="desc"><strong>Instructions:</strong> {ex_description}</p>
-                        {note_text}
-                    </div>
-                </div>
-            </div>
-            """
-
-        date_str = (
-            rx.created_at.strftime("%B %d, %Y")
-            if rx.created_at
-            else datetime.now().strftime("%B %d, %Y")
-        )
-        patient_name = (
-            html.escape(f"{rx.patient.first_name} {rx.patient.last_name}")
-            if rx.patient
-            else "Patient"
-        )
-        patient_phone = (
-            html.escape(rx.patient.phone) if rx.patient and rx.patient.phone else "N/A"
-        )
-        patient_dob = (
-            rx.patient.date_of_birth.strftime("%B %d, %Y")
-            if rx.patient and rx.patient.date_of_birth
-            else "N/A"
-        )
-        clinic_name = (
-            html.escape(rx.clinic.name) if rx.clinic else "Aarogya-Virohan Clinic"
-        )
-        physio_name = html.escape(
-            f"{rx.physio.first_name} {rx.physio.last_name}".strip()
-            if rx.physio and rx.physio.first_name
-            else (rx.physio.email if rx.physio else "N/A")
-        )
-        physio_notes_escaped = html.escape(rx.physio_notes) if rx.physio_notes else None
-        general_notes = (
-            f"<div class='general-notes'><h3>Clinical Notes & Guidance</h3><p>{physio_notes_escaped}</p></div>"
-            if physio_notes_escaped
-            else ""
-        )
-
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>Exercise Prescription - {patient_name}</title>
-            <style>
-                @page {{
-                    size: A4;
-                    margin: 20mm;
-                    @bottom-right {{
-                        content: "Page " counter(page) " of " counter(pages);
-                        font-family: 'Outfit', sans-serif;
-                        font-size: 8pt;
-                        color: #64748b;
-                    }}
-                    @bottom-left {{
-                        content: "{clinic_name} — Clinical Biometrics";
-                        font-family: 'Outfit', sans-serif;
-                        font-size: 8pt;
-                        color: #64748b;
-                    }}
-                }}
-                body {{
-                    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-                    color: #0f172a;
-                    margin: 0;
-                    padding: 0;
-                    line-height: 1.5;
-                }}
-                .header-container {{
-                    border-bottom: 2px solid #ff7a00;
-                    padding-bottom: 15px;
-                    margin-bottom: 25px;
-                }}
-                .clinic-title {{
-                    font-size: 24pt;
-                    font-weight: bold;
-                    color: #ff7a00;
-                    margin: 0 0 5px 0;
-                }}
-                .clinic-subtitle {{
-                    font-size: 10pt;
-                    color: #475569;
-                    margin: 0;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
-                }}
-                .meta-table {{
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-bottom: 30px;
-                }}
-                .meta-table td {{
-                    padding: 6px 10px;
-                    vertical-align: top;
-                    font-size: 10pt;
-                }}
-                .meta-table .label {{
-                    font-weight: bold;
-                    color: #475569;
-                    width: 15%;
-                    text-transform: uppercase;
-                    font-size: 8pt;
-                }}
-                .meta-table .value {{
-                    color: #0f172a;
-                    width: 35%;
-                }}
-                .exercise-card {{
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    margin-bottom: 20px;
-                    page-break-inside: avoid;
-                    overflow: hidden;
-                }}
-                .exercise-header {{
-                    background-color: #fff5eb;
-                    border-bottom: 1px solid #ffe0c2;
-                    padding: 10px 15px;
-                    font-weight: bold;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }}
-                .exercise-num {{
-                    color: #ff7a00;
-                    font-size: 11pt;
-                }}
-                .exercise-title {{
-                    font-size: 12pt;
-                    color: #0f172a;
-                    margin-left: 10px;
-                    flex-grow: 1;
-                }}
-                .exercise-part {{
-                    font-size: 9pt;
-                    background-color: #ff7a00;
-                    color: white;
-                    padding: 2px 8px;
-                    border-radius: 4px;
-                    text-transform: uppercase;
-                }}
-                .exercise-body {{
-                    display: table;
-                    width: 100%;
-                }}
-                .exercise-img-container {{
-                    display: table-cell;
-                    width: 30%;
-                    padding: 15px;
-                    vertical-align: top;
-                    text-align: center;
-                }}
-                .exercise-img {{
-                    max-width: 100%;
-                    max-height: 120px;
-                    border-radius: 6px;
-                }}
-                .exercise-details {{
-                    display: table-cell;
-                    width: 70%;
-                    padding: 15px;
-                    vertical-align: top;
-                }}
-                .dosage-grid {{
-                    display: table;
-                    width: 100%;
-                    margin-bottom: 10px;
-                    background-color: #f8fafc;
-                    border-radius: 6px;
-                }}
-                .dosage-cell {{
-                    display: table-cell;
-                    padding: 8px;
-                    text-align: center;
-                    border-right: 1px solid #e2e8f0;
-                }}
-                .dosage-cell:last-child {{
-                    border-right: none;
-                }}
-                .dosage-cell .label {{
-                    display: block;
-                    font-size: 7pt;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    font-weight: bold;
-                    margin-bottom: 3px;
-                }}
-                .dosage-cell .value {{
-                    font-size: 11pt;
-                    font-weight: bold;
-                    color: #ff7a00;
-                }}
-                .desc {{
-                    font-size: 9.5pt;
-                    color: #334155;
-                    margin: 8px 0 0 0;
-                }}
-                .note {{
-                    font-size: 9pt;
-                    color: #d97706;
-                    margin: 8px 0 0 0;
-                    background-color: #fef3c7;
-                    padding: 6px 10px;
-                    border-radius: 4px;
-                }}
-                .general-notes {{
-                    background-color: #f8fafc;
-                    border-left: 4px solid #ff7a00;
-                    padding: 15px;
-                    border-radius: 0 6px 6px 0;
-                    margin-bottom: 30px;
-                    page-break-inside: avoid;
-                }}
-                .general-notes h3 {{
-                    margin: 0 0 8px 0;
-                    font-size: 11pt;
-                    color: #ff7a00;
-                    text-transform: uppercase;
-                }}
-                .general-notes p {{
-                    margin: 0;
-                    font-size: 10pt;
-                    color: #475569;
-                    line-height: 1.6;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="header-container">
-                <h1 class="clinic-title">{clinic_name}</h1>
-                <p class="clinic-subtitle">Personalized Rehabilitation & Kinematic Recovery</p>
-            </div>
-            
-            <table class="meta-table">
-                <tr>
-                    <td class="label">Patient Name</td>
-                    <td class="value">{patient_name}</td>
-                    <td class="label">Date of Birth</td>
-                    <td class="value">{patient_dob}</td>
-                </tr>
-                <tr>
-                    <td class="label">Contact Phone</td>
-                    <td class="value">{patient_phone}</td>
-                    <td class="label">Prescribed Date</td>
-                    <td class="value">{date_str}</td>
-                </tr>
-                <tr>
-                    <td class="label">Therapist</td>
-                    <td class="value">{physio_name}</td>
-                    <td class="label"></td>
-                    <td class="value"></td>
-                </tr>
-            </table>
-
-            {general_notes}
-
-            <div style="margin-top: 10px;">
-                {items_html}
-            </div>
-        </body>
-        </html>
-        """
-
-        # Generate PDF using WeasyPrint
-        if HTML is None:
-            raise RuntimeError(
-                "PDF generation requires WeasyPrint and native GTK/Pango libraries to be installed on the system."
-            )
-        HTML(string=html_content).write_pdf(pdf_path)
-
-        # Save pdf key back to the database
-        repo = PrescriptionRepository(db)
-        await repo.update_pdf_key(rx, pdf_filename)
-
-        logger.info(
-            f"PDF successfully generated for prescription: {rx.id} at {pdf_path}"
-        )
-        return f"/api/v1/prescriptions/{rx.id}/pdf/download"
-    except Exception as e:
-        logger.error(
-            f"Error generating PDF for prescription {prescription_id}: {str(e)}"
-        )
-        raise
+    if fresh and fresh.pdf_key:
+        client = _storage_client()
+        if client is not None:
+            return await asyncio.to_thread(client.download_file, fresh.pdf_key)
+    raise ValueError("PDF could not be generated")
 
 
-def _build_prescription_message(patient_name: str, pdf_url: str) -> str:
-    """Format the WhatsApp message that accompanies a prescription download."""
-
+def _build_prescription_message(patient_name: str, clinic_name: str) -> str:
+    """
+    WhatsApp text that goes with the prescription. It carries no link: the
+    download path needs a login, and a public link would put health data on
+    an open URL. The physiotherapist attaches the PDF in WhatsApp
+    (decided by Onkar, 20 October 2026).
+    """
     return (
         f"Hello {patient_name},\n\n"
-        "Your prescription is ready.\n\n"
-        "Download:\n\n"
-        f"{pdf_url}"
+        f"Your home exercise programme from {clinic_name} is attached as a PDF. "
+        "Please follow the sets and reps as prescribed and contact us if anything hurts."
     )
 
 
 async def generate_prescription_pdf_response(
     db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID
 ) -> dict[str, object]:
-    """Generate the prescription PDF and return the download URL plus WhatsApp deep link."""
+    """Generate the PDF and return its download path, file name and WhatsApp link."""
 
     pdf_url = await generate_prescription_pdf(db, clinic_id, prescription_id)
     rx = await get_prescription_by_id(db, clinic_id, prescription_id)
@@ -520,8 +325,13 @@ async def generate_prescription_pdf_response(
     patient_name = (
         f"{rx.patient.first_name} {rx.patient.last_name}".strip() or "Patient"
     )
+    clinic_name = rx.clinic.name if rx.clinic else "your clinic"
     whatsapp_link = build_whatsapp_link(
-        rx.patient.phone or "", _build_prescription_message(patient_name, pdf_url)
+        rx.patient.phone or "", _build_prescription_message(patient_name, clinic_name)
     )
 
-    return {"pdf_url": pdf_url, "whatsapp_link": whatsapp_link}
+    return {
+        "pdf_url": pdf_url,
+        "whatsapp_link": whatsapp_link,
+        "filename": prescription_pdf_filename(rx),
+    }
