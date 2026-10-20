@@ -1,448 +1,366 @@
+"use client";
 
-
-import React, { useState, useEffect, useRef } from "react";
-import { PrescriptionItem } from "@/types/exercise";
-import { ExerciseRow } from "./ExerciseRow";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ClipboardList, FileText, Plus, Save, Loader2, Printer } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ClipboardList, Download, FilePlus2, History, Loader2, Save } from "lucide-react";
+import { Patient, PrescriptionItem, SavedPrescription } from "@/types/exercise";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  fetchPatients,
-  createPatient,
   createPrescription,
-  generatePrescriptionPDF,
+  downloadPrescriptionPDF,
+  fetchPatients,
+  fetchPrescriptions,
+  mapBackendExerciseToFrontend,
+  saveBlob,
   updatePrescription,
 } from "@/lib/api";
+import { toast } from "@/components/ui/toaster";
+import { ExerciseRow } from "./ExerciseRow";
+import { PatientPicker } from "./PatientPicker";
+import { AddPatientForm } from "./AddPatientForm";
 
 interface PrescriptionBuilderProps {
   prescription: PrescriptionItem[];
   onChange: (item: PrescriptionItem) => void;
   onRemove: (id: string) => void;
-  onGenerateReport: () => void;
+  onReplace: (items: PrescriptionItem[]) => void;
 }
 
-export function PrescriptionBuilder({
-  prescription,
-  onChange,
-  onRemove,
-  onGenerateReport,
-}: PrescriptionBuilderProps) {
-  const [patients, setPatients] = useState<any[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
-  const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
-  const [generatedPdfUrl, setGeneratedPdfUrl] = useState<string | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(true);
+// Same text the old builder sent with every new prescription.
+const DEFAULT_PHYSIO_NOTES =
+  "Please follow sets and reps instructions carefully. Reach out if you feel acute discomfort.";
 
-  // Tracks the live blob URL so we can revoke it before creating a new one —
-  // generatePrescriptionPDF() creates a fresh object URL each call, and without
-  // revoking the previous one, repeated edit -> print cycles leak memory.
-  const generatedPdfUrlRef = useRef<string | null>(null);
-  const setPdfUrl = (url: string | null) => {
-    if (generatedPdfUrlRef.current) {
-      URL.revokeObjectURL(generatedPdfUrlRef.current);
-    }
-    generatedPdfUrlRef.current = url;
-    setGeneratedPdfUrl(url);
-  };
+/** What was last saved, to tell "saved" from "changed since". */
+interface SavedState {
+  rxId: string;
+  patientId: string;
+  key: string;
+}
 
-  // Patient Modal / Inline Create Form state
+function itemsKey(items: PrescriptionItem[]): string {
+  return JSON.stringify(items.map((i) => [i.exercise.id, i.sets, i.reps, i.hold, i.frequency, i.note || ""]));
+}
+
+function toPayload(items: PrescriptionItem[]) {
+  return items.map((i) => ({
+    exercise_id: i.exercise.id,
+    sets: i.sets,
+    reps: i.reps,
+    hold: i.hold,
+    frequency: i.frequency,
+    note: i.note?.trim() || undefined,
+  }));
+}
+
+const dateFmt = new Intl.DateTimeFormat("en-IN", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "Asia/Kolkata",
+});
+
+function rxDate(iso: string): string {
+  return dateFmt.format(new Date(iso));
+}
+
+export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplace }: PrescriptionBuilderProps) {
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patientsLoading, setPatientsLoading] = useState(true);
+  const [patientId, setPatientId] = useState("");
   const [showAddPatient, setShowAddPatient] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [isCreatingPatient, setIsCreatingPatient] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<SavedPrescription[] | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [saved, setSaved] = useState<SavedState | null>(null);
+  const [busy, setBusy] = useState<"save" | "pdf" | null>(null);
 
-  // Load patients on mount
+  const key = useMemo(() => itemsKey(prescription), [prescription]);
+  const editingRxId = saved && saved.patientId === patientId ? saved.rxId : null;
+  const isSaved = !!editingRxId && saved?.key === key;
+  const editingRx = editingRxId ? history?.find((h) => h.id === editingRxId) : undefined;
+
+  // Patients once.
   useEffect(() => {
-    loadPatients();
+    fetchPatients()
+      .then(setPatients)
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Could not load patients."))
+      .finally(() => setPatientsLoading(false));
   }, []);
 
-  async function loadPatients(autoSelectId?: string) {
+  // History of the chosen patient.
+  const loadHistory = useCallback(async (id: string) => {
     try {
-      const data = await fetchPatients();
-      setPatients(data);
-      if (autoSelectId) {
-        setSelectedPatientId(autoSelectId);
-      }
-      // Intentionally NOT auto-selecting the first patient on initial load.
-      // Auto-selecting risked silently prescribing exercises to the wrong patient.
-    } catch (err) {
-      console.error("Failed to fetch patients", err);
+      setHistory(await fetchPrescriptions(id));
+    } catch {
+      setHistory([]);
     }
-  }
+  }, []);
 
-  const NAME_PATTERN = /^[A-Za-z][A-Za-z .'-]{0,99}$/;
-  const PHONE_PATTERN = /^[0-9]{10}$/;
-
-  const handleCreatePatient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedFirst = firstName.trim();
-    const trimmedLast = lastName.trim();
-
-    if (!trimmedFirst || !trimmedLast) {
-      setError("First and Last name are required");
-      return;
-    }
-    if (!NAME_PATTERN.test(trimmedFirst) || !NAME_PATTERN.test(trimmedLast)) {
-      setError("Names may only contain letters, spaces, hyphens, apostrophes, and periods");
-      return;
-    }
-    if (phone && !PHONE_PATTERN.test(phone)) {
-      setError("Phone number must be exactly 10 digits");
-      return;
-    }
-    setError(null);
-    setIsCreatingPatient(true);
-    try {
-      const newPatient = await createPatient({
-        first_name: trimmedFirst,
-        last_name: trimmedLast,
-        phone: phone || undefined,
-        date_of_birth: dateOfBirth || undefined,
-      });
-      setFirstName("");
-      setLastName("");
-      setPhone("");
-      setDateOfBirth("");
-      setShowAddPatient(false);
-      await loadPatients(newPatient.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to register patient");
-    } finally {
-      setIsCreatingPatient(false);
-    }
+  const selectPatient = (id: string) => {
+    setPatientId(id);
+    setHistory(null);
+    setHistoryOpen(false);
+    if (id) loadHistory(id);
   };
 
-  const handleSavePrescription = async () => {
-    if (!selectedPatientId) {
-      alert("Please select a patient first.");
-      return;
-    }
-    if (prescription.length === 0) {
-      alert("Please add at least one exercise to prescribe.");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const itemsPayload = prescription.map((item) => ({
-        exercise_id: item.exercise.id,
-        sets: item.sets,
-        reps: item.reps,
-        hold: item.hold,
-        frequency: item.frequency,
-        note: item.note,
-      }));
-
-      if (savedPrescriptionId) {
-        // Edit existing prescription
-        await updatePrescription(savedPrescriptionId, {
-          items: itemsPayload
-        });
-        setHasUnsavedChanges(false);
-        alert("Exercise Prescription updated successfully in the database!");
-      } else {
-        // Create new prescription
-        const payload = {
-          patient_id: selectedPatientId,
-          physio_notes: "Please follow sets and reps instructions carefully. Reach out if you feel acute discomfort.",
-          status: "active",
-          items: itemsPayload,
-        };
-        const result = await createPrescription(payload);
-        setSavedPrescriptionId(result.id);
-        setHasUnsavedChanges(false);
-        alert("Exercise Prescription saved successfully in the database!");
-      }
-    } catch (err) {
-      console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to save prescription.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handlePrintPDF = async () => {
-    if (!selectedPatientId) {
-      alert("Please select a patient first.");
-      return;
-    }
-    if (prescription.length === 0) {
-      alert("Please add at least one exercise.");
-      return;
-    }
-
-    setIsPrinting(true);
-    let targetId = savedPrescriptionId;
-    try {
-      const itemsPayload = prescription.map((item) => ({
-        exercise_id: item.exercise.id,
-        sets: item.sets,
-        reps: item.reps,
-        hold: item.hold,
-        frequency: item.frequency,
-        note: item.note,
-      }));
-
-      if (targetId) {
-        // Update existing prescription before printing
-        await updatePrescription(targetId, {
-          items: itemsPayload
-        });
-      } else {
-        // Create new prescription
-        const payload = {
-          patient_id: selectedPatientId,
-          physio_notes: "Please follow sets and reps instructions carefully. Reach out if you feel acute discomfort.",
-          items: itemsPayload,
-        };
-        const result = await createPrescription(payload);
-        targetId = result.id;
-        setSavedPrescriptionId(targetId);
-      }
-
-      setHasUnsavedChanges(false);
-
-      // Generate PDF
-      const pdfUrl = await generatePrescriptionPDF(targetId!);
-      setPdfUrl(pdfUrl);
-      
-      // Attempt to open in a new tab (might get blocked by browser popup blocker)
-      try {
-        window.open(pdfUrl, "_blank");
-      } catch (err) {
-        console.error("Popup blocker prevented auto-opening the PDF.", err);
-      }
-    } catch (err) {
-      console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to generate PDF report.");
-    } finally {
-      setIsPrinting(false);
-    }
-  };
-
-  // Reset prescription status and PDF URL when selected patient changes
+  // Warn before leaving with unsaved work.
   useEffect(() => {
-    setSavedPrescriptionId(null);
-    setPdfUrl(null);
-  }, [selectedPatientId]);
-
-  // Revoke any live blob URL when the component unmounts
-  useEffect(() => {
-    return () => {
-      if (generatedPdfUrlRef.current) {
-        URL.revokeObjectURL(generatedPdfUrlRef.current);
-      }
+    if (prescription.length === 0 || isSaved) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
     };
-  }, []);
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [prescription.length, isSaved]);
 
-  // Reset PDF URL and mark unsaved when prescription items list changes
-  useEffect(() => {
-    setPdfUrl(null);
-    setHasUnsavedChanges(true);
-  }, [prescription]);
+  const openSaved = (rx: SavedPrescription) => {
+    if (prescription.length > 0 && !isSaved) {
+      const ok = window.confirm("Replace the exercises on screen with this saved prescription? Unsaved changes will be lost.");
+      if (!ok) return;
+    }
+    const items: PrescriptionItem[] = [];
+    let missing = 0;
+    for (const it of rx.items) {
+      if (!it.exercise) {
+        missing++;
+        continue;
+      }
+      items.push({
+        exercise: mapBackendExerciseToFrontend(it.exercise),
+        sets: it.sets,
+        reps: it.reps,
+        hold: it.hold,
+        frequency: it.frequency,
+        note: it.note ?? undefined,
+      });
+    }
+    onReplace(items);
+    setSaved({ rxId: rx.id, patientId: rx.patient_id, key: itemsKey(items) });
+    setHistoryOpen(false);
+    if (missing) toast.error(`${missing} exercise(s) in this prescription no longer exist in the library.`);
+  };
+
+  const startNew = () => {
+    if (prescription.length > 0 && !isSaved) {
+      const ok = window.confirm("Clear the exercises on screen? Unsaved changes will be lost.");
+      if (!ok) return;
+    }
+    setSaved(null);
+    onReplace([]);
+  };
+
+  const validate = (): boolean => {
+    if (!patientId) {
+      toast.error("Choose a patient first.");
+      return false;
+    }
+    if (prescription.length === 0) {
+      toast.error("Add at least one exercise.");
+      return false;
+    }
+    return true;
+  };
+
+  /** Create or update; returns the prescription id. */
+  const persist = async (): Promise<string> => {
+    const items = toPayload(prescription);
+    let id: string;
+    if (editingRxId) {
+      await updatePrescription(editingRxId, { items });
+      id = editingRxId;
+    } else {
+      const created = await createPrescription({
+        patient_id: patientId,
+        physio_notes: DEFAULT_PHYSIO_NOTES,
+        status: "active",
+        items,
+      });
+      id = created.id;
+    }
+    setSaved({ rxId: id, patientId, key });
+    loadHistory(patientId);
+    return id;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+    setBusy("save");
+    try {
+      const wasEditing = !!editingRxId;
+      await persist();
+      toast(wasEditing ? "Prescription updated." : "Prescription saved.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save the prescription.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handlePdf = async () => {
+    if (!validate()) return;
+    setBusy("pdf");
+    try {
+      const id = isSaved && editingRxId ? editingRxId : await persist();
+      const { blob, filename } = await downloadPrescriptionPDF(id);
+      saveBlob(blob, filename);
+      toast(`Saved and downloaded ${filename}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create the PDF.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const status = !patientId
+    ? null
+    : editingRxId
+      ? isSaved
+        ? { tone: "ok", text: `Saved · ${editingRx ? rxDate(editingRx.created_at) : ""}` }
+        : { tone: "warn", text: "Editing a saved prescription · unsaved changes" }
+      : prescription.length
+        ? { tone: "muted", text: "New prescription · not saved yet" }
+        : null;
 
   return (
-    <div className="flex flex-col flex-1 relative min-h-0">
-      {/* Header section */}
-      <div className="mb-4 flex items-center justify-between shrink-0">
-        <h2 className="font-bold text-lg flex items-center gap-2 text-foreground">
-          <ClipboardList className="h-5 w-5 text-primary" />
-          Rehab Prescriber
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-4 flex shrink-0 items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-display text-xl font-bold text-ink">
+          <ClipboardList className="h-5 w-5 text-grove" />
+          Prescription
         </h2>
-        <span className="text-xs font-semibold bg-primary/10 text-primary px-2.5 py-0.5 rounded-full">
-          {prescription.length} items
-        </span>
-      </div>
-
-      {/* Patient Section */}
-      <div className="mb-4 p-3 bg-muted/30 border rounded-xl flex flex-col gap-2 shrink-0">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Select a Patient</Label>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAddPatient(!showAddPatient)}
-            className="h-7 text-xs font-bold text-primary hover:text-primary/90 hover:bg-primary/5 flex items-center gap-1 px-2"
+        {prescription.length > 0 && (
+          <button
+            type="button"
+            onClick={startNew}
+            className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-ink-2 hover:bg-muted"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Add New Patient 
-          </Button>
-        </div>
-
-        {showAddPatient ? (
-          <form onSubmit={handleCreatePatient} className="border-t pt-3 mt-1 flex flex-col gap-2.5">
-            <h4 className="text-xs font-bold text-foreground">Register New Patient</h4>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1">
-                <Label className="text-[10px] text-muted-foreground">First Name</Label>
-                <Input
-                  className="h-8 text-xs"
-                  placeholder="e.g. John"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value.replace(/[^A-Za-z .'-]/g, ""))}
-                  required
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label className="text-[10px] text-muted-foreground">Last Name</Label>
-                <Input
-                  className="h-8 text-xs"
-                  placeholder="e.g. Doe"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value.replace(/[^A-Za-z .'-]/g, ""))}
-                  required
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label className="text-[10px] text-muted-foreground">Phone Number</Label>
-              <Input
-                className="h-8 text-xs"
-                placeholder="e.g. 9876543210"
-                type="tel"
-                inputMode="numeric"
-                maxLength={10}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label className="text-[10px] text-muted-foreground">Date of Birth</Label>
-              <Input
-                type="date"
-                className="h-8 text-xs"
-                value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
-              />
-            </div>
-            {error && <span className="text-[10px] text-destructive font-medium">{error}</span>}
-            <div className="flex justify-end gap-2 mt-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddPatient(false)}
-                className="h-7 text-xs"
-              >
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" className="h-7 text-xs" disabled={isCreatingPatient}>
-                {isCreatingPatient && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />}
-                Add Patient
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <Select value={selectedPatientId} onValueChange={(val) => setSelectedPatientId(val || "")}>
-            <SelectTrigger className="h-9 w-full shadow-sm text-sm">
-              <SelectValue placeholder="Select patient...">
-                {selectedPatientId && patients.length > 0 ? (
-                  (() => {
-                    const selectedPatient = patients.find((p) => p.id === selectedPatientId);
-                    return selectedPatient
-                      ? `${selectedPatient.first_name} ${selectedPatient.last_name}`
-                      : undefined;
-                  })()
-                ) : undefined}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {patients.map((pat) => (
-                <SelectItem key={pat.id} value={pat.id}>
-                  {pat.first_name} {pat.last_name} {pat.phone ? `(${pat.phone})` : ""}
-                </SelectItem>
-              ))}
-              {patients.length === 0 && (
-                <div className="p-2 text-xs text-muted-foreground text-center">No patients found</div>
-              )}
-            </SelectContent>
-          </Select>
+            <FilePlus2 className="h-3.5 w-3.5" />
+            Start new
+          </button>
         )}
       </div>
 
-      {/* Exercises Prescribed list */}
-      {prescription.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-xl bg-muted/20">
-          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary">
-            <ClipboardList className="h-6 w-6" />
+      {/* Patient */}
+      <div className="mb-4 shrink-0 space-y-2">
+        <span className="block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Patient</span>
+        {showAddPatient ? (
+          <AddPatientForm
+            onCancel={() => setShowAddPatient(false)}
+            onCreated={(p) => {
+              setPatients((prev) => [p, ...prev]);
+              selectPatient(p.id);
+              setShowAddPatient(false);
+              toast(`${p.first_name} ${p.last_name} added.`);
+            }}
+          />
+        ) : (
+          <PatientPicker
+            patients={patients}
+            value={patientId}
+            onChange={selectPatient}
+            onAddNew={() => setShowAddPatient(true)}
+            loading={patientsLoading}
+          />
+        )}
+
+        {patientId && !showAddPatient && history && history.length > 0 && (
+          <div className="rounded-xl border border-line bg-card">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((o) => !o)}
+              aria-expanded={historyOpen}
+              className="flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-ink"
+            >
+              <History className="h-4 w-4 text-logo-teal-ink" />
+              <span className="flex-1">Previous prescriptions ({history.length})</span>
+              <span className="text-xs font-semibold text-grove">{historyOpen ? "Hide" : "Show"}</span>
+            </button>
+            {historyOpen && (
+              <ul className="max-h-60 divide-y divide-line-soft overflow-y-auto border-t border-line">
+                {history.map((rx) => {
+                  const names = rx.items
+                    .map((i) => (i.exercise?.title as string | undefined)?.toLowerCase())
+                    .filter(Boolean);
+                  const current = rx.id === editingRxId;
+                  return (
+                    <li key={rx.id} className="flex items-center gap-3 px-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-ink">
+                          {rxDate(rx.created_at)}
+                          <span className="ml-2 text-xs font-medium text-muted-foreground">
+                            {rx.items.length} {rx.items.length === 1 ? "exercise" : "exercises"}
+                          </span>
+                        </p>
+                        <p className="truncate text-xs capitalize text-muted-foreground">{names.join(", ")}</p>
+                      </div>
+                      {current ? (
+                        <span className="rounded-md bg-grove-wash px-2 py-1 text-xs font-semibold text-grove">Open</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openSaved(rx)}
+                          className="h-8 cursor-pointer rounded-lg border border-line px-3 text-xs font-semibold text-ink hover:border-grove hover:text-grove"
+                        >
+                          Open
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
-          <h3 className="font-semibold text-base mb-1">Prescription panel is empty</h3>
-          <p className="text-sm text-muted-foreground max-w-[250px]">
-            Select items from the library on the left and define dosage instructions.
+        )}
+      </div>
+
+      {/* Exercises */}
+      {prescription.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-line p-8 text-center">
+          <span className="mb-3 grid h-11 w-11 place-items-center rounded-full bg-grove-wash text-grove">
+            <ClipboardList className="h-5 w-5" />
+          </span>
+          <p className="font-semibold text-ink">No exercises yet</p>
+          <p className="mt-1 max-w-[260px] text-sm text-muted-foreground">
+            Add exercises from the library, then set the dose for each.
           </p>
         </div>
       ) : (
-        <>
-          <ScrollArea className="flex-1 pr-4 -mr-4 min-h-0">
-            <div className="pb-28">
-              {prescription.map((item) => (
-                <ExerciseRow
-                  key={item.exercise.id}
-                  item={item}
-                  onChange={onChange}
-                  onRemove={onRemove}
-                />
-              ))}
-            </div>
-          </ScrollArea>
-          
-          {/* Action buttons (Save & Print) */}
-          <div className="absolute bottom-0 left-0 right-0 pt-4 pb-2 bg-gradient-to-t from-background via-background to-transparent shrink-0 flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleSavePrescription}
-              disabled={isSaving}
-              className="flex-1 shadow-sm font-semibold h-11 border-primary/30 hover:bg-primary/5 active:scale-[0.98]"
-            >
-              {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
-              ) : (
-                <Save className="mr-2 h-4 w-4 text-primary" />
-              )}
-              {savedPrescriptionId && !hasUnsavedChanges ? "Saved" : "Save Plan"}
-            </Button>
-            {generatedPdfUrl ? (
-              <a
-                href={generatedPdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/30 transition-all active:scale-[0.98]"
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                Open / Save PDF
-              </a>
-            ) : (
-              <Button
-                onClick={handlePrintPDF}
-                disabled={isPrinting}
-                className="flex-1 shadow-lg shadow-primary/20 transition-all hover:shadow-primary/30 active:scale-[0.98] font-semibold h-11"
-              >
-                {isPrinting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Printer className="mr-2 h-4 w-4" />
-                )}
-                Print PDF
-              </Button>
-            )}
-          </div>
-        </>
+        <ol className="-mr-2 min-h-0 flex-1 space-y-2.5 overflow-y-auto pb-4 pr-2">
+          {prescription.map((item, i) => (
+            <ExerciseRow key={item.exercise.id} index={i + 1} item={item} onChange={onChange} onRemove={onRemove} />
+          ))}
+        </ol>
       )}
+
+      {/* Actions */}
+      <div className="sticky bottom-0 -mx-4 shrink-0 border-t border-line bg-canvas/95 px-4 pb-3 pt-3 backdrop-blur sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:backdrop-blur-none">
+        {status && (
+          <p
+            className={`mb-2 text-xs font-semibold ${
+              status.tone === "ok" ? "text-ok" : status.tone === "warn" ? "text-warn" : "text-muted-foreground"
+            }`}
+          >
+            {status.text}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={busy !== null || prescription.length === 0 || isSaved}
+            className="flex h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-line bg-card text-sm font-semibold text-ink transition-colors hover:border-grove/40 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isSaved ? "Saved" : editingRxId ? "Save changes" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={handlePdf}
+            disabled={busy !== null || prescription.length === 0}
+            className="flex h-11 flex-[1.6] cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-grove text-sm font-semibold text-white shadow-primary transition-colors hover:bg-grove-hover disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {busy === "pdf" ? "Preparing PDF..." : isSaved ? "Download PDF" : "Save & download PDF"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
-

@@ -1,36 +1,38 @@
 import React from "react";
+import { X } from "lucide-react";
 import { PrescriptionItem } from "@/types/exercise";
 import { DosageFields } from "./DosageFields";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
 
 interface ExerciseRowProps {
+  index: number;
   item: PrescriptionItem;
   onChange: (updatedItem: PrescriptionItem) => void;
   onRemove: (id: string) => void;
 }
 
-export function ExerciseRow({ item, onChange, onRemove }: ExerciseRowProps) {
+export function ExerciseRow({ index, item, onChange, onRemove }: ExerciseRowProps) {
   return (
-    <Card className="mb-3 border-border/60 bg-card/40 shadow-sm relative group overflow-hidden transition-all hover:border-primary/40 hover:shadow-md">
-      <div className="absolute top-0 left-0 w-1 h-full bg-primary/80 transition-all group-hover:bg-primary"></div>
-      <CardContent className="p-4 pl-5 relative">
-        <div className="flex justify-between items-start mb-1">
-          <h4 className="font-semibold text-sm leading-tight pr-6">
-            {item.exercise.name}
+    <li className="rounded-2xl border border-line bg-card p-3.5 shadow-card">
+      <div className="flex items-start gap-2.5">
+        <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-midnight text-[11px] font-bold text-white">
+          {index}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h4 className="font-display text-[15px] font-bold capitalize leading-snug text-ink">
+            {item.exercise.name.toLowerCase()}
           </h4>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 absolute top-3 right-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
-            onClick={() => onRemove(item.exercise.id)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <p className="text-xs font-medium text-muted-foreground">{item.exercise.bodyPart}</p>
         </div>
-        <DosageFields item={item} onChange={onChange} />
-      </CardContent>
-    </Card>
+        <button
+          type="button"
+          onClick={() => onRemove(item.exercise.id)}
+          aria-label={`Remove ${item.exercise.name}`}
+          className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-wash hover:text-danger"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <DosageFields item={item} onChange={onChange} />
+    </li>
   );
 }
