@@ -6,6 +6,7 @@ import { Check, Copy, Loader2, MessageCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
+import { REPEAT_OPTIONS } from '@/lib/schedule';
 import { PATIENT_TITLES, STAFF_INSTRUMENTS } from '@/lib/severity';
 import type { AssignmentCreated, InstrumentId, InstrumentSummary, Patient } from '@/lib/types';
 import { screenerMessage, whatsappLink } from '@/lib/whatsapp';
@@ -109,10 +110,13 @@ export function AssignDrawer({
   patient,
   open,
   onClose,
+  initialSelected = [],
 }: {
   patient: Patient;
   open: boolean;
   onClose: () => void;
+  /** Screeners ticked when the drawer opens, e.g. the ones that are due. */
+  initialSelected?: InstrumentId[];
 }) {
   const [created, setCreated] = useState<AssignmentCreated | null>(null);
   return (
@@ -127,15 +131,29 @@ export function AssignDrawer({
     >
       {/* SlideOver unmounts its children when closed, so the form starts
           fresh every time it opens. */}
-      {created ? <LinkReady patient={patient} created={created} /> : <AssignForm patient={patient} onCreated={setCreated} />}
+      {created ? (
+        <LinkReady patient={patient} created={created} />
+      ) : (
+        <AssignForm patient={patient} onCreated={setCreated} initialSelected={initialSelected} />
+      )}
     </SlideOver>
   );
 }
 
-function AssignForm({ patient, onCreated }: { patient: Patient; onCreated: (c: AssignmentCreated) => void }) {
+function AssignForm({
+  patient,
+  onCreated,
+  initialSelected,
+}: {
+  patient: Patient;
+  onCreated: (c: AssignmentCreated) => void;
+  initialSelected: InstrumentId[];
+}) {
   const qc = useQueryClient();
-  const [selected, setSelected] = useState<InstrumentId[]>([]);
+  const [selected, setSelected] = useState<InstrumentId[]>(initialSelected);
   const [days, setDays] = useState(7);
+  // '' = just once. A select needs string values.
+  const [repeat, setRepeat] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const instruments = useQuery({
@@ -149,11 +167,14 @@ function AssignForm({ patient, onCreated }: { patient: Patient; onCreated: (c: A
       api.post<AssignmentCreated>(`/patients/${patient.id}/psychosocial/sessions`, {
         instruments: selected,
         expires_in_days: days,
+        ...(repeat ? { repeat_every_weeks: Number(repeat) } : {}),
       }),
     onSuccess: (data) => {
       onCreated(data);
       qc.invalidateQueries({ queryKey: ['assignments', patient.id] });
+      qc.invalidateQueries({ queryKey: ['schedules', patient.id] });
       qc.invalidateQueries({ queryKey: ['worklist'] });
+      qc.invalidateQueries({ queryKey: ['due'] });
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -233,6 +254,21 @@ function AssignForm({ patient, onCreated }: { patient: Patient; onCreated: (c: A
             </option>
           ))}
         </select>
+      </div>
+
+      <div>
+        <FieldLabel htmlFor="repeat">Repeat</FieldLabel>
+        <select id="repeat" className={inputClass} value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+          {REPEAT_OPTIONS.map((o) => (
+            <option key={o.label} value={o.weeks ?? ''}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1.5 text-xs text-muted">
+          A repeat never sends anything by itself. When it is due again, the patient shows in the Due list and you
+          send the link as usual.
+        </p>
       </div>
 
       <Button type="submit" disabled={assign.isPending} className="w-full">

@@ -15,6 +15,11 @@ function plural(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/** "a, b and c" */
+function listWords(items: string[]) {
+  return items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
 /**
  * Deletion on request (SRS 3.2). Shown only to holders of screening.delete,
  * which by default is the clinic admin. Shows counts, never results.
@@ -51,7 +56,9 @@ export function DeleteDataPanel({ patientId, patientName }: { patientId: string;
   };
 
   const d = data.data;
-  const empty = d ? d.links === 0 && d.screeners === 0 && d.referral_actions === 0 && d.consent_records === 0 : true;
+  const empty = d
+    ? d.links === 0 && d.screeners === 0 && d.referral_actions === 0 && d.schedules === 0 && d.consent_records === 0
+    : true;
 
   return (
     <Card className="p-5">
@@ -66,9 +73,14 @@ export function DeleteDataPanel({ patientId, patientName }: { patientId: string;
         <div className="space-y-3 text-sm text-ink-2">
           <p>
             Use this when the patient asks the clinic to delete their screening answers. On file:{' '}
-            {plural(d!.screeners, 'questionnaire', 'questionnaires')}, {plural(d!.links, 'link', 'links')},{' '}
-            {plural(d!.referral_actions, 'referral note', 'referral notes')} and{' '}
-            {plural(d!.consent_records, 'consent record', 'consent records')}.
+            {listWords([
+              plural(d!.screeners, 'questionnaire', 'questionnaires'),
+              plural(d!.links, 'link', 'links'),
+              plural(d!.referral_actions, 'referral note', 'referral notes'),
+              ...(d!.schedules > 0 ? [plural(d!.schedules, 'repeat schedule', 'repeat schedules')] : []),
+              plural(d!.consent_records, 'consent record', 'consent records'),
+            ])}
+            .
           </p>
           <Button
             variant="secondary"
@@ -103,6 +115,7 @@ export function DeleteDataPanel({ patientId, patientName }: { patientId: string;
                 <li>{plural(d.screeners, 'questionnaire', 'questionnaires')} with all answers and results</li>
                 <li>{plural(d.links, 'patient link', 'patient links')}. Any open link stops working.</li>
                 <li>{plural(d.referral_actions, 'referral note', 'referral notes')}</li>
+                {d.schedules > 0 ? <li>{plural(d.schedules, 'repeat schedule', 'repeat schedules')}</li> : null}
                 <li>{plural(d.consent_records, 'consent record', 'consent records')}</li>
               </ul>
             </div>

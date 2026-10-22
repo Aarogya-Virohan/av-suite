@@ -10,13 +10,14 @@ import { api, ApiError, downloadFile } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate, formatDateTime, fullName } from '@/lib/format';
 import { REFERRAL_LABELS } from '@/lib/severity';
-import type { Assignment, AssignmentCreated, Patient, PatientSummary, PatientTrend, ReferralAction } from '@/lib/types';
+import type { Assignment, AssignmentCreated, InstrumentId, Patient, PatientSummary, PatientTrend, ReferralAction } from '@/lib/types';
 import { Avatar, Badge, Button, Card, CardHeader } from '@/components/ui/brand';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { useCan } from '@/components/staff/session-context';
 import { AssignDrawer, LinkReady } from '@/components/screening/AssignDrawer';
 import { DeleteDataPanel } from '@/components/screening/DeleteDataPanel';
 import { TrendChart } from '@/components/screening/TrendChart';
+import { PatientSchedules } from '@/components/screening/Schedules';
 import {
   EmptyState,
   FlagChips,
@@ -45,7 +46,10 @@ function AssignmentCard({ a, patient }: { a: Assignment; patient: Patient }) {
   const started = a.sessions.some((s) => s.status !== 'pending' || s.answered_count > 0);
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['assignments', a.patient_id] });
+    // A cancelled or renewed link changes whether a repeat is due.
+    qc.invalidateQueries({ queryKey: ['schedules', a.patient_id] });
     qc.invalidateQueries({ queryKey: ['worklist'] });
+    qc.invalidateQueries({ queryKey: ['due'] });
   };
 
   const cancel = useMutation({
@@ -134,6 +138,11 @@ export default function PatientPage() {
   const canViewResults = useCan('screening.view');
   const canDelete = useCan('screening.delete');
   const [assigning, setAssigning] = useState(false);
+  const [preselect, setPreselect] = useState<InstrumentId[]>([]);
+  const openAssign = (instruments: InstrumentId[] = []) => {
+    setPreselect(instruments);
+    setAssigning(true);
+  };
 
   const patient = useQuery({
     queryKey: ['patient', id],
@@ -224,13 +233,15 @@ export default function PatientPage() {
             </Button>
           ) : null}
           {canAssign ? (
-            <Button onClick={() => setAssigning(true)}>
+            <Button onClick={() => openAssign()}>
               <Send className="h-4 w-4" />
               Send screener
             </Button>
           ) : null}
         </div>
       </div>
+
+      {canAssign ? <PatientSchedules patientId={p.id} onSendDue={openAssign} /> : null}
 
       {!canViewResults ? (
         <Card className="p-5 text-sm text-ink-2">
@@ -304,7 +315,7 @@ export default function PatientPage() {
               <EmptyState
                 icon={ClipboardList}
                 title="No screeners sent yet"
-                action={canAssign ? <Button onClick={() => setAssigning(true)}>Send screener</Button> : undefined}
+                action={canAssign ? <Button onClick={() => openAssign()}>Send screener</Button> : undefined}
               >
                 Send PHQ-9, GAD-7 or DASS-21. The patient answers on their phone.
               </EmptyState>
@@ -338,7 +349,9 @@ export default function PatientPage() {
 
       {canDelete ? <DeleteDataPanel patientId={p.id} patientName={name} /> : null}
 
-      {canAssign ? <AssignDrawer patient={p} open={assigning} onClose={() => setAssigning(false)} /> : null}
+      {canAssign ? (
+        <AssignDrawer patient={p} open={assigning} onClose={() => setAssigning(false)} initialSelected={preselect} />
+      ) : null}
     </div>
   );
 }

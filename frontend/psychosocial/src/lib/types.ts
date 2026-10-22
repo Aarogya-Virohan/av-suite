@@ -197,6 +197,7 @@ export interface ScreeningData {
   links: number;
   screeners: number;
   referral_actions: number;
+  schedules: number;
   consent_records: number;
   withdrawal_on_file: boolean;
 }
@@ -232,4 +233,24 @@ export interface TrendSeries {
 export interface PatientTrend {
   patient_id: string;
   series: TrendSeries[];
+}
+
+// Repeat schedules and the Due list (SRS 4.1.1)
+export type ScheduleState = 'consent_withdrawn' | 'waiting' | 'due' | 'upcoming';
+
+export interface Schedule {
+  id: string;
+  patient_id: string;
+  instrument_id: InstrumentId;
+  short_name: string;
+  interval_days: number;
+  state: ScheduleState;
+  next_due_at: string | null;
+  last_completed_at: string | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface DueItem extends Schedule {
+  patient_name: string;
 }

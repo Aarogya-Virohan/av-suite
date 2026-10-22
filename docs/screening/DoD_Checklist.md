@@ -13,18 +13,18 @@ Status:
 
 Evidence:
 - **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
-- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download.
+- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list.
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 22 Oct 2026, on this branch: screening backend tests 200 pass, Playwright 10 of 10 pass, `npm test` 8 of 8 pass, tsc, eslint and `next build` clean.
+Last full run, 22 Oct 2026, on this branch: screening backend tests 212 pass, Playwright 12 of 12 pass, `npm test` 11 of 11 pass, tsc, eslint and `next build` clean.
 
 ## Summary
 
 | Status | Requirements |
 |---|---|
-| Done | 20 |
-| Partial | 2 |
+| Done | 21 |
+| Partial | 1 |
 | Not built | 8 |
 | Total | 30 |
 
@@ -37,7 +37,7 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
 | 1 | Assign one or more screeners (PHQ-9, GAD-7, DASS-21) to a patient from the patient's profile | Done | API test `test_full_flow_phq9_then_gad7` (PHQ-9 and GAD-7 on one link), `test_validation_of_assign_payload`. E2E 1: "Send screener" on the patient page, two screeners on one link. |
-| 2 | One-time or recurring assessment at a defined interval | Partial | One-time only. Recurring needs a scheduler decision first (P-12). |
+| 2 | One-time or recurring assessment at a defined interval | Done | "Repeat" in the send drawer: just once, or every 2, 4, 6, 8 or 12 weeks (S-D-026). A repeat never sends by itself: when it is due again the patient shows in "Due again" and on their page, and the physio sends it with one click. API tests in `test_schedules.py` (`test_schedule_state`, `test_due_after_interval_and_upcoming_before`, `test_cancelled_or_expired_link_makes_it_due_and_a_new_link_waits`, `test_withdrawn_and_removed_patients_are_never_due`, `test_stop_schedule`). E2E 6. |
 | 3 | View all pending, in-progress and completed sessions per patient | Done | API test `test_full_flow_phq9_then_gad7` (patient list with status per session). UI, not in E2E: patient page history. Clinic-wide worklist with status filter in E2E 1. |
 | 4 | Cancel a pending session the patient has not started | Done | API test `test_cancel_only_before_start` (refused once an answer exists). UI, not in E2E: "Cancel screener" on the patient page. |
 

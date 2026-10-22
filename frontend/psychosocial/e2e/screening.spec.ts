@@ -230,3 +230,51 @@ test('physio sees the score trend and downloads the PDF summary', async ({ page,
   expect(bytes.subarray(0, 4).toString()).toBe('%PDF');
   expect(problems).toEqual([]);
 });
+
+test('physio repeats a screener, sees it due again and sends it from the Due list', async ({ page, request }) => {
+  const c = await makeClinic(request);
+  const problems = watch(page);
+  await signIn(page, c.therapistEmail, c.password);
+  await page.goto(`/patients/${c.patientId}`);
+
+  // Send PHQ-9 set to repeat every 4 weeks.
+  await page.getByRole('button', { name: 'Send screener' }).first().click();
+  const drawer = page.getByRole('dialog', { name: 'Send a screener' });
+  await drawer.getByText('PHQ-9').click();
+  await drawer.getByLabel('Repeat').selectOption({ label: 'Every 4 weeks' });
+  await shot(page, '18-repeat');
+  await drawer.getByRole('button', { name: 'Create link' }).click();
+  await page.getByRole('dialog', { name: 'Send the link' }).getByRole('button', { name: 'Close' }).click();
+  const schedule = page.getByRole('listitem').filter({ hasText: 'every 4 weeks' });
+  await expect(schedule).toContainText('Link sent, waiting for the patient');
+
+  // The link is cancelled before the patient starts: the screener is due again.
+  await page.getByRole('button', { name: 'Cancel screener' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'PHQ-9 is due again' })).toBeVisible();
+  await expect(schedule).toContainText('Due since');
+
+  // It shows in the clinic's Due list.
+  await page.goto('/sessions');
+  await page.getByRole('button', { name: 'Due again' }).click();
+  const row = page.getByRole('link', { name: new RegExp(`Ritu ${c.patientLast}`) });
+  await expect(row).toContainText('PHQ-9 every 4 weeks');
+  await shot(page, '19-due-list');
+  await row.click();
+
+  // One click sends the due screener, already ticked.
+  await page.getByRole('button', { name: 'Send due screeners' }).click();
+  const again = page.getByRole('dialog', { name: 'Send a screener' });
+  await expect(again.getByRole('checkbox', { name: /PHQ-9/ })).toBeChecked();
+  await expect(again.getByRole('checkbox', { name: /GAD-7/ })).not.toBeChecked();
+  await again.getByRole('button', { name: 'Create link' }).click();
+  await expect(page.getByRole('dialog', { name: 'Send the link' }).getByText('Link ready')).toBeVisible();
+  await page.getByRole('dialog', { name: 'Send the link' }).getByRole('button', { name: 'Close' }).click();
+  await expect(schedule).toContainText('Link sent, waiting for the patient');
+  await expect(page.getByRole('status').filter({ hasText: 'due again' })).toHaveCount(0);
+
+  // Stopping the repeat removes it.
+  await page.getByRole('button', { name: 'Stop repeating PHQ-9' }).click();
+  await expect(page.getByText('Repeat stopped.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Repeat schedule' })).toHaveCount(0);
+  expect(problems).toEqual([]);
+});

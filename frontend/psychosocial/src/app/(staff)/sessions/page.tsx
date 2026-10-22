@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Clock, Flag, Hourglass, Loader2 } from 'lucide-react';
+import { BellRing, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Clock, Flag, Hourglass, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
@@ -17,14 +17,16 @@ import {
   SessionStatusBadge,
   SeverityIndicator,
 } from '@/components/screening/indicators';
+import { DueList } from '@/components/screening/Schedules';
 
-type View = 'attention' | 'in_progress' | 'pending' | 'completed';
+type View = 'attention' | 'in_progress' | 'pending' | 'completed' | 'due';
 
 const VIEWS: { key: View; label: string; icon: React.ElementType; status?: SessionStatus }[] = [
   { key: 'attention', label: 'Needs attention', icon: Flag },
   { key: 'in_progress', label: 'In progress', icon: Hourglass, status: 'in_progress' },
   { key: 'pending', label: 'Awaiting patient', icon: Clock, status: 'pending' },
   { key: 'completed', label: 'All completed', icon: CheckCircle2, status: 'completed' },
+  { key: 'due', label: 'Due again', icon: BellRing },
 ];
 
 const PAGE_SIZE = 20;
@@ -52,13 +54,14 @@ function ResultCell({ row }: { row: WorklistRow }) {
 
 export default function SessionsPage() {
   const canView = useCan('screening.view');
+  const canAssign = useCan('screening.assign');
   const [view, setView] = useState<View>('attention');
   const [page, setPage] = useState(1);
   const active = VIEWS.find((v) => v.key === view)!;
 
   const query = useQuery({
     queryKey: ['worklist', view, page],
-    enabled: canView,
+    enabled: canView && view !== 'due',
     queryFn: async () => {
       if (view === 'attention') {
         // Submitted flags plus unsubmitted risk answers (a patient who
@@ -91,7 +94,7 @@ export default function SessionsPage() {
       />
 
       <SegmentGroup role="group" aria-label="Filter screenings">
-        {VIEWS.map((v) => (
+        {VIEWS.filter((v) => v.key !== 'due' || canAssign).map((v) => (
           <SegmentTab
             key={v.key}
             active={view === v.key}
@@ -106,7 +109,9 @@ export default function SessionsPage() {
         ))}
       </SegmentGroup>
 
-      {query.isPending ? (
+      {view === 'due' ? (
+        <DueList />
+      ) : query.isPending ? (
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-grove" aria-label="Loading" />
         </div>
