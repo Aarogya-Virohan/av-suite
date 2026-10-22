@@ -18,6 +18,7 @@ from app.schemas.psychosocial import (
     AssignRequest,
     BaselineOut,
     DeleteScreeningDataRequest,
+    DueItemOut,
     InstrumentSummaryOut,
     PatientSummaryOut,
     PatientTrendOut,
@@ -26,6 +27,7 @@ from app.schemas.psychosocial import (
     ReissueLinkRequest,
     ResponseOut,
     ScaleOut,
+    ScheduleOut,
     ScreeningDataOut,
     SessionDetailOut,
     SessionSummaryOut,
@@ -38,6 +40,7 @@ from app.screening.registry import get_instrument, list_instruments
 from app.screening.trend import build_series
 from app.services import psychosocial as svc
 from app.services import psychosocial_report as report
+from app.services import psychosocial_schedule as schedules
 
 router = APIRouter()
 
@@ -151,6 +154,7 @@ async def assign_screeners(
         patient_id=patient_id,
         instrument_ids=list(payload.instruments),
         expires_in_days=payload.expires_in_days,
+        repeat_every_days=payload.repeat_every_weeks * 7 if payload.repeat_every_weeks else None,
     )
     names = await svc.user_names(db, {ctx.user.id})
     return ResponseEnvelope(
@@ -508,4 +512,66 @@ async def patient_report_pdf(
             "Content-Disposition": f'attachment; filename="{report.report_filename(data.patient_name, data.generated_at)}"',
             "Cache-Control": "no-store",
         },
+    )
+
+
+# --- repeat schedules and the Due list (SRS 4.1.1, S-D-026) ------------------
+def _schedule_out(view: schedules.ScheduleView, names: dict[uuid.UUID, str]) -> dict:
+    s = view.schedule
+    return dict(
+        id=s.id,
+        patient_id=s.patient_id,
+        instrument_id=s.instrument_id,
+        short_name=get_instrument(s.instrument_id).short_name,
+        interval_days=s.interval_days,
+        state=view.state,
+        next_due_at=view.next_due_at,
+        last_completed_at=view.last_completed_at,
+        created_at=s.created_at,
+        created_by_name=names.get(s.created_by) if s.created_by else None,
+    )
+
+
+@router.get(
+    "/patients/{patient_id}/psychosocial/schedules",
+    response_model=ResponseEnvelope[list[ScheduleOut]],
+)
+async def patient_schedules(
+    patient_id: uuid.UUID,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.assign")),
+):
+    views = await schedules.list_patient_schedules(db, clinic_id=ctx.clinic.id, patient_id=patient_id)
+    names = await svc.user_names(db, {v.schedule.created_by for v in views})
+    return ResponseEnvelope(data=[ScheduleOut(**_schedule_out(v, names)) for v in views])
+
+
+@router.post(
+    "/psychosocial/schedules/{schedule_id}/stop",
+    response_model=ResponseEnvelope[dict],
+)
+async def stop_schedule(
+    schedule_id: uuid.UUID,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.assign")),
+):
+    stopped = await schedules.stop_schedule(
+        db, clinic_id=ctx.clinic.id, user_id=ctx.user.id, schedule_id=schedule_id
+    )
+    return ResponseEnvelope(data={"id": str(stopped.id), "stopped": True})
+
+
+@router.get("/psychosocial/due", response_model=ResponseEnvelope[list[DueItemOut]])
+async def due_list(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.assign")),
+):
+    """Screeners due again across the clinic, most overdue first. No results."""
+    items = await schedules.clinic_due(db, clinic_id=ctx.clinic.id)
+    names = await svc.user_names(db, {v.schedule.created_by for v, _ in items})
+    return ResponseEnvelope(
+        data=[DueItemOut(**_schedule_out(v, names), patient_name=name) for v, name in items]
     )

@@ -25,6 +25,7 @@ from app.models.psychosocial import (
     PsychosocialAssignment,
     PsychosocialConsent,
     PsychosocialReferralAction,
+    PsychosocialSchedule,
     PsychosocialSession,
 )
 from app.models.user import User
@@ -171,6 +172,7 @@ async def create_assignment(
     patient_id: uuid.UUID,
     instrument_ids: list[str],
     expires_in_days: int,
+    repeat_every_days: int | None = None,
 ) -> tuple[PsychosocialAssignment, str]:
     await get_patient(db, clinic_id, patient_id)
 
@@ -218,6 +220,18 @@ async def create_assignment(
         for index, instrument in enumerate(instruments)
     ]
     db.add(assignment)
+    if repeat_every_days is not None:
+        # Same transaction: the link and its repeat are saved together.
+        from app.services.psychosocial_schedule import upsert_schedules
+
+        await upsert_schedules(
+            db,
+            clinic_id=clinic_id,
+            user_id=user_id,
+            patient_id=patient_id,
+            instrument_ids=instrument_ids,
+            interval_days=repeat_every_days,
+        )
     await db.commit()
     await audit(
         db,
@@ -228,6 +242,20 @@ async def create_assignment(
         entity_id=assignment.id,
         details={"patient_id": str(patient_id), "instruments": instrument_ids},
     )
+    if repeat_every_days is not None:
+        await audit(
+            db,
+            clinic_id=clinic_id,
+            user_id=user_id,
+            action="psychosocial.schedule_set",
+            entity_type="patient",
+            entity_id=patient_id,
+            details={
+                "patient_id": str(patient_id),
+                "instruments": instrument_ids,
+                "interval_days": repeat_every_days,
+            },
+        )
     return assignment, token
 
 
@@ -561,6 +589,7 @@ async def screening_data_counts(
         "links": await _count(db, PsychosocialAssignment, clinic_id, patient_id),
         "screeners": await _count(db, PsychosocialSession, clinic_id, patient_id),
         "referral_actions": await _count(db, PsychosocialReferralAction, clinic_id, patient_id),
+        "schedules": await _count(db, PsychosocialSchedule, clinic_id, patient_id),
         # The kept withdrawal record is not counted as deleted.
         "consent_records": consents - 1 if withdrawal_on_file else consents,
         "withdrawal_on_file": withdrawal_on_file,
@@ -572,8 +601,8 @@ async def delete_patient_screening_data(
 ) -> dict[str, Any]:
     """Erase every screening record for one patient, in one transaction.
 
-    Removed: links, screeners (answers and results), referral actions and
-    consent records. If the patient's latest consent decision is a
+    Removed: links, screeners (answers and results), referral actions, repeat
+    schedules and consent records. If the patient's latest consent decision is a
     withdrawal, that single record is kept (status, text version, date) so
     the clinic cannot send a new screener without the patient. Deleting a
     completed session is allowed: the immutability trigger blocks UPDATE only.
@@ -617,6 +646,11 @@ async def delete_patient_screening_data(
         .where(*scoped(PsychosocialAssignment))
         .execution_options(synchronize_session="fetch")
     )
+    await db.execute(
+        delete(PsychosocialSchedule)
+        .where(*scoped(PsychosocialSchedule))
+        .execution_options(synchronize_session="fetch")
+    )
     await db.commit()
 
     await audit(
@@ -631,6 +665,7 @@ async def delete_patient_screening_data(
             "links": counts["links"],
             "screeners": counts["screeners"],
             "referral_actions": counts["referral_actions"],
+            "schedules": counts["schedules"],
             "consent_records": counts["consent_records"],
             "withdrawal_kept": counts["withdrawal_on_file"],
         },

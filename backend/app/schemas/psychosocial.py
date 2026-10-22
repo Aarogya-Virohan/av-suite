@@ -53,6 +53,8 @@ class AssignRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     instruments: list[InstrumentId] = Field(min_length=1, max_length=3)
     expires_in_days: int = Field(default=7, ge=1, le=30)
+    # Repeat these screeners every N weeks (SRS 4.1.1). None = just once.
+    repeat_every_weeks: int | None = Field(default=None, ge=1, le=52)
 
 
 class ReissueLinkRequest(BaseModel):
@@ -191,6 +193,26 @@ class PatientTrendOut(BaseModel):
     series: list[TrendSeriesOut]
 
 
+ScheduleState = Literal["consent_withdrawn", "waiting", "due", "upcoming"]
+
+
+class ScheduleOut(BaseModel):
+    id: uuid.UUID
+    patient_id: uuid.UUID
+    instrument_id: str
+    short_name: str
+    interval_days: int
+    state: ScheduleState
+    next_due_at: datetime | None
+    last_completed_at: datetime | None
+    created_at: datetime
+    created_by_name: str | None
+
+
+class DueItemOut(ScheduleOut):
+    patient_name: str
+
+
 class ScreeningDataOut(BaseModel):
     """Counts only. Never scores, bands or flags: admins use this (SRS 3.2)."""
 
@@ -198,6 +220,7 @@ class ScreeningDataOut(BaseModel):
     links: int
     screeners: int
     referral_actions: int
+    schedules: int
     consent_records: int
     # True when the patient's latest consent decision is a withdrawal. That one
     # record is kept on deletion so no new screener can be sent without them.

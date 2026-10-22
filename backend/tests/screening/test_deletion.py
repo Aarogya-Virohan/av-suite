@@ -18,6 +18,7 @@ from app.models.psychosocial import (
     PsychosocialAssignment,
     PsychosocialConsent,
     PsychosocialReferralAction,
+    PsychosocialSchedule,
     PsychosocialSession,
 )
 from tests.screening.conftest import API, entitle, make_patient, set_overrides
@@ -30,6 +31,7 @@ TABLES = (
     PsychosocialSession,
     PsychosocialConsent,
     PsychosocialReferralAction,
+    PsychosocialSchedule,
 )
 
 
@@ -43,7 +45,7 @@ async def rows(db, patient_id) -> dict[str, int]:
 
 
 async def screened_patient(client, db, clinic_id, headers):
-    """One completed PHQ-9 with a risk answer and a referral action, plus one open GAD-7 link."""
+    """One completed PHQ-9 with a risk answer and a referral action, plus one open GAD-7 link set to repeat every 4 weeks."""
     patient = await make_patient(db, clinic_id)
     res = await assign(client, headers, patient.id, ["phq9"])
     token = token_of(res)
@@ -57,7 +59,13 @@ async def screened_patient(client, db, clinic_id, headers):
         headers=headers,
     )
     assert logged.status_code == 201, logged.text
-    open_token = token_of(await assign(client, headers, patient.id, ["gad7"]))
+    repeating = await client.post(
+        f"{API}/patients/{patient.id}/psychosocial/sessions",
+        json={"instruments": ["gad7"], "expires_in_days": 7, "repeat_every_weeks": 4},
+        headers=headers,
+    )
+    assert repeating.status_code == 201, repeating.text
+    open_token = token_of(repeating)
     return patient, token, open_token
 
 
@@ -84,6 +92,7 @@ async def test_admin_deletes_all_screening_data(
         "links": 2,
         "screeners": 2,
         "referral_actions": 1,
+        "schedules": 1,
         "consent_records": 1,
         "withdrawal_on_file": False,
     }
@@ -95,6 +104,7 @@ async def test_admin_deletes_all_screening_data(
         "psychosocial_sessions": 2,
         "psychosocial_consents": 1,
         "psychosocial_referral_actions": 1,
+        "psychosocial_schedules": 1,
     }
 
     # The confirmation word is required, exactly.
@@ -115,6 +125,7 @@ async def test_admin_deletes_all_screening_data(
         "psychosocial_sessions": 0,
         "psychosocial_consents": 0,
         "psychosocial_referral_actions": 0,
+        "psychosocial_schedules": 0,
     }
     # Another patient in the same clinic is untouched.
     assert await rows(db_session, other.id) == other_before
@@ -151,6 +162,7 @@ async def test_admin_deletes_all_screening_data(
         "links": 2,
         "screeners": 2,
         "referral_actions": 1,
+        "schedules": 1,
         "consent_records": 1,
         "withdrawal_kept": False,
     }
@@ -205,6 +217,7 @@ async def test_withdrawal_is_kept_so_no_new_screener_goes_out(
         "psychosocial_sessions": 0,
         "psychosocial_consents": 1,
         "psychosocial_referral_actions": 0,
+        "psychosocial_schedules": 0,
     }
 
 

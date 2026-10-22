@@ -28,7 +28,7 @@ from sqlalchemy import (
     Text,
     event,
 )
-from sqlalchemy import DDL
+from sqlalchemy import DDL, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -42,6 +42,8 @@ JSONType = JSON().with_variant(JSONB(), "postgresql")
 ASSIGNMENT_STATUSES = ("active", "completed", "cancelled")
 SESSION_STATUSES = ("pending", "in_progress", "completed", "cancelled")
 CONSENT_STATUSES = ("granted", "withdrawn")
+SCHEDULE_MIN_DAYS = 7
+SCHEDULE_MAX_DAYS = 364
 REFERRAL_ACTIONS = (
     "referred_gp",
     "referred_psychologist",
@@ -186,6 +188,50 @@ class PsychosocialReferralAction(Base):
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PsychosocialSchedule(Base, TimestampMixin):
+    """Repeat a screener for a patient every ``interval_days`` (SRS 4.1.1).
+
+    The schedule never sends anything by itself: links go out through the
+    physio's WhatsApp. It only decides when a screener is due again, so the
+    clinic sees it in the Due list (S-D-026). One active schedule per patient
+    and screener; stopping it keeps the row with ``stopped_at`` set.
+    """
+
+    __tablename__ = "psychosocial_schedules"
+    __table_args__ = (
+        CheckConstraint(
+            f"interval_days BETWEEN {SCHEDULE_MIN_DAYS} AND {SCHEDULE_MAX_DAYS}",
+            name="ck_psy_schedule_interval",
+        ),
+        Index("ix_psy_schedules_clinic_patient", "clinic_id", "patient_id"),
+        Index(
+            "uq_psy_schedules_active",
+            "clinic_id",
+            "patient_id",
+            "instrument_id",
+            unique=True,
+            postgresql_where=text("stopped_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    instrument_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    interval_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    stopped_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
 
 # --- Immutability guard (Postgres only) ------------------------------------
