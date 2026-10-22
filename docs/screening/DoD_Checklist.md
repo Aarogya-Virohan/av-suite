@@ -13,19 +13,19 @@ Status:
 
 Evidence:
 - **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
-- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat.
+- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat, E2E 8 is anonymised statistics and CSV.
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 22 Oct 2026, on this branch: screening backend tests 228 pass, full backend suite 530 pass with the same 10 pre-existing failures (P-09), Playwright 14 of 14 pass, `npm test` 17 of 17 pass, tsc, eslint and `next build` clean.
+Last full run, 22 Oct 2026, on this branch: screening backend tests 252 pass, full backend suite 554 pass with the same 10 pre-existing failures (P-09), Playwright 16 of 16 pass, `npm test` 21 of 21 pass, tsc, eslint and `next build` clean.
 
 ## Summary
 
 | Status | Requirements |
 |---|---|
-| Done | 22 |
+| Done | 25 |
 | Partial | 2 |
-| Not built | 6 |
+| Not built | 3 |
 | Total | 30 |
 
 Items marked "pending founder sign-off" work today with a safe default and may change after the founders answer (Decisions.md).
@@ -112,9 +112,9 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
-| 1 | Anonymised clinic statistics: sessions completed, band distribution, referral flag rate | Not built | v1.1. Admins cannot see individual results today (`test_admin_assigns_but_cannot_read_individual_results`, E2E 2). |
-| 2 | Filter by date range and instrument | Not built | v1.1, with item 1. |
-| 3 | Export aggregates as CSV | Not built | v1.1, with item 1. |
+| 1 | Anonymised clinic statistics: sessions completed, band distribution, referral flag rate | Done | Reports page, S-D-028. Counts from 1 to 4 hidden, plus a second count where needed. `test_admin_gets_suppressed_statistics_never_rows`, `test_no_hidden_cell_can_be_worked_out_from_the_total`, `test_referral_figure`. E2E 8. Admins still cannot open individual results (`test_admin_assigns_but_cannot_read_individual_results`, E2E 2). |
+| 2 | Filter by date range and instrument | Done | `test_filters_by_ist_date_range_and_screener` (IST day boundaries), `test_default_range_and_invalid_input`. E2E 8 filters by screener and by a period with no results. |
+| 3 | Export aggregates as CSV | Done | `test_csv_matches_the_screen_and_is_audited`: same figures as the screen, hidden cells stay hidden, audited. E2E 8 downloads the file and checks it. |
 
 ## Before go-live, outside section 4
 

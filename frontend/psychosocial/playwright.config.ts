@@ -16,6 +16,8 @@ export default defineConfig({
   use: {
     baseURL: process.env.APP_URL || 'http://localhost:3005',
     trace: 'retain-on-failure',
+    // Clinics and the backend's date ranges are on Indian time.
+    timezoneId: 'Asia/Kolkata',
     launchOptions: process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
   },
   projects: [

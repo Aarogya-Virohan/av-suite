@@ -298,3 +298,27 @@ export interface ClinicSettings {
   thresholds_editable: boolean;
   instruments: InstrumentSetting[];
 }
+
+// --- anonymised statistics (SRS 4.3.3) -------------------------------------
+export interface BandCount {
+  label: string;
+  /** null = hidden (small group) */
+  count: number | null;
+  suppressed: boolean;
+}
+
+export interface InstrumentAggregate {
+  instrument_id: InstrumentId;
+  short_name: string;
+  completed: number;
+  too_few: boolean;
+  referral: { count: number | null; rate_percent: number | null; suppressed: boolean };
+  scales: { scale_id: string; label: string; bands: BandCount[] }[];
+}
+
+export interface Aggregates {
+  date_from: string;
+  date_to: string;
+  min_cell: number;
+  instruments: InstrumentAggregate[];
+}

@@ -304,7 +304,11 @@ test('admin sets a default repeat that prefills the send form and never override
   expect(problems.filter((x) => !x.includes('http 403'))).toEqual([]);
 
   // --- physio: the send form starts at the clinic default -------------------
-  const ctx = await browser.newContext({ viewport: page.viewportSize()!, baseURL: test.info().project.use.baseURL });
+  const ctx = await browser.newContext({
+    viewport: page.viewportSize()!,
+    baseURL: test.info().project.use.baseURL,
+    timezoneId: test.info().project.use.timezoneId,
+  });
   const physio = await ctx.newPage();
   const physioProblems = watch(physio);
   await signIn(physio, c.therapistEmail, c.password);
@@ -348,4 +352,69 @@ test('admin sets a default repeat that prefills the send form and never override
   await expect(physio.getByRole('listitem').filter({ hasText: 'every 2 weeks' })).toHaveCount(0);
   expect(physioProblems).toEqual([]);
   await ctx.close();
+});
+
+test('admin sees anonymised statistics with small groups hidden and exports CSV', async ({ page, request }) => {
+  const c = await makeClinic(request);
+  const admin = { Authorization: `Bearer ${c.adminToken}` };
+  const problems = watch(page, [403]);
+
+  // Five patients answer PHQ-9 with no symptoms.
+  const ids: string[] = [];
+  for (let n = 0; n < 6; n++) {
+    const res = await request.post(`${API}/patients`, { headers: admin, data: { first_name: 'Stat', last_name: `Case${n}` } });
+    expect(res.ok()).toBeTruthy();
+    ids.push(((await res.json()) as { data: { id: string } }).data.id);
+  }
+  for (const id of ids.slice(0, 5)) {
+    const path = await assignVia(request, c.therapistToken, id, ['phq9']);
+    await completeVia(request, path, 'phq9', [0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  }
+
+  await signIn(page, c.adminEmail, c.password);
+  if (page.viewportSize()!.width < 600) await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('link', { name: 'Reports' }).click();
+  await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible();
+  const phq = page.locator('div.rounded-2xl').filter({ has: page.getByRole('heading', { name: 'PHQ-9', exact: true }) });
+  const band = (label: string) =>
+    phq.getByRole('row').filter({ has: page.getByRole('rowheader', { name: label, exact: true }) });
+  await expect(phq).toContainText('5 completed');
+  await expect(phq).toContainText('Referral recommended: 0 of 5 (0%)');
+  await expect(band('None-minimal')).toContainText('5');
+  const gad = page.locator('div.rounded-2xl').filter({ has: page.getByRole('heading', { name: 'GAD-7', exact: true }) });
+  await expect(gad).toContainText('None completed in this period.');
+
+  // A sixth patient scores Moderate: one person would stand out, so it is hidden with its partner.
+  const path = await assignVia(request, c.therapistToken, ids[5], ['phq9']);
+  await completeVia(request, path, 'phq9', [2, 2, 2, 2, 2, 2, 0, 0, 0]);
+  await page.reload();
+  await expect(phq).toContainText('6 completed');
+  await expect(phq).toContainText('Referral recommended: Hidden to protect a small group');
+  await expect(band('None-minimal')).toContainText('Hidden');
+  await expect(band('Moderate')).toContainText('Hidden');
+  await expect(band('Moderately severe')).toContainText('0');
+  await shot(page, '23-reports');
+
+  // Filters: one screener, then a period with nothing in it.
+  await page.getByLabel('Screener').selectOption({ label: 'PHQ-9' });
+  await expect(page.getByRole('heading', { name: 'GAD-7', exact: true })).toHaveCount(0);
+  await page.getByLabel('From').fill('2026-01-01');
+  await page.getByLabel('To').fill('2026-01-31');
+  await expect(phq).toContainText('0 completed');
+
+  // CSV of the same period and screener.
+  await page.getByLabel('To').fill(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
+  await expect(phq).toContainText('6 completed');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Export CSV' }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^screening-statistics-2026-01-01-to-\d{4}-\d{2}-\d{2}\.csv$/);
+  const csv = readFileSync((await download.path())!, 'utf8');
+  expect(csv).toContain('PHQ-9,,Completed sessions,6');
+  expect(csv).toContain('PHQ-9,PHQ-9,Band: Moderate,hidden');
+  expect(csv).not.toContain('GAD-7');
+  expect(csv).not.toContain('Stat');
+  expect(problems.filter((x) => !x.includes('http 403'))).toEqual([]);
+
+  // A physio has no Reports and no statistics.
+  const res = await request.get(`${API}/psychosocial/aggregates`, { headers: { Authorization: `Bearer ${c.therapistToken}` } });
+  expect(res.status()).toBe(403);
 });

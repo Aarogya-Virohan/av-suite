@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { ClipboardList, LogOut, Menu, ShieldCheck, SlidersHorizontal, Users, X } from 'lucide-react';
+import { BarChart3, ClipboardList, LogOut, Menu, ShieldCheck, SlidersHorizontal, Users, X } from 'lucide-react';
 import { clearStoredToken } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { Avatar } from '@/components/ui/brand';
@@ -13,6 +13,7 @@ const NAV = [
   { href: '/sessions', label: 'Screenings', icon: ClipboardList, capability: 'screening.view' },
   { href: '/patients', label: 'Patients', icon: Users, capability: 'patients.view' },
   { href: '/access', label: 'Access', icon: ShieldCheck, capability: 'permissions.edit' },
+  { href: '/reports', label: 'Reports', icon: BarChart3, capability: 'screening.aggregates' },
   { href: '/settings', label: 'Settings', icon: SlidersHorizontal, capability: 'screening.configure' },
 ] as const;
 
