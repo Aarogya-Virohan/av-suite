@@ -128,3 +128,8 @@ Format: context, choice, reason, decided by. Status "pending sign-off" means it 
 - Coverage: 12 PHQ-9 cases, 8 GAD-7 cases, 10 DASS-21 cases, every total for each instrument, and invalid input, 153 checks in all.
 - Verified: changing the GAD-7 Moderate band to 10 to 13 made the generator report 2 failures and made both report tests fail.
 - Decided by: proposal, pending Onkar sign-off.
+
+## S-D-023 Fixes found while re-running the frontend checks (22 Oct)
+- App icon: the app had no favicon, so every page made the browser request `/favicon.ico` and log a 404 console error. The Playwright tests fail on any console error, and on a re-run 4 of 6 failed for this reason alone. Choice: `src/app/icon.png`, a copy of `public/brand/av-logo-mark.png`, which Next serves as the page icon. After the fix: 6 of 6 pass, twice. The CRM has no favicon either. That is noted here only, it is not changed from this branch.
+- Vitest scope: there was no vitest config, so `npm test` also collected `e2e/screening.spec.ts` and exited with status 1 even though the 4 unit tests passed. Choice: `vitest.config.ts` limits vitest to `src/**/*.test.{ts,tsx}`. After the fix: `npm test` exits 0 with 4 of 4.
+- Decided by: proposal, pending Onkar sign-off.
