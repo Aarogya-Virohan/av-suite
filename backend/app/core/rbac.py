@@ -146,6 +146,9 @@ CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
         # screening.configure sets clinic-wide screening defaults (SRS 4.3.2,
         # S-D-027). Clinic level only, no patient data: in the admin template.
         "screening.configure": CapabilityDefinition("screening.configure", _NA),
+        # screening.aggregates shows anonymised clinic statistics with small
+        # cells hidden (SRS 4.3.3, S-D-028). No individual rows: admin template.
+        "screening.aggregates": CapabilityDefinition("screening.aggregates", _NA),
     }
 )
 

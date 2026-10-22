@@ -2,6 +2,8 @@
 
 Format: context, choice, reason, decided by. Status "pending sign-off" means it is built as the safe default and can still change.
 
+A one-line index of every decision, and the points to review before deploy, during the pilot and before scale, is in Review_Points.md.
+
 ## S-D-001 Branch base
 - Context: Tool 03 work starts on its own branch.
 - Choice: `feat/tool03-psychosocial` from `origin/dev` at `770bc87507a541ae93700751c517de21c7dca708` (20 Oct 2026). Alembic head at that commit: `a8c4e2f1d903` (single head).
@@ -175,3 +177,14 @@ Format: context, choice, reason, decided by. Status "pending sign-off" means it 
 - Audit: `psychosocial.settings_updated` with the screener and the value before and after. Saving an unchanged value writes nothing.
 - Verified: 16 backend tests in `test_settings.py`, 6 new vitest cases for the prefill rule, and Playwright E2E 7 at 390 px and 1440 px (admin saves defaults, physio sees the prefill and the mixed-default hint, a running 4-week repeat stays at 4 weeks after the admin changes the default to 2 weeks and the due screener is sent again).
 - Decided by: Onkar (start with 4.3.2, 22 Oct); read-only thresholds and the prefill rule are a proposal, pending Onkar sign-off.
+
+## S-D-028 Anonymised clinic statistics (SRS 4.3.3)
+- Context: SRS 4.3.3 asks for clinic statistics (sessions completed, band distribution, referral flag rate), all anonymised, filtered by date range and screener, with CSV export. SRS 3.2 says administrators see only anonymised, aggregated data.
+- What is counted: completed screeners of the clinic whose completion date falls in the range. Dates are Indian calendar days (IST). The default range is the last 90 days, and the longest is three years. Open, cancelled and expired links are not counted. Bands come from the result stored at submit time, so an older result keeps the band it was scored with. Results of patients later moved to the CRM recycle bin are still counted, since nothing identifies them here.
+- Small-cell rule (Onkar, 22 Oct: minimum 5): with fewer than 5 completed in the period only the total is shown. Any band count from 1 to 4 is hidden. If exactly one band is hidden, the smallest other non-zero band is hidden too, so the hidden one cannot be worked out from the total. The referral figure is hidden when either the flagged or the not-flagged count is from 1 to 4. Zero is always shown. The rules live in one pure module, `app/screening/aggregates.py`.
+- Access: new capability `screening.aggregates` (None/All), in the admin template, None for therapists and front desk. The response holds only totals, labels and counts: no patient ids, names, session ids or scores. A test checks the response keys and that no UUID appears in it.
+- API: `GET /psychosocial/aggregates?from=&to=&instrument=` and `GET /psychosocial/aggregates.csv` with the same parameters. The CSV carries exactly what the screen shows, with hidden cells written as "hidden". It is streamed with `no-store` and never stored. The file name is built in the browser, as for the PDF (S-L-013).
+- Audit: `psychosocial.aggregates_exported` with the range and screener. Viewing the page is not audited.
+- Verified: 24 backend tests in `test_aggregates.py` (suppression cases, a 5000-case randomised check that a hidden count can never be worked out from the total, referral rule, IST day boundaries at 23:59 and 00:01, other clinics and open links not counted, invalid ranges, CSV content and headers, audit, access). Playwright E2E 8 at 390 px and 1440 px: five patients answer, the counts show; a sixth answers Moderate and the page hides both affected bands and the referral figure; filters; the CSV download.
+- Limits: S-L-017 (a whole group in one band), S-L-018 (computed per request in Python).
+- Decided by: Onkar (minimum cell 5); the secondary rule, the referral rule and the rest are a proposal, pending Onkar sign-off.

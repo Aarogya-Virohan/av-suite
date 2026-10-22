@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -347,3 +347,38 @@ class UpdateInstrumentSettingRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     # Required, may be null (= just once). Same range the assign form accepts.
     default_repeat_weeks: int | None = Field(ge=1, le=52)
+
+
+# --- anonymised statistics (SRS 4.3.3) -------------------------------------
+class BandCountOut(BaseModel):
+    label: str
+    count: int | None
+    suppressed: bool
+
+
+class ScaleDistributionOut(BaseModel):
+    scale_id: str
+    label: str
+    bands: list[BandCountOut]
+
+
+class ReferralFigureOut(BaseModel):
+    count: int | None
+    rate_percent: float | None
+    suppressed: bool
+
+
+class InstrumentAggregateOut(BaseModel):
+    instrument_id: str
+    short_name: str
+    completed: int
+    too_few: bool
+    referral: ReferralFigureOut
+    scales: list[ScaleDistributionOut]
+
+
+class AggregatesOut(BaseModel):
+    date_from: date
+    date_to: date
+    min_cell: int
+    instruments: list[InstrumentAggregateOut]

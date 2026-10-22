@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
+from datetime import date, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -13,6 +15,7 @@ from app.models.patient import Patient
 from app.models.psychosocial import PsychosocialAssignment, PsychosocialSession
 from app.schemas.envelope import MetaPagination, ResponseEnvelope
 from app.schemas.psychosocial import (
+    AggregatesOut,
     AssignmentCreatedOut,
     AssignmentOut,
     AssignRequest,
@@ -47,6 +50,8 @@ from app.services import psychosocial as svc
 from app.services import psychosocial_report as report
 from app.services import psychosocial_schedule as schedules
 from app.services import psychosocial_settings as clinic_config
+from app.services import psychosocial_aggregates as stats
+from app.screening.aggregates import MIN_CELL
 
 router = APIRouter()
 
@@ -665,3 +670,71 @@ async def update_instrument_setting(
         weeks=payload.default_repeat_weeks,
     )
     return ResponseEnvelope(data=await _settings_out(db, ctx.clinic.id))
+
+
+# --- anonymised clinic statistics (SRS 4.3.3, S-D-028) -----------------------
+MAX_RANGE_DAYS = 366 * 3
+
+
+def _range(date_from: date | None, date_to: date | None) -> tuple[date, date]:
+    end = date_to or stats.today_ist()
+    start = date_from or end - timedelta(days=stats.DEFAULT_RANGE_DAYS - 1)
+    if start > end:
+        raise svc.error(422, "INVALID_RANGE", "The start date must be on or before the end date.")
+    if (end - start).days >= MAX_RANGE_DAYS:
+        raise svc.error(422, "INVALID_RANGE", "Choose a range of three years or less.")
+    return start, end
+
+
+@router.get("/psychosocial/aggregates", response_model=ResponseEnvelope[AggregatesOut])
+async def clinic_statistics(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    date_from: date | None = Query(default=None, alias="from"),
+    date_to: date | None = Query(default=None, alias="to"),
+    instrument: InstrumentId | None = None,
+    _scope: CapabilityScope = Depends(require_capability("screening.aggregates")),
+):
+    """Completed sessions, band distribution and referral rate. Small cells hidden."""
+    start, end = _range(date_from, date_to)
+    aggs = await stats.clinic_aggregates(
+        db, clinic_id=ctx.clinic.id, date_from=start, date_to=end, instrument_id=instrument
+    )
+    return ResponseEnvelope(
+        data=AggregatesOut(
+            date_from=start, date_to=end, min_cell=MIN_CELL, instruments=[asdict(a) for a in aggs]
+        )
+    )
+
+
+@router.get("/psychosocial/aggregates.csv")
+async def clinic_statistics_csv(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    date_from: date | None = Query(default=None, alias="from"),
+    date_to: date | None = Query(default=None, alias="to"),
+    instrument: InstrumentId | None = None,
+    _scope: CapabilityScope = Depends(require_capability("screening.aggregates")),
+):
+    """The same figures as the screen, as CSV. Hidden cells stay hidden."""
+    start, end = _range(date_from, date_to)
+    aggs = await stats.clinic_aggregates(
+        db, clinic_id=ctx.clinic.id, date_from=start, date_to=end, instrument_id=instrument
+    )
+    await svc.audit(
+        db,
+        clinic_id=ctx.clinic.id,
+        user_id=ctx.user.id,
+        action="psychosocial.aggregates_exported",
+        entity_type="clinic",
+        entity_id=ctx.clinic.id,
+        details={"from": start.isoformat(), "to": end.isoformat(), "instrument": instrument or "all"},
+    )
+    return Response(
+        content=stats.to_csv(aggs, start, end),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{stats.csv_filename(start, end)}"',
+            "Cache-Control": "no-store",
+        },
+    )
