@@ -200,3 +200,36 @@ export interface ScreeningData {
   consent_records: number;
   withdrawal_on_file: boolean;
 }
+
+// Score trend (SRS 4.1.2)
+export interface TrendBand {
+  min_score: number;
+  max_score: number;
+  label: string;
+  level: number;
+}
+
+export interface TrendPoint {
+  session_id: string;
+  completed_at: string;
+  score: number;
+  band_label: string;
+  band_level: number;
+  referral: boolean;
+}
+
+export interface TrendSeries {
+  instrument_id: InstrumentId;
+  short_name: string;
+  scale_id: string;
+  label: string;
+  max_score: number;
+  referral_from: number | null;
+  bands: TrendBand[];
+  points: TrendPoint[];
+}
+
+export interface PatientTrend {
+  patient_id: string;
+  series: TrendSeries[];
+}

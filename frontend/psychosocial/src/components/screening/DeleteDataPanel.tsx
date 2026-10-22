@@ -36,7 +36,7 @@ export function DeleteDataPanel({ patientId, patientName }: { patientId: string;
       toast.success(`Screening data for ${patientName} has been deleted.`);
       setOpen(false);
       setTyped('');
-      for (const key of ['screening-data', 'assignments', 'summary', 'patient-referrals']) {
+      for (const key of ['screening-data', 'assignments', 'summary', 'patient-referrals', 'trend']) {
         qc.invalidateQueries({ queryKey: [key, patientId] });
       }
       qc.invalidateQueries({ queryKey: ['worklist'] });

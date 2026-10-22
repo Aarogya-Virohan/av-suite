@@ -127,3 +127,16 @@ export async function shot(page: Page, name: string) {
   await page.waitForTimeout(350); // let the 220 ms entry animation finish
   await page.screenshot({ path: `${SHOTS}/${project}-${name}.png`, fullPage: true });
 }
+
+/** Consent, answer every scored item and submit, through the public patient API. */
+export async function completeVia(request: APIRequestContext, screenerPath: string, instrument: string, values: number[]) {
+  const url = `${API}/screener/${screenerPath.split('/').pop()}`;
+  const state = await ok<{ consent: { required: boolean; text_version: string } }>(await request.get(url));
+  if (state.consent.required) {
+    await ok(await request.post(`${url}/consent`, { data: { text_version: state.consent.text_version } }));
+  }
+  for (let n = 0; n < values.length; n++) {
+    await ok(await request.post(`${url}/answers`, { data: { instrument_id: instrument, item_id: `${instrument}_${n + 1}`, value: values[n] } }));
+  }
+  await ok(await request.post(`${url}/submit`, { data: { instrument_id: instrument } }));
+}

@@ -98,3 +98,39 @@ export const publicApi = {
   post: <T,>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body: body ?? {}, auth: false }).then((r) => r.data),
 };
+
+/**
+ * Download a file from an authenticated endpoint (the PDF summary). The token
+ * goes in the Authorization header, so the file never needs a public URL.
+ */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const token = getStoredToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/v1${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, 'Could not reach the server. Check your connection and try again.', 'NETWORK');
+  }
+  if (!res.ok) {
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      /* not JSON */
+    }
+    throw readError(res.status, body);
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(disposition);
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = match?.[1] ?? fallbackName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

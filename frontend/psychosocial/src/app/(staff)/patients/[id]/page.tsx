@@ -5,17 +5,18 @@ import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, ChevronRight, ClipboardList, Link2, Loader2, Phone, Send, XCircle } from 'lucide-react';
-import { api, ApiError } from '@/lib/api';
+import { ArrowLeft, ChevronRight, ClipboardList, Download, Link2, Loader2, Phone, Send, XCircle } from 'lucide-react';
+import { api, ApiError, downloadFile } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate, formatDateTime, fullName } from '@/lib/format';
 import { REFERRAL_LABELS } from '@/lib/severity';
-import type { Assignment, AssignmentCreated, Patient, PatientSummary, ReferralAction } from '@/lib/types';
+import type { Assignment, AssignmentCreated, Patient, PatientSummary, PatientTrend, ReferralAction } from '@/lib/types';
 import { Avatar, Badge, Button, Card, CardHeader } from '@/components/ui/brand';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { useCan } from '@/components/staff/session-context';
 import { AssignDrawer, LinkReady } from '@/components/screening/AssignDrawer';
 import { DeleteDataPanel } from '@/components/screening/DeleteDataPanel';
+import { TrendChart } from '@/components/screening/TrendChart';
 import {
   EmptyState,
   FlagChips,
@@ -154,6 +155,12 @@ export default function PatientPage() {
     enabled: canViewResults,
     queryFn: () => api.get<ReferralAction[]>(`/patients/${id}/psychosocial/referral-actions`),
   });
+  const trend = useQuery({
+    queryKey: ['trend', id],
+    enabled: canViewResults,
+    queryFn: () => api.get<PatientTrend>(`/patients/${id}/psychosocial/trend`),
+  });
+  const [downloading, setDownloading] = useState(false);
 
   if (!canViewPatient) return <NoAccess what="patients" />;
   if (patient.isPending) {
@@ -170,6 +177,19 @@ export default function PatientPage() {
 
   const p = patient.data;
   const name = fullName(p);
+
+  const downloadReport = async () => {
+    setDownloading(true);
+    try {
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'patient';
+      const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      await downloadFile(`/patients/${p.id}/psychosocial/report.pdf`, `screening-summary-${slug}-${day}.pdf`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create the PDF.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -196,12 +216,20 @@ export default function PatientPage() {
             </p>
           </div>
         </div>
-        {canAssign ? (
-          <Button onClick={() => setAssigning(true)}>
-            <Send className="h-4 w-4" />
-            Send screener
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {canViewResults ? (
+            <Button variant="secondary" onClick={downloadReport} disabled={downloading}>
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              PDF summary
+            </Button>
+          ) : null}
+          {canAssign ? (
+            <Button onClick={() => setAssigning(true)}>
+              <Send className="h-4 w-4" />
+              Send screener
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {!canViewResults ? (
@@ -250,6 +278,19 @@ export default function PatientPage() {
               <p className="rounded-2xl border border-dashed border-line bg-card/60 p-5 text-sm text-muted">No completed screenings yet.</p>
             )}
           </section>
+
+          {trend.data && trend.data.series.length > 0 ? (
+            <section aria-labelledby="trend-h">
+              <h2 id="trend-h" className="mb-3 font-display text-[15.5px] font-bold text-ink">
+                Score trend
+              </h2>
+              <div className="grid gap-4 xl:grid-cols-2">
+                {trend.data.series.map((s) => (
+                  <TrendChart key={`${s.instrument_id}-${s.scale_id}`} series={s} />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section aria-labelledby="history-h">
             <h2 id="history-h" className="mb-3 font-display text-[15.5px] font-bold text-ink">

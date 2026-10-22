@@ -13,19 +13,19 @@ Status:
 
 Evidence:
 - **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
-- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link.
+- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download.
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 22 Oct 2026, on this branch: screening backend tests 191 pass, Playwright 8 of 8 pass, `npm test` 4 of 4 pass, tsc, eslint and `next build` clean.
+Last full run, 22 Oct 2026, on this branch: screening backend tests 200 pass, Playwright 10 of 10 pass, `npm test` 8 of 8 pass, tsc, eslint and `next build` clean.
 
 ## Summary
 
 | Status | Requirements |
 |---|---|
-| Done | 17 |
+| Done | 20 |
 | Partial | 2 |
-| Not built | 11 |
+| Not built | 8 |
 | Total | 30 |
 
 Items marked "pending founder sign-off" work today with a safe default and may change after the founders answer (Decisions.md).
@@ -47,7 +47,7 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 |---|---|---|---|
 | 1 | Completed session shows total score, severity band, every answer and date of completion | Done | API test `test_full_flow_phq9_then_gad7` (score, band, answer labels, unscored difficulty item). E2E 1: score 7, band and the item 9 answer on the result page. The completion date is in the page header. The test does not assert it. |
 | 2 | Severity indicator that does not rely on colour alone | Done | E2E 1 finds the severity meter by its text label "Mild, band 2 of 5". |
-| 3 | Longitudinal chart of scores across sessions, per instrument | Not built | v1.1. SRS 3.5 asks for 24 months of history. |
+| 3 | Longitudinal chart of scores across sessions, per instrument | Done | One chart per scale on the patient page (S-D-025): x by date, published bands named on the chart, referral line, readable without colour. API tests `test_trend_api_respects_scope_and_order`, `test_twenty_four_months_of_history` (SRS 3.5). Unit tests in `src/lib/trend.test.ts`. E2E 5. |
 | 4 | Compare the current result against the patient's baseline | Done | API test `test_second_session_shows_baseline` (baseline 27, current 8). UI, not in E2E: baseline column on the result page. |
 
 ### 4.1.3 Referral Management
@@ -62,8 +62,8 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
-| 1 | Single-patient summary report as PDF: sessions, scores, bands, referral actions | Not built | v1.1. Must be authenticated and clinic-scoped, never a public file. |
-| 2 | Report suitable for the patient's clinical record | Not built | v1.1, with item 1. |
+| 1 | Single-patient summary report as PDF: sessions, scores, bands, referral actions | Done | "PDF summary" on the patient page (S-D-025). Rendered on request, streamed to the signed-in user, never stored. API tests `test_report_pdf_download_and_audit`, `test_report_content`. E2E 5 downloads it and checks it is a PDF. |
+| 2 | Report suitable for the patient's clinical record | Done | Clinic name, patient details, report ID, date and author, a disclaimer and a signature line, in the posture report style. Reviewed as rendered pages with 28 sessions over 24 months. |
 
 ## 4.2 Patient
 

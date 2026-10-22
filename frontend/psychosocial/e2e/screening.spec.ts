@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { API, assignVia, makeClinic, shot, signIn, watch } from './support';
+import { readFileSync } from 'node:fs';
+import { API, assignVia, completeVia, makeClinic, shot, signIn, watch } from './support';
 
 test('physio sends a screener, patient answers, physio reviews and logs a referral', async ({ page, browser, request }) => {
   const c = await makeClinic(request);
@@ -200,5 +201,32 @@ test('admin deletes a patient\'s screening data on request', async ({ page, requ
     })
   ).json();
   expect(after.data).toMatchObject({ links: 0, screeners: 0, referral_actions: 0, consent_records: 0 });
+  expect(problems).toEqual([]);
+});
+
+test('physio sees the score trend and downloads the PDF summary', async ({ page, request }) => {
+  const c = await makeClinic(request);
+  await completeVia(request, await assignVia(request, c.therapistToken, c.patientId, ['phq9']), 'phq9', [2, 2, 2, 2, 2, 1, 1, 1, 0]);
+  await completeVia(request, await assignVia(request, c.therapistToken, c.patientId, ['phq9']), 'phq9', [1, 1, 1, 1, 0, 0, 1, 0, 0]);
+  const problems = watch(page);
+
+  await signIn(page, c.therapistEmail, c.password);
+  await page.goto(`/patients/${c.patientId}`);
+  await expect(page.getByRole('heading', { name: 'Score trend' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'PHQ-9: 2 results from 13 to 5, latest 5, Mild.' })).toBeVisible();
+  // The chart may scroll inside its card on a phone, but the page must not.
+  // Compare with the configured viewport: on a mobile viewport a too-wide page
+  // zooms out, which widens window.innerWidth along with it.
+  const pageWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(pageWidth).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await shot(page, '17-trend');
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'PDF summary' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(new RegExp(`^screening-summary-ritu-sharma${c.patientLast.slice(6).toLowerCase()}-\\d{4}-\\d{2}-\\d{2}\\.pdf$`));
+  const bytes = readFileSync(await download.path());
+  expect(bytes.subarray(0, 4).toString()).toBe('%PDF');
   expect(problems).toEqual([]);
 });
