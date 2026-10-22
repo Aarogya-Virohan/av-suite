@@ -159,6 +159,25 @@ class ReferralActionRequest(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
+class ScreeningDataOut(BaseModel):
+    """Counts only. Never scores, bands or flags: admins use this (SRS 3.2)."""
+
+    patient_id: uuid.UUID
+    links: int
+    screeners: int
+    referral_actions: int
+    consent_records: int
+    # True when the patient's latest consent decision is a withdrawal. That one
+    # record is kept on deletion so no new screener can be sent without them.
+    withdrawal_on_file: bool
+
+
+class DeleteScreeningDataRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # Typed by the admin in the UI. Guards against an accidental call.
+    confirm: Literal["DELETE"]
+
+
 class PatientSummaryOut(BaseModel):
     """CDSS read contract v1 (SRS 5.1). Supporting input only."""
 

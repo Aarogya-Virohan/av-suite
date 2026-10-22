@@ -17,6 +17,7 @@ from app.schemas.psychosocial import (
     AssignmentOut,
     AssignRequest,
     BaselineOut,
+    DeleteScreeningDataRequest,
     InstrumentSummaryOut,
     PatientSummaryOut,
     ReferralActionOut,
@@ -24,6 +25,7 @@ from app.schemas.psychosocial import (
     ReissueLinkRequest,
     ResponseOut,
     ScaleOut,
+    ScreeningDataOut,
     SessionDetailOut,
     SessionSummaryOut,
     WorklistRowOut,
@@ -402,3 +404,36 @@ async def patient_referral_history(
     actions = await svc.referral_actions_for_sessions(db, ctx.clinic.id, session_ids)
     names = await svc.user_names(db, {a.recorded_by for a in actions})
     return ResponseEnvelope(data=[_referral_out(a, names) for a in actions])
+
+
+# --- deletion on request (SRS 3.2, S-D-024) ---------------------------------
+@router.get(
+    "/patients/{patient_id}/psychosocial/data",
+    response_model=ResponseEnvelope[ScreeningDataOut],
+)
+async def screening_data_overview(
+    patient_id: uuid.UUID,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.delete")),
+):
+    counts = await svc.screening_data_counts(db, clinic_id=ctx.clinic.id, patient_id=patient_id)
+    return ResponseEnvelope(data=ScreeningDataOut(**counts))
+
+
+@router.post(
+    "/patients/{patient_id}/psychosocial/data/delete",
+    response_model=ResponseEnvelope[ScreeningDataOut],
+)
+async def delete_screening_data(
+    patient_id: uuid.UUID,
+    payload: DeleteScreeningDataRequest,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.delete")),
+):
+    """Erase a patient's screening data. Returns what was removed."""
+    deleted = await svc.delete_patient_screening_data(
+        db, clinic_id=ctx.clinic.id, user_id=ctx.user.id, patient_id=patient_id
+    )
+    return ResponseEnvelope(data=ScreeningDataOut(**deleted))

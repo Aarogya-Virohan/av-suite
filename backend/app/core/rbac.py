@@ -136,9 +136,13 @@ CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
         # OWN = sessions this user assigned. Individual results are clinical
         # data: screening.view and screening.refer are NOT in the admin
         # template (see ADMIN_TEMPLATE_EXCLUDED below, SRS 3.2, S-D-011).
+        # screening.delete erases a patient's screening data on request
+        # (SRS 3.2). It is in the admin template so one accountable role
+        # handles an action that cannot be undone (S-D-024).
         "screening.assign": CapabilityDefinition("screening.assign", _NA),
         "screening.view": CapabilityDefinition("screening.view", _NOA),
         "screening.refer": CapabilityDefinition("screening.refer", _NOA),
+        "screening.delete": CapabilityDefinition("screening.delete", _NA),
     }
 )
 

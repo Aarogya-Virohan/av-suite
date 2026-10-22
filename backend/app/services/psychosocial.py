@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, desc, false, func, select
+from sqlalchemy import and_, delete, desc, false, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.permission import CapabilityScope
@@ -506,6 +506,107 @@ async def patient_summary(
     for session in sessions:
         latest.setdefault(session.instrument_id, session)
     return list(latest.values())
+
+
+# ---------------------------------------------------------------------------
+# deletion on request (SRS 3.2, S-D-024)
+# ---------------------------------------------------------------------------
+async def _count(db: AsyncSession, model, clinic_id: uuid.UUID, patient_id: uuid.UUID, *extra) -> int:
+    return await db.scalar(
+        select(func.count())
+        .select_from(model)
+        .where(model.clinic_id == clinic_id, model.patient_id == patient_id, *extra)
+    ) or 0
+
+
+async def screening_data_counts(
+    db: AsyncSession, *, clinic_id: uuid.UUID, patient_id: uuid.UUID
+) -> dict[str, Any]:
+    """What a deletion would remove. Counts only, no clinical values."""
+    await get_patient(db, clinic_id, patient_id)
+    consent = await latest_consent(db, clinic_id, patient_id)
+    withdrawal_on_file = consent is not None and consent.status == "withdrawn"
+    consents = await _count(db, PsychosocialConsent, clinic_id, patient_id)
+    return {
+        "patient_id": patient_id,
+        "links": await _count(db, PsychosocialAssignment, clinic_id, patient_id),
+        "screeners": await _count(db, PsychosocialSession, clinic_id, patient_id),
+        "referral_actions": await _count(db, PsychosocialReferralAction, clinic_id, patient_id),
+        # The kept withdrawal record is not counted as deleted.
+        "consent_records": consents - 1 if withdrawal_on_file else consents,
+        "withdrawal_on_file": withdrawal_on_file,
+    }
+
+
+async def delete_patient_screening_data(
+    db: AsyncSession, *, clinic_id: uuid.UUID, user_id: uuid.UUID, patient_id: uuid.UUID
+) -> dict[str, Any]:
+    """Erase every screening record for one patient, in one transaction.
+
+    Removed: links, screeners (answers and results), referral actions and
+    consent records. If the patient's latest consent decision is a
+    withdrawal, that single record is kept (status, text version, date) so
+    the clinic cannot send a new screener without the patient. Deleting a
+    completed session is allowed: the immutability trigger blocks UPDATE only.
+    The audit event holds counts, never clinical values.
+    """
+    counts = await screening_data_counts(db, clinic_id=clinic_id, patient_id=patient_id)
+    keep_id: uuid.UUID | None = None
+    if counts["withdrawal_on_file"]:
+        keep_id = (await latest_consent(db, clinic_id, patient_id)).id
+
+    def scoped(model):
+        return (model.clinic_id == clinic_id, model.patient_id == patient_id)
+
+    # Child rows first, so the result does not depend on FK cascades.
+    await db.execute(
+        delete(PsychosocialReferralAction)
+        .where(*scoped(PsychosocialReferralAction))
+        .execution_options(synchronize_session="fetch")
+    )
+    consent_filter = list(scoped(PsychosocialConsent))
+    if keep_id is not None:
+        consent_filter.append(PsychosocialConsent.id != keep_id)
+    await db.execute(
+        delete(PsychosocialConsent).where(*consent_filter).execution_options(synchronize_session="fetch")
+    )
+    if keep_id is not None:
+        # Its link is about to go. Keep the decision, drop the reference.
+        await db.execute(
+            update(PsychosocialConsent)
+            .where(PsychosocialConsent.id == keep_id)
+            .values(assignment_id=None)
+            .execution_options(synchronize_session="fetch")
+        )
+    await db.execute(
+        delete(PsychosocialSession)
+        .where(*scoped(PsychosocialSession))
+        .execution_options(synchronize_session="fetch")
+    )
+    await db.execute(
+        delete(PsychosocialAssignment)
+        .where(*scoped(PsychosocialAssignment))
+        .execution_options(synchronize_session="fetch")
+    )
+    await db.commit()
+
+    await audit(
+        db,
+        clinic_id=clinic_id,
+        user_id=user_id,
+        action="psychosocial.data_deleted",
+        entity_type="patient",
+        entity_id=patient_id,
+        details={
+            "patient_id": str(patient_id),
+            "links": counts["links"],
+            "screeners": counts["screeners"],
+            "referral_actions": counts["referral_actions"],
+            "consent_records": counts["consent_records"],
+            "withdrawal_kept": counts["withdrawal_on_file"],
+        },
+    )
+    return counts
 
 
 # ---------------------------------------------------------------------------
