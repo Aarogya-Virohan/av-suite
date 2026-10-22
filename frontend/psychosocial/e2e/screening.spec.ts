@@ -418,3 +418,75 @@ test('admin sees anonymised statistics with small groups hidden and exports CSV'
   const res = await request.get(`${API}/psychosocial/aggregates`, { headers: { Authorization: `Bearer ${c.therapistToken}` } });
   expect(res.status()).toBe(403);
 });
+
+test('admin keeps a referral contact list and the physio refers to a contact from it', async ({ page, browser, request }) => {
+  const c = await makeClinic(request);
+  const problems = watch(page, [403]);
+
+  // --- admin: Settings, referral contacts -----------------------------------
+  await signIn(page, c.adminEmail, c.password);
+  if (page.viewportSize()!.width < 600) await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Add contact' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Add a referral contact' });
+  await drawer.getByLabel('Name').fill('Dr Kavita Rao');
+  await drawer.getByLabel('Role').fill('Clinical psychologist');
+  await drawer.getByRole('button', { name: 'Add contact' }).click();
+  await expect(drawer.getByRole('alert')).toHaveText('Add a phone number or an email address.');
+  await drawer.getByLabel('Phone').fill('+91 98765 43210');
+  await drawer.getByLabel('Note (optional)').fill('Tuesdays and Thursdays');
+  await shot(page, '24-contact-form');
+  await drawer.getByRole('button', { name: 'Add contact' }).click();
+  await expect(page.getByText('Dr Kavita Rao added.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add contact' }).click();
+  const second = page.getByRole('dialog', { name: 'Add a referral contact' });
+  await second.getByLabel('Name').fill('Old Wellness Centre');
+  await second.getByLabel('Role').fill('Counselling service');
+  await second.getByLabel('Email').fill('hello@oldwellness.in');
+  await second.getByRole('button', { name: 'Add contact' }).click();
+  await expect(page.getByText('Old Wellness Centre added.')).toBeVisible();
+  await page.getByRole('button', { name: 'Archive Old Wellness Centre' }).click();
+  await expect(page.getByText('Old Wellness Centre archived.')).toBeVisible();
+  const archivedRow = page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('button', { name: 'Restore Old Wellness Centre' }) });
+  await expect(archivedRow).toContainText('Archived');
+  await shot(page, '25-contacts');
+  expect(problems.filter((x) => !x.includes('http 403'))).toEqual([]);
+
+  // --- a patient answers PHQ-9 at Moderate ----------------------------------
+  const path = await assignVia(request, c.therapistToken, c.patientId, ['phq9']);
+  await completeVia(request, path, 'phq9', [2, 2, 2, 2, 2, 2, 0, 0, 0]);
+  const listed = await request.get(`${API}/patients/${c.patientId}/psychosocial/sessions`, {
+    headers: { Authorization: `Bearer ${c.therapistToken}` },
+  });
+  const sessionId = ((await listed.json()) as { data: { sessions: { id: string }[] }[] }).data[0].sessions[0].id;
+
+  // --- physio: record the referral to a listed contact ----------------------
+  const ctx = await browser.newContext({
+    viewport: page.viewportSize()!,
+    baseURL: test.info().project.use.baseURL,
+    timezoneId: test.info().project.use.timezoneId,
+  });
+  const physio = await ctx.newPage();
+  const physioProblems = watch(physio);
+  await signIn(physio, c.therapistEmail, c.password);
+  await physio.goto(`/sessions/${sessionId}`);
+  await physio.getByLabel('Record what you did').selectOption('referred_psychologist');
+  const picker = physio.getByLabel('Referred to (optional)');
+  await expect(picker.locator('option')).toHaveText(['No contact', 'Dr Kavita Rao, Clinical psychologist']);
+  await picker.selectOption({ label: 'Dr Kavita Rao, Clinical psychologist' });
+  await expect(physio.getByText('+91 98765 43210 · Tuesdays and Thursdays')).toBeVisible();
+  await shot(physio, '26-referral-contact');
+  await physio.getByRole('button', { name: 'Save action' }).click();
+  await expect(physio.getByText('Referral action saved')).toBeVisible();
+  await expect(physio.getByText('To Dr Kavita Rao, Clinical psychologist')).toBeVisible();
+  await expect(picker).toHaveValue('');
+
+  // The patient page history names the contact too.
+  await physio.goto(`/patients/${c.patientId}`);
+  await expect(physio.getByText('to Dr Kavita Rao, Clinical psychologist')).toBeVisible();
+  expect(physioProblems).toEqual([]);
+  await ctx.close();
+});

@@ -10,7 +10,8 @@ import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { deltaWords, REFERRAL_LABELS, scoreDelta } from '@/lib/severity';
-import type { ReferralAction, ReferralActionKey, Scale, SessionDetail } from '@/lib/types';
+import { contactLabel, contactReach } from '@/lib/contacts';
+import type { ReferralAction, ReferralActionKey, ReferralContact, Scale, SessionDetail } from '@/lib/types';
 import { Button, Card, CardHeader, FieldLabel, inputClass } from '@/components/ui/brand';
 import { useCan } from '@/components/staff/session-context';
 import {
@@ -80,17 +81,26 @@ function ReferralLog({ detail }: { detail: SessionDetail }) {
   const qc = useQueryClient();
   const [action, setAction] = useState<ReferralActionKey | ''>('');
   const [note, setNote] = useState('');
+  const [contactId, setContactId] = useState('');
+  const contacts = useQuery({
+    queryKey: ['referral-contacts'],
+    queryFn: () => api.get<ReferralContact[]>('/psychosocial/referral-contacts'),
+    enabled: canRefer,
+  });
+  const chosen = contacts.data?.find((c) => c.id === contactId);
 
   const save = useMutation({
     mutationFn: () =>
       api.post<ReferralAction>(`/psychosocial/sessions/${detail.session.id}/referral-actions`, {
         action,
         note: note.trim() || null,
+        ...(contactId ? { contact_id: contactId } : {}),
       }),
     onSuccess: () => {
       toast.success('Referral action saved');
       setAction('');
       setNote('');
+      setContactId('');
       qc.invalidateQueries({ queryKey: ['session', detail.session.id] });
       qc.invalidateQueries({ queryKey: ['patient-referrals', detail.session.patient_id] });
     },
@@ -107,6 +117,9 @@ function ReferralLog({ detail }: { detail: SessionDetail }) {
           {detail.referral_actions.map((a) => (
             <li key={a.id} className="rounded-xl border border-line-soft bg-canvas/60 p-3 text-sm">
               <p className="font-semibold text-ink">{REFERRAL_LABELS[a.action]}</p>
+              {a.contact_name ? (
+                <p className="mt-0.5 text-ink-2">To {contactLabel(a.contact_name, a.contact_role)}</p>
+              ) : null}
               {a.note ? <p className="mt-0.5 text-ink-2">{a.note}</p> : null}
               <p className="mt-1 text-xs text-muted">
                 {a.recorded_by_name ?? 'Former staff member'} · {formatDateTime(a.recorded_at)}
@@ -139,6 +152,33 @@ function ReferralLog({ detail }: { detail: SessionDetail }) {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <FieldLabel htmlFor="ref-contact">Referred to (optional)</FieldLabel>
+            <select
+              id="ref-contact"
+              className={inputClass}
+              value={contactId}
+              onChange={(e) => setContactId(e.target.value)}
+              disabled={!contacts.data || contacts.data.length === 0}
+            >
+              <option value="">
+                {contacts.data && contacts.data.length === 0 ? 'No contacts in the clinic list yet' : 'No contact'}
+              </option>
+              {(contacts.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {contactLabel(c.name, c.role)}
+                </option>
+              ))}
+            </select>
+            {chosen ? (
+              <p className="mt-1.5 break-all text-xs text-ink-2">
+                {contactReach(chosen)}
+                {chosen.note ? ` · ${chosen.note}` : ''}
+              </p>
+            ) : contacts.data && contacts.data.length === 0 ? (
+              <p className="mt-1.5 text-xs text-muted">A clinic admin can add contacts on the Settings page.</p>
+            ) : null}
           </div>
           <div>
             <FieldLabel htmlFor="ref-note">Note (optional)</FieldLabel>

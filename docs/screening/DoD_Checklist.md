@@ -13,19 +13,19 @@ Status:
 
 Evidence:
 - **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
-- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat, E2E 8 is anonymised statistics and CSV.
+- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat, E2E 8 is anonymised statistics and CSV, E2E 9 is the referral contact directory.
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 22 Oct 2026, on this branch: screening backend tests 252 pass, full backend suite 554 pass with the same 10 pre-existing failures (P-09), Playwright 16 of 16 pass, `npm test` 21 of 21 pass, tsc, eslint and `next build` clean.
+Last full run, 22 Oct 2026, on this branch: screening backend tests 270 pass, full backend suite 572 pass with the same 10 pre-existing failures (P-09), Playwright 18 of 18 pass, `npm test` 24 of 24 pass, tsc, eslint and `next build` clean.
 
 ## Summary
 
 | Status | Requirements |
 |---|---|
-| Done | 25 |
+| Done | 26 |
 | Partial | 2 |
-| Not built | 3 |
+| Not built | 2 |
 | Total | 30 |
 
 Items marked "pending founder sign-off" work today with a safe default and may change after the founders answer (Decisions.md).
@@ -99,7 +99,7 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
 | 1 | Turn the module on or off for each physio | Done | E2E 2: admin turns off "Send screeners" on the Access page, then the physio's assign call gets 403. API tests `test_therapist_without_grant_is_refused`, `test_product_entitlement_required`. The CRM permission grid does not list the new keys yet (P-08). |
-| 2 | Manage referral contacts (name, role, contact details) used when logging referral actions | Not built | v1.1. Referral actions today use a fixed list of action types plus a free-text note. |
+| 2 | Manage referral contacts (name, role, contact details) used when logging referral actions | Done | Settings page, S-D-029. `test_admin_adds_edits_archives_and_restores`, `test_physio_logs_a_referral_to_a_contact` (name and role kept after an edit and an archive, also in the PDF), `test_access_and_clinic_isolation`. E2E 9: admin adds and archives contacts, the physio refers to a listed contact, the history names it. |
 
 ### 4.3.2 Configuration
 

@@ -11,6 +11,7 @@ import type { ClinicSettings, InstrumentId, InstrumentSetting, ScaleThreshold } 
 import { Badge, Button, Card, CardHeader, FieldLabel, inputClass, PageHeader } from '@/components/ui/brand';
 import { useCan } from '@/components/staff/session-context';
 import { EmptyState, InfoNote, NoAccess } from '@/components/screening/indicators';
+import { ReferralContacts } from '@/components/screening/ReferralContacts';
 
 type Defaults = Record<string, string>; // instrument id -> '' (just once) or weeks
 
@@ -51,6 +52,7 @@ export default function SettingsPage() {
         <>
           {/* Keyed on the saved data, so the form restarts from the server copy after a save. */}
           <DefaultsForm key={JSON.stringify(toDefaults(settings.data.instruments))} instruments={settings.data.instruments} />
+          <ReferralContacts />
           <ReferralRules settings={settings.data} />
         </>
       )}

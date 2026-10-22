@@ -107,6 +107,9 @@ export interface ReferralAction {
   note: string | null;
   recorded_by_name: string | null;
   recorded_at: string;
+  /** Copied when the action was saved (S-D-029). */
+  contact_name: string | null;
+  contact_role: string | null;
 }
 
 export type ReferralActionKey =
@@ -321,4 +324,25 @@ export interface Aggregates {
   date_to: string;
   min_cell: number;
   instruments: InstrumentAggregate[];
+}
+
+// --- referral contact directory (SRS 4.3.1) --------------------------------
+export interface ReferralContact {
+  id: string;
+  name: string;
+  role: string;
+  phone: string | null;
+  email: string | null;
+  note: string | null;
+  archived: boolean;
+  updated_at: string;
+  updated_by_name: string | null;
+}
+
+export interface ReferralContactInput {
+  name: string;
+  role: string;
+  phone: string | null;
+  email: string | null;
+  note: string | null;
 }

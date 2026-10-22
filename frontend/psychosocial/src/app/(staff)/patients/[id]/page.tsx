@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, ChevronRight, ClipboardList, Download, Link2, Loader2, Phone, Send, XCircle } from 'lucide-react';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { contactLabel } from '@/lib/contacts';
 import { formatDate, formatDateTime, fullName } from '@/lib/format';
 import { REFERRAL_LABELS } from '@/lib/severity';
 import type { Assignment, AssignmentCreated, InstrumentId, Patient, PatientSummary, PatientTrend, ReferralAction } from '@/lib/types';
@@ -335,6 +336,9 @@ export default function PatientPage() {
                 {referrals.data.map((r) => (
                   <li key={r.id} className="text-sm">
                     <span className="font-semibold text-ink">{REFERRAL_LABELS[r.action]}</span>
+                    {r.contact_name ? (
+                      <span className="text-ink-2"> · to {contactLabel(r.contact_name, r.contact_role)}</span>
+                    ) : null}
                     {r.note ? <span className="text-ink-2"> · {r.note}</span> : null}
                     <span className="block text-xs text-muted">
                       {r.recorded_by_name ?? 'Former staff member'} · {formatDateTime(r.recorded_at)}
