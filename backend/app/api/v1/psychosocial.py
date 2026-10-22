@@ -17,8 +17,11 @@ from app.schemas.psychosocial import (
     AssignmentOut,
     AssignRequest,
     BaselineOut,
+    ClinicSettingsOut,
     DeleteScreeningDataRequest,
     DueItemOut,
+    InstrumentId,
+    InstrumentSettingOut,
     InstrumentSummaryOut,
     PatientSummaryOut,
     PatientTrendOut,
@@ -34,13 +37,16 @@ from app.schemas.psychosocial import (
     TrendBandOut,
     TrendPointOut,
     TrendSeriesOut,
+    UpdateInstrumentSettingRequest,
     WorklistRowOut,
 )
 from app.screening.registry import get_instrument, list_instruments
+from app.screening.thresholds import thresholds_for
 from app.screening.trend import build_series
 from app.services import psychosocial as svc
 from app.services import psychosocial_report as report
 from app.services import psychosocial_schedule as schedules
+from app.services import psychosocial_settings as clinic_config
 
 router = APIRouter()
 
@@ -118,7 +124,12 @@ def assignment_out(assignment: PsychosocialAssignment, names: dict[uuid.UUID, st
     "/psychosocial/instruments",
     response_model=ResponseEnvelope[list[InstrumentSummaryOut]],
 )
-async def list_screeners(_scope: CapabilityScope = Depends(require_capability("screening.assign"))):
+async def list_screeners(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.assign")),
+):
+    defaults = await clinic_config.default_repeat_weeks(db, ctx.clinic.id)
     return ResponseEnvelope(
         data=[
             InstrumentSummaryOut(
@@ -128,6 +139,7 @@ async def list_screeners(_scope: CapabilityScope = Depends(require_capability("s
                 name=i.name,
                 item_count=len(i.scored_items),
                 citation=i.citation,
+                default_repeat_weeks=defaults.get(i.id),
             )
             for i in list_instruments()
         ]
@@ -575,3 +587,81 @@ async def due_list(
     return ResponseEnvelope(
         data=[DueItemOut(**_schedule_out(v, names), patient_name=name) for v, name in items]
     )
+
+
+# --- clinic settings (SRS 4.3.2) --------------------------------------------
+async def _settings_out(db, clinic_id: uuid.UUID) -> ClinicSettingsOut:
+    rows = await clinic_config.clinic_settings(db, clinic_id)
+    names = await svc.user_names(db, {r.updated_by for r in rows.values() if r.updated_by})
+    out = []
+    for inst in list_instruments():
+        row = rows.get(inst.id)
+        view = thresholds_for(inst)
+        out.append(
+            InstrumentSettingOut(
+                instrument_id=inst.id,
+                instrument_version=inst.version,
+                short_name=inst.short_name,
+                name=inst.name,
+                default_repeat_weeks=row.default_repeat_weeks if row else None,
+                updated_at=row.updated_at if row else None,
+                updated_by_name=names.get(row.updated_by) if row and row.updated_by else None,
+                source=view.source,
+                scales=[
+                    dict(
+                        scale_id=sc.scale_id,
+                        label=sc.label,
+                        max_score=sc.max_score,
+                        referral_band=sc.referral_band,
+                        referral_min_score=sc.referral_min_score,
+                        bands=[
+                            dict(label=b.label, min_score=b.min_score, max_score=b.max_score, refers=b.refers)
+                            for b in sc.bands
+                        ],
+                    )
+                    for sc in view.scales
+                ],
+                risk_rules=[
+                    dict(
+                        item_number=r.item_number,
+                        min_value=r.min_value,
+                        min_label=r.min_label,
+                        description=r.description,
+                    )
+                    for r in view.risk_rules
+                ],
+            )
+        )
+    return ClinicSettingsOut(thresholds_editable=clinic_config.THRESHOLDS_EDITABLE, instruments=out)
+
+
+@router.get("/psychosocial/settings", response_model=ResponseEnvelope[ClinicSettingsOut])
+async def get_clinic_settings(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.configure")),
+):
+    """Default repeat per screener and the referral rules in force. No patient data."""
+    return ResponseEnvelope(data=await _settings_out(db, ctx.clinic.id))
+
+
+@router.put(
+    "/psychosocial/settings/{instrument_id}",
+    response_model=ResponseEnvelope[ClinicSettingsOut],
+)
+async def update_instrument_setting(
+    instrument_id: InstrumentId,
+    payload: UpdateInstrumentSettingRequest,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.configure")),
+):
+    """Set the clinic default repeat for one screener. Existing schedules keep their interval."""
+    await clinic_config.set_default_repeat(
+        db,
+        clinic_id=ctx.clinic.id,
+        user_id=ctx.user.id,
+        instrument_id=instrument_id,
+        weeks=payload.default_repeat_weeks,
+    )
+    return ResponseEnvelope(data=await _settings_out(db, ctx.clinic.id))

@@ -234,6 +234,43 @@ class PsychosocialSchedule(Base, TimestampMixin):
     )
 
 
+# Clinic-wide default repeat per screener (SRS 4.3.2). Weeks, same range the
+# assign form accepts. Kept identical to migration d5f9b3c7e2a4.
+DEFAULT_REPEAT_MIN_WEEKS = 1
+DEFAULT_REPEAT_MAX_WEEKS = 52
+
+
+class PsychosocialClinicSetting(Base, TimestampMixin):
+    """Per-clinic, per-screener configuration (SRS 4.3.2, S-D-027).
+
+    Today it holds only the default repeat interval that prefills the Repeat
+    field when a screener is sent. ``None`` means "just once". Changing it
+    never touches repeat schedules that already exist. Referral thresholds are
+    not stored here: they are fixed at the published norms until the founders
+    decide otherwise (Pending P-13).
+    """
+
+    __tablename__ = "psychosocial_clinic_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "default_repeat_weeks IS NULL OR default_repeat_weeks BETWEEN "
+            f"{DEFAULT_REPEAT_MIN_WEEKS} AND {DEFAULT_REPEAT_MAX_WEEKS}",
+            name="ck_psy_setting_repeat_weeks",
+        ),
+        Index("uq_psy_settings_clinic_instrument", "clinic_id", "instrument_id", unique=True),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    instrument_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    default_repeat_weeks: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
 # --- Immutability guard (Postgres only) ------------------------------------
 # Same SQL as migration b3d7e1f0c2a9, so tests that build the schema with
 # create_all() get exactly the trigger production has. DDL() treats % as a

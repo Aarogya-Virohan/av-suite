@@ -143,6 +143,9 @@ CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
         "screening.view": CapabilityDefinition("screening.view", _NOA),
         "screening.refer": CapabilityDefinition("screening.refer", _NOA),
         "screening.delete": CapabilityDefinition("screening.delete", _NA),
+        # screening.configure sets clinic-wide screening defaults (SRS 4.3.2,
+        # S-D-027). Clinic level only, no patient data: in the admin template.
+        "screening.configure": CapabilityDefinition("screening.configure", _NA),
     }
 )
 

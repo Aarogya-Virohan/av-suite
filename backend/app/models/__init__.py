@@ -24,6 +24,7 @@ from app.models.document import PatientDocument
 from app.models.audit import AuditLog
 from app.models.psychosocial import (
     PsychosocialAssignment,
+    PsychosocialClinicSetting,
     PsychosocialConsent,
     PsychosocialReferralAction,
     PsychosocialSchedule,
@@ -68,4 +69,5 @@ __all__ = [
     "PsychosocialConsent",
     "PsychosocialReferralAction",
     "PsychosocialSchedule",
+    "PsychosocialClinicSetting",
 ]

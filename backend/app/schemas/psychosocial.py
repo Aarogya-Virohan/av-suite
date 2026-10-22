@@ -35,6 +35,8 @@ class InstrumentSummaryOut(BaseModel):
     name: str
     item_count: int
     citation: str
+    # Clinic-wide default for the Repeat field (SRS 4.3.2). None = just once.
+    default_repeat_weeks: int | None = None
 
 
 class InstrumentOut(BaseModel):
@@ -296,3 +298,52 @@ class SubmitOut(BaseModel):
     # Booleans only: the patient never sees a score (SRS 4.2.2, flow step 2).
     show_referral_message: bool
     show_support_contacts: bool
+
+
+# --- clinic settings (SRS 4.3.2) ------------------------------------------
+class BandThresholdOut(BaseModel):
+    label: str
+    min_score: int
+    max_score: int | None
+    refers: bool
+
+
+class ScaleThresholdOut(BaseModel):
+    scale_id: str
+    label: str
+    max_score: int
+    referral_band: str
+    referral_min_score: int
+    bands: list[BandThresholdOut]
+
+
+class RiskRuleOut(BaseModel):
+    item_number: int
+    min_value: int
+    min_label: str
+    description: str
+
+
+class InstrumentSettingOut(BaseModel):
+    instrument_id: str
+    instrument_version: str
+    short_name: str
+    name: str
+    default_repeat_weeks: int | None
+    updated_at: datetime | None
+    updated_by_name: str | None
+    source: str
+    scales: list[ScaleThresholdOut]
+    risk_rules: list[RiskRuleOut]
+
+
+class ClinicSettingsOut(BaseModel):
+    # False until the founders decide on clinic-level thresholds (S-D-027, P-13).
+    thresholds_editable: bool
+    instruments: list[InstrumentSettingOut]
+
+
+class UpdateInstrumentSettingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # Required, may be null (= just once). Same range the assign form accepts.
+    default_repeat_weeks: int | None = Field(ge=1, le=52)
