@@ -17,7 +17,7 @@ Evidence:
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 22 Oct 2026, on this branch: screening backend tests 184 pass, Playwright 6 of 6 pass, `npm test` 4 of 4 pass, tsc, eslint and `next build` clean.
+Last full run, 22 Oct 2026, on this branch: screening backend tests 191 pass, Playwright 8 of 8 pass, `npm test` 4 of 4 pass, tsc, eslint and `next build` clean.
 
 ## Summary
 
@@ -118,6 +118,6 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 
 ## Before go-live, outside section 4
 
-- Deletion on request (SRS 3.2). The consent text already promises it (S-L-005).
+- Deletion on request (SRS 3.2): done 22 Oct (S-D-024). The clinic admin deletes a patient's screening data from the patient page. Covered by `backend/tests/screening/test_deletion.py` and the Playwright test "admin deletes a patient's screening data on request".
 - Founder answers F1 to F6, re-consent and staff accounts for screening-only clinics (P-03).
 - `AV_Suite_Clinical_Reference_v1.xlsx` comparison (P-05).

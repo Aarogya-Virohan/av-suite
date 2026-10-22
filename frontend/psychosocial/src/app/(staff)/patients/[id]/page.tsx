@@ -15,6 +15,7 @@ import { Avatar, Badge, Button, Card, CardHeader } from '@/components/ui/brand';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { useCan } from '@/components/staff/session-context';
 import { AssignDrawer, LinkReady } from '@/components/screening/AssignDrawer';
+import { DeleteDataPanel } from '@/components/screening/DeleteDataPanel';
 import {
   EmptyState,
   FlagChips,
@@ -130,6 +131,7 @@ export default function PatientPage() {
   const canViewPatient = useCan('patients.view');
   const canAssign = useCan('screening.assign');
   const canViewResults = useCan('screening.view');
+  const canDelete = useCan('screening.delete');
   const [assigning, setAssigning] = useState(false);
 
   const patient = useQuery({
@@ -292,6 +294,8 @@ export default function PatientPage() {
           ) : null}
         </>
       )}
+
+      {canDelete ? <DeleteDataPanel patientId={p.id} patientName={name} /> : null}
 
       {canAssign ? <AssignDrawer patient={p} open={assigning} onClose={() => setAssigning(false)} /> : null}
     </div>

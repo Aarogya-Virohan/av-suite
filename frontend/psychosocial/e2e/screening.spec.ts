@@ -152,3 +152,53 @@ test('invalid link shows a calm error', async ({ page }) => {
   await shot(page, '13-invalid-link');
   expect(problems).toEqual([]);
 });
+
+test('admin deletes a patient\'s screening data on request', async ({ page, request }) => {
+  const c = await makeClinic(request);
+  // One completed PHQ-9 (through the public API) and one open GAD-7 link.
+  const token = (await assignVia(request, c.therapistToken, c.patientId, ['phq9'])).split('/').pop()!;
+  const screener = `${API}/screener/${token}`;
+  const state = await (await request.get(screener)).json();
+  expect((await request.post(`${screener}/consent`, { data: { text_version: state.data.consent.text_version } })).ok()).toBeTruthy();
+  for (let n = 1; n <= 9; n++) {
+    const res = await request.post(`${screener}/answers`, { data: { instrument_id: 'phq9', item_id: `phq9_${n}`, value: 0 } });
+    expect(res.ok()).toBeTruthy();
+  }
+  expect((await request.post(`${screener}/submit`, { data: { instrument_id: 'phq9' } })).ok()).toBeTruthy();
+  const openToken = (await assignVia(request, c.therapistToken, c.patientId, ['gad7'])).split('/').pop()!;
+  const problems = watch(page);
+
+  await signIn(page, c.adminEmail, c.password);
+  if (page.viewportSize()!.width < 600) await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('link', { name: 'Patients' }).first().click();
+  await page.getByRole('link', { name: new RegExp(`Ritu ${c.patientLast}`) }).click();
+  await expect(page.getByText('2 questionnaires, 2 links, 0 referral notes and 1 consent record')).toBeVisible();
+  await shot(page, '14-delete-panel');
+
+  await page.getByRole('button', { name: 'Delete screening data' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Delete screening data' });
+  await expect(drawer.getByText('This cannot be undone.')).toBeVisible();
+  const confirm = drawer.getByRole('button', { name: 'Delete for good' });
+  await expect(confirm).toBeDisabled();
+  await drawer.getByLabel('Type DELETE to confirm').fill('delete');
+  await expect(confirm).toBeDisabled();
+  await drawer.getByLabel('Type DELETE to confirm').fill('DELETE');
+  await expect(confirm).toBeEnabled();
+  await shot(page, '15-delete-confirm');
+  await confirm.click();
+
+  await expect(page.getByText(`Screening data for Ritu ${c.patientLast} has been deleted.`)).toBeVisible();
+  await expect(page.getByText('There is no screening data to delete for this patient.')).toBeVisible();
+  await shot(page, '16-deleted');
+
+  // Really gone: both links are dead and the counts are zero.
+  expect((await request.get(`${API}/screener/${token}`)).status()).toBe(404);
+  expect((await request.get(`${API}/screener/${openToken}`)).status()).toBe(404);
+  const after = await (
+    await request.get(`${API}/patients/${c.patientId}/psychosocial/data`, {
+      headers: { Authorization: `Bearer ${c.adminToken}` },
+    })
+  ).json();
+  expect(after.data).toMatchObject({ links: 0, screeners: 0, referral_actions: 0, consent_records: 0 });
+  expect(problems).toEqual([]);
+});

@@ -190,3 +190,13 @@ export interface SubmitResult {
   show_referral_message: boolean;
   show_support_contacts: boolean;
 }
+
+// Deletion on request (SRS 3.2). Counts only, never results.
+export interface ScreeningData {
+  patient_id: string;
+  links: number;
+  screeners: number;
+  referral_actions: number;
+  consent_records: number;
+  withdrawal_on_file: boolean;
+}
