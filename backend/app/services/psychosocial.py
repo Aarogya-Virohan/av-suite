@@ -474,7 +474,9 @@ async def log_referral_action(
     session: PsychosocialSession,
     action: str,
     note: str | None,
+    contact=None,
 ) -> PsychosocialReferralAction:
+    """``contact`` is an active PsychosocialReferralContact of this clinic, or None."""
     if session.status != "completed" or not session.referral_flag:
         raise error(
             status.HTTP_409_CONFLICT,
@@ -490,6 +492,9 @@ async def log_referral_action(
         note=(note or "").strip() or None,
         recorded_by=user_id,
         recorded_at=utcnow(),
+        contact_id=contact.id if contact is not None else None,
+        contact_name=contact.name if contact is not None else None,
+        contact_role=contact.role if contact is not None else None,
     )
     db.add(record)
     await db.commit()
@@ -500,7 +505,10 @@ async def log_referral_action(
         action="psychosocial.referral_logged",
         entity_type="psychosocial_session",
         entity_id=session.id,
-        details={"patient_id": str(session.patient_id)},
+        details={
+            "patient_id": str(session.patient_id),
+            "contact_id": str(contact.id) if contact is not None else None,
+        },
     )
     return record
 

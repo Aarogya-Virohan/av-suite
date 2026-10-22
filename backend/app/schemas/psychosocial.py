@@ -6,9 +6,16 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from app.models.psychosocial import REFERRAL_ACTIONS
+from app.models.psychosocial import (
+    CONTACT_EMAIL_MAX,
+    CONTACT_NAME_MAX,
+    CONTACT_NOTE_MAX,
+    CONTACT_PHONE_MAX,
+    CONTACT_ROLE_MAX,
+    REFERRAL_ACTIONS,
+)
 
 InstrumentId = Literal["phq9", "gad7", "dass21"]
 ReferralAction = Literal[REFERRAL_ACTIONS]  # type: ignore[valid-type]
@@ -137,6 +144,9 @@ class ReferralActionOut(BaseModel):
     note: str | None
     recorded_by_name: str | None
     recorded_at: datetime
+    # Copied when the action was logged (S-D-029). None = no contact named.
+    contact_name: str | None = None
+    contact_role: str | None = None
 
 
 class BaselineOut(BaseModel):
@@ -161,6 +171,8 @@ class ReferralActionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     action: ReferralAction
     note: str | None = Field(default=None, max_length=1000)
+    # Optional contact from the clinic directory (SRS 4.3.1).
+    contact_id: uuid.UUID | None = None
 
 
 class TrendBandOut(BaseModel):
@@ -382,3 +394,68 @@ class AggregatesOut(BaseModel):
     date_to: date
     min_cell: int
     instruments: list[InstrumentAggregateOut]
+
+
+# --- referral contact directory (SRS 4.3.1) ---------------------------------
+def _blank_to_none(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+class ReferralContactIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(max_length=CONTACT_NAME_MAX)
+    role: str = Field(max_length=CONTACT_ROLE_MAX)
+    # Digits with optional +, spaces and hyphens, 6 to 20 digits.
+    phone: str | None = Field(default=None, max_length=CONTACT_PHONE_MAX)
+    email: EmailStr | None = Field(default=None, max_length=CONTACT_EMAIL_MAX)
+    note: str | None = Field(default=None, max_length=CONTACT_NOTE_MAX)
+
+    @field_validator("name", "role")
+    @classmethod
+    def _required_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be empty")
+        return value
+
+    @field_validator("phone", "note", mode="before")
+    @classmethod
+    def _optional_text(cls, value):
+        return _blank_to_none(value) if isinstance(value, str) or value is None else value
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def _optional_email(cls, value):
+        return _blank_to_none(value) if isinstance(value, str) or value is None else value
+
+    @field_validator("phone")
+    @classmethod
+    def _phone_shape(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        digits = [c for c in value if c.isdigit()]
+        allowed = set("0123456789+- ")
+        if any(c not in allowed for c in value) or "+" in value[1:] or not 6 <= len(digits) <= 20:
+            raise ValueError("enter a phone number with 6 to 20 digits")
+        return value
+
+    @model_validator(mode="after")
+    def _reachable(self):
+        if self.phone is None and self.email is None:
+            raise ValueError("add a phone number or an email address")
+        return self
+
+
+class ReferralContactOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    role: str
+    phone: str | None
+    email: str | None
+    note: str | None
+    archived: bool
+    updated_at: datetime
+    updated_by_name: str | None

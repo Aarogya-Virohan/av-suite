@@ -160,6 +160,46 @@ class PsychosocialConsent(Base):
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+# Referral contact directory (SRS 4.3.1). Kept identical to migration e7a1c4b9d2f6.
+CONTACT_NAME_MAX = 120
+CONTACT_ROLE_MAX = 80
+CONTACT_PHONE_MAX = 32
+CONTACT_EMAIL_MAX = 254
+CONTACT_NOTE_MAX = 500
+
+
+class PsychosocialReferralContact(Base, TimestampMixin):
+    """A person or service the clinic refers patients to (SRS 4.3.1, S-D-029).
+
+    Clinic-level data, no patient information. Never deleted: archiving hides
+    it from the picker while referral actions that named it keep their copy of
+    the name and role. At least one of phone or email is required.
+    """
+
+    __tablename__ = "psychosocial_referral_contacts"
+    __table_args__ = (
+        CheckConstraint("phone IS NOT NULL OR email IS NOT NULL", name="ck_psy_contact_reachable"),
+        Index("ix_psy_contacts_clinic", "clinic_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(CONTACT_NAME_MAX), nullable=False)
+    role: Mapped[str] = mapped_column(String(CONTACT_ROLE_MAX), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(CONTACT_PHONE_MAX), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(CONTACT_EMAIL_MAX), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(CONTACT_NOTE_MAX), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
 class PsychosocialReferralAction(Base):
     """Append-only log of what the physio did about a referral flag."""
 
@@ -188,6 +228,16 @@ class PsychosocialReferralAction(Base):
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Referral contact chosen from the clinic directory (SRS 4.3.1, S-D-029).
+    # Name and role are copied at the time, so the log still says who it was
+    # after the contact is edited or archived.
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("psychosocial_referral_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    contact_name: Mapped[str | None] = mapped_column(String(CONTACT_NAME_MAX), nullable=True)
+    contact_role: Mapped[str | None] = mapped_column(String(CONTACT_ROLE_MAX), nullable=True)
 
 
 class PsychosocialSchedule(Base, TimestampMixin):

@@ -30,6 +30,8 @@ from app.schemas.psychosocial import (
     PatientTrendOut,
     ReferralActionOut,
     ReferralActionRequest,
+    ReferralContactIn,
+    ReferralContactOut,
     ReissueLinkRequest,
     ResponseOut,
     ScaleOut,
@@ -51,6 +53,7 @@ from app.services import psychosocial_report as report
 from app.services import psychosocial_schedule as schedules
 from app.services import psychosocial_settings as clinic_config
 from app.services import psychosocial_aggregates as stats
+from app.services import psychosocial_contacts as contacts
 from app.screening.aggregates import MIN_CELL
 
 router = APIRouter()
@@ -313,6 +316,8 @@ def _referral_out(record, names) -> ReferralActionOut:
         note=record.note,
         recorded_by_name=names.get(record.recorded_by) if record.recorded_by else None,
         recorded_at=record.recorded_at,
+        contact_name=record.contact_name,
+        contact_role=record.contact_role,
     )
 
 
@@ -402,6 +407,11 @@ async def log_referral(
     session = await svc.get_session_for_staff(
         db, clinic_id=ctx.clinic.id, session_id=session_id, scope=scope, user_id=ctx.user.id
     )
+    contact = (
+        await contacts.active_contact_for_referral(db, ctx.clinic.id, payload.contact_id)
+        if payload.contact_id
+        else None
+    )
     record = await svc.log_referral_action(
         db,
         clinic_id=ctx.clinic.id,
@@ -409,6 +419,7 @@ async def log_referral(
         session=session,
         action=payload.action,
         note=payload.note,
+        contact=contact,
     )
     names = await svc.user_names(db, {ctx.user.id})
     return ResponseEnvelope(data=_referral_out(record, names))
@@ -738,3 +749,98 @@ async def clinic_statistics_csv(
             "Cache-Control": "no-store",
         },
     )
+
+
+# --- referral contact directory (SRS 4.3.1, S-D-029) -------------------------
+async def _contacts_out(db, rows) -> list[ReferralContactOut]:
+    names = await svc.user_names(db, {r.updated_by for r in rows if r.updated_by})
+    return [
+        ReferralContactOut(
+            id=r.id,
+            name=r.name,
+            role=r.role,
+            phone=r.phone,
+            email=r.email,
+            note=r.note,
+            archived=r.archived_at is not None,
+            updated_at=r.updated_at,
+            updated_by_name=names.get(r.updated_by) if r.updated_by else None,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/psychosocial/referral-contacts", response_model=ResponseEnvelope[list[ReferralContactOut]])
+async def referral_contacts_for_picker(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.refer")),
+):
+    """Active contacts, for the physio logging a referral action."""
+    rows = await contacts.list_contacts(db, ctx.clinic.id, include_archived=False)
+    return ResponseEnvelope(data=await _contacts_out(db, rows))
+
+
+@router.get(
+    "/psychosocial/settings/referral-contacts",
+    response_model=ResponseEnvelope[list[ReferralContactOut]],
+)
+async def referral_contacts_for_admin(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.configure")),
+):
+    """Every contact, archived ones last."""
+    rows = await contacts.list_contacts(db, ctx.clinic.id, include_archived=True)
+    return ResponseEnvelope(data=await _contacts_out(db, rows))
+
+
+@router.post(
+    "/psychosocial/settings/referral-contacts",
+    response_model=ResponseEnvelope[ReferralContactOut],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_referral_contact(
+    payload: ReferralContactIn,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.configure")),
+):
+    row = await contacts.create_contact(
+        db, clinic_id=ctx.clinic.id, user_id=ctx.user.id, values=payload.model_dump()
+    )
+    return ResponseEnvelope(data=(await _contacts_out(db, [row]))[0])
+
+
+@router.put(
+    "/psychosocial/settings/referral-contacts/{contact_id}",
+    response_model=ResponseEnvelope[ReferralContactOut],
+)
+async def update_referral_contact(
+    contact_id: uuid.UUID,
+    payload: ReferralContactIn,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.configure")),
+):
+    row = await contacts.update_contact(
+        db, clinic_id=ctx.clinic.id, user_id=ctx.user.id, contact_id=contact_id, values=payload.model_dump()
+    )
+    return ResponseEnvelope(data=(await _contacts_out(db, [row]))[0])
+
+
+@router.post(
+    "/psychosocial/settings/referral-contacts/{contact_id}/{change}",
+    response_model=ResponseEnvelope[ReferralContactOut],
+)
+async def archive_referral_contact(
+    contact_id: uuid.UUID,
+    change: Literal["archive", "restore"],
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.configure")),
+):
+    row = await contacts.set_archived(
+        db, clinic_id=ctx.clinic.id, user_id=ctx.user.id, contact_id=contact_id, archived=change == "archive"
+    )
+    return ResponseEnvelope(data=(await _contacts_out(db, [row]))[0])

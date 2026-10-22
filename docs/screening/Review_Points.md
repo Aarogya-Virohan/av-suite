@@ -2,7 +2,7 @@
 
 One place to see what was decided and what must be looked at again, and when. Details stay in Decisions.md (S-D), Known_Limitations.md (S-L) and Pending.md (P). This file links to them and does not repeat them. Update it in the same commit as any new decision or limitation.
 
-Last updated: 22 Oct 2026 (S-D-028).
+Last updated: 22 Oct 2026 (S-D-029).
 
 ## 1. Decision index
 
@@ -38,6 +38,7 @@ Status: **Onkar** = decided by Onkar. **Founders** = built as a safe default, wa
 | S-D-026 | Repeat schedules with a Due list, no scheduler | Onkar (no scheduler), rest Sign-off |
 | S-D-027 | Default repeat per screener; thresholds read-only | Onkar (scope), rest Sign-off |
 | S-D-028 | Anonymised statistics with a minimum cell of 5 | Onkar (minimum 5), rest Sign-off |
+| S-D-029 | Referral contact directory; contacts archived, never deleted; name and role copied onto each referral | Sign-off |
 
 ## 2. Before merge and deploy
 
@@ -46,7 +47,7 @@ Nothing here is optional for the first deploy. Work through it in order.
 | # | Point | Source | Owner |
 |---|---|---|---|
 | 1 | Set `SCREENER_CLIENT_IP_HEADER=X-Real-IP` on Railway | P-04, S-D-018 | Onkar |
-| 2 | Run `alembic upgrade head` on the target database. It must end at `d5f9b3c7e2a4` (three Tool 03 migrations). Nothing in the repo runs migrations on deploy, so confirm how the CRM Project applies them. | PR #33 | Onkar |
+| 2 | Before migrating, check the target database: `alembic current` must show a revision from `dev`, and `\dt` and `\dT` must match it. A stale revision stamp on an empty database made a local upgrade fail on 22 Oct. Then run `alembic upgrade head`; it must end at `e7a1c4b9d2f6` (four Tool 03 migrations). Nothing in the repo runs migrations on deploy, so confirm how the CRM Project applies them. | PR #33 | Onkar |
 | 3 | Create the Vercel project for `frontend/psychosocial` and add its origin to `CORS_ORIGINS` | P-01, P-11 | Onkar |
 | 4 | Re-check the merge with the latest `dev`: no conflicts, a single Alembic head, the same 10 pre-existing failures | PR #33 | Us |
 | 5 | Install `psycho-social-screening` for the pilot clinic only | S-D-012 | Onkar |

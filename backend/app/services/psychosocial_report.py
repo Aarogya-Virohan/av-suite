@@ -101,6 +101,7 @@ class ReferralRow:
     action: str
     note: str | None
     by: str
+    contact: str | None = None
 
 
 @dataclass
@@ -205,6 +206,7 @@ async def build_report_data(
                 action=REFERRAL_LABELS.get(a.action, a.action),
                 note=a.note,
                 by=names.get(a.recorded_by, "Former staff member") if a.recorded_by else "Former staff member",
+                contact=f"{a.contact_name} ({a.contact_role})" if a.contact_name else None,
             )
         )
 
@@ -358,9 +360,10 @@ def _referrals_table(rows: list[ReferralRow]) -> str:
     for r in rows:
         about = f"{_esc(r.screener)} of {_esc(display_date(r.screener_date))}" if r.screener else ""
         note = f'<br/><span class="note">{_esc(r.note)}</span>' if r.note else ""
+        contact = f"<br/>To: {_esc(r.contact)}" if r.contact else ""
         body.append(
             f"<tr><td>{_esc(display_date(r.recorded_at))}</td><td>{about}</td>"
-            f"<td><strong>{_esc(r.action)}</strong>{note}</td><td>{_esc(r.by)}</td></tr>"
+            f"<td><strong>{_esc(r.action)}</strong>{contact}{note}</td><td>{_esc(r.by)}</td></tr>"
         )
     return (
         '<table class="grid"><thead><tr><th style="width:17%">Recorded</th>'
