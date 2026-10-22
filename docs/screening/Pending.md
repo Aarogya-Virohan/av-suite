@@ -13,4 +13,4 @@
 | P-09 | Pre-existing on `dev`, not Tool 03: 10 backend tests fail on a clean Postgres run (appointments, bucket, patients, permissions, treatments), and `alembic check` reports enum drift on `clinics.type` and `memberships.role` | CRM Project | Found 20 Oct, reported only | No |
 | P-10 | Pre-existing on `dev`: shared `get_client_ip()` used by public booking trusts `CF-Connecting-IP` and the leftmost `X-Forwarded-For` from any caller | CRM Project | Found 20 Oct, reported only | No |
 | P-11 | Local run of the new app: add `http://localhost:3005` to `CORS_ORIGINS` in backend `.env` | Onkar | Open | No |
-| P-12 | v1.1 list: trend chart, PDF report, recurring schedule, admin settings, aggregates and CSV, patient own-history view, CRM patient tab, Exercise Library context, deletion-on-request | Us | Not started | No |
+| P-12 | v1.1 list: trend chart, PDF report, recurring schedule, admin settings, aggregates and CSV, patient own-history view, referral contact directory (SRS 4.3.1), CRM patient tab, Exercise Library context, deletion-on-request | Us | Not started | No |

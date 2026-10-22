@@ -1,0 +1,123 @@
+# Tool 03 Psycho-Social Screening: DoD Checklist
+
+SRS section 7, deliverable 04: a self-completed checklist for every functional requirement in SRS section 4.
+
+Branch `feat/tool03-psychosocial`, v1.0 core (draft PR #33).
+
+## How to read this
+
+Status:
+- **Done**: built and covered by the evidence listed.
+- **Partial**: part of the requirement is built. The gap is named.
+- **Not built**: planned for v1.1 (Known_Limitations S-L-009, Pending P-12).
+
+Evidence:
+- **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
+- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link.
+- **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
+- **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
+
+Last full run, 22 Oct 2026, on this branch: screening backend tests 184 pass, Playwright 6 of 6 pass, `npm test` 4 of 4 pass, tsc, eslint and `next build` clean.
+
+## Summary
+
+| Status | Requirements |
+|---|---|
+| Done | 17 |
+| Partial | 2 |
+| Not built | 11 |
+| Total | 30 |
+
+Items marked "pending founder sign-off" work today with a safe default and may change after the founders answer (Decisions.md).
+
+## 4.1 Physiotherapist
+
+### 4.1.1 Screening Management
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Assign one or more screeners (PHQ-9, GAD-7, DASS-21) to a patient from the patient's profile | Done | API test `test_full_flow_phq9_then_gad7` (PHQ-9 and GAD-7 on one link), `test_validation_of_assign_payload`. E2E 1: "Send screener" on the patient page, two screeners on one link. |
+| 2 | One-time or recurring assessment at a defined interval | Partial | One-time only. Recurring needs a scheduler decision first (P-12). |
+| 3 | View all pending, in-progress and completed sessions per patient | Done | API test `test_full_flow_phq9_then_gad7` (patient list with status per session). UI, not in E2E: patient page history. Clinic-wide worklist with status filter in E2E 1. |
+| 4 | Cancel a pending session the patient has not started | Done | API test `test_cancel_only_before_start` (refused once an answer exists). UI, not in E2E: "Cancel screener" on the patient page. |
+
+### 4.1.2 Results Review
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Completed session shows total score, severity band, every answer and date of completion | Done | API test `test_full_flow_phq9_then_gad7` (score, band, answer labels, unscored difficulty item). E2E 1: score 7, band and the item 9 answer on the result page. The completion date is in the page header. The test does not assert it. |
+| 2 | Severity indicator that does not rely on colour alone | Done | E2E 1 finds the severity meter by its text label "Mild, band 2 of 5". |
+| 3 | Longitudinal chart of scores across sessions, per instrument | Not built | v1.1. SRS 3.5 asks for 24 months of history. |
+| 4 | Compare the current result against the patient's baseline | Done | API test `test_second_session_shows_baseline` (baseline 27, current 8). UI, not in E2E: baseline column on the result page. |
+
+### 4.1.3 Referral Management
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Automatic referral at PHQ-9 >= 10, GAD-7 >= 10, any DASS-21 subscale Severe or above | Done | Report: every possible score on all three instruments. API tests `test_full_flow_phq9_then_gad7`, `test_dass21_severe_subscale_refers`. Extra rule: PHQ-9 item 9 above 0 also refers (S-D-005, pending founder sign-off F1). |
+| 2 | Document the referral action taken | Done | API test `test_full_flow_phq9_then_gad7` (action saved, refused on an unflagged session). E2E 1: "Referred to psychologist" with a note. |
+| 3 | History of all referral flags and documented actions for a patient | Done | API test `test_full_flow_phq9_then_gad7` (referral action history). UI, not in E2E: flags on each session and a "Referral history" list on the patient page. |
+
+### 4.1.4 Reporting
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Single-patient summary report as PDF: sessions, scores, bands, referral actions | Not built | v1.1. Must be authenticated and clinic-scoped, never a public file. |
+| 2 | Report suitable for the patient's clinical record | Not built | v1.1, with item 1. |
+
+## 4.2 Patient
+
+### 4.2.1 Informed Consent
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Plain-language explanation before the first screener: what is collected, how it is used, who sees it | Done | E2E 1: "Before you start" screen. Text in `backend/app/screening/consent.py`, draft `2026-10-20.draft1`, pending founder sign-off F6. |
+| 2 | Active consent required, no screening without it | Done | API test `test_full_flow_phq9_then_gad7` (answer before consent gets `CONSENT_REQUIRED`). E2E 1: "Continue" stays disabled until the box is ticked. |
+| 3 | Withdraw consent at any time, which stops future sessions | Done | API test `test_withdraw_consent_cancels_open_and_blocks_new`. UI, not in E2E: withdraw option on the screener page. There is no way back after a withdrawal yet (S-L-006, founder question). |
+
+### 4.2.2 Questionnaire Completion
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Access through a direct link or the patient portal | Partial | Direct link only. AV Suite has no patient portal today. |
+| 2 | Response options as in the published instrument | Done | Wording is verbatim (S-D-004). Scoring test `test_published_response_options`. E2E 1 answers by the published option labels. |
+| 3 | Progress saved after each question, resume an unfinished session | Done | API test `test_full_flow_phq9_then_gad7` (saved answers come back on reopen). E2E 1 reloads the page at question 5 and resumes there. |
+| 4 | A response cannot change after moving past it | Done | API test `test_full_flow_phq9_then_gad7` (`ANSWER_LOCKED`, strict order). The screener has no back button. A Postgres trigger also blocks changes to a submitted session (`test_completed_session_rejects_db_update`). |
+| 5 | Confirmation on submit, and a calm message to talk to the physio when referral is flagged | Done | E2E 1: "Thank you", the "may help to talk things through" message, and no score shown. On a risk answer it also shows Tele-MANAS (pending founder sign-off F2). |
+
+### 4.2.3 History Access
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Patient sees own score history if the physio enables it | Not built | v1.1. |
+| 2 | Simplified labels (Low, Moderate, High), no clinical wording in the patient view | Not built | v1.1, with item 1. Today the patient never sees a score or a band. |
+
+## 4.3 Clinic Administrator
+
+### 4.3.1 Access Control
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Turn the module on or off for each physio | Done | E2E 2: admin turns off "Send screeners" on the Access page, then the physio's assign call gets 403. API tests `test_therapist_without_grant_is_refused`, `test_product_entitlement_required`. The CRM permission grid does not list the new keys yet (P-08). |
+| 2 | Manage referral contacts (name, role, contact details) used when logging referral actions | Not built | v1.1. Referral actions today use a fixed list of action types plus a free-text note. |
+
+### 4.3.2 Configuration
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Clinic-wide default screening interval per instrument | Not built | v1.1, depends on recurring screening (4.1.1 item 2). |
+| 2 | Configure referral thresholds, defaults equal to published norms, changes need confirmation | Not built | v1.1. The fixed thresholds match the published norms (Report). |
+
+### 4.3.3 Aggregate Reporting
+
+| # | Requirement | Status | Evidence and notes |
+|---|---|---|---|
+| 1 | Anonymised clinic statistics: sessions completed, band distribution, referral flag rate | Not built | v1.1. Admins cannot see individual results today (`test_admin_assigns_but_cannot_read_individual_results`, E2E 2). |
+| 2 | Filter by date range and instrument | Not built | v1.1, with item 1. |
+| 3 | Export aggregates as CSV | Not built | v1.1, with item 1. |
+
+## Before go-live, outside section 4
+
+- Deletion on request (SRS 3.2). The consent text already promises it (S-L-005).
+- Founder answers F1 to F6, re-consent and staff accounts for screening-only clinics (P-03).
+- `AV_Suite_Clinical_Reference_v1.xlsx` comparison (P-05).
