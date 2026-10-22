@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.core.dependencies import AuthenticatedContextDep, SessionDep, require_capability
 from app.enums.permission import CapabilityScope
@@ -20,6 +20,7 @@ from app.schemas.psychosocial import (
     DeleteScreeningDataRequest,
     InstrumentSummaryOut,
     PatientSummaryOut,
+    PatientTrendOut,
     ReferralActionOut,
     ReferralActionRequest,
     ReissueLinkRequest,
@@ -28,10 +29,15 @@ from app.schemas.psychosocial import (
     ScreeningDataOut,
     SessionDetailOut,
     SessionSummaryOut,
+    TrendBandOut,
+    TrendPointOut,
+    TrendSeriesOut,
     WorklistRowOut,
 )
 from app.screening.registry import get_instrument, list_instruments
+from app.screening.trend import build_series
 from app.services import psychosocial as svc
+from app.services import psychosocial_report as report
 
 router = APIRouter()
 
@@ -437,3 +443,69 @@ async def delete_screening_data(
         db, clinic_id=ctx.clinic.id, user_id=ctx.user.id, patient_id=patient_id
     )
     return ResponseEnvelope(data=ScreeningDataOut(**deleted))
+
+
+# --- trend and PDF summary (SRS 4.1.2, 4.1.4, S-D-025) ----------------------
+@router.get(
+    "/patients/{patient_id}/psychosocial/trend",
+    response_model=ResponseEnvelope[PatientTrendOut],
+)
+async def patient_trend(
+    patient_id: uuid.UUID,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    scope: CapabilityScope = Depends(require_capability("screening.view")),
+):
+    sessions = await svc.completed_sessions(
+        db, clinic_id=ctx.clinic.id, patient_id=patient_id, scope=scope, user_id=ctx.user.id
+    )
+    series = build_series(sessions)
+    return ResponseEnvelope(
+        data=PatientTrendOut(
+            patient_id=patient_id,
+            series=[
+                TrendSeriesOut(
+                    instrument_id=s.instrument_id,
+                    short_name=s.short_name,
+                    scale_id=s.scale_id,
+                    label=s.label,
+                    max_score=s.max_score,
+                    referral_from=s.referral_from,
+                    bands=[TrendBandOut(**vars(b)) for b in s.bands],
+                    points=[TrendPointOut(**vars(p)) for p in s.points],
+                )
+                for s in series
+            ],
+        )
+    )
+
+
+@router.get("/patients/{patient_id}/psychosocial/report.pdf")
+async def patient_report_pdf(
+    patient_id: uuid.UUID,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    scope: CapabilityScope = Depends(require_capability("screening.view")),
+):
+    """Screening summary PDF, rendered on request and never stored."""
+    data = await report.build_report_data(
+        db, clinic_id=ctx.clinic.id, patient_id=patient_id, scope=scope, user_id=ctx.user.id
+    )
+    pdf = await report.render_pdf(data)
+    await svc.audit(
+        db,
+        clinic_id=ctx.clinic.id,
+        user_id=ctx.user.id,
+        action="psychosocial.report_generated",
+        entity_type="patient",
+        entity_id=patient_id,
+        details={"patient_id": str(patient_id), "sessions": len(data.sessions)},
+    )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{report.report_filename(data.patient_name, data.generated_at)}"',
+            "Cache-Control": "no-store",
+        },
+    )

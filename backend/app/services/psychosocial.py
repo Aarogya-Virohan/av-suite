@@ -508,6 +508,35 @@ async def patient_summary(
     return list(latest.values())
 
 
+async def completed_sessions(
+    db: AsyncSession,
+    *,
+    clinic_id: uuid.UUID,
+    patient_id: uuid.UUID,
+    scope: CapabilityScope,
+    user_id: uuid.UUID,
+) -> list[PsychosocialSession]:
+    """Every completed session the caller may see, oldest first (trend, report)."""
+    await get_patient(db, clinic_id, patient_id)
+    conditions = [
+        PsychosocialSession.clinic_id == clinic_id,
+        PsychosocialSession.patient_id == patient_id,
+        PsychosocialSession.status == "completed",
+    ]
+    scoped = scope_filter(scope, user_id)
+    if scoped is not None:
+        conditions.append(scoped)
+    return list(
+        (
+            await db.scalars(
+                select(PsychosocialSession)
+                .where(*conditions)
+                .order_by(PsychosocialSession.completed_at)
+            )
+        ).all()
+    )
+
+
 # ---------------------------------------------------------------------------
 # deletion on request (SRS 3.2, S-D-024)
 # ---------------------------------------------------------------------------

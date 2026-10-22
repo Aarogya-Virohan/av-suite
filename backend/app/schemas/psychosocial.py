@@ -159,6 +159,38 @@ class ReferralActionRequest(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
+class TrendBandOut(BaseModel):
+    min_score: int
+    max_score: int
+    label: str
+    level: int
+
+
+class TrendPointOut(BaseModel):
+    session_id: uuid.UUID
+    completed_at: datetime
+    score: int
+    band_label: str
+    band_level: int
+    referral: bool
+
+
+class TrendSeriesOut(BaseModel):
+    instrument_id: str
+    short_name: str
+    scale_id: str
+    label: str
+    max_score: int
+    referral_from: int | None
+    bands: list[TrendBandOut]
+    points: list[TrendPointOut]
+
+
+class PatientTrendOut(BaseModel):
+    patient_id: uuid.UUID
+    series: list[TrendSeriesOut]
+
+
 class ScreeningDataOut(BaseModel):
     """Counts only. Never scores, bands or flags: admins use this (SRS 3.2)."""
 
