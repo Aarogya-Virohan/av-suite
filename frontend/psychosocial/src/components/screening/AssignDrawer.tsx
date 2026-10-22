@@ -6,9 +6,9 @@ import { Check, Copy, Loader2, MessageCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
-import { REPEAT_OPTIONS } from '@/lib/schedule';
+import { clinicDefaultRepeat, repeatOptionsWith } from '@/lib/schedule';
 import { PATIENT_TITLES, STAFF_INSTRUMENTS } from '@/lib/severity';
-import type { AssignmentCreated, InstrumentId, InstrumentSummary, Patient } from '@/lib/types';
+import type { AssignmentCreated, InstrumentId, InstrumentSummary, Patient, Schedule } from '@/lib/types';
 import { screenerMessage, whatsappLink } from '@/lib/whatsapp';
 import { Button, FieldLabel, inputClass } from '@/components/ui/brand';
 import { SlideOver } from '@/components/ui/SlideOver';
@@ -152,8 +152,9 @@ function AssignForm({
   const qc = useQueryClient();
   const [selected, setSelected] = useState<InstrumentId[]>(initialSelected);
   const [days, setDays] = useState(7);
-  // '' = just once. A select needs string values.
-  const [repeat, setRepeat] = useState('');
+  // null = not touched, so the clinic default applies. '' = just once.
+  // A select needs string values.
+  const [repeatChoice, setRepeatChoice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const instruments = useQuery({
@@ -161,6 +162,19 @@ function AssignForm({
     queryFn: () => api.get<InstrumentSummary[]>('/psychosocial/instruments'),
     staleTime: Infinity,
   });
+
+  // Same query as the Repeat schedule card, so this is usually cached.
+  const schedules = useQuery({
+    queryKey: ['schedules', patient.id],
+    queryFn: () => api.get<Schedule[]>(`/patients/${patient.id}/psychosocial/schedules`),
+  });
+  const running = Object.fromEntries((schedules.data ?? []).map((s) => [s.instrument_id, s.interval_days]));
+  // Until we know which screeners already repeat, prefill nothing (safe side).
+  const clinicDefault = schedules.isSuccess
+    ? clinicDefaultRepeat(selected, instruments.data ?? [], running)
+    : { weeks: null, mixed: false, hint: null };
+  const repeat = repeatChoice ?? (clinicDefault.weeks ? String(clinicDefault.weeks) : '');
+  const repeatOptions = repeatOptionsWith(repeat ? Number(repeat) : null);
 
   const assign = useMutation({
     mutationFn: () =>
@@ -258,13 +272,24 @@ function AssignForm({
 
       <div>
         <FieldLabel htmlFor="repeat">Repeat</FieldLabel>
-        <select id="repeat" className={inputClass} value={repeat} onChange={(e) => setRepeat(e.target.value)}>
-          {REPEAT_OPTIONS.map((o) => (
+        <select
+          id="repeat"
+          className={inputClass}
+          value={repeat}
+          onChange={(e) => setRepeatChoice(e.target.value)}
+          aria-describedby={clinicDefault.hint && repeatChoice === null ? 'repeat-default' : undefined}
+        >
+          {repeatOptions.map((o) => (
             <option key={o.label} value={o.weeks ?? ''}>
               {o.label}
             </option>
           ))}
         </select>
+        {clinicDefault.hint && repeatChoice === null ? (
+          <p id="repeat-default" className="mt-1.5 text-xs font-semibold text-ink-2">
+            {clinicDefault.hint}
+          </p>
+        ) : null}
         <p className="mt-1.5 text-xs text-muted">
           A repeat never sends anything by itself. When it is due again, the patient shows in the Due list and you
           send the link as usual.

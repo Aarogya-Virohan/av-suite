@@ -278,3 +278,74 @@ test('physio repeats a screener, sees it due again and sends it from the Due lis
   await expect(page.getByRole('heading', { name: 'Repeat schedule' })).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+test('admin sets a default repeat that prefills the send form and never overrides a running repeat', async ({ page, browser, request }) => {
+  const c = await makeClinic(request);
+  const problems = watch(page, [403]);
+
+  // --- admin: Settings page -------------------------------------------------
+  await signIn(page, c.adminEmail, c.password);
+  if (page.viewportSize()!.width < 600) await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByText('PHQ-9: referral from Moderate (10 or more, out of 27)')).toBeVisible();
+  await expect(page.getByText('DASS-21 Anxiety: referral from Severe (15 or more, out of 42)')).toBeVisible();
+  await expect(page.getByText(/Question 9:/)).toBeVisible();
+  await expect(page.getByText('Fixed', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save defaults' })).toBeDisabled();
+
+  await page.getByLabel('PHQ-9', { exact: true }).selectOption({ label: 'Every 4 weeks' });
+  await page.getByLabel('GAD-7', { exact: true }).selectOption({ label: 'Every 8 weeks' });
+  await page.getByRole('button', { name: 'Save defaults' }).click();
+  await expect(page.getByText('Default repeat saved.')).toBeVisible();
+  await expect(page.getByText('by Neha Kapoor')).toHaveCount(2);
+  await expect(page.getByLabel('PHQ-9', { exact: true })).toHaveValue('4');
+  await shot(page, '20-settings');
+  expect(problems.filter((x) => !x.includes('http 403'))).toEqual([]);
+
+  // --- physio: the send form starts at the clinic default -------------------
+  const ctx = await browser.newContext({ viewport: page.viewportSize()!, baseURL: test.info().project.use.baseURL });
+  const physio = await ctx.newPage();
+  const physioProblems = watch(physio);
+  await signIn(physio, c.therapistEmail, c.password);
+  await physio.goto(`/patients/${c.patientId}`);
+  await physio.getByRole('button', { name: 'Send screener' }).first().click();
+  const drawer = physio.getByRole('dialog', { name: 'Send a screener' });
+  const repeat = drawer.getByLabel('Repeat');
+  await expect(repeat).toHaveValue('');
+  await drawer.locator('label').filter({ hasText: 'PHQ-9' }).click();
+  await expect(repeat).toHaveValue('4');
+  await expect(drawer.getByText('Clinic default for PHQ-9: every 4 weeks.')).toBeVisible();
+  await drawer.locator('label').filter({ hasText: 'GAD-7' }).click();
+  await expect(repeat).toHaveValue('');
+  await expect(drawer.getByText(/Clinic defaults differ \(PHQ-9 every 4 weeks, GAD-7 every 8 weeks\)/)).toBeVisible();
+  await drawer.locator('label').filter({ hasText: 'GAD-7' }).click();
+  await expect(repeat).toHaveValue('4');
+  await shot(physio, '21-default-prefill');
+  await drawer.getByRole('button', { name: 'Create link' }).click();
+  await physio.getByRole('dialog', { name: 'Send the link' }).getByRole('button', { name: 'Close' }).click();
+  const schedule = physio.getByRole('listitem').filter({ hasText: 'every 4 weeks' });
+  await expect(schedule).toContainText('Link sent, waiting for the patient');
+
+  // The admin changes the default later. The running repeat must not follow it.
+  const put = await request.put(`${API}/psychosocial/settings/phq9`, {
+    headers: { Authorization: `Bearer ${c.adminToken}` },
+    data: { default_repeat_weeks: 2 },
+  });
+  expect(put.status()).toBe(200);
+
+  await physio.getByRole('button', { name: 'Cancel screener' }).click();
+  await expect(physio.getByRole('status').filter({ hasText: 'PHQ-9 is due again' })).toBeVisible();
+  await physio.reload();
+  await physio.getByRole('button', { name: 'Send due screeners' }).click();
+  const again = physio.getByRole('dialog', { name: 'Send a screener' });
+  await expect(again.getByText('Already repeating for this patient: PHQ-9 every 4 weeks.', { exact: false })).toBeVisible();
+  await expect(again.getByLabel('Repeat')).toHaveValue('');
+  await shot(physio, '22-running-repeat');
+  await again.getByRole('button', { name: 'Create link' }).click();
+  await physio.getByRole('dialog', { name: 'Send the link' }).getByRole('button', { name: 'Close' }).click();
+  await expect(schedule).toContainText('Link sent, waiting for the patient');
+  await expect(physio.getByRole('listitem').filter({ hasText: 'every 2 weeks' })).toHaveCount(0);
+  expect(physioProblems).toEqual([]);
+  await ctx.close();
+});

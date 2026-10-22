@@ -35,6 +35,8 @@ export interface InstrumentSummary {
   name: string;
   item_count: number;
   citation: string;
+  /** Clinic-wide default for the Repeat field (SRS 4.3.2). null = just once. */
+  default_repeat_weeks: number | null;
 }
 
 export interface Scale {
@@ -253,4 +255,46 @@ export interface Schedule {
 
 export interface DueItem extends Schedule {
   patient_name: string;
+}
+
+// --- clinic settings (SRS 4.3.2) ------------------------------------------
+export interface BandThreshold {
+  label: string;
+  min_score: number;
+  max_score: number | null;
+  refers: boolean;
+}
+
+export interface ScaleThreshold {
+  scale_id: string;
+  label: string;
+  max_score: number;
+  referral_band: string;
+  referral_min_score: number;
+  bands: BandThreshold[];
+}
+
+export interface RiskRule {
+  item_number: number;
+  min_value: number;
+  min_label: string;
+  description: string;
+}
+
+export interface InstrumentSetting {
+  instrument_id: InstrumentId;
+  instrument_version: string;
+  short_name: string;
+  name: string;
+  default_repeat_weeks: number | null;
+  updated_at: string | null;
+  updated_by_name: string | null;
+  source: string;
+  scales: ScaleThreshold[];
+  risk_rules: RiskRule[];
+}
+
+export interface ClinicSettings {
+  thresholds_editable: boolean;
+  instruments: InstrumentSetting[];
 }

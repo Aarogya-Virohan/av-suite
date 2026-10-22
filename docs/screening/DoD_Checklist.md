@@ -13,19 +13,19 @@ Status:
 
 Evidence:
 - **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
-- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list.
+- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat.
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 22 Oct 2026, on this branch: screening backend tests 212 pass, Playwright 12 of 12 pass, `npm test` 11 of 11 pass, tsc, eslint and `next build` clean.
+Last full run, 22 Oct 2026, on this branch: screening backend tests 228 pass, full backend suite 530 pass with the same 10 pre-existing failures (P-09), Playwright 14 of 14 pass, `npm test` 17 of 17 pass, tsc, eslint and `next build` clean.
 
 ## Summary
 
 | Status | Requirements |
 |---|---|
-| Done | 21 |
-| Partial | 1 |
-| Not built | 8 |
+| Done | 22 |
+| Partial | 2 |
+| Not built | 6 |
 | Total | 30 |
 
 Items marked "pending founder sign-off" work today with a safe default and may change after the founders answer (Decisions.md).
@@ -105,8 +105,8 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
-| 1 | Clinic-wide default screening interval per instrument | Not built | v1.1, depends on recurring screening (4.1.1 item 2). |
-| 2 | Configure referral thresholds, defaults equal to published norms, changes need confirmation | Not built | v1.1. The fixed thresholds match the published norms (Report). |
+| 1 | Clinic-wide default screening interval per instrument | Done | Settings page, S-D-027. `test_admin_sets_default_and_the_assign_form_gets_it`, `test_changing_the_default_leaves_existing_schedules_alone`, `test_only_holders_of_screening_configure_can_configure`. E2E 7: the admin saves defaults, the physio's send drawer starts at the default, and a running repeat is not changed. |
+| 2 | Configure referral thresholds, defaults equal to published norms, changes need confirmation | Partial | The Settings page shows the thresholds in force, built from the instrument definitions (`test_threshold_view_agrees_with_the_scoring_engine_at_every_score`, E2E 7). Clinic changes are not built and wait for a founder decision (S-L-015, P-13). |
 
 ### 4.3.3 Aggregate Reporting
 
