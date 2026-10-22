@@ -132,7 +132,26 @@ CAPABILITY_REGISTRY: Mapping[str, CapabilityDefinition] = MappingProxyType(
         # --- posture ------------------------------------------------------
         "posture.view": CapabilityDefinition("posture.view", _NOA),
         "posture.create": CapabilityDefinition("posture.create", _NA),
+        # --- psycho-social screening (Tool 03) -----------------------------
+        # OWN = sessions this user assigned. Individual results are clinical
+        # data: screening.view and screening.refer are NOT in the admin
+        # template (see ADMIN_TEMPLATE_EXCLUDED below, SRS 3.2, S-D-011).
+        # screening.delete erases a patient's screening data on request
+        # (SRS 3.2). It is in the admin template so one accountable role
+        # handles an action that cannot be undone (S-D-024).
+        "screening.assign": CapabilityDefinition("screening.assign", _NA),
+        "screening.view": CapabilityDefinition("screening.view", _NOA),
+        "screening.refer": CapabilityDefinition("screening.refer", _NOA),
+        "screening.delete": CapabilityDefinition("screening.delete", _NA),
     }
+)
+
+# Capabilities an admin does not get by default. SRS 3.2 for Tool 03:
+# administrators see anonymised aggregates only, never individual patient
+# responses. A clinic can still grant these to a user explicitly, and every
+# grant is written to the audit log by the permissions endpoint.
+ADMIN_TEMPLATE_EXCLUDED: frozenset[str] = frozenset(
+    {"screening.view", "screening.refer"}
 )
 
 
@@ -142,11 +161,15 @@ _NONE = CapabilityScope.NONE
 
 
 def _admin_template() -> Mapping[str, CapabilityScope]:
-    """Admin gets the widest scope every capability allows."""
+    """Admin gets the widest scope every capability allows, minus ADMIN_TEMPLATE_EXCLUDED."""
 
     return MappingProxyType(
         {
-            key: (_ALL if _ALL in definition.allowed_scopes else _OWN)
+            key: (
+                CapabilityScope.NONE
+                if key in ADMIN_TEMPLATE_EXCLUDED
+                else (_ALL if _ALL in definition.allowed_scopes else _OWN)
+            )
             for key, definition in CAPABILITY_REGISTRY.items()
         }
     )

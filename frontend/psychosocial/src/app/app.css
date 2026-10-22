@@ -1,0 +1,46 @@
+/*
+ * Additions for the Tool 03 app only. globals.css is a verbatim copy of the
+ * CRM theme (see S-D-019) and must stay untouched so the two can be diffed.
+ */
+
+@keyframes av-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes av-slide-in-right {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes av-rise {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* The CRM SlideOver uses these class names without defining them. */
+.animate-fade-in { animation: av-fade-in 160ms ease-out both; }
+.animate-slide-in-right { animation: av-slide-in-right 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.animate-rise { animation: av-rise 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-in-right,
+  .animate-rise {
+    animation: none;
+  }
+}
+
+/* Severity meter: filled segments carry meaning by count and fill pattern,
+   not only by colour. Empty segments are outlined. */
+.sev-seg {
+  height: 8px;
+  flex: 1 1 0;
+  border-radius: 999px;
+  border: 1.5px solid currentColor;
+  opacity: 0.35;
+}
+.sev-seg[data-on="true"] {
+  background: currentColor;
+  opacity: 1;
+}
