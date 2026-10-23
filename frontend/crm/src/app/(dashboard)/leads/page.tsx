@@ -47,6 +47,8 @@ function formatCreated(value: string) {
 const sourceLabel = (source: string | null | undefined) => (source ? source.replace(/_/g, ' ') : null);
 
 const isConverted = (lead: Lead) => lead.stage === 'converted' || !!lead.converted_patient_id;
+// A lost lead cannot be converted; move it back to an open stage first (founder feedback, X-1).
+const isLost = (lead: Lead) => lead.stage === 'lost';
 
 export default function LeadsPage() {
   usePermissionSubscription(); // see Decisions.md D-013
@@ -140,7 +142,7 @@ export default function LeadsPage() {
     <AppShell>
       <div className="space-y-6">
         <PageHeader
-          title="Leads Pipeline"
+          title="Patient Leads"
           subtitle="Track and convert prospective patients"
           actions={
             <>
@@ -254,7 +256,9 @@ export default function LeadsPage() {
                         </td>
                         <td className="px-5 py-3.5">{stageSelect(lead)}</td>
                         <td className="px-5 py-3.5 text-right">
-                          {!isConverted(lead) ? (
+                          {isLost(lead) ? (
+                            <span className="text-xs text-muted">Lost</span>
+                          ) : !isConverted(lead) ? (
                             canConvertLead ? (
                               convertButton(lead)
                             ) : (
@@ -298,7 +302,7 @@ export default function LeadsPage() {
                       </div>
                     ) : (
                       stageLeads.map((lead) => (
-                        <Card key={lead.id} className="space-y-3 p-4 transition-shadow hover:shadow-hero/20">
+                        <Card key={lead.id} className="space-y-3 p-4">
                           <div className="flex items-start gap-3">
                             <Avatar name={lead.name} size={32} />
                             <div className="min-w-0">
@@ -324,7 +328,7 @@ export default function LeadsPage() {
 
                           <div className="flex items-center justify-between gap-2 pt-0.5">
                             {stageSelect(lead, true)}
-                            {!isConverted(lead) && canConvertLead && convertButton(lead, true)}
+                            {!isConverted(lead) && !isLost(lead) && canConvertLead && convertButton(lead, true)}
                           </div>
                         </Card>
                       ))

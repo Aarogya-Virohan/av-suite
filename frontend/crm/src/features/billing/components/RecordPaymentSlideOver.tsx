@@ -89,6 +89,12 @@ export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOv
   }, [isOpen, reset]);
 
   const invoiceId = watch('invoice_id');
+  // Cash has no bank reference, so the field is hidden and cleared (C-18).
+  const paymentMethod = watch('payment_method');
+  const needsReference = paymentMethod !== 'cash';
+  React.useEffect(() => {
+    if (!needsReference) setValue('transaction_reference', '');
+  }, [needsReference, setValue]);
   const selected = payable.find((inv) => inv.id === invoiceId) ?? null;
   const balance = selected ? balanceOf(selected) : 0;
 
@@ -204,10 +210,12 @@ export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOv
             />
             {errors.payment_date && <p className={errorText}>{errors.payment_date.message}</p>}
           </div>
-          <div>
-            <FieldLabel htmlFor="pay-ref">Transaction Reference</FieldLabel>
-            <input id="pay-ref" {...register('transaction_reference')} type="text" placeholder="e.g. UPI ref no." className={inputClass} />
-          </div>
+          {needsReference && (
+            <div>
+              <FieldLabel htmlFor="pay-ref">Transaction Reference</FieldLabel>
+              <input id="pay-ref" {...register('transaction_reference')} type="text" placeholder="Bank / UPI ref no. (optional)" className={inputClass} />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-line pt-4">

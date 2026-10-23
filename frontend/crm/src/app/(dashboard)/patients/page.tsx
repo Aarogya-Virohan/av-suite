@@ -31,13 +31,14 @@ export default function PatientsPage() {
   usePermissionSubscription(); // see Decisions.md D-013
   const router = useRouter();
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const isAllowed = canAccessModule('patients');
   const [statusFilter, setStatusFilter] = useState<PatientStatus | 'all'>('all');
   const { data: response, isLoading } = usePatients(
     searchTerm,
     page,
-    10,
+    pageSize,
     isAllowed,
     statusFilter === 'all' ? undefined : statusFilter,
   );
@@ -140,6 +141,7 @@ export default function PatientsPage() {
           currentPage={meta?.page}
           pageSize={meta?.page_size}
           onPageChange={setPage}
+          onPageSizeChange={setPageSize}
         />
 
         <AddPatientSlideOver isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />

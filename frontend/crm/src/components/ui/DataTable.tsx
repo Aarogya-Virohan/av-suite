@@ -22,9 +22,12 @@ interface DataTableProps<T> {
   currentPage?: number;
   pageSize?: number;
   onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
   // Server-side search support
   onSearchChange?: (term: string) => void;
 }
+
+const PAGE_SIZES = [5, 10, 25, 50, 75] as const;
 
 export function DataTable<T extends { id: string }>({
   columns,
@@ -38,10 +41,12 @@ export function DataTable<T extends { id: string }>({
   currentPage: serverPage,
   pageSize: serverPageSize = 10,
   onPageChange,
+  onPageSizeChange,
   onSearchChange,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [clientPage, setClientPage] = useState(1);
+  const [clientPageSize, setClientPageSize] = useState(10);
 
   // Debounce logic for server-side search
   useEffect(() => {
@@ -55,7 +60,19 @@ export function DataTable<T extends { id: string }>({
   
   const isServerSide = totalItems !== undefined && onPageChange !== undefined;
   const currentPage = isServerSide ? (serverPage || 1) : clientPage;
-  const pageSize = isServerSide ? serverPageSize : 10;
+  const pageSize = isServerSide ? serverPageSize : clientPageSize;
+  // Rows per page (founder feedback C-27). Server-side tables show it only
+  // when the page passes onPageSizeChange.
+  const canChangePageSize = !isServerSide || !!onPageSizeChange;
+  const handlePageSizeChange = (size: number) => {
+    if (isServerSide) {
+      onPageSizeChange?.(size);
+      onPageChange?.(1);
+    } else {
+      setClientPageSize(size);
+      setClientPage(1);
+    }
+  };
 
   const handlePageChange = (newPage: number) => {
     if (isServerSide && onPageChange) {
@@ -139,9 +156,11 @@ export function DataTable<T extends { id: string }>({
                   <tr
                     key={item.id}
                     onClick={() => onRowClick && onRowClick(item)}
-                    className={`transition-colors hover:bg-canvas/70 dark:hover:bg-slate-800/50 ${
-                      onRowClick ? 'cursor-pointer' : ''
-                    }`}
+                    // Only rows that open something get a hover state, so read-only
+                    // tables do not look clickable (C-03).
+                    className={
+                      onRowClick ? 'cursor-pointer transition-colors hover:bg-canvas/70 dark:hover:bg-slate-800/50' : undefined
+                    }
                   >
                     {columns.map((col) => (
                       <td key={col.key} className="px-5 py-3.5 text-ink-2 dark:text-slate-200">
@@ -161,9 +180,27 @@ export function DataTable<T extends { id: string }>({
 
         {/* Pagination Footer */}
         <div className="flex items-center justify-between border-t border-line px-5 py-3 text-xs dark:border-slate-800 dark:bg-slate-950/50">
-          <span className="text-muted">
-            Page {currentPage} of {totalPages}
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-muted">
+              Page {currentPage} of {totalPages}
+            </span>
+            {canChangePageSize && (
+              <label className="flex items-center gap-1.5 text-muted">
+                <span>Rows per page</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="h-8 cursor-pointer rounded-lg border border-line bg-card px-2 text-xs font-semibold text-ink-2 transition-colors hover:border-slate-300 focus:border-grove focus:outline-none dark:border-slate-700 dark:bg-slate-800"
+                >
+                  {PAGE_SIZES.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => handlePageChange(Math.max(1, currentPage - 1))}

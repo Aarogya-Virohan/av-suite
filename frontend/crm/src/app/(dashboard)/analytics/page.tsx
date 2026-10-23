@@ -191,7 +191,7 @@ export default function AnalyticsPage() {
                   <h2 className="font-display text-[15.5px] font-bold text-ink">Running costs & net profit unavailable</h2>
                 </div>
                 <p className="text-sm leading-relaxed text-muted">
-                  Expense and salary data is not persisted by the backend, so no expense or profit estimate is shown.
+                  Clinic expenses and salaries are not recorded in AV Suite yet, so profit cannot be calculated. Figures here are revenue only.
                 </p>
               </Card>
             </div>
@@ -202,10 +202,22 @@ export default function AnalyticsPage() {
   );
 }
 
+const rangeDate = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/** The API returns [start, end) as UTC timestamps; show the last included day, not the exclusive end. */
+function rangeLabel(start: string, end: string) {
+  const s = new Date(start.slice(0, 10) + 'T00:00:00Z');
+  const e = new Date(new Date(end.slice(0, 10) + 'T00:00:00Z').getTime() - 86_400_000);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return '';
+  const a = rangeDate.format(s);
+  const b = rangeDate.format(e < s ? s : e);
+  return a === b ? a : `${a} to ${b}`;
+}
+
 function RangeNote({ start, end }: { start: string; end: string }) {
   return (
     <p className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-xs text-muted">
-      UTC range: {start.slice(0, 10)} – {end.slice(0, 10)} (end exclusive)
+      Showing {rangeLabel(start, end)}
     </p>
   );
 }

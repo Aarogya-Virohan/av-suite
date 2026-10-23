@@ -202,7 +202,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <label className="mb-1 block text-[11px] font-medium text-muted">Qty</label>
+                    <label className="mb-1 block text-[11px] font-medium text-muted" title="Number of units, e.g. 10 sessions">Sessions / Qty</label>
                     <input
                       {...register(`items.${idx}.quantity`, { setValueAs: toNumberOrUndefined })}
                       type="number"
