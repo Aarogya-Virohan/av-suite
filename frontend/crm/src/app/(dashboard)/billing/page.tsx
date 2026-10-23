@@ -79,6 +79,28 @@ export default function BillingPage() {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [previewMode, setPreviewMode] = useState<'invoice' | 'receipt'>('invoice');
 
+  // The preview is a modal without its own route, so the browser Back button
+  // used to leave Billing (founder feedback C-12). Opening it now adds a
+  // history entry, Back closes the modal, and closing it pops that entry.
+  // Next's own history state is copied, otherwise the App Router reloads the
+  // page on popstate.
+  const openPreview = (inv: Invoice, mode: 'invoice' | 'receipt') => {
+    setPreviewInvoice(inv);
+    setPreviewMode(mode);
+    window.history.pushState({ ...(window.history.state ?? {}), avInvoicePreview: true }, '');
+  };
+  const closePreview = () => {
+    if (window.history.state?.avInvoicePreview) window.history.back();
+    else setPreviewInvoice(null);
+  };
+  React.useEffect(() => {
+    const onPop = () => {
+      if (!window.history.state?.avInvoicePreview) setPreviewInvoice(null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const { data: invoices = [], isLoading: isLoadingInvoices } = useInvoices(canViewInvoices);
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments(canViewPayments);
   const { data: packages = [], isLoading: isLoadingPackages } = usePackages(canViewPackages);
@@ -145,10 +167,7 @@ export default function BillingPage() {
       render: (inv) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              setPreviewInvoice(inv);
-              setPreviewMode('invoice');
-            }}
+            onClick={() => openPreview(inv, 'invoice')}
             className={cn(SMALL_ACTION, 'border border-line bg-card text-ink-2 hover:bg-canvas')}
           >
             <Eye className="h-3.5 w-3.5" />
@@ -156,10 +175,7 @@ export default function BillingPage() {
           </button>
           {inv.status === 'paid' && (
             <button
-              onClick={() => {
-                setPreviewInvoice(inv);
-                setPreviewMode('receipt');
-              }}
+              onClick={() => openPreview(inv, 'receipt')}
               className={cn(SMALL_ACTION, 'bg-ok-wash text-ok hover:bg-[#d3eedc]')}
             >
               <Printer className="h-3.5 w-3.5" />
@@ -296,7 +312,7 @@ export default function BillingPage() {
         <RecordPaymentSlideOver isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />
         <InvoicePreviewModal
           isOpen={!!previewInvoice}
-          onClose={() => setPreviewInvoice(null)}
+          onClose={closePreview}
           invoice={previewInvoice}
           mode={previewMode}
         />

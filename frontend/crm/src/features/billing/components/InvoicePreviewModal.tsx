@@ -101,14 +101,19 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-midnight/60 p-4 backdrop-blur-xs"
+      // Top-aligned and scrollable: a centred flex box cut off the toolbar
+      // (Print and Close) when the document was taller than the screen (C-13).
+      className="fixed inset-0 z-50 overflow-y-auto bg-midnight/60 p-4 backdrop-blur-xs sm:py-8"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       role="dialog"
       aria-modal="true"
       aria-label={`${docTitle} ${invoice.invoice_number}`}
     >
-      <div className="w-full max-w-2xl space-y-5 rounded-2xl border border-line bg-card p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="mx-auto w-full max-w-2xl space-y-5 rounded-2xl border border-line bg-card p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
         {/* Header Actions (not printed) */}
-        <div className="no-print flex items-center justify-between border-b border-line pb-4">
+        <div className="no-print sticky -top-4 z-10 sm:-top-8 -mx-6 -mt-6 flex items-center justify-between rounded-t-2xl border-b border-line bg-card px-6 py-4 dark:bg-slate-900">
           <h2 className="font-display text-lg font-bold text-ink">
             {docTitle} · {invoice.invoice_number}
           </h2>
