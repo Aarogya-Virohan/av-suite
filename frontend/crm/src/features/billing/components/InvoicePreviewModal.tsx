@@ -296,10 +296,9 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
           )}
 
           <div className="flex items-end justify-between border-t border-[#ebe5d8] pt-8 text-[11px] text-[#767b93]">
-            <p>Computer-generated document. Thank you for visiting {clinicName}.</p>
-            <div className="w-36 border-t border-[#767b93] pt-1 text-center">
-              <p className="font-bold text-[#141a33]">Authorized Signatory</p>
-            </div>
+            {/* Clinics have no digital signature, so no signature line (C-19). */}
+            <p>This is a computer-generated {isReceipt ? 'receipt' : 'invoice'} and does not need a signature.</p>
+            <p>Thank you for visiting {clinicName}.</p>
           </div>
         </div>
       </div>
