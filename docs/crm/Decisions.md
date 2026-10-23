@@ -318,6 +318,30 @@ Each entry follows this structure:
 
 ---
 
+## [D-022] Founder Feedback Phase 0 (23 Oct): CRM Quick Fixes
+
+- **Date**: 2026-10-23
+- **Context**: Shivank's feedback of 23 Oct (list + 8 annotated screenshots). Analysis per item is in the CRM Project doc `feedback-crm-23Oct2026.md` (IDs C-01 to C-27, own findings X-1 to X-3). This batch is the frontend-only part that needed no founder decision.
+- **Decision**:
+  - C-01: the header date opens a month calendar; picking a day opens `/appointments?date=YYYY-MM-DD`, filtered by the local (IST) day on the client because the backend `date` filter uses UTC days. "Book Visit" prefills that day (future days at 10:00). Users without Appointments access keep the plain date.
+  - C-03: hover states only where something is clickable. Read-only table rows and lead kanban cards no longer change on hover.
+  - C-05: referral source is a dropdown (Google search, AI search, Walk-in, Friend or family, Doctor referral, Previous treatment, Practo / Justdial / other app, Social media, Other with free text). The column stays free text; an old value not in the list opens as Other with its text, so nothing saved is lost.
+  - C-06: SOAP Notes and Assessments were the same component on the same table shown twice. They are one tab, "SOAP & Assessments", with an All / Initial / Re-assessment filter, a type badge per note, and a note type choice on unfinalized notes. A patient's first note defaults to Initial, later ones to Re-assessment. Tab name still to be confirmed by founders.
+  - C-09: Leads page title "Patient Leads" (sidebar label unchanged).
+  - C-12: opening an invoice or receipt adds a browser history entry, so Back closes the preview instead of leaving Billing. Next's own history state is copied into the entry, otherwise the App Router reloads the page on popstate. Reproduced before the fix (Back went from the receipt to /leads).
+  - C-13: the preview modal is top-aligned and scrolls, with a sticky toolbar (Print and Close). Before, a centred flex box put the Close button above the screen (y = -195 px at 1366x720) with no way to reach it.
+  - C-17: invoice line label "Sessions / Qty".
+  - C-18: the transaction reference field is hidden and cleared for Cash.
+  - C-27: rows per page (5, 10, 25, 50, 75) on every DataTable; the Patients list sends `page_size` to the API.
+  - X-1: Lost leads have no Convert button.
+  - X-2: Analytics no longer shows developer text ("UTC range ... (end exclusive)", "not persisted by the backend"); it shows the date range in words and says expenses are not recorded yet.
+  - Found on the way: Appointments requested only 10 rows with no paging, so later appointments never showed. It now requests 500, the backend maximum (L-39).
+- **Not in this batch**: C-14 / X-3 (test data cleanup, Onkar), C-19 onwards and everything needing founders or backend.
+- **Verified**: `tsc` clean, vitest 25 pass (2 new for the referral field), `next build` clean; Playwright on the production build against a local backend and Postgres, desktop 1366 px with time zone Asia/Kolkata, checked every item above plus the DB rows for a new re-assessment; no page errors; only failing call is the expected Rx 403 for a clinic without the Rx entitlement. Phone width screenshots taken; the CRM layout itself is not phone-ready (sidebar stays open), unchanged by this batch.
+- **Affected Files**: `frontend/crm/src/components/layout/{AppShell,HeaderCalendar}.tsx`, `components/ui/DataTable.tsx`, `app/(dashboard)/{appointments,billing,leads,analytics,patients}/page.tsx`, `app/(dashboard)/patients/[id]/page.tsx`, `features/patients/components/{SoapNotesTab,PatientFormFields,ReferralSourceField,AddPatientSlideOver,EditPatientSlideOver}.tsx`, `features/patients/referral-source.test.tsx`, `features/billing/components/{InvoicePreviewModal,RecordPaymentSlideOver,CreateInvoiceSlideOver}.tsx`, `features/appointments/components/AddAppointmentSlideOver.tsx`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -361,5 +385,7 @@ Each entry follows this structure:
 | L-36 | Prescription PDF letterhead shows the clinic name with initials; the clinic logo and contact details are not printed (no clinic profile fields yet, see L-14) | Open | Frontend + Sparsh |
 | L-37 | "Therapist guidance" on a prescription is the fixed default text from the builder; there is no field to write it | Open, product decision | Onkar |
 | L-38 | Exercise images are cached in the server's memory only; the first PDF after a deploy downloads them again (parallel, 6 s cap). An image that fails prints "Image not available" | Accepted for now; move images into our own storage with the exercise image pipeline | Backend |
+| L-39 | Appointments loads at most 500 appointments in one request (backend maximum) and has no paging; the backend has no `order_by` and its `date` filter uses UTC days, so the day filter runs on the client | Open; backend paging, ordering and a local-day filter | Backend + frontend |
+| L-40 | Leads list loads every lead in one request and has no rows-per-page or paging (it is not a DataTable) | Open; fine at today's volume | Frontend |
 
-*Last updated: 2026-10-20 (D-021, L-18 fixed, L-34 to L-38 added) | Branch: feat/exercise-ui-redesign*
+*Last updated: 2026-10-23 (D-022, L-39, L-40 added) | Branch: feat/crm-feedback-phase0*
