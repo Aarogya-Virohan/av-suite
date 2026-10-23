@@ -342,6 +342,21 @@ Each entry follows this structure:
 
 ---
 
+## [D-023] Founder Feedback Phase 1 (frontend only): Leads Report, Packages on Invoices, Percent Discount and Tax, No Signature Line
+
+- **Date**: 2026-10-24
+- **Context**: Second batch from the 23 Oct founder feedback (CRM Project doc `feedback-crm-23Oct2026.md`), only items that need no backend change and no founder decision. Delivered on branch `feat/crm-feedback-phase1-fe`, merged into `dev` only when Onkar decides.
+- **Decision**:
+  - C-11: Leads page has "Export CSV" (the leads currently shown, with search applied; UTF-8 with BOM so Excel opens it; cells starting with = + - @ are quoted with a leading apostrophe to stop spreadsheet formulas) and a "Monthly" table for the last 6 months (new, converted, lost, still open, conversion %), counted by local month of the date added.
+  - C-15: Create Invoice has "+ Add package…" listing the clinic's active packages; picking one adds "<name> (<n> sessions)" at the package price, filling the empty first line if it is blank. A per-clinic service and fee list (consultation fee) still needs the backend.
+  - C-16: Discount and tax can be typed in rupees or percent (switch per field). Tax in percent applies to the amount after discount. Only the rupee amounts are sent and stored; printing "10%" on the invoice needs percent fields in the backend.
+  - C-19: invoice and receipt footer drops "Authorized Signatory" and says the document is computer-generated and needs no signature. The clinic logo was already printed when set in Settings; address, phone and GSTIN still wait for clinic profile fields (L-14).
+  - Found on the way: the leads list sent no `limit`, so the API default of 100 silently cut off later leads; it now asks for 500 (L-40). The leads table rows had a hover state although they are not clickable; removed (C-03 follow-up).
+- **Verified**: `tsc` clean, vitest 27 pass (2 new for CSV escaping and monthly counts), `next build` clean. Playwright on the production build against a local backend and Postgres (1366 px, Asia/Kolkata): CSV download (name, row count, escaping), monthly counts with a lead moved to September in the DB, package line, 10% discount and 18% tax giving 7,434.00 on 7,000.00, invoice saved with discount 700.00 and tax 1,134.00 (checked in Postgres), preview shows both and no signature line; no page errors, no failed API calls.
+- **Affected Files**: `frontend/crm/src/app/(dashboard)/leads/page.tsx`, `features/leads/{api,report}.ts`, `features/leads/report.test.ts`, `features/billing/components/{CreateInvoiceSlideOver,InvoicePreviewModal}.tsx`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -386,6 +401,6 @@ Each entry follows this structure:
 | L-37 | "Therapist guidance" on a prescription is the fixed default text from the builder; there is no field to write it | Open, product decision | Onkar |
 | L-38 | Exercise images are cached in the server's memory only; the first PDF after a deploy downloads them again (parallel, 6 s cap). An image that fails prints "Image not available" | Accepted for now; move images into our own storage with the exercise image pipeline | Backend |
 | L-39 | Appointments loads at most 500 appointments in one request (backend maximum) and has no paging; the backend has no `order_by` and its `date` filter uses UTC days, so the day filter runs on the client | Open; backend paging, ordering and a local-day filter | Backend + frontend |
-| L-40 | Leads list loads every lead in one request and has no rows-per-page or paging (it is not a DataTable) | Open; fine at today's volume | Frontend |
+| L-40 | Leads list loads at most 500 leads in one request (backend maximum) and has no rows-per-page or paging (it is not a DataTable). Before 24 Oct it sent no limit and got only the API default of 100. Export CSV and the monthly table use the same 500 | Open; backend paging or a monthly count endpoint once a clinic passes 500 leads | Frontend + backend |
 
-*Last updated: 2026-10-23 (D-022, L-39, L-40 added) | Branch: feat/crm-feedback-phase0*
+*Last updated: 2026-10-24 (D-023, L-40 updated) | Branch: feat/crm-feedback-phase1-fe*
