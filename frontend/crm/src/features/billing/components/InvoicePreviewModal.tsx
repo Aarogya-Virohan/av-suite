@@ -8,7 +8,8 @@ import { useInvoicePayments } from '../api';
 import { hasCapability } from '../../../config/permissions';
 import { useAuthStore } from '../../../store';
 import { formatMoney } from '../../../lib/money';
-import { Printer, X } from 'lucide-react';
+import { MessageSquare, Printer, X } from 'lucide-react';
+import { openWhatsApp } from '../../../components/ui/WhatsAppButton';
 import { Badge, type BadgeTone, Button } from '../../../components/ui/brand';
 
 interface InvoicePreviewModalProps {
@@ -99,6 +100,35 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
   const balance = Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0);
   const docTitle = isReceipt ? 'Payment Receipt' : 'Invoice';
 
+  // The browser uses the page title as the PDF file name, so it is set for the
+  // print and restored after (C-20). The backend invoice PDF is a placeholder
+  // and is not used (Decisions.md L-41).
+  const printOrSave = () => {
+    const previous = document.title;
+    const safe = (s: string) => s.replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '');
+    document.title = `${isReceipt ? 'Receipt' : 'Invoice'}_${safe(invoice.invoice_number)}_${safe(patientName)}`;
+    const restore = () => {
+      document.title = previous;
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    window.print();
+  };
+
+  // Click-to-chat with the patient; the PDF is attached by hand in WhatsApp.
+  const sendOnWhatsApp = () => {
+    const lines = [
+      `Hi ${patientName},`,
+      '',
+      `${isReceipt ? 'Payment receipt' : 'Invoice'} ${invoice.invoice_number} from ${clinicName}`,
+      `Total: ${money(invoice.total_amount)}`,
+      `Paid: ${money(invoice.paid_amount)}`,
+    ];
+    if (!isReceipt && balance > 0) lines.push(`Balance due: ${money(balance)}`);
+    lines.push('', `The ${isReceipt ? 'receipt' : 'invoice'} PDF is attached.`, '', 'Thank you.');
+    openWhatsApp(patient?.phone, patientName, lines.join('\n'), clinicName);
+  };
+
   return (
     <div
       // Top-aligned and scrollable: a centred flex box cut off the toolbar
@@ -118,9 +148,15 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
             {docTitle} · {invoice.invoice_number}
           </h2>
           <div className="flex items-center gap-2">
-            <Button onClick={() => window.print()}>
+            {patient?.phone && (
+              <Button variant="secondary" onClick={sendOnWhatsApp} title="Open WhatsApp with a message to the patient. Attach the saved PDF there.">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </Button>
+            )}
+            <Button onClick={printOrSave} title="Print, or choose Save as PDF in the print dialog">
               <Printer className="h-4 w-4" />
-              <span>Print {isReceipt ? 'Receipt' : 'Invoice'}</span>
+              <span>Print / Save PDF</span>
             </Button>
             <button
               onClick={onClose}
