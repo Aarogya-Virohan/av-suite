@@ -12,11 +12,13 @@ import { hasCapability } from '../../../config/permissions';
 import { useUsers } from '../../users/api';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
-import { localDateTimeInputToISO, toLocalDateTimeInput } from '../../../lib/datetime';
+import { localDateTimeInputToISO, localToday, toLocalDateTimeInput } from '../../../lib/datetime';
 import { cn } from '../../../lib/cn';
 
 interface AddAppointmentSlideOverProps {
   isOpen: boolean;
+  /** YYYY-MM-DD picked on the Appointments page; future days default to 10:00. */
+  defaultDate?: string | null;
   onClose: () => void;
 }
 
@@ -42,7 +44,7 @@ const errorText = 'mt-1.5 text-xs font-medium text-danger';
  * - "Appointment Type" was removed: appointments have no such column, so the
  *   value was silently dropped (L-19).
  */
-export function AddAppointmentSlideOver({ isOpen, onClose }: AddAppointmentSlideOverProps) {
+export function AddAppointmentSlideOver({ isOpen, onClose, defaultDate }: AddAppointmentSlideOverProps) {
   const createAppointment = useCreateAppointment();
   const { data: aptResponse } = useAppointments(undefined, undefined, 1, 100);
   const existingAppointments = aptResponse?.data || [];
@@ -80,13 +82,13 @@ export function AddAppointmentSlideOver({ isOpen, onClose }: AddAppointmentSlide
         patient_id: '',
         therapist_id: '',
         appointment_type: 'consultation',
-        scheduled_at: nextQuarterHour(),
+        scheduled_at: defaultDate && defaultDate > localToday() ? `${defaultDate}T10:00` : nextQuarterHour(),
         duration_minutes: 30,
         status: 'scheduled',
         source: 'manual',
       });
     }
-  }, [isOpen, reset]);
+  }, [isOpen, reset, defaultDate]);
 
   const selectedTherapist = watch('therapist_id');
   const selectedTime = watch('scheduled_at');

@@ -4,12 +4,13 @@ import React from 'react';
 import { SidebarNavigation } from './SidebarNavigation';
 import { CommandBar } from './CommandBar';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { HeaderCalendar } from './HeaderCalendar';
 import { AuthGuard } from '../auth/AuthGuard';
 import { useUiStore, useAuthStore } from '../../store';
 import { CalendarDays, Search } from 'lucide-react';
 import { useClinicSettings } from '../../features/settings/api';
 import { cn } from '../../lib/cn';
-import { hasCapability, usePermissionSubscription } from '../../config/permissions';
+import { canAccessModule, hasCapability, usePermissionSubscription } from '../../config/permissions';
 
 const todayLabel = () =>
   new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date());
@@ -65,7 +66,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
 
             <div className="flex items-center gap-2.5">
-              {today && (
+              {today && canAccessModule('appointments') && <HeaderCalendar label={today} />}
+              {today && !canAccessModule('appointments') && (
                 <span className="hidden h-10 items-center gap-2 rounded-[10px] border border-line bg-card px-3 text-sm font-medium text-ink-2 md:flex">
                   <CalendarDays className="h-4 w-4" />
                   {today}

@@ -17,6 +17,11 @@ import { canAccessModule, canPerformAction, hasCapability, usePermissionSubscrip
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { Avatar, Badge, type BadgeTone, Button, Card, PageHeader, SegmentGroup, SegmentTab } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { localToday } from '../../../lib/datetime';
+
+const dayTitle = new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const isDateParam = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(`${v}T00:00:00`).getTime());
 
 const STATUS_STYLE: Record<string, string> = {
   scheduled: 'bg-info-wash text-info border-info/20',
@@ -53,11 +58,29 @@ interface BookingRequest {
 
 type SubTabKey = 'list' | 'requests' | 'bookingLink';
 
+// useSearchParams needs a Suspense boundary for the production build.
 export default function AppointmentsPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <AppointmentsPageContent />
+    </React.Suspense>
+  );
+}
+
+function AppointmentsPageContent() {
   usePermissionSubscription(); // see Decisions.md D-013
   const role = useAuthStore((s) => s.role);
   const isAllowed = canAccessModule('appointments');
-  const { data: appointmentsResponse, isLoading } = useAppointments(undefined, undefined, 1, 10, isAllowed);
+  // This page used to request only 10 appointments with no pagination, so
+  // anything beyond the first 10 was never shown. 500 is the backend maximum
+  // until real paging exists (Decisions.md L-39).
+  const { data: appointmentsResponse, isLoading } = useAppointments(undefined, undefined, 1, 500, isAllowed);
+  // ?date=YYYY-MM-DD comes from the header calendar (C-01). Filtered by the
+  // local (IST) day here, because the backend's date filter uses UTC days.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const dateParam = searchParams.get('date');
+  const selectedDate = isDateParam(dateParam) ? dateParam : null;
   const appointments: Appointment[] = appointmentsResponse?.data || [];
   const updateStatus = useUpdateAppointmentStatus();
 
@@ -102,10 +125,13 @@ export default function AppointmentsPage() {
   }, [bookingKey]);
   const [showQr, setShowQr] = useState(false);
 
-  const filteredAppointments = appointments.filter((apt) => {
-    if (statusFilter !== 'all' && apt.status !== statusFilter) return false;
-    return true;
-  });
+  const filteredAppointments = appointments
+    .filter((apt) => {
+      if (statusFilter !== 'all' && apt.status !== statusFilter) return false;
+      if (selectedDate && localToday(new Date(apt.scheduled_at)) !== selectedDate) return false;
+      return true;
+    })
+    .sort((a, b) => (selectedDate ? String(a.scheduled_at).localeCompare(String(b.scheduled_at)) : 0));
 
   if (!isAllowed) {
     return <AccessRestricted message="Appointments access is restricted for your role." />;
@@ -201,6 +227,25 @@ export default function AppointmentsPage() {
         {activeSubTab === 'list' && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                aria-label="Show appointments on a day"
+                value={selectedDate ?? ''}
+                onChange={(e) => router.replace(e.target.value ? `/appointments?date=${e.target.value}` : '/appointments')}
+                className="h-10 cursor-pointer rounded-[10px] border border-line bg-card px-3 text-sm font-medium text-ink-2 transition-colors hover:border-slate-300"
+              />
+              {selectedDate && (
+                <button
+                  type="button"
+                  onClick={() => router.replace('/appointments')}
+                  className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[10px] border border-grove/30 bg-grove-wash px-3 text-xs font-semibold text-grove transition-colors hover:bg-grove/15"
+                >
+                  {dayTitle.format(new Date(`${selectedDate}T00:00:00`))}
+                  <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="sr-only">Show all days</span>
+                </button>
+              )}
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as 'all' | 'scheduled' | 'completed' | 'cancelled')}
@@ -212,6 +257,7 @@ export default function AppointmentsPage() {
                 <option value="cancelled">Cancelled</option>
                 <option value="no_show">No Show</option>
               </select>
+              </div>
               <span className="text-xs text-muted">
                 {filteredAppointments.length} {filteredAppointments.length === 1 ? 'appointment' : 'appointments'}
               </span>
@@ -433,7 +479,7 @@ export default function AppointmentsPage() {
         )}
 
         {/* Add Appointment Drawer */}
-        <AddAppointmentSlideOver isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
+        <AddAppointmentSlideOver isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} defaultDate={selectedDate} />
 
         {/* Reschedule Appointment Drawer */}
         <RescheduleSlideOver
