@@ -357,6 +357,30 @@ Each entry follows this structure:
 
 ---
 
+## [D-024] Passwords Limited to 72 Bytes (bcrypt)
+
+- **Date**: 2026-10-24
+- **Context**: bcrypt 5 raises ValueError for passwords over 72 bytes. `POST /auth/register` had no length limit and `POST /users` allowed 128 characters, so a long password returned 500 (reproduced live). Login was not affected (the error is caught and returns 401).
+- **Decision**: `check_password_byte_length` in `backend/app/core/security.py` (72 bytes, UTF-8) is a field validator on `RegisterRequest` and `UserCreate`; long passwords now get 422 with a plain message. The CRM checks the same limit before submitting Add User and Add Therapist (`src/lib/password.ts`).
+- **Verified**: pytest 313 pass on the branch vs 309 on dev, same 10 environment failures (4 new tests); live 80-character register 422, normal register 201; Add User shows the message and sends no request.
+- **Affected Files**: `backend/app/core/security.py`, `backend/app/schemas/{auth,user}.py`, `backend/tests/test_password_length.py`, `frontend/crm/src/lib/password{,.test}.ts`, `frontend/crm/src/features/users/components/AddUserSlideOver.tsx`, `frontend/crm/src/app/(dashboard)/therapists/page.tsx`
+- **Branch**: `fix/password-length` (its entry is added here, on `feat/crm-ux-oct`, to avoid a conflict with D-023).
+
+---
+
+## [D-025] Invoice Save as PDF and WhatsApp, Phone Layout, Booking Requests Refresh
+
+- **Date**: 2026-10-24
+- **Context**: Founder feedback C-20 (download and send invoices), the phone screenshots (sidebar covered the page at 390 px), and booking requests that only appeared after a page refresh.
+- **Decision**:
+  - C-20: the invoice and receipt preview has "Print / Save PDF" (the page title is set to `Invoice_<number>_<patient>` during printing, so "Save as PDF" suggests that file name) and "WhatsApp" (click-to-chat with the patient: document number, total, paid, balance due, and a note that the PDF is attached). The backend invoice PDF is not used: it is a placeholder (L-41).
+  - Phone layout (below 768 px): the sidebar starts closed and opens as an overlay from a menu button in the header; tapping the backdrop or a page link closes it. Header and page padding shrink on phones. Desktop is unchanged.
+  - Pending booking requests refresh every 60 s while the tab is visible and when the user returns to the tab. A failed refresh keeps the current list instead of clearing it.
+- **Not changed**: email sending (needs an email service), server-side invoice PDF (L-41, after the billing backend batch).
+- **Affected Files**: `frontend/crm/src/features/billing/components/InvoicePreviewModal.tsx`, `src/components/layout/{AppShell,SidebarNavigation}.tsx`, `src/app/(dashboard)/appointments/page.tsx`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -402,5 +426,6 @@ Each entry follows this structure:
 | L-38 | Exercise images are cached in the server's memory only; the first PDF after a deploy downloads them again (parallel, 6 s cap). An image that fails prints "Image not available" | Accepted for now; move images into our own storage with the exercise image pipeline | Backend |
 | L-39 | Appointments loads at most 500 appointments in one request (backend maximum) and has no paging; the backend has no `order_by` and its `date` filter uses UTC days, so the day filter runs on the client | Open; backend paging, ordering and a local-day filter | Backend + frontend |
 | L-40 | Leads list loads at most 500 leads in one request (backend maximum) and has no rows-per-page or paging (it is not a DataTable). Before 24 Oct it sent no limit and got only the API default of 100. Export CSV and the monthly table use the same 500 | Open; backend paging or a monthly count endpoint once a clinic passes 500 leads | Frontend + backend |
+| L-41 | Backend invoice PDF is a placeholder: `BillingService.generate_invoice_pdf` returns five lines of text with a `%PDF-1.4` header (not a valid PDF), and `generate_invoice_pdf_response` builds the download URL as `/api/v1/billing/invoices/...` while the route is `/api/v1/invoices/...`. The CRM does not call it; invoices are saved through the browser print dialog (D-025) | Open; real server PDF (same approach as the Rx PDF) after the billing backend batch, so the files do not conflict | Backend |
 
-*Last updated: 2026-10-24 (D-023, L-40 updated) | Branch: feat/crm-feedback-phase1-fe*
+*Last updated: 2026-10-24 (D-024, D-025, L-41 added) | Branch: feat/crm-ux-oct*
