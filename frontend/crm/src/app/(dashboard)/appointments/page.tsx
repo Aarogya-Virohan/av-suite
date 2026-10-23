@@ -92,19 +92,36 @@ function AppointmentsPageContent() {
 
   const canViewBookingRequests = hasCapability('booking.view');
 
-  // Fetch pending appointment requests from backend on mount (only for authorized roles)
+  // Pending booking requests used to load once, so new public requests only
+  // showed after a page refresh. They now refresh every 60 s while the tab is
+  // visible and when the user comes back to the tab.
   React.useEffect(() => {
     if (!canViewBookingRequests) return;
+    let first = true;
     const fetchRequests = async () => {
       try {
         const res = await apiClient.get('/appointment-requests');
         setRequests(res.data?.data || res.data || []);
       } catch {
-        // If endpoint isn't live yet, stay empty rather than showing mock data
-        setRequests([]);
+        // First load: stay empty rather than show mock data. Later polls keep
+        // the list on screen if one request fails.
+        if (first) setRequests([]);
+      } finally {
+        first = false;
       }
     };
     fetchRequests();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') fetchRequests();
+    }, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchRequests();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [canViewBookingRequests]);
 
   // Booking link uses the clinic's unique slug from /auth/me (exact match on
