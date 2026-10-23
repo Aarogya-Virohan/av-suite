@@ -6,8 +6,10 @@ import { Patient, PrescriptionItem, SavedPrescription } from "@/types/exercise";
 import {
   createPrescription,
   downloadPrescriptionPDF,
+  fetchNoteSuggestions,
   fetchPatients,
   fetchPrescriptions,
+  type NoteSuggestions,
   mapBackendExerciseToFrontend,
   saveBlob,
   updatePrescription,
@@ -16,6 +18,7 @@ import { toast } from "@/components/ui/toaster";
 import { ExerciseRow } from "./ExerciseRow";
 import { PatientPicker } from "./PatientPicker";
 import { AddPatientForm } from "./AddPatientForm";
+import { QuickPicks, addPhrase } from "./QuickPicks";
 
 interface PrescriptionBuilderProps {
   prescription: PrescriptionItem[];
@@ -24,9 +27,11 @@ interface PrescriptionBuilderProps {
   onReplace: (items: PrescriptionItem[]) => void;
 }
 
-// Same text the old builder sent with every new prescription.
+// Same text the builder has sent with every new prescription since the
+// start; now only the starting value of an editable field.
 const DEFAULT_PHYSIO_NOTES =
   "Please follow sets and reps instructions carefully. Reach out if you feel acute discomfort.";
+const GUIDANCE_MAX = 2000;
 
 /** What was last saved, to tell "saved" from "changed since". */
 interface SavedState {
@@ -35,8 +40,11 @@ interface SavedState {
   key: string;
 }
 
-function itemsKey(items: PrescriptionItem[]): string {
-  return JSON.stringify(items.map((i) => [i.exercise.id, i.sets, i.reps, i.hold, i.frequency, i.note || ""]));
+function itemsKey(items: PrescriptionItem[], guidance: string): string {
+  return JSON.stringify([
+    items.map((i) => [i.exercise.id, i.sets, i.reps, i.hold, i.frequency, (i.note || "").trim()]),
+    guidance.trim(),
+  ]);
 }
 
 function toPayload(items: PrescriptionItem[]) {
@@ -70,8 +78,10 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saved, setSaved] = useState<SavedState | null>(null);
   const [busy, setBusy] = useState<"save" | "pdf" | null>(null);
+  const [guidance, setGuidance] = useState(DEFAULT_PHYSIO_NOTES);
+  const [suggestions, setSuggestions] = useState<NoteSuggestions>({ notes: [], guidance: [] });
 
-  const key = useMemo(() => itemsKey(prescription), [prescription]);
+  const key = useMemo(() => itemsKey(prescription, guidance), [prescription, guidance]);
   const editingRxId = saved && saved.patientId === patientId ? saved.rxId : null;
   const isSaved = !!editingRxId && saved?.key === key;
   const editingRx = editingRxId ? history?.find((h) => h.id === editingRxId) : undefined;
@@ -83,6 +93,18 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
       .catch((err) => toast.error(err instanceof Error ? err.message : "Could not load patients."))
       .finally(() => setPatientsLoading(false));
   }, []);
+
+  // Quick-pick phrases from this clinic's earlier prescriptions. Optional:
+  // without them the fields still work as plain text.
+  const loadSuggestions = useCallback(() => {
+    fetchNoteSuggestions()
+      .then(setSuggestions)
+      .catch(() => setSuggestions({ notes: [], guidance: [] }));
+  }, []);
+
+  useEffect(() => {
+    loadSuggestions();
+  }, [loadSuggestions]);
 
   // History of the chosen patient.
   const loadHistory = useCallback(async (id: string) => {
@@ -131,8 +153,10 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
         note: it.note ?? undefined,
       });
     }
+    const savedGuidance = rx.physio_notes ?? "";
     onReplace(items);
-    setSaved({ rxId: rx.id, patientId: rx.patient_id, key: itemsKey(items) });
+    setGuidance(savedGuidance);
+    setSaved({ rxId: rx.id, patientId: rx.patient_id, key: itemsKey(items, savedGuidance) });
     setHistoryOpen(false);
     if (missing) toast.error(`${missing} exercise(s) in this prescription no longer exist in the library.`);
   };
@@ -143,6 +167,7 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
       if (!ok) return;
     }
     setSaved(null);
+    setGuidance(DEFAULT_PHYSIO_NOTES);
     onReplace([]);
   };
 
@@ -162,13 +187,15 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
   const persist = async (): Promise<string> => {
     const items = toPayload(prescription);
     let id: string;
+    const notes = guidance.trim();
     if (editingRxId) {
-      await updatePrescription(editingRxId, { items });
+      // "" clears the guidance; the PDF then leaves the box out.
+      await updatePrescription(editingRxId, { items, physio_notes: notes });
       id = editingRxId;
     } else {
       const created = await createPrescription({
         patient_id: patientId,
-        physio_notes: DEFAULT_PHYSIO_NOTES,
+        physio_notes: notes || undefined,
         status: "active",
         items,
       });
@@ -176,6 +203,7 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
     }
     setSaved({ rxId: id, patientId, key });
     loadHistory(patientId);
+    loadSuggestions();
     return id;
   };
 
@@ -322,11 +350,41 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
           </p>
         </div>
       ) : (
-        <ol className="-mr-2 min-h-0 flex-1 space-y-2.5 overflow-y-auto pb-4 pr-2">
-          {prescription.map((item, i) => (
-            <ExerciseRow key={item.exercise.id} index={i + 1} item={item} onChange={onChange} onRemove={onRemove} />
-          ))}
-        </ol>
+        <div className="-mr-2 min-h-0 flex-1 space-y-2.5 overflow-y-auto pb-4 pr-2">
+          <ol className="space-y-2.5">
+            {prescription.map((item, i) => (
+              <ExerciseRow
+                key={item.exercise.id}
+                index={i + 1}
+                item={item}
+                onChange={onChange}
+                onRemove={onRemove}
+                noteSuggestions={suggestions.notes}
+              />
+            ))}
+          </ol>
+
+          <section className="space-y-2 rounded-2xl border border-line bg-card p-3.5 shadow-card">
+            <label htmlFor="rx-guidance" className="block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Guidance for the patient
+            </label>
+            <textarea
+              id="rx-guidance"
+              rows={3}
+              maxLength={GUIDANCE_MAX}
+              value={guidance}
+              onChange={(e) => setGuidance(e.target.value)}
+              placeholder="Shown on the PDF under the exercises (optional)"
+              className="w-full resize-y rounded-[10px] border border-line bg-canvas/60 px-3 py-2 text-[13px] leading-relaxed text-ink placeholder:text-[#8a8fa6] transition-colors focus:border-grove focus:bg-card focus:outline-none focus:ring-2 focus:ring-grove/15"
+            />
+            <QuickPicks
+              label="Quick guidance"
+              options={suggestions.guidance}
+              current={guidance}
+              onPick={(phrase) => setGuidance((g) => addPhrase(g, /[.!?]$/.test(phrase) ? phrase : `${phrase}.`, " ", GUIDANCE_MAX))}
+            />
+          </section>
+        </div>
       )}
 
       {/* Actions */}

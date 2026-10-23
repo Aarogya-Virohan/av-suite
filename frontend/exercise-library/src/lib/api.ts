@@ -192,7 +192,7 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
   return {
     id: String(be.id),
     name: String(be.title ?? ""),
-    bodyPart: (be.body_part as string) || "General",
+    bodyPart: ((be.body_part as string) || "").trim() || "Other",
     condition: (be.condition as string) || "General Recovery",
     instructions: (be.description as string) || "",
     sets: (be.sets as number) || 3,
@@ -205,16 +205,40 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
   };
 }
 
+export interface ExercisePage {
+  items: Exercise[];
+  total: number;
+}
+
+/**
+ * One page of exercises, ordered head to toe by the backend. The library
+ * loads pages as the user scrolls, so it works for thousands of exercises.
+ */
 export async function fetchExercises(
-  search?: string,
-  bodyPart?: string,
+  opts: { search?: string; bodyParts?: string[]; page?: number; pageSize?: number },
   signal?: AbortSignal
-): Promise<Exercise[]> {
-  const params = new URLSearchParams({ page_size: "100" });
-  if (search) params.set("search", search);
-  if (bodyPart) params.set("body_part", bodyPart);
-  const data = await json<Record<string, unknown>[]>(`/exercises?${params}`, { signal });
-  return (data || []).map(mapBackendExerciseToFrontend);
+): Promise<ExercisePage> {
+  const params = new URLSearchParams({
+    page: String(opts.page ?? 1),
+    page_size: String(opts.pageSize ?? 30),
+  });
+  if (opts.search) params.set("search", opts.search);
+  if (opts.bodyParts?.length) params.set("body_part", opts.bodyParts.join(","));
+  const response = await request(`/exercises?${params}`, { signal });
+  const body = await response.json();
+  const items = ((body.data as Record<string, unknown>[]) || []).map(mapBackendExerciseToFrontend);
+  const total = typeof body.meta?.total === "number" ? body.meta.total : items.length;
+  return { items, total };
+}
+
+export interface BodyPartCount {
+  body_part: string;
+  count: number;
+}
+
+/** Every body part the clinic can see, head to toe, with counts. */
+export async function fetchBodyParts(): Promise<BodyPartCount[]> {
+  return (await json<BodyPartCount[]>("/exercises/body-parts")) || [];
 }
 
 // --------------------------------------------------------------- patients
@@ -269,6 +293,17 @@ export function updatePrescription(
     method: "PATCH",
     body: JSON.stringify(patch),
   });
+}
+
+export interface NoteSuggestions {
+  notes: string[];
+  guidance: string[];
+}
+
+/** Phrases this clinic already wrote, most used first. */
+export async function fetchNoteSuggestions(): Promise<NoteSuggestions> {
+  const data = await json<NoteSuggestions>("/prescriptions/note-suggestions");
+  return { notes: data?.notes ?? [], guidance: data?.guidance ?? [] };
 }
 
 function filenameFrom(disposition: string | null): string | null {

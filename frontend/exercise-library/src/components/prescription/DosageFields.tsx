@@ -1,9 +1,12 @@
 import React, { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { PrescriptionItem } from "@/types/exercise";
+import { QuickPicks, addPhrase } from "./QuickPicks";
 
 interface DosageFieldsProps {
   item: PrescriptionItem;
   onChange: (updatedItem: PrescriptionItem) => void;
+  noteSuggestions: string[];
 }
 
 /*
@@ -17,9 +20,10 @@ const fieldBase =
   "h-10 w-full rounded-[10px] border border-line bg-card px-2.5 text-sm font-semibold text-ink transition-colors focus:border-grove focus:outline-none focus:ring-2 focus:ring-grove/15";
 
 /**
- * Number input that lets the user clear and retype. The old one clamped on
- * every keystroke, so clearing "10" to type "15" produced "115" or "1".
- * The value is clamped when the field loses focus.
+ * Number input that lets the user clear and retype (the value is clamped
+ * when the field loses focus), with up and down buttons beside it (founders,
+ * 23 Oct: "small drop down and drop up meter along with direct writing").
+ * The keyboard arrow keys do the same.
  */
 function NumberField({
   label,
@@ -43,6 +47,14 @@ function NumberField({
     setShown(value);
     setDraft(String(value));
   }
+
+  const step = (delta: number) => {
+    const base = parseInt(draft, 10);
+    const from = Number.isNaN(base) ? value : base;
+    const next = Math.min(Math.max(from + delta, min), max);
+    setDraft(String(next));
+    if (next !== value) onCommit(next);
+  };
 
   const commit = () => {
     const parsed = parseInt(draft, 10);
@@ -74,23 +86,46 @@ function NumberField({
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             if (e.key === "ArrowUp" || e.key === "ArrowDown") {
               e.preventDefault();
-              const next = Math.min(Math.max(value + (e.key === "ArrowUp" ? 1 : -1), min), max);
-              onCommit(next);
+              step(e.key === "ArrowUp" ? 1 : -1);
             }
           }}
-          className={`${fieldBase} ${suffix ? "pr-6" : ""}`}
+          className={`${fieldBase} ${suffix ? "pr-11" : "pr-7"}`}
         />
         {suffix && (
-          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+          <span className="pointer-events-none absolute right-7 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
             {suffix}
           </span>
         )}
+        <span className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded-md border border-line-soft">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={`Increase ${label}`}
+            disabled={value >= max}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => step(1)}
+            className="grid flex-1 cursor-pointer place-items-center bg-canvas/70 text-ink-2 hover:bg-grove-wash hover:text-grove disabled:cursor-default disabled:opacity-35"
+          >
+            <ChevronUp className="h-3 w-3" strokeWidth={2.5} />
+          </button>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label={`Decrease ${label}`}
+            disabled={value <= min}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => step(-1)}
+            className="grid flex-1 cursor-pointer place-items-center border-t border-line-soft bg-canvas/70 text-ink-2 hover:bg-grove-wash hover:text-grove disabled:cursor-default disabled:opacity-35"
+          >
+            <ChevronDown className="h-3 w-3" strokeWidth={2.5} />
+          </button>
+        </span>
       </span>
     </label>
   );
 }
 
-export function DosageFields({ item, onChange }: DosageFieldsProps) {
+export function DosageFields({ item, onChange, noteSuggestions }: DosageFieldsProps) {
   const update = (patch: Partial<PrescriptionItem>) => onChange({ ...item, ...patch });
   const options = FREQUENCIES.includes(item.frequency) ? FREQUENCIES : [item.frequency, ...FREQUENCIES];
 
@@ -125,6 +160,13 @@ export function DosageFields({ item, onChange }: DosageFieldsProps) {
         maxLength={500}
         onChange={(e) => update({ note: e.target.value })}
         className="h-10 w-full rounded-[10px] border border-line bg-canvas/60 px-3 text-[13px] text-ink placeholder:text-[#8a8fa6] transition-colors focus:border-grove focus:bg-card focus:outline-none focus:ring-2 focus:ring-grove/15"
+      />
+      <QuickPicks
+        label="Quick notes"
+        options={noteSuggestions}
+        current={item.note || ""}
+        onPick={(phrase) => update({ note: addPhrase(item.note || "", phrase, ", ", 500) })}
+        singleLine
       />
     </div>
   );

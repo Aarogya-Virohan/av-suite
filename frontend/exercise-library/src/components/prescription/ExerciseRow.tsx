@@ -8,9 +8,10 @@ interface ExerciseRowProps {
   item: PrescriptionItem;
   onChange: (updatedItem: PrescriptionItem) => void;
   onRemove: (id: string) => void;
+  noteSuggestions: string[];
 }
 
-export function ExerciseRow({ index, item, onChange, onRemove }: ExerciseRowProps) {
+export function ExerciseRow({ index, item, onChange, onRemove, noteSuggestions }: ExerciseRowProps) {
   return (
     <li className="rounded-2xl border border-line bg-card p-3.5 shadow-card">
       <div className="flex items-start gap-2.5">
@@ -32,7 +33,7 @@ export function ExerciseRow({ index, item, onChange, onRemove }: ExerciseRowProp
           <X className="h-4 w-4" />
         </button>
       </div>
-      <DosageFields item={item} onChange={onChange} />
+      <DosageFields item={item} onChange={onChange} noteSuggestions={noteSuggestions} />
     </li>
   );
 }

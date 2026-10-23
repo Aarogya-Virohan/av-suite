@@ -6,13 +6,14 @@ import { CloudOff, Loader2 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SplitLayout } from "@/components/layout/SplitLayout";
 import { SearchBar } from "@/components/library/SearchBar";
-import { FilterChips } from "@/components/library/FilterChips";
+import { BodyPartFilter } from "@/components/library/BodyPartFilter";
 import { ExerciseList } from "@/components/library/ExerciseList";
 import { PrescriptionBuilder } from "@/components/prescription/PrescriptionBuilder";
 import { Exercise, PrescriptionItem } from "@/types/exercise";
-import { fetchExercises, getToken } from "@/lib/api";
+import { fetchBodyParts, fetchExercises, getToken, type BodyPartCount } from "@/lib/api";
 
 const SEARCH_DEBOUNCE_MS = 250;
+const PAGE_SIZE = 30;
 
 export default function Home() {
   const router = useRouter();
@@ -21,12 +22,21 @@ export default function Home() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [selectedParts, setSelectedParts] = useState<string[]>([]);
-  const [bodyParts, setBodyParts] = useState<string[]>([]);
+  const [bodyParts, setBodyParts] = useState<BodyPartCount[]>([]);
+  const [bodyPartsFailed, setBodyPartsFailed] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefetching, setIsRefetching] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const firstLoad = useRef(true);
+  // Bumped on every new search/filter; a page that arrives for an older
+  // query is dropped instead of being appended to the new list.
+  const queryVersion = useRef(0);
+  const moreController = useRef<AbortController | null>(null);
 
   // Route guard.
   useEffect(() => {
@@ -39,25 +49,38 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Fetch on search or chip change. Older requests are aborted, so a slow
-  // response can never overwrite a newer one, and the current list stays on
-  // screen (dimmed) until the new one arrives.
+  // Body parts for the filter: all of them, head to toe, from the backend.
+  useEffect(() => {
+    if (!getToken()) return;
+    fetchBodyParts()
+      .then((rows) => {
+        setBodyParts(rows);
+        setBodyPartsFailed(false);
+      })
+      .catch(() => setBodyPartsFailed(true));
+  }, [reloadKey]);
+
+  // First page on search or filter change. Older requests are aborted, so a
+  // slow response can never overwrite a newer one, and the current list stays
+  // on screen (dimmed) until the new one arrives.
   useEffect(() => {
     if (!getToken()) return;
     const controller = new AbortController();
+    const version = ++queryVersion.current;
+    moreController.current?.abort();
     const initial = firstLoad.current;
     if (initial) setIsLoading(true);
     else setIsRefetching(true);
 
-    fetchExercises(search || undefined, selectedParts.join(",") || undefined, controller.signal)
-      .then((data) => {
-        setExercises(data);
+    fetchExercises({ search: search || undefined, bodyParts: selectedParts, page: 1, pageSize: PAGE_SIZE }, controller.signal)
+      .then(({ items, total: count }) => {
+        if (version !== queryVersion.current) return;
+        setExercises(items);
+        setTotal(count);
+        setPage(1);
+        setLoadMoreError(null);
         setLoadError(null);
-        if (initial) {
-          // Chip list comes from the unfiltered first load.
-          setBodyParts(Array.from(new Set(data.map((e) => e.bodyPart))).filter(Boolean));
-          firstLoad.current = false;
-        }
+        firstLoad.current = false;
       })
       .catch((err) => {
         if (err instanceof DOMException && err.name === "AbortError") return;
@@ -72,8 +95,47 @@ export default function Home() {
     return () => controller.abort();
   }, [search, selectedParts, reloadKey]);
 
-  const togglePart = (part: string) =>
-    setSelectedParts((prev) => (prev.includes(part) ? prev.filter((p) => p !== part) : [...prev, part]));
+  const hasMore = exercises.length < total;
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || isRefetching) return;
+    const version = queryVersion.current;
+    const controller = new AbortController();
+    moreController.current = controller;
+    setLoadingMore(true);
+    setLoadMoreError(null);
+    fetchExercises(
+      { search: search || undefined, bodyParts: selectedParts, page: page + 1, pageSize: PAGE_SIZE },
+      controller.signal
+    )
+      .then(({ items, total: count }) => {
+        if (version !== queryVersion.current) return;
+        setExercises((prev) => {
+          // The backend order is total (region, title, id), so pages do not
+          // overlap; the id check only guards against data changing between
+          // two page requests.
+          const seen = new Set(prev.map((e) => e.id));
+          return [...prev, ...items.filter((e) => !seen.has(e.id))];
+        });
+        setTotal(count);
+        setPage((p) => p + 1);
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (version === queryVersion.current) {
+          setLoadMoreError(err instanceof Error ? err.message : "Could not load more exercises.");
+        }
+      })
+      .finally(() => {
+        if (version === queryVersion.current) setLoadingMore(false);
+      });
+  }, [loadingMore, hasMore, isRefetching, search, selectedParts, page]);
+
+  // Keep picked parts in head-to-toe order, like the list.
+  const setParts = (next: string[]) => {
+    const order = new Map(bodyParts.map((b, i) => [b.body_part, i]));
+    setSelectedParts([...next].sort((a, b) => (order.get(a) ?? 1e9) - (order.get(b) ?? 1e9)));
+  };
 
   const resetFilters = () => {
     setSearchInput("");
@@ -145,15 +207,15 @@ export default function Home() {
                 <div className="flex items-baseline justify-between">
                   <h1 className="font-display text-xl font-bold text-ink">Exercise Library</h1>
                   <span className="text-xs font-medium text-muted-foreground">
-                    {exercises.length} {exercises.length === 1 ? "exercise" : "exercises"}
+                    {total} {total === 1 ? "exercise" : "exercises"}
                   </span>
                 </div>
                 <SearchBar value={searchInput} onChange={setSearchInput} busy={isRefetching} />
-                <FilterChips
+                <BodyPartFilter
                   parts={bodyParts}
-                  selectedParts={selectedParts}
-                  onToggle={togglePart}
-                  onClear={() => setSelectedParts([])}
+                  selected={selectedParts}
+                  onChange={setParts}
+                  unavailable={bodyPartsFailed}
                 />
                 {loadError && (
                   <p role="alert" className="text-xs font-medium text-danger">
@@ -168,6 +230,10 @@ export default function Home() {
                 stale={isRefetching}
                 onReset={resetFilters}
                 hasFilters={!!searchInput || selectedParts.length > 0}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                loadMoreError={loadMoreError}
+                onLoadMore={loadMore}
               />
             </>
           }
