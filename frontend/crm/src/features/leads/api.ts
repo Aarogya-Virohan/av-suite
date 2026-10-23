@@ -10,7 +10,9 @@ export function useLeads(stage?: LeadStage, enabled = true) {
     queryKey: [...LEADS_QUERY_KEY, { stage }],
     queryFn: async () => {
       const res = await apiClient.get('/leads', {
-        params: stage ? { stage } : undefined,
+        // Without a limit the API returns its default of 100, so later leads
+        // never showed. 500 is the backend maximum (Decisions.md L-40).
+        params: { limit: 500, ...(stage ? { stage } : {}) },
       });
       if (Array.isArray(res.data)) return res.data;
       if (res.data?.items && Array.isArray(res.data.items)) return res.data.items;

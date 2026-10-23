@@ -5,7 +5,9 @@ import { AppShell } from '../../../components/layout/AppShell';
 import { useLeads, useUpdateLeadStage, useConvertLead } from '../../../features/leads/api';
 import { AddLeadSlideOver } from '../../../features/leads/components/AddLeadSlideOver';
 import { Lead, LeadStage } from '../../../types/api';
-import { Plus, UserCheck, Phone, Mail, Search, List, LayoutGrid, CalendarClock, Loader2 } from 'lucide-react';
+import { Plus, UserCheck, Phone, Mail, Search, List, LayoutGrid, CalendarClock, Loader2, Download, BarChart3 } from 'lucide-react';
+import { downloadCsv, leadsToCsv, monthlyLeadCounts } from '../../../features/leads/report';
+import { localToday } from '../../../lib/datetime';
 import { toast } from 'sonner';
 import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
@@ -64,6 +66,7 @@ export default function LeadsPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showMonthly, setShowMonthly] = useState(false);
 
   const handleConvert = async (leadId: string, leadName: string) => {
     try {
@@ -146,6 +149,22 @@ export default function LeadsPage() {
           subtitle="Track and convert prospective patients"
           actions={
             <>
+              {leads.length > 0 && (
+                <>
+                  <Button variant="secondary" onClick={() => setShowMonthly((v) => !v)} aria-pressed={showMonthly}>
+                    <BarChart3 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Monthly</span>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => downloadCsv(`leads-${localToday()}.csv`, leadsToCsv(filteredLeads))}
+                    title="Download the leads shown below as a CSV file (opens in Excel)"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">Export CSV</span>
+                  </Button>
+                </>
+              )}
               <SegmentGroup>
                 <SegmentTab active={viewMode === 'list'} onClick={() => setViewMode('list')} icon={List}>
                   <span className="hidden sm:inline">List</span>
@@ -192,6 +211,43 @@ export default function LeadsPage() {
           )}
         </div>
 
+        {showMonthly && !isLoading && (
+          <Card className="overflow-hidden">
+            <div className="flex items-center justify-between border-b border-line px-5 py-3">
+              <h2 className="font-display text-[15px] font-bold text-ink">Leads by month</h2>
+              <span className="text-xs text-muted">Last 6 months, by date added</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] font-bold uppercase tracking-wider text-muted">
+                    <th className="px-5 py-2.5">Month</th>
+                    <th className="px-5 py-2.5 text-right">New leads</th>
+                    <th className="px-5 py-2.5 text-right">Converted</th>
+                    <th className="px-5 py-2.5 text-right">Lost</th>
+                    <th className="px-5 py-2.5 text-right">Still open</th>
+                    <th className="px-5 py-2.5 text-right">Conversion</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {monthlyLeadCounts(leads).map((m) => (
+                    <tr key={m.key}>
+                      <td className="px-5 py-2.5 font-semibold text-ink">{m.label}</td>
+                      <td className="px-5 py-2.5 text-right tabular-nums">{m.total}</td>
+                      <td className="px-5 py-2.5 text-right tabular-nums text-ok">{m.converted}</td>
+                      <td className="px-5 py-2.5 text-right tabular-nums text-danger">{m.lost}</td>
+                      <td className="px-5 py-2.5 text-right tabular-nums">{m.open}</td>
+                      <td className="px-5 py-2.5 text-right tabular-nums text-muted">
+                        {m.total ? `${Math.round((m.converted / m.total) * 100)}%` : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
         {isLoading ? (
           <Card className="flex h-64 items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-grove" aria-label="Loading leads" />
@@ -222,7 +278,7 @@ export default function LeadsPage() {
                     </tr>
                   ) : (
                     filteredLeads.map((lead) => (
-                      <tr key={lead.id} className="transition-colors hover:bg-canvas/70 dark:hover:bg-slate-800/50">
+                      <tr key={lead.id}>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
                             <Avatar name={lead.name} size={36} />
