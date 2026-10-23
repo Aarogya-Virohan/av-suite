@@ -22,7 +22,7 @@ import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } f
 import { Avatar, Button, Card } from '../../../../components/ui/brand';
 import { cn } from '../../../../lib/cn';
 
-type TabKey = 'timeline' | 'documents' | 'treatments' | 'soapNotes' | 'assessments' | 'progression' | 'rx' | 'billing';
+type TabKey = 'timeline' | 'documents' | 'treatments' | 'soapNotes' | 'progression' | 'rx' | 'billing';
 
 export default function PatientWorkspacePage() {
   usePermissionSubscription(); // see Decisions.md D-013
@@ -133,8 +133,7 @@ export default function PatientWorkspacePage() {
     { key: 'timeline', label: 'Timeline', icon: Clock },
     { key: 'documents', label: 'Documents', icon: FileText },
     { key: 'treatments', label: 'Treatments', icon: Stethoscope },
-    { key: 'soapNotes', label: 'SOAP Notes', icon: FileText },
-    { key: 'assessments', label: 'Assessments', icon: Stethoscope },
+    { key: 'soapNotes', label: 'SOAP & Assessments', icon: FileText },
     { key: 'progression', label: 'Progression', icon: Activity },
     { key: 'rx', label: 'Rx Prescription', icon: FileCheck },
     { key: 'billing', label: 'Billing', icon: CreditCard },
@@ -314,9 +313,7 @@ export default function PatientWorkspacePage() {
 
           {activeTab === 'treatments' && <TreatmentsTab patientId={patient.id} />}
 
-          {activeTab === 'soapNotes' && <SoapNotesTab patientId={patient.id} isReassessmentOnly={false} />}
-
-          {activeTab === 'assessments' && <SoapNotesTab patientId={patient.id} isReassessmentOnly={true} />}
+          {activeTab === 'soapNotes' && <SoapNotesTab patientId={patient.id} />}
 
           {activeTab === 'progression' && <ProgressionTab patientId={patient.id} patientName={`${patient.first_name} ${patient.last_name}`} />}
 
