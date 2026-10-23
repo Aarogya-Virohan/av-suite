@@ -68,7 +68,11 @@ export function SidebarNavigation() {
   const role = useAuthStore((s) => s.role);
   const clinic = useAuthStore((s) => s.clinic);
   const logout = useAuthStore((s) => s.logout);
-  const { isSidebarOpen, toggleSidebar } = useUiStore();
+  const { isSidebarOpen, toggleSidebar, setSidebarOpen } = useUiStore();
+  // On phones the sidebar is an overlay; picking a page closes it.
+  const closeOnPhone = () => {
+    if (window.matchMedia('(max-width: 767px)').matches) setSidebarOpen(false);
+  };
   const { data: clinicSettings } = useClinicSettings(hasCapability('settings.view')); // L-29
 
   const effectiveClinic = clinic || clinicSettings;
@@ -82,7 +86,8 @@ export function SidebarNavigation() {
     <aside
       className={cn(
         'fixed bottom-0 left-0 top-0 z-30 flex flex-col overflow-hidden bg-[var(--brand-navy)] text-white transition-all duration-200',
-        isSidebarOpen ? 'w-64' : 'w-16',
+        // Phones: hidden when closed, overlay when open. Desktop: 64 / 16 as before.
+        isSidebarOpen ? 'w-64 translate-x-0' : 'w-16 -translate-x-full md:translate-x-0',
       )}
     >
       {/* Brand glow, taken from the website banner. Sits above the clinic's
@@ -146,6 +151,7 @@ export function SidebarNavigation() {
                     key={item.href}
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
+                    onClick={closeOnPhone}
                     className={cn(
                       'relative flex items-center gap-3 rounded-[9px] px-3 py-2.5 text-sm font-medium transition-colors',
                       isActive
