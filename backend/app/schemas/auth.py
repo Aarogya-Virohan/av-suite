@@ -1,6 +1,9 @@
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
+
+from app.core.security import check_password_byte_length
+
 
 class RegisterRequest(BaseModel):
     clinic_name: str
@@ -8,6 +11,12 @@ class RegisterRequest(BaseModel):
     password: str
     first_name: str
     last_name: str
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, value: str) -> str:
+        return check_password_byte_length(value)
+
 
 class LoginRequest(BaseModel):
     email: EmailStr

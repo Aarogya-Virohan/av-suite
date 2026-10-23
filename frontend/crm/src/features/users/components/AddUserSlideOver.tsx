@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { PASSWORD_TOO_LONG_MESSAGE, passwordTooLong } from '../../../lib/password';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { SlideOver } from '../../../components/ui/SlideOver';
@@ -52,6 +53,7 @@ export function AddUserSlideOver({ isOpen, onClose }: Props) {
     if (!lastName.trim()) next.lastName = 'Last name is required';
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) next.email = 'Enter a valid email';
     if (password.length < 8) next.password = 'At least 8 characters';
+    else if (passwordTooLong(password)) next.password = PASSWORD_TOO_LONG_MESSAGE;
     if (!role) next.role = 'Select a role';
     setErrors(next);
     return Object.keys(next).length === 0;
