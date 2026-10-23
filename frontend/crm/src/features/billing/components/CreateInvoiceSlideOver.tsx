@@ -10,7 +10,7 @@ import { invoiceFormSchema, InvoiceFormValues } from '../../../lib/schemas';
 // The invoice number is assigned by the backend (per clinic, INV-0001,
 // INV-0002, ...) and any number sent by the client is ignored, so the form
 // has no number field. The number is shown after the invoice is created.
-import { useCreateInvoice } from '../api';
+import { useCreateInvoice, usePackages } from '../api';
 import { usePatients } from '../../patients/api';
 import { hasCapability } from '../../../config/permissions';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
@@ -35,6 +35,27 @@ const num = (v: unknown) => {
 /** Round to paise to avoid float artefacts like 0.1 + 0.2. */
 const paise = (n: number) => Math.round(n * 100) / 100;
 const rupees = (n: number) => formatMoney(paise(n).toFixed(2));
+type AdjustMode = 'amount' | 'percent';
+
+/** Small ₹ / % switch for discount and tax (C-16). */
+function ModeSwitch({ mode, onChange, label }: { mode: AdjustMode; onChange: (m: AdjustMode) => void; label: string }) {
+  return (
+    <span role="group" aria-label={`${label} in rupees or percent`} className="inline-flex overflow-hidden rounded-md border border-line text-[10px] font-bold">
+      {(['amount', 'percent'] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          aria-pressed={mode === m}
+          onClick={() => onChange(m)}
+          className={cn('cursor-pointer px-1.5 py-0.5 transition-colors', mode === m ? 'bg-grove text-white' : 'bg-card text-muted hover:text-ink')}
+        >
+          {m === 'amount' ? '₹' : '%'}
+        </button>
+      ))}
+    </span>
+  );
+}
+
 const toNumberOrUndefined = (v: unknown) => (v === '' || v == null ? undefined : Number(v));
 
 const emptyItem = () => ({ description: '', quantity: 1, unit_price: undefined as unknown as number, total_price: 0 });
@@ -53,6 +74,15 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   const createInvoice = useCreateInvoice();
   const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
+  // Packages from the clinic's catalogue can be added as a ready line (C-15).
+  const { data: packages = [] } = usePackages(isOpen && hasCapability('packages.view'));
+  const activePackages = packages.filter((p) => p.status === 'active');
+  // Discount and tax can be typed in rupees or percent; only the rupee amount
+  // is stored, because the backend has no percent fields yet (C-16).
+  const [discountMode, setDiscountMode] = React.useState<AdjustMode>('amount');
+  const [taxMode, setTaxMode] = React.useState<AdjustMode>('amount');
+  const [discountPct, setDiscountPct] = React.useState('');
+  const [taxPct, setTaxPct] = React.useState('');
 
   const freshValues = (): InvoiceFormValues => ({
     patient_id: '',
@@ -80,19 +110,42 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   });
 
   React.useEffect(() => {
-    if (isOpen) reset(freshValues());
+    if (isOpen) {
+      reset(freshValues());
+      setDiscountMode('amount');
+      setTaxMode('amount');
+      setDiscountPct('');
+      setTaxPct('');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, reset]);
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'items' });
+  const { fields, append, remove, update } = useFieldArray({ control, name: 'items' });
 
   const items = watch('items') || [];
-  const discountAmount = num(watch('discount_amount'));
-  const taxAmount = num(watch('tax_amount'));
   const issueDate = watch('issue_date');
 
   const lineTotal = (i: number) => paise(num(items[i]?.quantity || 1) * num(items[i]?.unit_price));
   const subtotal = paise(items.reduce((acc, _item, i) => acc + lineTotal(i), 0));
+  const discountAmount =
+    discountMode === 'percent' ? paise((subtotal * Math.min(100, num(discountPct))) / 100) : num(watch('discount_amount'));
+  // Tax in percent applies to the amount after discount.
+  const taxAmount = taxMode === 'percent' ? paise((Math.max(0, subtotal - discountAmount) * num(taxPct)) / 100) : num(watch('tax_amount'));
+
+  const addPackage = (packageId: string) => {
+    const pkg = activePackages.find((p) => p.id === packageId);
+    if (!pkg) return;
+    const line = {
+      description: `${pkg.name} (${pkg.total_sessions} sessions)`,
+      quantity: 1,
+      unit_price: Number(pkg.price),
+      total_price: Number(pkg.price),
+    };
+    const first = items[0];
+    // Fill the empty starting line instead of leaving a blank one behind.
+    if (items.length === 1 && !first?.description?.trim() && !num(first?.unit_price)) update(0, line);
+    else append(line);
+  };
   const totalAmount = paise(Math.max(0, subtotal - discountAmount + taxAmount));
 
   const onSubmit = async (values: InvoiceFormValues) => {
@@ -168,6 +221,22 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-line pb-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-grove">Line Items</h4>
+            <div className="flex items-center gap-3">
+            {activePackages.length > 0 && (
+              <select
+                aria-label="Add a package from the catalogue"
+                value=""
+                onChange={(e) => addPackage(e.target.value)}
+                className="h-8 max-w-[180px] cursor-pointer rounded-lg border border-line bg-card px-2 text-xs font-semibold text-ink-2 transition-colors hover:border-grove focus:border-grove focus:outline-none"
+              >
+                <option value="">+ Add package…</option>
+                {activePackages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} · {rupees(Number(p.price))}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
               onClick={() => append(emptyItem())}
@@ -176,6 +245,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
               <Plus className="h-3.5 w-3.5" />
               <span>Add Item</span>
             </button>
+            </div>
           </div>
 
           {fields.map((field, idx) => {
@@ -247,23 +317,48 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="inv-discount" className="mb-1 block text-[11px] font-medium text-muted">
-                Discount (₹)
-              </label>
-              <input
-                id="inv-discount"
-                {...register('discount_amount', { setValueAs: (v) => num(v) })}
-                type="number"
-                min={0}
-                step="0.01"
-                className={cn(smallInput, errors.discount_amount && 'border-danger')}
-              />
+              <div className="mb-1 flex items-center justify-between">
+                <label htmlFor={discountMode === 'percent' ? 'inv-discount-pct' : 'inv-discount'} className="text-[11px] font-medium text-muted">
+                  Discount ({discountMode === 'percent' ? '%' : '₹'})
+                </label>
+                <ModeSwitch mode={discountMode} onChange={setDiscountMode} label="Discount" />
+              </div>
+              {discountMode === 'percent' ? (
+                <input
+                  id="inv-discount-pct"
+                  value={discountPct}
+                  onChange={(e) => setDiscountPct(e.target.value)}
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  className={smallInput}
+                />
+              ) : (
+                <input
+                  id="inv-discount"
+                  {...register('discount_amount', { setValueAs: (v) => num(v) })}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className={cn(smallInput, errors.discount_amount && 'border-danger')}
+                />
+              )}
+              {discountMode === 'percent' && <p className="mt-1 text-[11px] tabular-nums text-muted">= {rupees(discountAmount)}</p>}
             </div>
             <div>
-              <label htmlFor="inv-tax" className="mb-1 block text-[11px] font-medium text-muted">
-                Tax (₹)
-              </label>
-              <input id="inv-tax" {...register('tax_amount', { setValueAs: (v) => num(v) })} type="number" min={0} step="0.01" className={smallInput} />
+              <div className="mb-1 flex items-center justify-between">
+                <label htmlFor={taxMode === 'percent' ? 'inv-tax-pct' : 'inv-tax'} className="text-[11px] font-medium text-muted">
+                  Tax ({taxMode === 'percent' ? '%' : '₹'})
+                </label>
+                <ModeSwitch mode={taxMode} onChange={setTaxMode} label="Tax" />
+              </div>
+              {taxMode === 'percent' ? (
+                <input id="inv-tax-pct" value={taxPct} onChange={(e) => setTaxPct(e.target.value)} type="number" min={0} step="0.01" className={smallInput} />
+              ) : (
+                <input id="inv-tax" {...register('tax_amount', { setValueAs: (v) => num(v) })} type="number" min={0} step="0.01" className={smallInput} />
+              )}
+              {taxMode === 'percent' && <p className="mt-1 text-[11px] tabular-nums text-muted">= {rupees(taxAmount)} (on amount after discount)</p>}
             </div>
           </div>
           {errors.discount_amount && <p className={errorText}>{errors.discount_amount.message}</p>}
