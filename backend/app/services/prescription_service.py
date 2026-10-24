@@ -185,7 +185,8 @@ def _rx_doc(rx: Prescription) -> RxDoc:
         )
     return RxDoc(
         rx_id=str(rx.id),
-        clinic_name=(rx.clinic.name if rx.clinic else "AV Clinic"),
+        clinic_name=(rx.clinic.name if rx.clinic else ""),
+        clinic_logo=(rx.clinic.branding_logo_url if rx.clinic else None),
         physio_name=physio_name,
         patient_name=(
             f"{patient.first_name} {patient.last_name}".strip() if patient else "Patient"

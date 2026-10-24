@@ -302,3 +302,160 @@ async def test_download_is_clinic_scoped_and_own_scoped(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------- letterhead (feedback 23 Oct)
+
+
+def _data_uri(fmt: str, mime: str, size=(300, 120)) -> str:
+    import base64
+
+    buf = io.BytesIO()
+    Image.new("RGBA" if fmt != "JPEG" else "RGB", size, (200, 30, 30)).save(buf, format=fmt)
+    return f"data:image/{mime};base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+async def test_letterhead_wording_and_no_signature() -> None:
+    out = build_prescription_html(_doc())
+    assert "Exercise Prescription Tool" in out
+    assert "Physical Therapy" not in out
+    assert "Prescribed by" not in out
+    assert "signature" not in out.lower()
+    assert '<div class="caption">Date</div>' not in out
+    assert "Treating therapist" in out and "Asha Rao" in out
+    # AV logo top-left, clinic on the right.
+    assert 'class="av-wordmark"' in out
+    assert out.index('class="lh-av"') < out.index('class="lh-clinic"')
+    assert "Grove &lt;Physio&gt;" in out
+    # No logo stored: clinic name only, no logo cell.
+    assert 'class="lh-logo"' not in out
+    # Date stays in the top box.
+    assert "Prescribed on" in out
+
+
+async def test_letterhead_av_only_without_clinic_and_no_empty_therapist() -> None:
+    out = build_prescription_html(_doc(clinic_name="", physio_name=""))
+    assert 'class="lh-clinic"' not in out and 'class="lh-logo"' not in out
+    assert ">Clinic<" not in out
+    assert "Treating therapist" not in out
+    assert 'class="av-wordmark"' in out
+
+
+async def test_clinic_logo_is_used_when_valid() -> None:
+    from app.services.report_letterhead import resolve_clinic_logo
+
+    src = await resolve_clinic_logo(_data_uri("PNG", "png", (1600, 400)))
+    assert src.startswith("data:image/png;base64,")
+    import base64
+
+    with Image.open(io.BytesIO(base64.b64decode(src.split(",", 1)[1]))) as img:
+        assert max(img.size) <= 400  # shrunk
+    out = build_prescription_html(_doc(clinic_logo_src=src))
+    assert f'<td class="lh-logo"><div class="tile"><img src="{src}"' in out
+
+
+@pytest.mark.parametrize(
+    ("fmt", "mime"), [("JPEG", "jpeg"), ("WEBP", "webp"), ("GIF", "gif"), ("PNG", "PNG")]
+)
+async def test_clinic_logo_raster_formats_become_png(fmt: str, mime: str) -> None:
+    from app.services.report_letterhead import resolve_clinic_logo
+
+    src = await resolve_clinic_logo(_data_uri(fmt, mime))
+    assert src.startswith("data:image/png;base64,"), fmt
+
+
+async def test_clinic_logo_bad_values_fall_back() -> None:
+    import base64
+
+    from app.services import report_letterhead
+    from app.services.report_letterhead import resolve_clinic_logo
+
+    svg = "data:image/svg+xml;base64," + base64.b64encode(
+        b'<svg xmlns="http://www.w3.org/2000/svg"><image href="http://169.254.169.254/"/></svg>'
+    ).decode()
+    not_image = "data:image/png;base64," + base64.b64encode(b"hello world").decode()
+    bad = [
+        None, "", "   ", svg, not_image,
+        "data:image/png;base64,@@@@",
+        'data:image/png;base64,AAAA" onload="x',
+        "http://example.com/logo.png",  # https only
+        "https://example.com/logo.png",  # no fetcher given
+        "/static/logo.png",
+        "javascript:alert(1)",
+        "data:image/png;base64," + "A" * (report_letterhead.LOGO_MAX_CHARS + 4),
+    ]
+    for value in bad:
+        assert await resolve_clinic_logo(value) == "", value
+
+
+async def test_clinic_logo_remote_url_uses_fetcher() -> None:
+    from app.services.report_letterhead import resolve_clinic_logo
+
+    seen: list[str] = []
+
+    async def ok(url: str) -> bytes:
+        seen.append(url)
+        return _png(800, 200)
+
+    async def none(url: str) -> None:
+        return None
+
+    async def boom(url: str) -> bytes:
+        raise TimeoutError()
+
+    async def junk(url: str) -> bytes:
+        return b"<html>not a logo</html>"
+
+    assert (await resolve_clinic_logo("https://cdn.test/l.png", ok)).startswith("data:image/png")
+    assert seen == ["https://cdn.test/l.png"]
+    assert await resolve_clinic_logo("https://cdn.test/l.png", none) == ""
+    assert await resolve_clinic_logo("https://cdn.test/l.png", boom) == ""
+    assert await resolve_clinic_logo("https://cdn.test/l.png", junk) == ""
+    seen.clear()
+    assert await resolve_clinic_logo("http://cdn.test/l.png", ok) == ""
+    assert seen == []
+
+
+async def test_fetch_logo_blocks_private_hosts_and_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if request.url.path == "/big":
+            return httpx.Response(200, content=b"\0" * 2000)
+        return httpx.Response(200, content=_png(10, 10))
+
+    transport = httpx.MockTransport(handler)
+    assert await prescription_pdf.fetch_logo("https://cdn.test/l.png", transport) is not None
+    assert await prescription_pdf.fetch_logo("https://internal.test/l.png", transport) is None
+    assert not any("internal.test" in c for c in calls)
+    monkeypatch.setattr(prescription_pdf, "IMAGE_MAX_BYTES", 1000)
+    assert await prescription_pdf.fetch_logo("https://cdn.test/big", transport) is None
+
+
+async def test_generated_pdf_uses_clinic_logo_from_db(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    storage = _FakeStorage()
+    monkeypatch.setattr(prescription_service, "_storage_client", lambda: storage)
+    seen: list[str] = []
+    real_render = prescription_pdf._render
+
+    def spy(html_content: str) -> bytes:
+        seen.append(html_content)
+        return real_render(html_content)
+
+    monkeypatch.setattr(prescription_pdf, "_render", spy)
+    clinic, _user, patient, exercise, headers = await _setup(db_session)
+    clinic.branding_logo_url = _data_uri("PNG", "png")
+    await db_session.commit()
+    rx_id = await _create_rx(client, headers, patient, exercise)
+
+    gen = await client.post(f"{settings.API_V1_PREFIX}/prescriptions/{rx_id}/pdf", headers=headers)
+    assert gen.status_code == 200, gen.text
+    assert len(seen) == 1
+    html_out = seen[0]
+    assert '<td class="lh-logo"><div class="tile"><img src="data:image/png;base64,' in html_out
+    assert clinic.name in html_out
+    assert "Treating therapist" in html_out and "Asha Rao" in html_out
+    assert storage.files[f"prescriptions/{clinic.id}/{rx_id}.pdf"][:5] == b"%PDF-"
