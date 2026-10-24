@@ -272,6 +272,24 @@ async def create_exercise(
         raise
 
 
+@router.get("/body-parts", tags=["Exercises"])
+async def list_body_parts(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: CapabilityScope = Depends(require_capability("exercises.view")),
+):
+    """
+    Body parts of every exercise the clinic can see, head to toe, with how
+    many exercises each has. The library builds its filter from this, so the
+    list is complete however many exercises there are (not only one page).
+    Exercises without a body part are counted under "Other".
+    """
+    from app.repositories.exercise import ExerciseRepository
+
+    rows = await ExerciseRepository(db).list_body_parts(request.state.clinic_id)
+    return ResponseEnvelope(data=[{"body_part": name, "count": count} for name, count in rows])
+
+
 @router.get(
     "/by-condition",
     response_model=ResponseEnvelope[List[ExerciseRead]],
