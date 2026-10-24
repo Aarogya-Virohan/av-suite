@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Exercise } from "@/types/exercise";
-import { Check, ImageOff, Lock, Plus } from "lucide-react";
+import { Check, ImageOff, Lock, Play, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ExerciseCardProps {
@@ -27,6 +27,17 @@ export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
             onError={() => setImgFailed(true)}
             className="h-full w-full object-contain"
           />
+        ) : exercise.videoUrl ? (
+          <a
+            href={exercise.videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Watch the ${exercise.name} demo video (opens in a new tab)`}
+            className="flex h-full w-full flex-col items-center justify-center gap-1 text-grove transition-colors hover:bg-grove-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+          >
+            <Play className="h-5 w-5" aria-hidden />
+            <span className="text-[11px] font-semibold">Watch video</span>
+          </a>
         ) : (
           <ImageOff className="h-5 w-5 text-[#b9b3a4]" aria-hidden />
         )}

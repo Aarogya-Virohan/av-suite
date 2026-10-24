@@ -200,8 +200,10 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
     hold: (be.hold as number) || 0,
     frequency: (be.frequency as string) || "Daily",
     isFree: Boolean(be.is_free),
-    videoUrl: (be.video_url as string) || "",
-    imageUrl: (be.video_url as string) || "", // video_url holds the image URL in the current DB design
+    // The API splits the stored media link into a picture and a demo video
+    // (EL-D-003); a video link is never used as an image source.
+    videoUrl: (be.demo_video_url as string) || "",
+    imageUrl: (be.image_url as string) || "",
   };
 }
 
