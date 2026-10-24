@@ -22,6 +22,25 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-002] Founders' feedback, batch 2: prescription PDF letterhead, co-branding and therapist name
+
+- **Date**: 2026-10-24
+- **Context**: Founders' feedback of 23 Oct 2026 on the prescription PDF: change "Physical Therapy & Rehabilitation" to "Exercise Prescription Tool"; our single logo top-left on every report; use the space where "Admin2 User" shows for the clinic's branding, and keep only our branding when the clinic is not onboarded; clinics have no digital signature, so remove the signature section and show the treating therapist; the date belongs at the top.
+- **Found while checking the code**: "Admin2 User" is the test account's real name, printed as "Prescribed by". The CRM settings page saves the clinic logo in `clinics.branding_logo_url` as a data URI of any `image/*` file up to 200 KB, and the settings API accepts any string, so the value can also be SVG, a remote URL or not an image at all. On 24 Oct both production clinics had no logo stored. The letterhead band was 100% wide plus 28 mm of padding, so its right edge ran off the page (hidden before because the right column was short).
+- **Decision**:
+  - New shared letterhead `backend/app/services/report_letterhead.py`: Aarogya Virohan white wordmark top-left on every page with the subtitle "Exercise Prescription Tool"; the clinic name on the right with the clinic logo on a white tile next to it. Other reports can adopt it in their own work; the posture module is not changed.
+  - Clinic logo: every value is decoded and re-encoded as a PNG of at most 400 px with Pillow before it reaches the PDF. PNG, JPEG, WebP and GIF data URIs are accepted; an https URL is downloaded with the exercise image rules (public hosts only, 6 s timeout, 8 MB cap). SVG, plain http, relative paths and anything unreadable are dropped, and the clinic name is shown without a logo.
+  - No clinic on the prescription: the right side stays empty (Aarogya Virohan only). A clinic without a usable logo still shows its name, because the patient needs to know which clinic prescribed.
+  - "Selectable" branding is automatic: the clinic logo shows when one is stored. No per-PDF toggle unless the founders ask for one.
+  - Signature and date lines removed. "Treating therapist: <name>" is printed under the safety note (the prescriber). The date stays in the patient box at the top, in IST.
+  - Letterhead uses `box-sizing: border-box`, so the right side sits inside the page margin.
+- **API and data**: no change. No migration.
+- **Verified**: backend `pytest` on a fresh Postgres: base `release/el-oct` 010bd96 314 pass / 10 known environment failures; this branch 325 pass / the same 10 (11 new tests: wording present and absent, AV-only, logo used, four raster formats re-encoded, twelve bad values dropped, remote URL through the fetcher, private host and size cap blocked, and a PDF generated through the API with a logo stored on the clinic in the DB). A mutation that allowed plain http logos made a test fail. Real PDFs rasterised and every page checked: 2-page prescription with a WebP logo and a long clinic name, AV-only, and an SVG logo falling back to the name.
+- **Not verified**: live rendering on Railway (checked after the round reaches dev). Exercise images show "Image not available" locally because the container cannot reach Blogger.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/prescription_service.py`, `backend/tests/test_prescription_pdf.py`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -31,5 +50,7 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-03 | Red flags: no reviewed list exists. Quick picks only reuse what the clinic already wrote | Open; founders to give or approve a list | Founders |
 | EL-L-04 | Quick picks read the clinic's last 1000 exercise notes and last 1000 prescriptions; older phrases drop out | Accepted | - |
 | EL-L-05 | Exercise images and videos share `video_url` (some rows hold relative video names such as `hamstring.mp4`, so no picture shows) | Open; separate image and video fields, with the personalised exercise photos | Backend |
+| EL-L-06 | The CRM settings page accepts any `image/*` logo and the settings API does not check the value. SVG logos never print on the prescription (name only) | Open; limit the CRM upload to PNG/JPEG/WebP, in the CRM round | CRM |
+| EL-L-07 | The PDF names the prescribing therapist. "Head of clinic" needs clinic profile fields that do not exist yet (CRM L-14) | Open; founders to choose, fields come with the CRM clinic profile work | Founders + backend |
 
-*Last updated: 2026-10-24 (EL-D-001, EL-L-01 to EL-L-05) | Branch: feat/el-ux*
+*Last updated: 2026-10-24 (EL-D-002, EL-L-06, EL-L-07) | Branch: feat/el-pdf*
