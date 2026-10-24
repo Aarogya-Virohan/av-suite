@@ -41,6 +41,24 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-003] Exercise media, batch 3: picture and demo video read apart, no migration yet
+
+- **Date**: 2026-10-24
+- **Context**: `exercises.video_url` holds every media link (EL-L-05). The founders want personalised exercise photos from two angles (feedback item 2, question Q2 still open) and the library will grow to a few thousand exercises from the image pipeline.
+- **Found while checking**: production data on 24 Oct: 12 global exercises with Blogger picture links (no file extension), 8 clinic exercises with video file links, 1 empty; no relative names such as `hamstring.mp4` remain. The library card put video links into an `<img>`, so the 8 clinic videos never showed anywhere. The prescription PDF downloaded every video link (up to 8 MB or the 6 s timeout) only to fail reading it as a picture. The open CDSS branch adds four migrations chained from `a8c4e2f1d903`, the same head a new migration here would use.
+- **Decision**:
+  - No migration in this batch. The media model depends on the founders' answer to Q2 (likely a media table with kind and angle, not one more column), so a column now would mean a second migration and a second data move. It also avoids two alembic heads while the CDSS branch is open.
+  - New `backend/app/services/exercise_media.py` splits the stored link when it is read: a video is an https link whose path ends in a video extension (.mp4, .mov, .m4v, .webm, .m3u8, .ogv) or that points to YouTube or Vimeo; any other https link is a picture; anything that is not an absolute https link is neither.
+  - API: `ExerciseRead` gains read-only `image_url` and `demo_video_url`. `video_url` is unchanged in requests, responses and the database, so existing clients keep working. Values sent for the new fields on create or update are ignored.
+  - Prescription PDF fetches only `image_url`; video links are never downloaded.
+  - Library card: picture from `image_url`; an exercise with only a video shows a "Watch video" tile that opens the video in a new tab (`noopener noreferrer`). This is a new visible control; the card looked the same as "no image" before.
+- **Later, with the founders' answer**: a proper media model (picture, video, clinic photos from two angles, consent where a patient appears) in its own migration, chained after whichever head `dev` has then.
+- **Verified**: backend `pytest` on a fresh Postgres: base `release/el-oct` a9c1483 325 pass / 10 known environment failures; this branch 349 pass / the same 10 (24 new: 21 split cases, API fields and unchanged `video_url` and DB value, create ignores the computed fields, PDF asks only for the picture link). Using `video_url` for the PDF again made the PDF test fail. Frontend `tsc`, `eslint`, `next build` clean. Playwright on the production build at 1440 and 390 px against a local backend: picture card uses `image_url`, video card shows the tile with the right link, a relative name shows the no-image icon, the tile opens a new tab; no page errors, no failed calls.
+- **Not verified**: live. Whether the 12 Blogger and 8 video links in production all start with https (http links are now shown as neither).
+- **Affected Files**: `backend/app/services/exercise_media.py`, `backend/app/schemas/exercise.py`, `backend/app/services/prescription_service.py`, `backend/tests/test_exercise_media.py`, `frontend/exercise-library/src/lib/api.ts`, `frontend/exercise-library/src/components/library/ExerciseCard.tsx`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -49,8 +67,8 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-02 | L-35 (CRM file), exercise part fixed here: exercises page through the whole library. The patient picker still loads at most 100 patients | Open | Frontend |
 | EL-L-03 | Red flags: no reviewed list exists. Quick picks only reuse what the clinic already wrote | Open; founders to give or approve a list | Founders |
 | EL-L-04 | Quick picks read the clinic's last 1000 exercise notes and last 1000 prescriptions; older phrases drop out | Accepted | - |
-| EL-L-05 | Exercise images and videos share `video_url` (some rows hold relative video names such as `hamstring.mp4`, so no picture shows) | Open; separate image and video fields, with the personalised exercise photos | Backend |
+| EL-L-05 | Exercise pictures and videos share `video_url`. Since EL-D-003 the API reads them apart (`image_url`, `demo_video_url`); the stored column is still shared. No relative names left in production (24 Oct) | Partly fixed; proper media model with the founders' answer on personalised photos | Backend + founders |
 | EL-L-06 | The CRM settings page accepts any `image/*` logo and the settings API does not check the value. SVG logos never print on the prescription (name only) | Open; limit the CRM upload to PNG/JPEG/WebP, in the CRM round | CRM |
 | EL-L-07 | The PDF names the prescribing therapist. "Head of clinic" needs clinic profile fields that do not exist yet (CRM L-14) | Open; founders to choose, fields come with the CRM clinic profile work | Founders + backend |
 
-*Last updated: 2026-10-24 (EL-D-002, EL-L-06, EL-L-07) | Branch: feat/el-pdf*
+*Last updated: 2026-10-24 (EL-D-003, EL-L-05 updated) | Branch: feat/el-media*
