@@ -8,6 +8,7 @@ from app.models.prescription import Prescription
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
 from app.repositories.prescription import PrescriptionRepository
 from app.utils.whatsapp import build_whatsapp_link
+from app.services import exercise_media
 from app.services.prescription_pdf import (
     RxDoc,
     RxItem,
@@ -180,7 +181,9 @@ def _rx_doc(rx: Prescription) -> RxDoc:
                 hold=item.hold,
                 frequency=item.frequency,
                 note=item.note,
-                image_url=(ex.video_url if ex and ex.video_url else None),
+                # Only picture links are fetched; demo videos are never
+                # downloaded into the PDF (EL-D-003).
+                image_url=(exercise_media.image_url(ex.video_url) if ex else None),
             )
         )
     return RxDoc(
