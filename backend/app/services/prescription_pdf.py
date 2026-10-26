@@ -98,6 +98,10 @@ class RxItem:
     note: str | None
     image_url: str | None
     image_src: str = ""
+    # The clinic's own photos (front, side) as data URIs, EL-D-004. When
+    # present they replace the library picture.
+    exercise_id: str | None = None
+    photo_srcs: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -294,11 +298,20 @@ def _patient_box(doc: RxDoc, on: date) -> str:
 
 
 def _exercise_card(index: int, item: RxItem) -> str:
-    image = (
-        f'<img src="{item.image_src}" alt="" />'
-        if item.image_src
-        else '<div class="noimg">Image not available</div>'
-    )
+    photos = [p for p in item.photo_srcs if p][:2]
+    if len(photos) == 2:
+        image = (
+            '<table class="pair"><tr>'
+            + "".join(f'<td><img class="photo" src="{p}" alt="" /></td>' for p in photos)
+            + "</tr></table>"
+        )
+    elif photos:
+        image = f'<img class="photo" src="{photos[0]}" alt="" />'
+    elif item.image_src:
+        image = f'<img src="{item.image_src}" alt="" />'
+    else:
+        image = '<div class="noimg">Image not available</div>'
+    img_class = "ex-img two" if len(photos) == 2 else "ex-img"
     hold = f"{item.hold}&nbsp;s" if item.hold else "&ndash;"
     note = (
         f'<p class="ex-note"><span>Therapist note</span>{_esc(item.note)}</p>'
@@ -310,7 +323,7 @@ def _exercise_card(index: int, item: RxItem) -> str:
     )
     return f"""
 <div class="ex-card"><table class="ex"><tr>
-  <td class="ex-img">{image}</td>
+  <td class="{img_class}">{image}</td>
   <td class="ex-body">
     <p class="ex-head"><span class="ex-num">{index}</span>
       <span class="ex-title">{_esc(item.title.lower())}</span>
@@ -411,6 +424,11 @@ p {{ margin: 0; }}
 .ex-img {{ width: 40mm; padding-right: 4mm !important; }}
 .ex-img img {{ width: 40mm; height: 32mm; object-fit: contain; background: #fff;
   border-radius: 2.5mm; border: 1px solid {RULE}; display: block; }}
+.ex-img.two {{ width: 64mm; }}
+.pair {{ border-collapse: collapse; }}
+.pair td {{ padding: 0 !important; vertical-align: top; }}
+.pair td + td {{ padding-left: 2mm !important; }}
+.ex-img .pair img {{ width: 31mm; height: 32mm; box-sizing: border-box; }}
 .noimg {{ width: 40mm; height: 32mm; border-radius: 2.5mm; border: 1px dashed {RULE};
   color: {MUTED}; font-size: 7pt; text-align: center; line-height: 32mm; }}
 .ex-head {{ margin-bottom: 2mm; }}
@@ -490,7 +508,8 @@ async def render_prescription_pdf(doc: RxDoc) -> bytes:
     """Embed images and the clinic logo, build the HTML and render it off the
     event loop."""
     images, logo = await asyncio.gather(
-        embed_images([it.image_url for it in doc.items if it.image_url]),
+        # Items with the clinic's own photos do not need the library picture.
+        embed_images([it.image_url for it in doc.items if it.image_url and not it.photo_srcs]),
         resolve_clinic_logo(doc.clinic_logo, fetch_logo),
     )
     doc.clinic_logo_src = logo
