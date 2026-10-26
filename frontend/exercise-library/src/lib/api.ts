@@ -1,4 +1,4 @@
-import { Exercise, Patient, SavedPrescription } from "@/types/exercise";
+import { Exercise, ExercisePhoto, Patient, PhotoAngle, SavedPrescription } from "@/types/exercise";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const API = `${BASE_URL}/api/v1`;
@@ -122,7 +122,10 @@ function networkError(): ApiError {
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  // FormData sets its own multipart Content-Type with the boundary.
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
@@ -179,6 +182,13 @@ export async function login(email: string, password: string, clinicId?: string):
 export interface Me {
   user: { first_name?: string | null; last_name?: string | null; email: string };
   clinic: { name: string } | null;
+  /** Capability key to scope ("none", "own" or "all"). */
+  capabilities?: Record<string, string>;
+}
+
+export function can(me: Me | null, capability: string): boolean {
+  const scope = me?.capabilities?.[capability];
+  return !!scope && scope !== "none";
 }
 
 export function fetchMe(): Promise<Me> {
@@ -204,7 +214,45 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
     // (EL-D-003); a video link is never used as an image source.
     videoUrl: (be.demo_video_url as string) || "",
     imageUrl: (be.image_url as string) || "",
+    photos: mapPhotos(be.photos),
   };
+}
+
+function mapPhotos(raw: unknown): ExercisePhoto[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (p): p is { angle: PhotoAngle; updated_at: string } =>
+        !!p && (p.angle === "front" || p.angle === "side") && typeof p.updated_at === "string"
+    )
+    .map((p) => ({ angle: p.angle, updatedAt: p.updated_at }));
+}
+
+// --------------------------------------------------------------- exercise photos
+
+/** The photo as a blob URL. The endpoint needs the login token, so a plain
+ * <img src> cannot load it. The caller revokes the URL when done. */
+export async function fetchExercisePhoto(exerciseId: string, angle: PhotoAngle): Promise<string> {
+  const response = await request(`/exercises/${encodeURIComponent(exerciseId)}/photos/${angle}`);
+  return URL.createObjectURL(await response.blob());
+}
+
+export async function uploadExercisePhoto(
+  exerciseId: string,
+  angle: PhotoAngle,
+  file: File
+): Promise<ExercisePhoto> {
+  const form = new FormData();
+  form.append("file", file);
+  const data = await json<{ angle: PhotoAngle; updated_at: string }>(
+    `/exercises/${encodeURIComponent(exerciseId)}/photos/${angle}`,
+    { method: "PUT", body: form }
+  );
+  return { angle: data.angle, updatedAt: data.updated_at };
+}
+
+export async function deleteExercisePhoto(exerciseId: string, angle: PhotoAngle): Promise<void> {
+  await request(`/exercises/${encodeURIComponent(exerciseId)}/photos/${angle}`, { method: "DELETE" });
 }
 
 export interface ExercisePage {
