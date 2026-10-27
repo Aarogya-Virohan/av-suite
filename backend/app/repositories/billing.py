@@ -98,7 +98,7 @@ class InvoiceRepository(BaseRepository[Invoice]):
 
         statement = (
             select(Invoice)
-            .options(selectinload(Invoice.items), selectinload(Invoice.payments))
+            .options(selectinload(Invoice.items), selectinload(Invoice.payments), selectinload(Invoice.patient))
             .where(Invoice.id == invoice_id)
         )
         statement = self._apply_clinic_scope(statement, clinic_id)
@@ -121,7 +121,7 @@ class InvoiceRepository(BaseRepository[Invoice]):
         """List invoices with optional patient, status, and date range filters."""
 
         effective_limit = min(limit, 500)
-        statement = select(Invoice).options(selectinload(Invoice.items))
+        statement = select(Invoice).options(selectinload(Invoice.items), selectinload(Invoice.patient))
 
         if patient_id is not None:
             statement = statement.where(Invoice.patient_id == patient_id)
@@ -173,7 +173,7 @@ class PaymentRepository(BaseRepository[Payment]):
         """List payments with optional invoice, patient, and date range filters."""
 
         effective_limit = min(limit, 500)
-        statement = select(Payment)
+        statement = select(Payment).options(selectinload(Payment.patient))
 
         if invoice_id is not None:
             statement = statement.where(Payment.invoice_id == invoice_id)
