@@ -52,7 +52,9 @@ class TreatmentSessionRepository(BaseRepository[TreatmentSession]):
             end_dt = datetime.combine(end_date, time.max, tzinfo=timezone.utc)
             statement = statement.where(TreatmentSession.treatment_date <= end_dt)
 
-        statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
+        statement = self._apply_clinic_scope(statement, clinic_id).order_by(
+            TreatmentSession.treatment_date.desc(), TreatmentSession.created_at.desc()
+        ).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())
 
@@ -97,6 +99,8 @@ class SoapAssessmentRepository(BaseRepository[SoapAssessment]):
         if is_reassessment is not None:
             statement = statement.where(SoapAssessment.is_reassessment == is_reassessment)
 
-        statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
+        statement = self._apply_clinic_scope(statement, clinic_id).order_by(
+            SoapAssessment.created_at.desc()
+        ).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())
