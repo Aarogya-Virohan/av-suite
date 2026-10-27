@@ -1,22 +1,37 @@
 import React, { useState } from "react";
 import { Exercise } from "@/types/exercise";
-import { Check, ImageOff, Lock, Play, Plus } from "lucide-react";
+import { Camera, Check, ImageOff, Lock, Play, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useExercisePhoto } from "@/lib/exercisePhotos";
 
 interface ExerciseCardProps {
   exercise: Exercise;
   isAdded: boolean;
   onAdd: (exercise: Exercise) => void;
+  /** Shown only to users who may add clinic photos (exercises.edit). */
+  onEditPhotos?: (exercise: Exercise) => void;
 }
 
-export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
+export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos }: ExerciseCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
-  const showImage = exercise.imageUrl && !imgFailed;
+  // The clinic's own front photo comes first, then the library picture.
+  const front = exercise.photos?.find((p) => p.angle === "front") ?? exercise.photos?.[0];
+  const clinicUrl = useExercisePhoto(exercise.id, front);
+  const showClinic = !!front && clinicUrl !== null;
+  const showImage = !showClinic && exercise.imageUrl && !imgFailed;
+  const photoCount = exercise.photos?.length ?? 0;
 
   return (
     <article className="group flex gap-3.5 rounded-2xl border border-line bg-card p-3 shadow-card transition-colors hover:border-grove/30">
       <div className="grid h-[76px] w-[96px] shrink-0 place-items-center overflow-hidden rounded-xl border border-line-soft bg-white">
-        {showImage ? (
+        {showClinic ? (
+          clinicUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={clinicUrl} alt="" className="h-full w-full object-contain" />
+          ) : (
+            <span className="h-full w-full animate-pulse bg-grove-wash" aria-hidden />
+          )
+        ) : showImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={exercise.imageUrl}
@@ -53,6 +68,11 @@ export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
               <span className="rounded-md bg-grove-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-grove">
                 {exercise.bodyPart}
               </span>
+              {photoCount > 0 && (
+                <span className="rounded-md bg-info-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-info">
+                  Clinic photo{photoCount > 1 ? "s" : ""}
+                </span>
+              )}
               {!exercise.isFree && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-warn-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warn">
                   <Lock className="h-2.5 w-2.5" />
@@ -62,6 +82,18 @@ export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
             </div>
           </div>
 
+          <div className="flex shrink-0 items-center gap-1.5">
+          {onEditPhotos && (
+            <button
+              type="button"
+              onClick={() => onEditPhotos(exercise)}
+              aria-label={`Clinic photos for ${exercise.name}`}
+              title="Clinic photos"
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded-[10px] border border-line text-grove transition-colors hover:bg-grove-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+            >
+              <Camera className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="button"
             disabled={isAdded}
@@ -77,6 +109,7 @@ export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
             {isAdded ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {isAdded ? "Added" : "Add"}
           </button>
+          </div>
         </div>
         {exercise.instructions && (
           <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-ink-2">{exercise.instructions}</p>
