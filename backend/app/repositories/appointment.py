@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,27 @@ class AppointmentRepository(BaseRepository[Appointment]):
         """Create an appointment repository bound to the active session."""
 
         super().__init__(session, Appointment)
+
+    async def count_appointments(self, *, clinic_id: UUID, scheduled_date: date | None = None,
+                                 start_date: date | None = None, end_date: date | None = None,
+                                 patient_id: UUID | None = None, therapist_id: UUID | None = None,
+                                 status: AppointmentStatus | None = None) -> int:
+        statement = select(func.count()).select_from(Appointment)
+        if scheduled_date is not None:
+            start_dt = datetime.combine(scheduled_date, time.min, tzinfo=CLINIC_TZ).astimezone(timezone.utc)
+            end_dt = datetime.combine(scheduled_date + timedelta(days=1), time.min, tzinfo=CLINIC_TZ).astimezone(timezone.utc)
+            statement = statement.where(Appointment.scheduled_at >= start_dt, Appointment.scheduled_at < end_dt)
+        if start_date is not None:
+            start_dt = datetime.combine(start_date, time.min, tzinfo=CLINIC_TZ).astimezone(timezone.utc)
+            statement = statement.where(Appointment.scheduled_at >= start_dt)
+        if end_date is not None:
+            end_dt = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=CLINIC_TZ).astimezone(timezone.utc)
+            statement = statement.where(Appointment.scheduled_at < end_dt)
+        if patient_id is not None: statement = statement.where(Appointment.patient_id == patient_id)
+        if therapist_id is not None: statement = statement.where(Appointment.therapist_id == therapist_id)
+        if status is not None: statement = statement.where(Appointment.status == status)
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        return int(await self.session.scalar(statement) or 0)
 
     async def get_by_id(self, id: UUID, **kwargs) -> Appointment | None:
         statement = select(Appointment).options(
@@ -55,7 +76,9 @@ class AppointmentRepository(BaseRepository[Appointment]):
         )
 
         if scheduled_date is not None:
-            start_date = end_date = scheduled_date
+            start_dt = datetime.combine(scheduled_date, time.min, tzinfo=CLINIC_TZ).astimezone(timezone.utc)
+            end_dt = datetime.combine(scheduled_date + timedelta(days=1), time.min, tzinfo=CLINIC_TZ).astimezone(timezone.utc)
+            statement = statement.where(Appointment.scheduled_at >= start_dt, Appointment.scheduled_at < end_dt)
         if start_date is not None:
             start_dt = datetime.combine(start_date, time.min, tzinfo=CLINIC_TZ).astimezone(timezone.utc)
             statement = statement.where(Appointment.scheduled_at >= start_dt)

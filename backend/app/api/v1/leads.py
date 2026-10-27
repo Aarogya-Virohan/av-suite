@@ -99,7 +99,10 @@ async def list_leads(
         limit=limit,
     )
     items = [LeadResponse.model_validate(ld) for ld in leads]
-    return LeadListResponse(items=items, total=len(items), offset=offset, limit=limit)
+    total = await service.lead_repository.count_leads(
+        clinic_id=clinic.id, stage=stage, assigned_to=assigned_to, source=source, search=search
+    )
+    return LeadListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
 @router.get("/{id}", response_model=LeadResponse)

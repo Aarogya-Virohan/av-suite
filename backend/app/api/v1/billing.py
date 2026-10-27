@@ -115,8 +115,9 @@ async def list_packages(
         clinic.id, status=status_filter, offset=offset, limit=limit
     )
     items = [PackageResponse.model_validate(p) for p in packages]
+    total = await service.package_repository.count_packages(clinic_id=clinic.id, status=status_filter)
     return PackageListResponse(
-        items=items, total=len(items), offset=offset, limit=limit
+        items=items, total=total, offset=offset, limit=limit
     )
 
 
@@ -240,8 +241,11 @@ async def list_patient_packages_by_patient(
         limit=limit,
     )
     items = [PatientPackageResponse.model_validate(p) for p in packages]
+    total = await service.patient_package_repository.count_packages(
+        clinic_id=clinic.id, patient_id=patient_id, package_id=package_id, status=status_filter
+    )
     return PatientPackageListResponse(
-        items=items, total=len(items), offset=offset, limit=limit
+        items=items, total=total, offset=offset, limit=limit
     )
 
 
@@ -367,8 +371,12 @@ async def list_invoices(
         limit=limit,
     )
     items = [InvoiceResponse.model_validate(inv) for inv in invoices]
+    total = await service.invoice_repository.count_invoices(
+        clinic_id=clinic.id, patient_id=patient_id, status=status_filter,
+        start_date=start_date, end_date=end_date
+    )
     return InvoiceListResponse(
-        items=items, total=len(items), offset=offset, limit=limit
+        items=items, total=total, offset=offset, limit=limit
     )
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -20,6 +20,12 @@ class PackageRepository(BaseRepository[Package]):
         """Initialize repository bound to session."""
 
         super().__init__(session, Package)
+
+    async def count_packages(self, *, clinic_id: UUID, status: PackageStatus | None = None) -> int:
+        statement = select(func.count()).select_from(Package)
+        if status is not None: statement = statement.where(Package.status == status)
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        return int(await self.session.scalar(statement) or 0)
 
     async def list_packages(
         self,
@@ -49,6 +55,15 @@ class PatientPackageRepository(BaseRepository[PatientPackage]):
         """Initialize repository bound to session."""
 
         super().__init__(session, PatientPackage)
+
+    async def count_packages(self, *, clinic_id: UUID, patient_id: UUID | None = None,
+                             package_id: UUID | None = None, status: PackageStatus | None = None) -> int:
+        statement = select(func.count()).select_from(PatientPackage)
+        if patient_id is not None: statement = statement.where(PatientPackage.patient_id == patient_id)
+        if package_id is not None: statement = statement.where(PatientPackage.package_id == package_id)
+        if status is not None: statement = statement.where(PatientPackage.status == status)
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        return int(await self.session.scalar(statement) or 0)
 
     async def list_packages(
         self,
@@ -86,6 +101,19 @@ class InvoiceRepository(BaseRepository[Invoice]):
         """Initialize repository bound to session."""
 
         super().__init__(session, Invoice)
+
+    async def count_invoices(self, *, clinic_id: UUID, patient_id: UUID | None = None,
+                             status: InvoiceStatus | None = None, start_date: date | None = None,
+                             end_date: date | None = None) -> int:
+        statement = select(func.count()).select_from(Invoice)
+        if patient_id is not None: statement = statement.where(Invoice.patient_id == patient_id)
+        if status is not None: statement = statement.where(Invoice.status == status)
+        if start_date is not None:
+            statement = statement.where(Invoice.issue_date >= datetime.combine(start_date, time.min, tzinfo=timezone.utc))
+        if end_date is not None:
+            statement = statement.where(Invoice.issue_date <= datetime.combine(end_date, time.max, tzinfo=timezone.utc))
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        return int(await self.session.scalar(statement) or 0)
 
     async def get_by_id_with_items(
         self,
@@ -158,6 +186,19 @@ class PaymentRepository(BaseRepository[Payment]):
         """Initialize repository bound to session."""
 
         super().__init__(session, Payment)
+
+    async def count_payments(self, *, clinic_id: UUID, invoice_id: UUID | None = None,
+                             patient_id: UUID | None = None, start_date: date | None = None,
+                             end_date: date | None = None) -> int:
+        statement = select(func.count()).select_from(Payment)
+        if invoice_id is not None: statement = statement.where(Payment.invoice_id == invoice_id)
+        if patient_id is not None: statement = statement.where(Payment.patient_id == patient_id)
+        if start_date is not None:
+            statement = statement.where(Payment.payment_date >= datetime.combine(start_date, time.min, tzinfo=timezone.utc))
+        if end_date is not None:
+            statement = statement.where(Payment.payment_date <= datetime.combine(end_date, time.max, tzinfo=timezone.utc))
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        return int(await self.session.scalar(statement) or 0)
 
     async def list_payments(
         self,

@@ -112,9 +112,14 @@ async def list_appointments(
     )
 
     items = [AppointmentResponse.model_validate(a) for a in appointments]
+    total = await service.appointment_repository.count_appointments(
+        clinic_id=clinic.id, scheduled_date=scheduled_date, start_date=start_date,
+        end_date=end_date, patient_id=patient_id, therapist_id=effective_therapist_id,
+        status=status_filter,
+    )
     return AppointmentListResponse(
         items=items,
-        total=len(items),
+        total=total,
         offset=offset,
         limit=limit,
     )
