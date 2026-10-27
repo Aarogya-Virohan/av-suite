@@ -59,6 +59,20 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-006] Bigger exercise pictures in the library and on the prescription PDF
+
+- **Date**: 2026-10-27
+- **Context**: Onkar, 27 Oct, after the batch 1 to 3 release went live: the picture on the PDF the patient gets is too small to follow, and in the library it cannot be opened large. The new exercise pictures are wide (three numbered steps in one image).
+- **Decision**:
+  - PDF: each exercise card shows its number, name and body part, then the picture across the card (up to 60 mm high, about 85 mm wide for the current pictures; it was 40 x 32 mm beside the text), then the dose, steps and note. Two exercises fit on a page. Pictures are embedded at up to 1400 px (was 560) so they stay sharp.
+  - Library: bigger thumbnail; clicking it opens the picture full size in a viewer (Escape, the close button or a click outside closes it).
+  - No API or database change. Built on dev 60a0219, separate from `feat/el-photos` and `feat/el-categories` (those also change the card and the PDF and will need this merged in).
+- **Verified**: pytest on dev 60a0219 369 pass / 10 known environment failures; this branch 370 / the same 10 (1 new test: picture above the dose, 60 mm, 1400 px; putting 560 px back makes it fail). Real PDFs rendered with three of the new pictures: 3 exercises on 2 pages, 6 on 3, every page looked at. Exercise Library `tsc`, `eslint`, `next build` clean; Playwright at 1440 and 390 px: viewer opens, picture 1024 x 721 on desktop and full width on a phone, Escape and outside click close it, no page errors.
+- **Not verified**: live.
+- **Affected Files**: `backend/app/services/prescription_pdf.py`, `backend/tests/test_prescription_pdf.py`, `frontend/exercise-library/src/components/library/ExerciseCard.tsx`, `frontend/exercise-library/src/components/library/ImageViewer.tsx`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -71,4 +85,4 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-06 | The CRM settings page accepts any `image/*` logo and the settings API does not check the value. SVG logos never print on the prescription (name only) | Open; limit the CRM upload to PNG/JPEG/WebP, in the CRM round | CRM |
 | EL-L-07 | The PDF names the prescribing therapist. "Head of clinic" needs clinic profile fields that do not exist yet (CRM L-14) | Open; founders to choose, fields come with the CRM clinic profile work | Founders + backend |
 
-*Last updated: 2026-10-24 (EL-D-003, EL-L-05 updated) | Branch: feat/el-media*
+*Last updated: 2026-10-27 (EL-D-006) | Branch: fix/el-image-size*
