@@ -30,11 +30,17 @@ from app.enums.user import UserRole
 from app.core.database import get_db
 from app.core.dependencies import require_capability
 from app.enums.permission import CapabilityScope
-from app.schemas.exercise import ExerciseCreate, ExercisePhotoInfo, ExerciseRead, ExerciseUpdate
+from app.schemas.exercise import (
+    ExerciseCategoryRef,
+    ExerciseCreate,
+    ExercisePhotoInfo,
+    ExerciseRead,
+    ExerciseUpdate,
+)
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
-from app.services import exercise_photos, exercise_service
+from app.services import exercise_category_service, exercise_photos, exercise_service
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +55,14 @@ async def list_exercises(
     body_part: Optional[str] = Query(None, description="Filter by body part"),
     is_free: Optional[bool] = Query(None, description="Filter by free/paid status"),
     search: Optional[str] = Query(None, description="Search in exercise title"),
+    category: Optional[List[str]] = Query(
+        None,
+        description=(
+            "Category ids from GET /exercises/categories (repeat the parameter "
+            "or separate with commas). Inside one group any value matches; "
+            "across groups every group must match."
+        ),
+    ),
     pagination: PaginationParams = Depends(get_pagination_params),
     db: AsyncSession = Depends(get_db),
     _: CapabilityScope = Depends(require_capability("exercises.view")),
@@ -139,10 +153,16 @@ async def list_exercises(
         # JWT token decode se clinic_id set hota hai middleware mein
         clinic_id = request.state.clinic_id
         logger.debug(f"Fetching exercises for clinic: {clinic_id}")
+        try:
+            category_conditions = await exercise_category_service.filter_conditions(
+                db, exercise_category_service.parse_ids(category)
+            )
+        except exercise_category_service.CategoryError as exc:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
         # Service layer ko call karte hain
         # Exercises list aur total count return hota hai with filters applied
         exercises, total = await exercise_service.get_exercises(
-            db, clinic_id, pagination, body_part, is_free, search
+            db, clinic_id, pagination, body_part, is_free, search, category_conditions
         )
 
         # Pagination metadata prepare karte hain
@@ -154,6 +174,8 @@ async def list_exercises(
         logger.info(f"Retrieved {len(exercises)} exercises, total: {total}")
         return ResponseEnvelope(data=await _with_photos(db, clinic_id, exercises), meta=meta)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"List exercises error: {str(e)}")
         raise
@@ -259,10 +281,11 @@ async def create_exercise(
 
         # Service layer ko call karte hain
         # New exercise database record create hota hai
+        exercise_in.category_ids = await _checked_category_ids(db, exercise_in.category_ids)
         exercise = await exercise_service.create_exercise(db, clinic_id, exercise_in)
 
         logger.info(f"Exercise created successfully: {exercise.id}")
-        return ResponseEnvelope(data=exercise)
+        return ResponseEnvelope(data=(await _with_photos(db, clinic_id, [exercise]))[0])
 
     except HTTPException:
         # Already handled exceptions ko re-raise karte hain
@@ -270,6 +293,21 @@ async def create_exercise(
     except Exception as e:
         logger.error(f"Create exercise error: {str(e)}")
         raise
+
+
+@router.get("/categories", tags=["Exercises"])
+async def list_categories(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _: CapabilityScope = Depends(require_capability("exercises.view")),
+):
+    """
+    Category groups for the library filter panel (EL-D-005), in panel order,
+    each with its values and how many exercises the clinic can see (its own
+    and global) carry each value. Counts do not change with the filters.
+    """
+    groups = await exercise_category_service.list_with_counts(db, request.state.clinic_id)
+    return ResponseEnvelope(data=groups)
 
 
 @router.get("/body-parts", tags=["Exercises"])
@@ -467,13 +505,15 @@ async def update_exercise(
     """Update an existing exercise."""
 
     clinic_id = request.state.clinic_id
+    if exercise_in.category_ids is not None:
+        exercise_in.category_ids = await _checked_category_ids(db, exercise_in.category_ids)
     exercise = await exercise_service.update_exercise(db, clinic_id, id, exercise_in)
     if not exercise:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Exercise not found or not in caller's clinic",
         )
-    return ResponseEnvelope(data=exercise)
+    return ResponseEnvelope(data=(await _with_photos(db, clinic_id, [exercise]))[0])
 
 
 @router.delete("/{id}", response_model=ResponseEnvelope[dict], tags=["Exercises"])
@@ -500,10 +540,25 @@ async def delete_exercise(
 # --------------------------------------------------------------------------
 
 
+async def _checked_category_ids(db: AsyncSession, ids):
+    try:
+        return await exercise_category_service.check_ids(db, ids)
+    except exercise_category_service.CategoryError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+
 async def _with_photos(db: AsyncSession, clinic_id, exercises) -> List[ExerciseRead]:
-    """ExerciseRead rows with the caller's clinic photos attached."""
+    """ExerciseRead rows with their categories and the caller's clinic photos
+    attached."""
     rows = [ExerciseRead.model_validate(e) for e in exercises]
-    if not rows or not clinic_id:
+    if not rows:
+        return rows
+    categories = await exercise_category_service.categories_for(db, [r.id for r in rows])
+    for r in rows:
+        r.categories = [
+            ExerciseCategoryRef.model_validate(c) for c in categories.get(r.id, [])
+        ]
+    if not clinic_id:
         return rows
     photos = await exercise_photos.photos_for(
         db, uuid.UUID(str(clinic_id)), [r.id for r in rows]

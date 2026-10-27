@@ -13,7 +13,8 @@ class ExerciseBase(BaseModel):
     video_url: Optional[str] = None
 
 class ExerciseCreate(ExerciseBase):
-    pass
+    # Category ids (GET /exercises/categories). Omitted or empty: none.
+    category_ids: Optional[list[uuid.UUID]] = None
 
 class ExerciseUpdate(BaseModel):
     title: Optional[str] = None
@@ -21,6 +22,18 @@ class ExerciseUpdate(BaseModel):
     body_part: Optional[str] = None
     is_free: Optional[bool] = None
     video_url: Optional[str] = None
+    # Omitted: categories unchanged. A list (also empty) replaces them.
+    category_ids: Optional[list[uuid.UUID]] = None
+
+class ExerciseCategoryRef(BaseModel):
+    """One category an exercise carries (EL-D-005)."""
+
+    id: uuid.UUID
+    group_key: str
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ExercisePhotoInfo(BaseModel):
     """One of the caller's clinic photos for an exercise. The image itself is
@@ -43,6 +56,9 @@ class ExerciseRead(ExerciseBase):
     # The caller's clinic photos (front, side). Filled by the list and detail
     # endpoints; empty elsewhere (EL-D-004).
     photos: list[ExercisePhotoInfo] = []
+    # Categories in filter panel order. Filled by the list, detail, create and
+    # update endpoints; empty elsewhere (EL-D-005).
+    categories: list[ExerciseCategoryRef] = []
 
     model_config = ConfigDict(from_attributes=True)
 

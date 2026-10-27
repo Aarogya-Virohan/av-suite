@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Optional, Tuple, List
+from typing import Optional, Sequence, Tuple, List
 
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,7 @@ from app.repositories.base import BaseRepository
 from app.schemas.exercise import ExerciseCreate, ExerciseUpdate
 from app.schemas.common import PaginationParams
 from app.services.body_regions import region_rank_sql, sort_key
+from app.services.exercise_category_service import set_categories
 
 
 class ExerciseRepository(BaseRepository[Exercise]):
@@ -26,7 +27,8 @@ class ExerciseRepository(BaseRepository[Exercise]):
         pagination: PaginationParams,
         body_part: Optional[str] = None,
         is_free: Optional[bool] = None,
-        search: Optional[str] = None
+        search: Optional[str] = None,
+        category_conditions: Sequence = (),
     ) -> Tuple[List[Exercise], int]:
         
         query = select(Exercise).where(
@@ -47,6 +49,9 @@ class ExerciseRepository(BaseRepository[Exercise]):
                     conditions.append(func.trim(Exercise.body_part) == "")
                 query = query.where(or_(*conditions))
         
+        for condition in category_conditions:
+            query = query.where(condition)
+
         if is_free is not None:
             query = query.where(Exercise.is_free == is_free)
         
@@ -87,9 +92,12 @@ class ExerciseRepository(BaseRepository[Exercise]):
     async def create_exercise(self, clinic_id: str, exercise_in: ExerciseCreate) -> Exercise:
         exercise = Exercise(
             clinic_id=uuid.UUID(clinic_id),
-            **exercise_in.model_dump()
+            **exercise_in.model_dump(exclude={"category_ids"})
         )
         self.session.add(exercise)
+        if exercise_in.category_ids:
+            await self.session.flush()
+            await set_categories(self.session, exercise.id, exercise_in.category_ids)
         await self.session.commit()
         await self.session.refresh(exercise)
         return exercise
@@ -106,8 +114,10 @@ class ExerciseRepository(BaseRepository[Exercise]):
         return result.scalars().first()
 
     async def update_exercise(self, db_obj: Exercise, exercise_in: ExerciseUpdate) -> Exercise:
-        update_data = exercise_in.model_dump(exclude_unset=True)
+        update_data = exercise_in.model_dump(exclude_unset=True, exclude={"category_ids"})
         updated = await self.update(db_obj, update_data)
+        if exercise_in.category_ids is not None:
+            await set_categories(self.session, updated.id, exercise_in.category_ids)
         await self.session.commit()
         await self.session.refresh(updated)
         return updated
