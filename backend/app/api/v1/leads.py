@@ -28,6 +28,7 @@ from app.schemas.lead import (
     LeadUpdate,
 )
 from app.services.lead import LeadNotFoundError, LeadService, LeadValidationError
+from app.services.audit import log_event_safely
 
 router = APIRouter()
 
@@ -68,6 +69,8 @@ async def create_lead(
 
     try:
         lead = await service.create_lead(clinic.id, payload)
+        await log_event_safely(service.lead_repository.session, clinic.id, user.id, "create", "lead", lead.id,
+                               {"stage": lead.stage.value if lead.stage else None})
         return LeadResponse.model_validate(lead)
     except LeadValidationError as exc:
         raise HTTPException(
@@ -128,13 +131,20 @@ async def update_lead(
     id: UUID,
     payload: LeadUpdate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: LeadServiceDep,
     scope: CapabilityScope = Depends(require_capability("leads.edit")),
 ) -> LeadResponse:
     """Update lead stage, assignment, notes, or contact info."""
 
     try:
+        previous = await service.get_lead(clinic.id, id)
+        old_stage = previous.stage
         lead = await service.update_lead(clinic.id, id, payload)
+        details = {}
+        if old_stage != lead.stage:
+            details = {"old_stage": old_stage.value, "new_stage": lead.stage.value}
+        await log_event_safely(service.lead_repository.session, clinic.id, user.id, "update", "lead", lead.id, details)
         return LeadResponse.model_validate(lead)
     except LeadNotFoundError as exc:
         raise HTTPException(
@@ -152,6 +162,7 @@ async def update_lead(
 async def convert_lead(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: LeadServiceDep,
     scope: CapabilityScope = Depends(require_capability("leads.convert")),
 ) -> LeadConvertResponse:
@@ -159,6 +170,8 @@ async def convert_lead(
 
     try:
         updated_lead, patient = await service.convert_lead_to_patient(clinic.id, id)
+        await log_event_safely(service.lead_repository.session, clinic.id, user.id, "convert", "lead", id,
+                               {"patient_id": str(patient.id)})
         return LeadConvertResponse(
             lead=LeadResponse.model_validate(updated_lead),
             patient_id=patient.id,
@@ -185,6 +198,7 @@ async def delete_lead(
 
     try:
         await service.delete_lead(clinic.id, id, deleted_by=user.id)
+        await log_event_safely(service.lead_repository.session, clinic.id, user.id, "delete", "lead", id)
     except LeadNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)

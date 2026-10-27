@@ -31,6 +31,7 @@ from app.services.appointment import (
     AppointmentService,
     AppointmentValidationError,
 )
+from app.services.audit import log_event_safely
 
 router = APIRouter()
 
@@ -68,6 +69,8 @@ async def create_appointment(
 
     try:
         appointment = await service.create_appointment(clinic.id, payload)
+        await log_event_safely(service.appointment_repository.session, clinic.id, user.id, "create", "appointment", appointment.id,
+                               {"patient_id": str(appointment.patient_id), "therapist_id": str(appointment.therapist_id)})
         return AppointmentResponse.model_validate(appointment)
     except AppointmentValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -172,6 +175,7 @@ async def update_appointment(
                 detail="You cannot reassign an appointment to another therapist.",
             )
         appointment = await service.update_appointment(clinic.id, id, payload)
+        await log_event_safely(service.appointment_repository.session, clinic.id, user.id, "update", "appointment", id)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -198,6 +202,7 @@ async def soft_cancel_appointment(
                 detail="You can only cancel your own appointments.",
             )
         appointment = await service.soft_cancel(clinic.id, id, deleted_by=user.id)
+        await log_event_safely(service.appointment_repository.session, clinic.id, user.id, "cancel", "appointment", id)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

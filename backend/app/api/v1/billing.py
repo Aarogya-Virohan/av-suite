@@ -50,6 +50,7 @@ from app.services.billing import (
     BillingService,
     BillingValidationError,
 )
+from app.services.audit import log_event_safely
 
 router = APIRouter()
 
@@ -320,6 +321,7 @@ async def delete_patient_package(
 async def create_invoice(
     payload: InvoiceCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: BillingServiceDep,
     scope: CapabilityScope = Depends(require_capability("invoices.create")),
 ) -> InvoiceResponse:
@@ -327,6 +329,8 @@ async def create_invoice(
 
     try:
         invoice = await service.create_invoice(clinic.id, payload)
+        await log_event_safely(service.invoice_repository.session, clinic.id, user.id, "create", "invoice", invoice.id,
+                               {"patient_id": str(invoice.patient_id), "total_amount": str(invoice.total_amount)})
         return InvoiceResponse.model_validate(invoice)
     except BillingValidationError as exc:
         raise HTTPException(
@@ -403,6 +407,7 @@ async def update_invoice(
     id: UUID,
     payload: InvoiceUpdate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: BillingServiceDep,
     scope: CapabilityScope = Depends(require_capability("invoices.edit")),
 ) -> InvoiceResponse:
@@ -410,6 +415,7 @@ async def update_invoice(
 
     try:
         invoice = await service.update_invoice(clinic.id, id, payload)
+        await log_event_safely(service.invoice_repository.session, clinic.id, user.id, "update", "invoice", id)
         return InvoiceResponse.model_validate(invoice)
     except BillingNotFoundError as exc:
         raise HTTPException(
@@ -435,6 +441,7 @@ async def delete_invoice(
 
     try:
         await service.delete_invoice(clinic.id, id, deleted_by=user.id)
+        await log_event_safely(service.invoice_repository.session, clinic.id, user.id, "delete", "invoice", id)
     except BillingNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
@@ -491,6 +498,7 @@ async def record_payment_for_invoice(
     invoice_id: UUID,
     payload: PaymentCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: BillingServiceDep,
     scope: CapabilityScope = Depends(require_capability("payments.record")),
 ) -> PaymentResponse:
@@ -504,6 +512,8 @@ async def record_payment_for_invoice(
 
     try:
         payment = await service.record_payment(clinic.id, payload)
+        await log_event_safely(service.payment_repository.session, clinic.id, user.id, "create", "payment", payment.id,
+                               {"invoice_id": str(payment.invoice_id), "patient_id": str(payment.patient_id), "amount": str(payment.amount)})
         return PaymentResponse.model_validate(payment)
     except BillingNotFoundError as exc:
         raise HTTPException(
@@ -521,6 +531,7 @@ async def record_payment_for_invoice(
 async def record_payment(
     payload: PaymentCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: BillingServiceDep,
     scope: CapabilityScope = Depends(require_capability("payments.record")),
 ) -> PaymentResponse:
@@ -528,6 +539,8 @@ async def record_payment(
 
     try:
         payment = await service.record_payment(clinic.id, payload)
+        await log_event_safely(service.payment_repository.session, clinic.id, user.id, "create", "payment", payment.id,
+                               {"invoice_id": str(payment.invoice_id), "patient_id": str(payment.patient_id), "amount": str(payment.amount)})
         return PaymentResponse.model_validate(payment)
     except BillingNotFoundError as exc:
         raise HTTPException(
@@ -563,8 +576,12 @@ async def list_payments(
         limit=limit,
     )
     items = [PaymentResponse.model_validate(p) for p in payments]
+    total = await service.payment_repository.count_payments(
+        clinic_id=clinic.id, invoice_id=invoice_id, patient_id=patient_id,
+        start_date=start_date, end_date=end_date
+    )
     return PaymentListResponse(
-        items=items, total=len(items), offset=offset, limit=limit
+        items=items, total=total, offset=offset, limit=limit
     )
 
 
@@ -592,6 +609,7 @@ async def get_payment(
 async def delete_payment(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: BillingServiceDep,
     scope: CapabilityScope = Depends(require_capability("payments.delete")),
 ) -> None:
@@ -599,6 +617,7 @@ async def delete_payment(
 
     try:
         await service.delete_payment(clinic.id, id)
+        await log_event_safely(service.payment_repository.session, clinic.id, user.id, "delete", "payment", id)
     except BillingNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
