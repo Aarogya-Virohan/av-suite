@@ -77,11 +77,27 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-005] Exercise categories: tag groups, filter panel and counts
+
+- **Date**: 2026-10-27
+- **Context**: Founders' feedback item 1 (23 Oct 2026) asked for 30+ categories. Answer to question 1 (27 Oct): use the same filter groups and category names as the reference platform the team uses, so we have the same number of categories; our exercise text and images are our own. The reference platform does not have one category list: every exercise carries tags from several groups and each group is a filter. The names were noted by hand from its filter panel (no data taken from it).
+- **Decision**:
+  - 11 groups, 216 values: Joint/Region 25, Position 11, Movement 22, Equipment 73, Difficulty 3, Specialty 18, Objective 37, Condition 12, Property of water 8, Assistance 2, Age group 5. The list lives in `app/services/exercise_categories.py`. Joint/Region runs head to toe, Difficulty from easy to hard, "No equipment" first, the rest alphabetical.
+  - Tables `exercise_categories` (group, name, order, active) and `exercise_category_links` (exercise, category), migration `d2f6a8c0e4b1` chained after `c1e5f7a9b3d2`. The migration seeds the list from its own frozen copy; a test checks the copy matches the module. Every category id is a uuid5 of group and name in a fixed namespace, so ids are the same on every database and tags can be written by id.
+  - API: `GET /exercises/categories` returns the groups in panel order with each value's count over the exercises the clinic can see (its own and global). `GET /exercises?category=<id>` (repeat or comma separated): any value inside a group matches, every group must match. `POST` and `PUT /exercises` take `category_ids`: omitted keeps, a list replaces, an empty list clears; an unknown or inactive id gives 422 and nothing is saved. List, detail, create and update return each exercise's `categories`.
+  - Library: the body part dropdown is replaced by a Filters panel (behaviour change): every group with counts, search inside groups longer than 6, show all, values with no exercises shown in grey, ticks apply straight away, ticked values stay as removable pills under the search with Clear all. Cards show the Joint/Region categories and fall back to the old body part.
+  - `body_part` stays: the list order and `GET /exercises/body-parts` still use it, and older clients keep working.
+- **Verified**: backend `pytest` on a fresh Postgres: base `feat/el-photos` 758bb51 361 pass / 10 known environment failures; this branch 368 pass / the same 10 (7 new: list matches the migration, list shape and fixed ids, groups and clinic-scoped counts, OR inside a group and AND across groups with search, bad and unknown ids refused, create and update set, keep, replace and clear, unknown or inactive ids save nothing and inactive values are hidden). Mutations: OR across groups, counts not limited to the clinic, and no id check each made a test fail. Migration: upgrade, downgrade, upgrade on a fresh database, 216 rows; `alembic check` shows only the two enum differences that exist on the base too. Frontend `tsc`, `eslint`, `next build` clean. Playwright on the production build at 1440 and 390 px against the 21 exercises of production (13 global from the seed migration, 4 per clinic) with draft tags: 17 visible, Cervical 6, Cervical and Retraction 2, Cervical or Shoulder 10, Clear all back to 17, Equipment shows all 73, Escape closes; no page errors, no failed calls.
+- **Not verified**: live. The draft tags used in the local test are not in the repo and are not clinical decisions.
+- **Affected Files**: `backend/alembic/versions/d2f6a8c0e4b1_exercise_categories.py`, `backend/app/models/exercise_category.py`, `backend/app/models/__init__.py`, `backend/app/services/exercise_categories.py`, `backend/app/services/exercise_category_service.py`, `backend/app/services/exercise_service.py`, `backend/app/repositories/exercise.py`, `backend/app/schemas/exercise.py`, `backend/app/api/v1/exercises.py`, `backend/tests/test_exercise_categories.py`, `frontend/exercise-library/src/**`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
 |---|---|---|---|
-| EL-L-01 | Body part names are free text. Synonyms show as separate entries next to each other (e.g. "Thoracic" and "Upper Back"), and some exercises sit in the wrong part (e.g. a neck isometric under "Other"). The 30+ categories the founders plan need a fixed list and a data clean-up before the bulk import of new exercises | Open; waits for the founders' category list (body regions or exercise types) | Us + founders |
+| EL-L-01 | Body part names are free text. Synonyms show as separate entries next to each other (e.g. "Thoracic" and "Upper Back"), and some exercises sit in the wrong part (e.g. a neck isometric under "Other") | Partly fixed: fixed category list since EL-D-005; `body_part` still drives the list order (EL-L-13) | Us + founders |
 | EL-L-02 | L-35 (CRM file), exercise part fixed here: exercises page through the whole library. The patient picker still loads at most 100 patients | Open | Frontend |
 | EL-L-03 | Red flags: no reviewed list exists. Quick picks only reuse what the clinic already wrote | Open; founders to give or approve a list | Founders |
 | EL-L-04 | Quick picks read the clinic's last 1000 exercise notes and last 1000 prescriptions; older phrases drop out | Accepted | - |
@@ -90,5 +106,9 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-07 | The PDF names the prescribing therapist. "Head of clinic" needs clinic profile fields that do not exist yet (CRM L-14) | Open; founders to choose, fields come with the CRM clinic profile work | Founders + backend |
 | EL-L-08 | The Exercise Library asks `/auth/me` twice on load (header and page) | Accepted; merge into one call when the header is next changed | Frontend |
 | EL-L-09 | Library pictures and videos still share `video_url`; clinic photos have their own table (EL-D-004). Moving library pictures into the same model waits for the categories work (founders' reference for Q1) | Open | Backend |
+| EL-L-10 | No screen sets an exercise's categories; only the API (`category_ids`) does. The 21 production exercises carry no categories until reviewed tags are applied: the 13 global ones have fixed ids from the seed migration, so a data migration can tag them; the clinic ones need SQL by id | Open; tags to be reviewed first | Us + founders |
+| EL-L-11 | Counts in the panel do not change with the filters picked. The Objective list may be incomplete: the reference panel showed 30 values and 7 more were seen in an earlier filtered view | Open | Frontend + backend |
+| EL-L-12 | `PUT /exercises/{id}` lets any clinic with `exercises.edit` change a global exercise, now including its categories (behaviour from before this branch) | Open; global exercises should be changed by AV only | Backend + founders |
+| EL-L-13 | The list is still ordered by the free-text `body_part`, not by the Joint/Region categories | Open; switch once every exercise is tagged | Backend |
 
-*Last updated: 2026-10-27 (EL-D-004, EL-L-08, EL-L-09) | Branch: feat/el-photos*
+*Last updated: 2026-10-27 (EL-D-005, EL-L-01 updated, EL-L-10 to EL-L-13) | Branch: feat/el-categories*
