@@ -202,7 +202,9 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
   return {
     id: String(be.id),
     name: String(be.title ?? ""),
-    bodyPart: ((be.body_part as string) || "").trim() || "Other",
+    // Joint/Region categories when the exercise has them (EL-D-005), else
+    // the older free-text body part.
+    bodyPart: regionLabel(be.categories) || ((be.body_part as string) || "").trim() || "Other",
     condition: (be.condition as string) || "General Recovery",
     instructions: (be.description as string) || "",
     sets: (be.sets as number) || 3,
@@ -216,6 +218,14 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
     imageUrl: (be.image_url as string) || "",
     photos: mapPhotos(be.photos),
   };
+}
+
+function regionLabel(raw: unknown): string {
+  if (!Array.isArray(raw)) return "";
+  return raw
+    .filter((c) => c && c.group_key === "joint_region" && typeof c.name === "string")
+    .map((c) => c.name as string)
+    .join(", ");
 }
 
 function mapPhotos(raw: unknown): ExercisePhoto[] {
@@ -265,7 +275,7 @@ export interface ExercisePage {
  * loads pages as the user scrolls, so it works for thousands of exercises.
  */
 export async function fetchExercises(
-  opts: { search?: string; bodyParts?: string[]; page?: number; pageSize?: number },
+  opts: { search?: string; categories?: string[]; page?: number; pageSize?: number },
   signal?: AbortSignal
 ): Promise<ExercisePage> {
   const params = new URLSearchParams({
@@ -273,7 +283,8 @@ export async function fetchExercises(
     page_size: String(opts.pageSize ?? 30),
   });
   if (opts.search) params.set("search", opts.search);
-  if (opts.bodyParts?.length) params.set("body_part", opts.bodyParts.join(","));
+  // Category ids (EL-D-005): any value inside a group, every group across.
+  for (const id of opts.categories ?? []) params.append("category", id);
   const response = await request(`/exercises?${params}`, { signal });
   const body = await response.json();
   const items = ((body.data as Record<string, unknown>[]) || []).map(mapBackendExerciseToFrontend);
@@ -281,14 +292,22 @@ export async function fetchExercises(
   return { items, total };
 }
 
-export interface BodyPartCount {
-  body_part: string;
+export interface CategoryValue {
+  id: string;
+  name: string;
+  /** Exercises the clinic can see (its own and global) that carry it. */
   count: number;
 }
 
-/** Every body part the clinic can see, head to toe, with counts. */
-export async function fetchBodyParts(): Promise<BodyPartCount[]> {
-  return (await json<BodyPartCount[]>("/exercises/body-parts")) || [];
+export interface CategoryGroup {
+  key: string;
+  label: string;
+  values: CategoryValue[];
+}
+
+/** Every category group, in panel order, with counts (EL-D-005). */
+export async function fetchCategories(): Promise<CategoryGroup[]> {
+  return (await json<CategoryGroup[]>("/exercises/categories")) || [];
 }
 
 // --------------------------------------------------------------- patients

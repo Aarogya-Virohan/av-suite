@@ -6,12 +6,12 @@ import { CloudOff, Loader2 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SplitLayout } from "@/components/layout/SplitLayout";
 import { SearchBar } from "@/components/library/SearchBar";
-import { BodyPartFilter } from "@/components/library/BodyPartFilter";
+import { CategoryFilter } from "@/components/library/CategoryFilter";
 import { ExerciseList } from "@/components/library/ExerciseList";
 import { PhotoDialog } from "@/components/library/PhotoDialog";
 import { PrescriptionBuilder } from "@/components/prescription/PrescriptionBuilder";
 import { Exercise, ExercisePhoto, PrescriptionItem } from "@/types/exercise";
-import { can, fetchBodyParts, fetchExercises, fetchMe, getToken, type BodyPartCount } from "@/lib/api";
+import { can, fetchCategories, fetchExercises, fetchMe, getToken, type CategoryGroup } from "@/lib/api";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const PAGE_SIZE = 30;
@@ -22,9 +22,9 @@ export default function Home() {
   const [prescription, setPrescription] = useState<PrescriptionItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [selectedParts, setSelectedParts] = useState<string[]>([]);
-  const [bodyParts, setBodyParts] = useState<BodyPartCount[]>([]);
-  const [bodyPartsFailed, setBodyPartsFailed] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
+  const [categoriesFailed, setCategoriesFailed] = useState(false);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -65,15 +65,15 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Body parts for the filter: all of them, head to toe, from the backend.
+  // Category groups for the filter panel, with counts, from the backend.
   useEffect(() => {
     if (!getToken()) return;
-    fetchBodyParts()
+    fetchCategories()
       .then((rows) => {
-        setBodyParts(rows);
-        setBodyPartsFailed(false);
+        setCategoryGroups(rows);
+        setCategoriesFailed(false);
       })
-      .catch(() => setBodyPartsFailed(true));
+      .catch(() => setCategoriesFailed(true));
   }, [reloadKey]);
 
   // First page on search or filter change. Older requests are aborted, so a
@@ -88,7 +88,7 @@ export default function Home() {
     if (initial) setIsLoading(true);
     else setIsRefetching(true);
 
-    fetchExercises({ search: search || undefined, bodyParts: selectedParts, page: 1, pageSize: PAGE_SIZE }, controller.signal)
+    fetchExercises({ search: search || undefined, categories: selectedCategories, page: 1, pageSize: PAGE_SIZE }, controller.signal)
       .then(({ items, total: count }) => {
         if (version !== queryVersion.current) return;
         setExercises(items);
@@ -109,7 +109,7 @@ export default function Home() {
       });
 
     return () => controller.abort();
-  }, [search, selectedParts, reloadKey]);
+  }, [search, selectedCategories, reloadKey]);
 
   const hasMore = exercises.length < total;
 
@@ -121,7 +121,7 @@ export default function Home() {
     setLoadingMore(true);
     setLoadMoreError(null);
     fetchExercises(
-      { search: search || undefined, bodyParts: selectedParts, page: page + 1, pageSize: PAGE_SIZE },
+      { search: search || undefined, categories: selectedCategories, page: page + 1, pageSize: PAGE_SIZE },
       controller.signal
     )
       .then(({ items, total: count }) => {
@@ -145,18 +145,18 @@ export default function Home() {
       .finally(() => {
         if (version === queryVersion.current) setLoadingMore(false);
       });
-  }, [loadingMore, hasMore, isRefetching, search, selectedParts, page]);
+  }, [loadingMore, hasMore, isRefetching, search, selectedCategories, page]);
 
-  // Keep picked parts in head-to-toe order, like the list.
-  const setParts = (next: string[]) => {
-    const order = new Map(bodyParts.map((b, i) => [b.body_part, i]));
-    setSelectedParts([...next].sort((a, b) => (order.get(a) ?? 1e9) - (order.get(b) ?? 1e9)));
+  // Keep picked categories in panel order (group, then value).
+  const setCategories = (next: string[]) => {
+    const order = new Map(categoryGroups.flatMap((g) => g.values).map((v, i) => [v.id, i]));
+    setSelectedCategories([...next].sort((a, b) => (order.get(a) ?? 1e9) - (order.get(b) ?? 1e9)));
   };
 
   const resetFilters = () => {
     setSearchInput("");
     setSearch("");
-    setSelectedParts([]);
+    setSelectedCategories([]);
   };
 
   const addedIds = useMemo(() => prescription.map((p) => p.exercise.id), [prescription]);
@@ -227,11 +227,12 @@ export default function Home() {
                   </span>
                 </div>
                 <SearchBar value={searchInput} onChange={setSearchInput} busy={isRefetching} />
-                <BodyPartFilter
-                  parts={bodyParts}
-                  selected={selectedParts}
-                  onChange={setParts}
-                  unavailable={bodyPartsFailed}
+                <CategoryFilter
+                  groups={categoryGroups}
+                  selected={selectedCategories}
+                  onChange={setCategories}
+                  total={total}
+                  unavailable={categoriesFailed}
                 />
                 {loadError && (
                   <p role="alert" className="text-xs font-medium text-danger">
@@ -245,7 +246,7 @@ export default function Home() {
                 onAdd={addExercise}
                 stale={isRefetching}
                 onReset={resetFilters}
-                hasFilters={!!searchInput || selectedParts.length > 0}
+                hasFilters={!!searchInput || selectedCategories.length > 0}
                 hasMore={hasMore}
                 loadingMore={loadingMore}
                 loadMoreError={loadMoreError}
