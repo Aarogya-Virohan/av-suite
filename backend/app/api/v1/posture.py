@@ -242,6 +242,16 @@ def _annotate_or_blank(
 # The founders ruled that no report is generated until the landmarks are
 # confirmed (Q6); /detect then /report replaces it.
 
+# Typed into an optional field to mean "nothing", these printed on reports as
+# "Assessing physiotherapist: Na" (13 and 27 October 2026). Treated as empty.
+_PLACEHOLDERS = {"na", "n/a", "n.a.", "nil", "none", "-", "--", "null", "not applicable"}
+
+
+def blank_if_placeholder(value: str | None) -> str:
+    v = (value or "").strip()
+    return "" if v.lower() in _PLACEHOLDERS else v
+
+
 def report_filename(case_ref: str, now: datetime, unique: str) -> str:
     """
     File name for a saved report.
@@ -941,7 +951,10 @@ async def report_from_review(
     patient_name: str = Form(...),
     age: int = Form(...),
     gender: str = Form(...),
-    case_ref: str = Form(...),
+    # Optional on the intake screen. FastAPI treats an empty form value as
+    # missing, so a required field here failed every report where it was
+    # left blank, only at the very last step (phone test, 27 October 2026).
+    case_ref: str = Form(""),
     patient_height_cm: float = Form(...),
     clinician_name: str = Form(""),
     front_source: str = Form("unknown"),
@@ -965,6 +978,9 @@ async def report_from_review(
                 f"Received: {patient_height_cm} cm."
             ),
         )
+
+    case_ref = blank_if_placeholder(case_ref)
+    clinician_name = blank_if_placeholder(clinician_name)
 
     try:
         token_views = read_detection_token(detection_token)

@@ -23,6 +23,28 @@ export type TiltSample = { t: number; roll: number; pitch: number; rate: number 
 // refuses anything over 15.
 export const MAX_TILT_DEG = 10
 
+// 27 October 2026, first phone test: a limit on the fastest reading in the
+// window (3 deg/s) flickered on and off by hand, because single readings of
+// natural hand tremor cross it. The screen now uses the mean turning speed
+// over STEADY_RATE_WINDOW_MS with two thresholds (hysteresis): steady once
+// the mean drops to STEADY_RATE_ENTER, unsteady only when it rises past
+// STEADY_RATE_LEAVE. Starting values; the ?debug=1 panel shows the real
+// numbers on a phone.
+export const STEADY_RATE_WINDOW_MS = 400
+// Raised from 6 and 10 after the second phone test, where a phone being
+// handled read 8 to 30 deg/s and the screen still could not settle.
+export const STEADY_RATE_ENTER = 9
+export const STEADY_RATE_LEAVE = 15
+
+// Mean turning speed over the window, deg/s; null when the device reports no
+// rotation rate or there are too few readings.
+export function meanRate(samples: TiltSample[], now: number, windowMs = STEADY_RATE_WINDOW_MS): number | null {
+  const w = recent(samples, now, windowMs)
+  if (w.length < 5 || w.some((s) => s.rate === null)) return null
+  return mean(w.map((s) => s.rate as number))
+}
+
+// Earlier rule, kept as the fallback for devices without a gyroscope:
 // Steady: over the last STEADY_WINDOW_MS the phone turned no faster than
 // STEADY_RATE_DEG_S (gyroscope). The gyroscope is used for this, not the
 // spread of the tilt readings, because the accelerometer also feels the
@@ -64,7 +86,14 @@ export function rollFromGravity(g: Gravity): number {
 
 // Forward or backward lean from upright, size only.
 export function pitchFromGravity(g: Gravity): number {
-  return Math.abs(deg(Math.atan2(g.z, Math.hypot(g.x, g.y))))
+  return Math.abs(pitchSignedFromGravity(g))
+}
+
+// The same with its direction, on a normalised reading. In the W3C frame z
+// points out of the screen, so z > 0 means the screen faces partly upward:
+// the top of the phone leans away from the user and the camera points down.
+export function pitchSignedFromGravity(g: Gravity): number {
+  return deg(Math.atan2(g.z, Math.hypot(g.x, g.y)))
 }
 
 export function wrap180(a: number): number {

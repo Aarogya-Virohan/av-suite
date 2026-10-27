@@ -1579,3 +1579,27 @@ Not yet verified, needed before this is trusted:
   turns the stream.
 - The same on an iPhone.
 - Whether 3 deg/s is reachable by hand on a normal phone; tune if not.
+
+### Same day, after Onkar's phone tests
+- Steadiness now uses the mean gyroscope speed over 0.4 s with hysteresis
+  (steady at 9 deg/s or less, unsteady above 15). The first limit (3 deg/s
+  on the fastest single reading) flickered by hand; the phone read 8 to 30
+  deg/s while handled.
+- Bubble shows forward lean too, and the hint says which way to fix it.
+  Checked on Onkar's phone: pointing the camera down asks to tilt the top
+  towards you, as intended.
+- Calibration only reads a phone standing within 30 degrees of upright; a
+  phone lying flat had been accepted. Two calibrations on Onkar's phone gave
+  0.88 and 0.84 degrees.
+- Camera screen closed by history popstate, and the effect that pushed the
+  history entry depended on a prop recreated on every parent render, so the
+  screen could stay open holding the camera and the next view opened black.
+  Now pushed once and closed directly. Camera start has a watchdog.
+- ?debug=1 shows live sensor readings; hidden otherwise.
+- case_ref was a required form field on /posture/report while optional on
+  the intake screen, so a blank case reference failed every report at the
+  last step. Now optional. "NA", "N/A", "nil", "none", "-" in case ref or
+  clinician are treated as empty (they printed as "Na" on reports).
+- "Points to check" on the review screen is red (Onkar).
+First real report from the new flow (Sandeep, 27 October): levelled by 0.2,
+0.8 and 0.6 degrees on side, front and back.
