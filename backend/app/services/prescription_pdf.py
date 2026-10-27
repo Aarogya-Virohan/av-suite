@@ -73,7 +73,7 @@ SAFETY_NOTE = (
 # Image fetching limits.
 IMAGE_TIMEOUT_S = 6.0
 IMAGE_MAX_BYTES = 8 * 1024 * 1024
-IMAGE_MAX_PX = 560
+IMAGE_MAX_PX = 1400
 IMAGE_CONCURRENCY = 6
 IMAGE_CACHE_SIZE = 256
 _MAX_REDIRECTS = 3
@@ -309,12 +309,13 @@ def _exercise_card(index: int, item: RxItem) -> str:
         f'<p class="ex-instr">{_esc(item.instructions)}</p>' if item.instructions else ""
     )
     return f"""
-<div class="ex-card"><table class="ex"><tr>
-  <td class="ex-img">{image}</td>
+<div class="ex-card">
+  <p class="ex-head"><span class="ex-num">{index}</span>
+    <span class="ex-title">{_esc(item.title.lower())}</span>
+    <span class="ex-part">{_esc(item.body_part)}</span></p>
+  <div class="ex-img">{image}</div>
+  <table class="ex"><tr>
   <td class="ex-body">
-    <p class="ex-head"><span class="ex-num">{index}</span>
-      <span class="ex-title">{_esc(item.title.lower())}</span>
-      <span class="ex-part">{_esc(item.body_part)}</span></p>
     <table class="dose"><tr>
       <td><span class="k">Sets</span><span class="v">{item.sets}</span></td>
       <td><span class="k">Reps</span><span class="v">{item.reps}</span></td>
@@ -408,11 +409,11 @@ p {{ margin: 0; }}
   padding: 3mm; margin: 0 0 3mm 0; page-break-inside: avoid; }}
 .ex {{ width: 100%; border-collapse: collapse; }}
 .ex td {{ vertical-align: top; padding: 0; }}
-.ex-img {{ width: 40mm; padding-right: 4mm !important; }}
-.ex-img img {{ width: 40mm; height: 32mm; object-fit: contain; background: #fff;
-  border-radius: 2.5mm; border: 1px solid {RULE}; display: block; }}
-.noimg {{ width: 40mm; height: 32mm; border-radius: 2.5mm; border: 1px dashed {RULE};
-  color: {MUTED}; font-size: 7pt; text-align: center; line-height: 32mm; }}
+.ex-img {{ margin: 0 0 2.5mm 0; text-align: center; background: #fff;
+  border-radius: 2.5mm; border: 1px solid {RULE}; padding: 1mm; }}
+.ex-img img {{ max-width: 100%; max-height: 60mm; width: auto; height: auto; display: inline-block; }}
+.noimg {{ height: 14mm; border-radius: 2.5mm; border: 1px dashed {RULE};
+  color: {MUTED}; font-size: 7pt; text-align: center; line-height: 14mm; }}
 .ex-head {{ margin-bottom: 2mm; }}
 .ex-num {{ display: inline-block; width: 5.6mm; height: 5.6mm; line-height: 5.6mm; border-radius: 50%;
   background: {MIDNIGHT}; color: #fff; text-align: center; font-weight: 700; font-size: 7.6pt;

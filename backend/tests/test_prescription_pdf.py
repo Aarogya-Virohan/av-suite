@@ -459,3 +459,17 @@ async def test_generated_pdf_uses_clinic_logo_from_db(
     assert clinic.name in html_out
     assert "Treating therapist" in html_out and "Asha Rao" in html_out
     assert storage.files[f"prescriptions/{clinic.id}/{rx_id}.pdf"][:5] == b"%PDF-"
+
+
+async def test_exercise_picture_is_large_and_above_the_dose() -> None:
+    """Founders, 27 Oct: pictures were too small for patients to follow.
+    The picture now spans the card above the dose, and is kept sharp."""
+    from app.services import prescription_pdf as pdf
+
+    item = RxItem("Clamshell", "Hip", "", 3, 10, 0, "Daily", "",
+                  "https://example.com/a.png", image_src="data:image/jpeg;base64,AAAA")
+    out = build_prescription_html(_doc(items=[item]))
+    card = out[out.index('<div class="ex-card">'):]
+    assert card.index('<div class="ex-img"><img') < card.index('<table class="dose">')
+    assert "max-height: 60mm" in out
+    assert pdf.IMAGE_MAX_PX >= 1200
