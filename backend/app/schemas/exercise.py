@@ -1,7 +1,9 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 import uuid
 from typing import Optional
 from datetime import datetime
+
+from app.services import exercise_media
 
 class ExerciseBase(BaseModel):
     title: str
@@ -27,3 +29,15 @@ class ExerciseRead(ExerciseBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    # Read-only, worked out from video_url (EL-D-003). video_url itself is
+    # unchanged, so existing clients keep working.
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def image_url(self) -> Optional[str]:
+        return exercise_media.image_url(self.video_url)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def demo_video_url(self) -> Optional[str]:
+        return exercise_media.demo_video_url(self.video_url)
