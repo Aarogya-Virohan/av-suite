@@ -43,6 +43,12 @@ from app.services.posture.exceptions import (
     InsufficientVisibilityError,
 )
 from app.services.posture.pdf_service import generate_posture_pdf
+from app.services.posture.level import (
+    rotate_display_image,
+    rotate_landmarks,
+    rotate_pixel_pair,
+    validate_correction,
+)
 
 from app.services.posture.calculator import (
     calc_cva,
@@ -941,6 +947,15 @@ async def report_from_review(
     front_source: str = Form("unknown"),
     side_source: str = Form("unknown"),
     back_source: str = Form("unknown"),
+    # Phone tilt at capture, 27 October 2026 (see services/posture/level.py).
+    # Sent only for guided camera captures that had a tilt reading; ignored
+    # for uploads, whose tilt is not known.
+    front_level_deg: float | None = Form(None),
+    side_level_deg: float | None = Form(None),
+    back_level_deg: float | None = Form(None),
+    front_level_calibrated: bool = Form(False),
+    side_level_calibrated: bool = Form(False),
+    back_level_calibrated: bool = Form(False),
 ):
     if not 50 <= patient_height_cm <= 250:
         raise HTTPException(
@@ -976,6 +991,23 @@ async def report_from_review(
         "back": await back_display.read(),
     }
 
+    sources = {"front": front_source, "side": side_source, "back": back_source}
+    raw_levels = {"front": front_level_deg, "side": side_level_deg, "back": back_level_deg}
+    calibrated = {
+        "front": front_level_calibrated,
+        "side": side_level_calibrated,
+        "back": back_level_calibrated,
+    }
+    levels: dict[str, float | None] = {}
+    for name in ("side", "front", "back"):
+        if sources[name] != "camera":
+            levels[name] = None
+            continue
+        try:
+            levels[name] = validate_correction(raw_levels[name])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=f"{name} photograph: {e}")
+
     views: dict[str, DetectedView] = {}
     audit_views: dict[str, dict] = {}
 
@@ -997,11 +1029,23 @@ async def report_from_review(
                 detail=f"{name} display image does not match the analysed photograph.",
             )
 
+        # Phone tilt: the clinician reviewed the points on the photograph
+        # as taken; measurement uses them turned back to true vertical.
+        level = levels[name]
+        display_bytes = displays[name]
+        if level:
+            landmarks = rotate_landmarks(landmarks, tv["width_px"], tv["height_px"], level)
+            iris = rotate_pixel_pair(iris, tv["width_px"], tv["height_px"], level)
+            try:
+                display_bytes = rotate_display_image(display_bytes, level)
+            except Exception:
+                raise HTTPException(status_code=422, detail=f"{name} display image could not be read.")
+
         views[name] = DetectedView(
             landmarks=landmarks,
             width_px=tv["width_px"],
             height_px=tv["height_px"],
-            image_bytes=displays[name],
+            image_bytes=display_bytes,
             iris=iris,
             model_landmarks=rows_to_landmarks(tv["landmarks"]),
             display_scale=disp_h / tv["height_px"],
@@ -1027,6 +1071,16 @@ async def report_from_review(
             "views": audit_views,
         },
     )
+
+    # What was corrected, per view, so a later visit can be compared and
+    # the correction can be audited. None when no tilt was known (upload,
+    # or a device without a motion sensor).
+    for name in ("side", "front", "back"):
+        report["views"][name]["levelCorrection"] = (
+            None
+            if levels[name] is None
+            else {"degrees": round(levels[name], 2), "calibrated": bool(calibrated[name])}
+        )
 
     return report
 

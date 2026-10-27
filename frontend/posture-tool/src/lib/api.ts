@@ -5,6 +5,7 @@ import type {
   LandmarkReviewSubmission,
   PostureReport,
 } from "@/types/posture"
+import type { CaptureLevel } from "@/lib/tilt"
 
 // The server explains a refused review (a point not reviewed, an expired
 // detection) in its error detail; show that rather than a generic failure.
@@ -71,6 +72,11 @@ interface ReportPayload {
   frontSource: string
   sideSource: string
   backSource: string
+  // Phone tilt at capture (lib/tilt.ts); null for uploads and for devices
+  // that could not report it.
+  frontLevel: CaptureLevel | null
+  sideLevel: CaptureLevel | null
+  backLevel: CaptureLevel | null
 }
 
 /**
@@ -97,6 +103,14 @@ export async function generateReport(payload: ReportPayload): Promise<PostureRep
   formData.append("front_source", payload.frontSource)
   formData.append("side_source", payload.sideSource)
   formData.append("back_source", payload.backSource)
+
+  const levels = { front: payload.frontLevel, side: payload.sideLevel, back: payload.backLevel }
+  for (const [name, level] of Object.entries(levels)) {
+    if (level) {
+      formData.append(`${name}_level_deg`, String(level.degrees))
+      formData.append(`${name}_level_calibrated`, level.calibrated ? "true" : "false")
+    }
+  }
 
   const response = await fetch(`${API_URL}/posture/report`, {
     method: "POST",

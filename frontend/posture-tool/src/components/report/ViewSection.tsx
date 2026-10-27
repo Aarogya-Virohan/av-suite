@@ -25,11 +25,16 @@ const SIDE_HIDDEN_SEVERITIES: ReadonlySet<string> = new Set([
 export default function ViewSection({ viewName, data }: Props) {
   // The capture source stays: it decides whether two visits can be
   // compared (founders, 10 October 2026).
+  const level = data.levelCorrection
   const sourceText =
     data.captureSource === "upload"
       ? "Uploaded photo"
       : data.captureSource === "camera"
-        ? "Guided camera capture"
+        ? level
+          ? `Guided camera capture, levelled by ${Math.abs(level.degrees).toFixed(1)}\u00b0`
+          : level === null
+            ? "Guided camera capture, tilt not measured"
+            : "Guided camera capture"
         : null
 
   return (

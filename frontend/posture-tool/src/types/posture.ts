@@ -34,6 +34,9 @@ export interface ViewData {
   // How the photograph was taken. Sent by the backend since 3 October 2026;
   // optional because earlier reports do not carry it.
   captureSource?: "camera" | "upload" | "unknown"
+  // Phone tilt corrected before measuring, since 27 October 2026. null on a
+  // new report when no tilt was known; absent on older reports.
+  levelCorrection?: { degrees: number; calibrated: boolean } | null
 }
 
 export interface SynthesisData {
