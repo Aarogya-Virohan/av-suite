@@ -5,7 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.enums.lead import LeadStage, LeadSource
+from app.enums.lead import LeadStage, LeadSource, LeadLostReason
+from pydantic import model_validator
 
 
 class LeadBase(BaseModel):
@@ -17,6 +18,14 @@ class LeadBase(BaseModel):
     source: LeadSource | None = Field(default=None, description="Lead acquisition source.")
     stage: LeadStage = Field(default=LeadStage.NEW, description="Lifecycle stage of lead.")
     notes: str | None = Field(default=None, max_length=2000, description="Internal notes regarding lead.")
+    lost_reason: LeadLostReason | None = None
+    lost_remark: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_lost_reason_remark(self):
+        if self.stage == LeadStage.LOST and self.lost_reason == LeadLostReason.OTHER and not self.lost_remark:
+            raise ValueError("lost_remark is required when lost_reason is 'other'")
+        return self
 
 
 class LeadCreate(LeadBase):
@@ -35,6 +44,8 @@ class LeadUpdate(BaseModel):
     stage: LeadStage | None = Field(default=None)
     assigned_to: UUID | None = Field(default=None)
     notes: str | None = Field(default=None, max_length=2000)
+    lost_reason: LeadLostReason | None = None
+    lost_remark: str | None = Field(default=None, max_length=500)
 
 
 class LeadResponse(LeadBase):

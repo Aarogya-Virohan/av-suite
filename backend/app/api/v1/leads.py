@@ -30,6 +30,8 @@ from app.schemas.lead import (
 from app.services.lead import LeadNotFoundError, LeadService, LeadValidationError
 from app.services.audit import log_event_safely
 
+from app.services.lead import LeadNotFoundError, LeadPayloadValidationError, LeadService, LeadValidationError
+
 router = APIRouter()
 
 
@@ -72,6 +74,8 @@ async def create_lead(
         await log_event_safely(service.lead_repository.session, clinic.id, user.id, "create", "lead", lead.id,
                                {"stage": lead.stage.value if lead.stage else None})
         return LeadResponse.model_validate(lead)
+    except LeadPayloadValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except LeadValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
@@ -150,6 +154,8 @@ async def update_lead(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+    except LeadPayloadValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except LeadValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
