@@ -49,6 +49,7 @@ from app.services.billing import (
     BillingNotFoundError,
     BillingService,
     BillingValidationError,
+    BillingPayloadValidationError,
 )
 from app.services.audit import log_event_safely
 
@@ -332,6 +333,8 @@ async def create_invoice(
         await log_event_safely(service.invoice_repository.session, clinic.id, user.id, "create", "invoice", invoice.id,
                                {"patient_id": str(invoice.patient_id), "total_amount": str(invoice.total_amount)})
         return InvoiceResponse.model_validate(invoice)
+    except BillingPayloadValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except BillingValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
@@ -421,6 +424,8 @@ async def update_invoice(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+    except BillingPayloadValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except BillingValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)

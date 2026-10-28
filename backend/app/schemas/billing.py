@@ -151,6 +151,8 @@ class InvoiceBase(BaseModel):
     due_date: datetime | None = None
     discount_amount: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0.00"))
     tax_amount: Decimal = Field(default=Decimal("0.00"), ge=Decimal("0.00"))
+    discount_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"), max_digits=5, decimal_places=2)
+    tax_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"), max_digits=5, decimal_places=2)
     notes: str | None = None
 
 
@@ -171,6 +173,8 @@ class InvoiceUpdate(BaseModel):
     due_date: datetime | None = None
     discount_amount: Decimal | None = Field(default=None, ge=Decimal("0.00"))
     tax_amount: Decimal | None = Field(default=None, ge=Decimal("0.00"))
+    discount_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"), max_digits=5, decimal_places=2)
+    tax_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"), max_digits=5, decimal_places=2)
     status: InvoiceStatus | None = None
     notes: str | None = None
 
