@@ -43,19 +43,19 @@ class FrozenDateTime(datetime):
         )
 
 
-def test_analytics_periods_are_utc_calendar_ranges() -> None:
+def test_analytics_periods_are_india_calendar_ranges() -> None:
     periods = AnalyticsPeriods.containing(
         datetime(2024, 1, 1, 0, 30, tzinfo=timezone(timedelta(hours=14)))
     )
 
-    assert periods.today.start == datetime(2023, 12, 31, tzinfo=UTC)
-    assert periods.today.end == datetime(2024, 1, 1, tzinfo=UTC)
-    assert periods.this_week.start == datetime(2023, 12, 25, tzinfo=UTC)
-    assert periods.this_week.end == datetime(2024, 1, 1, tzinfo=UTC)
-    assert periods.this_month.start == datetime(2023, 12, 1, tzinfo=UTC)
-    assert periods.this_month.end == datetime(2024, 1, 1, tzinfo=UTC)
-    assert periods.this_year.start == datetime(2023, 1, 1, tzinfo=UTC)
-    assert periods.this_year.end == datetime(2024, 1, 1, tzinfo=UTC)
+    assert periods.today.start.isoformat() == "2023-12-31T00:00:00+05:30"
+    assert periods.today.end.isoformat() == "2024-01-01T00:00:00+05:30"
+    assert periods.this_week.start.isoformat() == "2023-12-25T00:00:00+05:30"
+    assert periods.this_week.end.isoformat() == "2024-01-01T00:00:00+05:30"
+    assert periods.this_month.start.isoformat() == "2023-12-01T00:00:00+05:30"
+    assert periods.this_month.end.isoformat() == "2024-01-01T00:00:00+05:30"
+    assert periods.this_year.start.isoformat() == "2023-01-01T00:00:00+05:30"
+    assert periods.this_year.end.isoformat() == "2024-01-01T00:00:00+05:30"
 
 
 async def _create_context(session: AsyncSession):
@@ -1251,5 +1251,6 @@ async def test_analytics_api_period_contract_and_scoping(
         "week",
         "month",
         "year",
+        "custom",
     ]
     assert period_parameter["schema"]["default"] == "month"
