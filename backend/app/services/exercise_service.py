@@ -21,7 +21,7 @@ from app.models.exercise import Exercise
 from app.schemas.exercise import ExerciseCreate, ExerciseUpdate
 from app.schemas.common import PaginationParams
 from app.repositories.exercise import ExerciseRepository
-from typing import Optional, List, Tuple
+from typing import Optional, List, Sequence, Tuple
 import uuid
 import logging
 
@@ -34,7 +34,8 @@ async def get_exercises(
     pagination: PaginationParams,
     body_part: Optional[str] = None,
     is_free: Optional[bool] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    category_conditions: Sequence = (),
 ) -> Tuple[List[Exercise], int]:
     """
     Function ka purpose: Clinic aur global exercises ko list karna advanced filters ke saath
@@ -100,7 +101,9 @@ async def get_exercises(
         logger.debug(f"Fetching exercises for clinic {clinic_id}")
         
         repo = ExerciseRepository(db)
-        return await repo.list_exercises(clinic_id, pagination, body_part, is_free, search)
+        return await repo.list_exercises(
+            clinic_id, pagination, body_part, is_free, search, category_conditions
+        )
         
     except ValueError as e:
         logger.error(f"Invalid clinic_id format: {clinic_id}")

@@ -1,4 +1,4 @@
-import { Exercise, Patient, SavedPrescription } from "@/types/exercise";
+import { Exercise, ExercisePhoto, Patient, PhotoAngle, SavedPrescription } from "@/types/exercise";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const API = `${BASE_URL}/api/v1`;
@@ -122,7 +122,10 @@ function networkError(): ApiError {
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  // FormData sets its own multipart Content-Type with the boundary.
+  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
@@ -179,6 +182,13 @@ export async function login(email: string, password: string, clinicId?: string):
 export interface Me {
   user: { first_name?: string | null; last_name?: string | null; email: string };
   clinic: { name: string } | null;
+  /** Capability key to scope ("none", "own" or "all"). */
+  capabilities?: Record<string, string>;
+}
+
+export function can(me: Me | null, capability: string): boolean {
+  const scope = me?.capabilities?.[capability];
+  return !!scope && scope !== "none";
 }
 
 export function fetchMe(): Promise<Me> {
@@ -192,7 +202,9 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
   return {
     id: String(be.id),
     name: String(be.title ?? ""),
-    bodyPart: ((be.body_part as string) || "").trim() || "Other",
+    // Joint/Region categories when the exercise has them (EL-D-005), else
+    // the older free-text body part.
+    bodyPart: regionLabel(be.categories) || ((be.body_part as string) || "").trim() || "Other",
     condition: (be.condition as string) || "General Recovery",
     instructions: (be.description as string) || "",
     sets: (be.sets as number) || 3,
@@ -204,7 +216,53 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
     // (EL-D-003); a video link is never used as an image source.
     videoUrl: (be.demo_video_url as string) || "",
     imageUrl: (be.image_url as string) || "",
+    photos: mapPhotos(be.photos),
   };
+}
+
+function regionLabel(raw: unknown): string {
+  if (!Array.isArray(raw)) return "";
+  return raw
+    .filter((c) => c && c.group_key === "joint_region" && typeof c.name === "string")
+    .map((c) => c.name as string)
+    .join(", ");
+}
+
+function mapPhotos(raw: unknown): ExercisePhoto[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (p): p is { angle: PhotoAngle; updated_at: string } =>
+        !!p && (p.angle === "front" || p.angle === "side") && typeof p.updated_at === "string"
+    )
+    .map((p) => ({ angle: p.angle, updatedAt: p.updated_at }));
+}
+
+// --------------------------------------------------------------- exercise photos
+
+/** The photo as a blob URL. The endpoint needs the login token, so a plain
+ * <img src> cannot load it. The caller revokes the URL when done. */
+export async function fetchExercisePhoto(exerciseId: string, angle: PhotoAngle): Promise<string> {
+  const response = await request(`/exercises/${encodeURIComponent(exerciseId)}/photos/${angle}`);
+  return URL.createObjectURL(await response.blob());
+}
+
+export async function uploadExercisePhoto(
+  exerciseId: string,
+  angle: PhotoAngle,
+  file: File
+): Promise<ExercisePhoto> {
+  const form = new FormData();
+  form.append("file", file);
+  const data = await json<{ angle: PhotoAngle; updated_at: string }>(
+    `/exercises/${encodeURIComponent(exerciseId)}/photos/${angle}`,
+    { method: "PUT", body: form }
+  );
+  return { angle: data.angle, updatedAt: data.updated_at };
+}
+
+export async function deleteExercisePhoto(exerciseId: string, angle: PhotoAngle): Promise<void> {
+  await request(`/exercises/${encodeURIComponent(exerciseId)}/photos/${angle}`, { method: "DELETE" });
 }
 
 export interface ExercisePage {
@@ -217,7 +275,7 @@ export interface ExercisePage {
  * loads pages as the user scrolls, so it works for thousands of exercises.
  */
 export async function fetchExercises(
-  opts: { search?: string; bodyParts?: string[]; page?: number; pageSize?: number },
+  opts: { search?: string; categories?: string[]; page?: number; pageSize?: number },
   signal?: AbortSignal
 ): Promise<ExercisePage> {
   const params = new URLSearchParams({
@@ -225,7 +283,8 @@ export async function fetchExercises(
     page_size: String(opts.pageSize ?? 30),
   });
   if (opts.search) params.set("search", opts.search);
-  if (opts.bodyParts?.length) params.set("body_part", opts.bodyParts.join(","));
+  // Category ids (EL-D-005): any value inside a group, every group across.
+  for (const id of opts.categories ?? []) params.append("category", id);
   const response = await request(`/exercises?${params}`, { signal });
   const body = await response.json();
   const items = ((body.data as Record<string, unknown>[]) || []).map(mapBackendExerciseToFrontend);
@@ -233,14 +292,22 @@ export async function fetchExercises(
   return { items, total };
 }
 
-export interface BodyPartCount {
-  body_part: string;
+export interface CategoryValue {
+  id: string;
+  name: string;
+  /** Exercises the clinic can see (its own and global) that carry it. */
   count: number;
 }
 
-/** Every body part the clinic can see, head to toe, with counts. */
-export async function fetchBodyParts(): Promise<BodyPartCount[]> {
-  return (await json<BodyPartCount[]>("/exercises/body-parts")) || [];
+export interface CategoryGroup {
+  key: string;
+  label: string;
+  values: CategoryValue[];
+}
+
+/** Every category group, in panel order, with counts (EL-D-005). */
+export async function fetchCategories(): Promise<CategoryGroup[]> {
+  return (await json<CategoryGroup[]>("/exercises/categories")) || [];
 }
 
 // --------------------------------------------------------------- patients

@@ -59,6 +59,40 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-004] Clinic photos of an exercise, front and side
+
+- **Date**: 2026-10-27
+- **Context**: Founders' feedback item 2 (23 Oct 2026): admin or therapist can take a picture of an exercise from two angles to personalise it. Answer to question 2 (27 Oct): option A, the clinic adds its own photos of the exercise and only that clinic sees them. Photos of patients are out of scope.
+- **Decision**:
+  - New table `exercise_photos` (migration `c1e5f7a9b3d2`): clinic, exercise, angle (`front` or `side`), storage key, size, uploader. One photo per clinic, exercise and angle. Works for global exercises too; the photo belongs to the clinic, not to the exercise.
+  - API: `PUT` and `DELETE /exercises/{id}/photos/{angle}` need `exercises.edit` (admins by default; a therapist only when the admin grants it, no role template changed). `GET /exercises/{id}/photos/{angle}` needs `exercises.view` and returns the JPEG for the caller's clinic only (`Cache-Control: private`). The list and detail responses carry `photos` (angle, size, `updated_at`) for the caller's clinic.
+  - Every upload is decoded and re-encoded as JPEG with Pillow: EXIF data (GPS, camera, time) is dropped, the long side is capped at 1600 px, only JPG, PNG and WebP of at least 200 px are accepted, 10 MB at most.
+  - Files go to the private bucket under `exercise-photos/<clinic>/<exercise>/<angle>-<random>.jpg`. No silent local fallback (Railway's disk is wiped on deploy): when storage is down the upload returns 503. A replaced or removed photo's file is deleted from the bucket (new `delete_file` in the shared `app/core/storage.py`, additive only). `EXERCISE_PHOTOS_LOCAL_DIR` is for local runs and must not be set on Railway.
+  - Library: the card shows the clinic's front photo before the library picture, with a "Clinic photo(s)" tag; users with `exercises.edit` get a camera button that opens front and side slots (add, replace, remove; on phones the file picker offers the camera). The dialog says "Use photos of the exercise only. Do not upload photos of patients."
+  - PDF: the clinic's photos replace the library picture (two side by side when both angles exist); the library picture is then not downloaded.
+- **Migration order**: the open CDSS branch also chains from `a8c4e2f1d903`. Whichever of the two reaches dev second points its first migration's `down_revision` at the other's last revision and is tested again (noted in the migration file).
+- **Verified**: backend `pytest` on a fresh Postgres: base `release/el-oct` 934a2b9 349 pass / 10 known environment failures; this branch 361 pass / the same 10 (12 new: EXIF removed and size capped, PNG with transparency, bad, tiny, GIF and oversize files refused, upload, view, list, replace (old file removed), delete, other clinic sees nothing and cannot delete, no photo on another clinic's own exercise, therapist with view only can see but not add, with `exercises.edit` can add, no storage gives 503 and saves nothing, bucket key and delete on replace, PDF uses both photos and skips the library picture). Mutations: dropping the clinic filter and writing EXIF back each made a test fail. Migration: upgrade, downgrade, upgrade on a fresh database; `alembic check` shows no difference for `exercise_photos` (two enum differences on `clinics.type` and `memberships.role` exist on the base too). Frontend `tsc`, `eslint`, `next build` clean. Playwright on the production build at 1440 and 390 px: camera button for the admin, bad file shows the error, front and side upload, remove, Escape closes, card shows the clinic photo after a reload, a therapist with view only sees the photo and no camera button; no page errors. Real PDF rasterised: two photos side by side, one photo, library picture.
+- **Not verified**: live upload to the Supabase bucket (tested with a fake bucket and local disk); phone camera capture on a real device.
+- **Affected Files**: `backend/alembic/versions/c1e5f7a9b3d2_exercise_photos.py`, `backend/app/models/exercise_photo.py`, `backend/app/models/__init__.py`, `backend/app/services/exercise_photos.py`, `backend/app/core/storage.py`, `backend/app/api/v1/exercises.py`, `backend/app/schemas/exercise.py`, `backend/app/services/prescription_service.py`, `backend/app/services/prescription_pdf.py`, `backend/tests/test_exercise_photos.py`, `frontend/exercise-library/src/**`
+
+---
+
+## [EL-D-005] Exercise categories: tag groups, filter panel and counts
+
+- **Date**: 2026-10-27
+- **Context**: Founders' feedback item 1 (23 Oct 2026) asked for 30+ categories. Answer to question 1 (27 Oct): use the same filter groups and category names as the reference platform the team uses, so we have the same number of categories; our exercise text and images are our own. The reference platform does not have one category list: every exercise carries tags from several groups and each group is a filter. The names were noted by hand from its filter panel (no data taken from it).
+- **Decision**:
+  - 11 groups, 216 values: Joint/Region 25, Position 11, Movement 22, Equipment 73, Difficulty 3, Specialty 18, Objective 37, Condition 12, Property of water 8, Assistance 2, Age group 5. The list lives in `app/services/exercise_categories.py`. Joint/Region runs head to toe, Difficulty from easy to hard, "No equipment" first, the rest alphabetical.
+  - Tables `exercise_categories` (group, name, order, active) and `exercise_category_links` (exercise, category), migration `d2f6a8c0e4b1` chained after `c1e5f7a9b3d2`. The migration seeds the list from its own frozen copy; a test checks the copy matches the module. Every category id is a uuid5 of group and name in a fixed namespace, so ids are the same on every database and tags can be written by id.
+  - API: `GET /exercises/categories` returns the groups in panel order with each value's count over the exercises the clinic can see (its own and global). `GET /exercises?category=<id>` (repeat or comma separated): any value inside a group matches, every group must match. `POST` and `PUT /exercises` take `category_ids`: omitted keeps, a list replaces, an empty list clears; an unknown or inactive id gives 422 and nothing is saved. List, detail, create and update return each exercise's `categories`.
+  - Library: the body part dropdown is replaced by a Filters panel (behaviour change): every group with counts, search inside groups longer than 6, show all, values with no exercises shown in grey, ticks apply straight away, ticked values stay as removable pills under the search with Clear all. Cards show the Joint/Region categories and fall back to the old body part.
+  - `body_part` stays: the list order and `GET /exercises/body-parts` still use it, and older clients keep working.
+- **Verified**: backend `pytest` on a fresh Postgres: base `feat/el-photos` 758bb51 361 pass / 10 known environment failures; this branch 368 pass / the same 10 (7 new: list matches the migration, list shape and fixed ids, groups and clinic-scoped counts, OR inside a group and AND across groups with search, bad and unknown ids refused, create and update set, keep, replace and clear, unknown or inactive ids save nothing and inactive values are hidden). Mutations: OR across groups, counts not limited to the clinic, and no id check each made a test fail. Migration: upgrade, downgrade, upgrade on a fresh database, 216 rows; `alembic check` shows only the two enum differences that exist on the base too. Frontend `tsc`, `eslint`, `next build` clean. Playwright on the production build at 1440 and 390 px against the 21 exercises of production (13 global from the seed migration, 4 per clinic) with draft tags: 17 visible, Cervical 6, Cervical and Retraction 2, Cervical or Shoulder 10, Clear all back to 17, Equipment shows all 73, Escape closes; no page errors, no failed calls.
+- **Not verified**: live. The draft tags used in the local test are not in the repo and are not clinical decisions.
+- **Affected Files**: `backend/alembic/versions/d2f6a8c0e4b1_exercise_categories.py`, `backend/app/models/exercise_category.py`, `backend/app/models/__init__.py`, `backend/app/services/exercise_categories.py`, `backend/app/services/exercise_category_service.py`, `backend/app/services/exercise_service.py`, `backend/app/repositories/exercise.py`, `backend/app/schemas/exercise.py`, `backend/app/api/v1/exercises.py`, `backend/tests/test_exercise_categories.py`, `frontend/exercise-library/src/**`
+
+---
+
 ## [EL-D-006] Bigger exercise pictures in the library and on the prescription PDF
 
 - **Date**: 2026-10-27
@@ -68,7 +102,8 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
   - Library: bigger thumbnail; clicking it opens the picture full size in a viewer (Escape, the close button or a click outside closes it).
   - No API or database change. Built on dev 60a0219, separate from `feat/el-photos` and `feat/el-categories` (those also change the card and the PDF and will need this merged in).
 - **Verified**: pytest on dev 60a0219 369 pass / 10 known environment failures; this branch 370 / the same 10 (1 new test: picture above the dose, 60 mm, 1400 px; putting 560 px back makes it fail). Real PDFs rendered with three of the new pictures: 3 exercises on 2 pages, 6 on 3, every page looked at. Exercise Library `tsc`, `eslint`, `next build` clean; Playwright at 1440 and 390 px: viewer opens, picture 1024 x 721 on desktop and full width on a phone, Escape and outside click close it, no page errors.
-- **Not verified**: live.
+- **Live**: since 27 Oct 2026 (dev 0c5212d).
+- **Merged with EL-D-004** (29 Oct, `release/el-nov`): clinic photos use this layout. One photo sits across the card like a library picture; two photos sit side by side in the same area, each up to half the width and 60 mm high. In the library the clinic photo opens in the same full-size viewer.
 - **Affected Files**: `backend/app/services/prescription_pdf.py`, `backend/tests/test_prescription_pdf.py`, `frontend/exercise-library/src/components/library/ExerciseCard.tsx`, `frontend/exercise-library/src/components/library/ImageViewer.tsx`
 
 ---
@@ -77,12 +112,18 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 | # | Item | Status | Owner |
 |---|---|---|---|
-| EL-L-01 | Body part names are free text. Synonyms show as separate entries next to each other (e.g. "Thoracic" and "Upper Back"), and some exercises sit in the wrong part (e.g. a neck isometric under "Other"). The 30+ categories the founders plan need a fixed list and a data clean-up before the bulk import of new exercises | Open; waits for the founders' category list (body regions or exercise types) | Us + founders |
+| EL-L-01 | Body part names are free text. Synonyms show as separate entries next to each other (e.g. "Thoracic" and "Upper Back"), and some exercises sit in the wrong part (e.g. a neck isometric under "Other") | Partly fixed: fixed category list since EL-D-005; `body_part` still drives the list order (EL-L-13) | Us + founders |
 | EL-L-02 | L-35 (CRM file), exercise part fixed here: exercises page through the whole library. The patient picker still loads at most 100 patients | Open | Frontend |
 | EL-L-03 | Red flags: no reviewed list exists. Quick picks only reuse what the clinic already wrote | Open; founders to give or approve a list | Founders |
 | EL-L-04 | Quick picks read the clinic's last 1000 exercise notes and last 1000 prescriptions; older phrases drop out | Accepted | - |
 | EL-L-05 | Exercise pictures and videos share `video_url`. Since EL-D-003 the API reads them apart (`image_url`, `demo_video_url`); the stored column is still shared. No relative names left in production (24 Oct) | Partly fixed; proper media model with the founders' answer on personalised photos | Backend + founders |
 | EL-L-06 | The CRM settings page accepts any `image/*` logo and the settings API does not check the value. SVG logos never print on the prescription (name only) | Open; limit the CRM upload to PNG/JPEG/WebP, in the CRM round | CRM |
 | EL-L-07 | The PDF names the prescribing therapist. "Head of clinic" needs clinic profile fields that do not exist yet (CRM L-14) | Open; founders to choose, fields come with the CRM clinic profile work | Founders + backend |
+| EL-L-08 | The Exercise Library asks `/auth/me` twice on load (header and page) | Accepted; merge into one call when the header is next changed | Frontend |
+| EL-L-09 | Library pictures and videos still share `video_url`; clinic photos have their own table (EL-D-004). Moving library pictures into the same model waits for the categories work (founders' reference for Q1) | Open | Backend |
+| EL-L-10 | No screen sets an exercise's categories; only the API (`category_ids`) does. The 21 production exercises carry no categories until reviewed tags are applied: the 13 global ones have fixed ids from the seed migration, so a data migration can tag them; the clinic ones need SQL by id | Open; tags to be reviewed first | Us + founders |
+| EL-L-11 | Counts in the panel do not change with the filters picked. The Objective list may be incomplete: the reference panel showed 30 values and 7 more were seen in an earlier filtered view | Open | Frontend + backend |
+| EL-L-12 | `PUT /exercises/{id}` lets any clinic with `exercises.edit` change a global exercise, now including its categories (behaviour from before this branch) | Open; global exercises should be changed by AV only | Backend + founders |
+| EL-L-13 | The list is still ordered by the free-text `body_part`, not by the Joint/Region categories | Open; switch once every exercise is tagged | Backend |
 
-*Last updated: 2026-10-27 (EL-D-006) | Branch: fix/el-image-size*
+*Last updated: 2026-10-29 (EL-D-004 to EL-D-006 merged in order; clinic photos use the EL-D-006 card layout) | Branch: release/el-nov*
