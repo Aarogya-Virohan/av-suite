@@ -166,3 +166,44 @@ async def test_invoice_numbers_are_backend_generated_and_clinic_unique(
     )
     db_session.add(cross_clinic_invoice)
     await db_session.flush()
+
+
+@pytest.mark.asyncio
+async def test_invoice_and_payment_responses_include_patient_names_without_lazy_load(
+    client, auth_headers
+):
+    patient_id = await _create_patient(client, auth_headers)
+    invoice = await _create_invoice(client, auth_headers, patient_id, total="40.00")
+    assert invoice["patient_name"] == "Billing Patient"
+
+    invoice_detail = await client.get(
+        f"{settings.API_V1_PREFIX}/invoices/{invoice['id']}", headers=auth_headers
+    )
+    assert invoice_detail.status_code == 200
+    assert invoice_detail.json()["patient_name"] == "Billing Patient"
+    invoice_list = await client.get(f"{settings.API_V1_PREFIX}/invoices", headers=auth_headers)
+    assert invoice_list.status_code == 200
+    assert next(x for x in invoice_list.json()["items"] if x["id"] == invoice["id"])["patient_name"] == "Billing Patient"
+
+    first = await _record_payment(client, auth_headers, invoice, patient_id, "10.00")
+    assert first.status_code == 201, first.text
+    assert first.json()["patient_name"] == "Billing Patient"
+    payment_id = first.json()["id"]
+    payment_detail = await client.get(
+        f"{settings.API_V1_PREFIX}/payments/{payment_id}", headers=auth_headers
+    )
+    assert payment_detail.status_code == 200
+    assert payment_detail.json()["patient_name"] == "Billing Patient"
+    payment_list = await client.get(f"{settings.API_V1_PREFIX}/payments", headers=auth_headers)
+    assert payment_list.status_code == 200
+    assert next(x for x in payment_list.json()["items"] if x["id"] == payment_id)["patient_name"] == "Billing Patient"
+
+    second = await client.post(
+        f"{settings.API_V1_PREFIX}/invoices/{invoice['id']}/payments",
+        json={"invoice_id": invoice["id"], "patient_id": str(patient_id),
+              "amount": "10.00", "payment_method": "cash",
+              "payment_date": "2026-10-15T10:00:00Z"},
+        headers=auth_headers,
+    )
+    assert second.status_code == 201, second.text
+    assert second.json()["patient_name"] == "Billing Patient"

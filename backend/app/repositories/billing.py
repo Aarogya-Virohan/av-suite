@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.enums.billing import InvoiceStatus
 from app.enums.package import PackageStatus
@@ -186,6 +186,16 @@ class PaymentRepository(BaseRepository[Payment]):
         """Initialize repository bound to session."""
 
         super().__init__(session, Payment)
+
+    async def get_by_id_with_patient(
+        self, payment_id: UUID, *, clinic_id: UUID
+    ) -> Payment | None:
+        """Load a payment and its patient in one query for response serialization."""
+        statement = select(Payment).options(joinedload(Payment.patient)).where(
+            Payment.id == payment_id, Payment.clinic_id == clinic_id
+        )
+        result = await self.session.scalars(statement)
+        return result.one_or_none()
 
     async def count_payments(self, *, clinic_id: UUID, invoice_id: UUID | None = None,
                              patient_id: UUID | None = None, start_date: date | None = None,

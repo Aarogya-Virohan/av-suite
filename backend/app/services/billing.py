@@ -518,14 +518,21 @@ class BillingService:
             invoice,
             {"paid_amount": new_paid_amount, "status": new_status},
         )
+        # Build the response object, including its patient, before committing.
+        # A failed reload/serialization must not leave a payment that a caller
+        # may retry and accidentally duplicate.
+        loaded_payment = await self.payment_repository.get_by_id_with_patient(
+            payment.id, clinic_id=clinic_id
+        )
+        if loaded_payment is None:
+            raise BillingNotFoundError(f"Created payment '{payment.id}' could not be reloaded.")
         await self.payment_repository.session.commit()
-
-        return payment
+        return loaded_payment
 
     async def get_payment(self, clinic_id: UUID, payment_id: UUID) -> Payment:
         """Retrieve a single payment by ID ensuring clinic scoping."""
 
-        payment = await self.payment_repository.get_by_id(
+        payment = await self.payment_repository.get_by_id_with_patient(
             payment_id, clinic_id=clinic_id
         )
         if payment is None:

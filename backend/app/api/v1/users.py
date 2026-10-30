@@ -40,8 +40,6 @@ async def list_users(
     List all users/therapists in the clinic.
     """
     clinic_id = auth_context.clinic.id
-    user_was_created = False
-
     stmt = (
         select(User, Membership.role)
         .join(Membership, Membership.user_id == User.id)
@@ -82,6 +80,7 @@ async def create_user(
     Create a new user in the clinic.
     """
     clinic_id = auth_context.clinic.id
+    user_was_created = False
     
     # Extract first/last name if only name is provided
     fname = payload.first_name
