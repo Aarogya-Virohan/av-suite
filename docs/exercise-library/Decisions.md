@@ -109,6 +109,21 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-007] Import of the AV exercise master list
+
+- **Date**: 2026-10-30
+- **Context**: Onkar, 30 Oct: every exercise of the AV master sheet (1507 rows, AV-EX-0001 to AV-EX-1500 plus 7 rows with another id format) goes into the library, with no duplicates. Images follow later with the image pipeline.
+- **Decision**:
+  - Migration `f4a9c2e7b1d3` (after `d2f6a8c0e4b1`) adds 1442 global exercises: id `md5('AV-EX-xxxx')::uuid`, title from the sheet, `body_part` from the sheet category, description empty (the sheet holds image prompts, not patient instructions), `is_free` true, no picture.
+  - Not inserted (65 rows): 17 already in the library (5 renamed originals and 12 added on 27 Oct); 20 that repeat another sheet row under a reworded name (for example "Wall angel" and "Wall angels", "Supported mini squat" and "Mini squat (supported)"), keeping the name that fits the `<exercise> (<variant>)` pattern; 14 "(supported)" copies of exercises that are already supported; 7 rows without an AV-EX id (left out until they get one); 7 that are the same as an original exercise.
+  - Those 7 originals are renamed to the sheet name instead of getting a second row, so saved prescriptions keep their exercise: CHIN TUCKS to Chin tuck, PENDULUM EXERCISE to Pendulum, the two cervical isometrics to Cervical flexion isometric and Cervical extension isometric, GLUTE SQUEEZE to Glute set, SCAPULAR SQUEEZES to Scapular retraction, WALL SLIDES to Wall angels (its description is a wall angel).
+  - The insert skips any title that a global exercise already has (case and spaces ignored), and ids that exist, so a second run adds nothing. Downgrade removes only imported rows that no prescription or clinic photo uses.
+- **Verified**: 11 parametrized checks on the frozen list (sheet numbers, id format and uniqueness, titles unique as written and with word order, plurals and punctuation ignored, no clash with the original or production titles, renames point at the right seed rows, column lengths, body part order, counts); adding a repeated or existing exercise to the list makes them fail. On a copy of production's exercise rows (25 global): 1467 after upgrade, no repeated title; downgrade with one imported exercise used in a prescription keeps that one (26); upgrade again 1467; a second run on an imported database adds nothing. Fresh database: 1455. Full pytest 400 pass / the same 10 known failures. Library on the production build at 1440 and 390 px: 1455 exercises, search "squat" 39, no page errors or failed calls.
+- **Not verified**: live.
+- **Affected Files**: `backend/alembic/versions/f4a9c2e7b1d3_import_av_exercise_master_list.py`, `backend/tests/test_exercise_master_import.py`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -126,5 +141,6 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-11 | Counts in the panel do not change with the filters picked. (The Objective list was completed on 30 Oct, 43 values.) | Open | Frontend + backend |
 | EL-L-12 | `PUT /exercises/{id}` lets any clinic with `exercises.edit` change a global exercise, now including its categories (behaviour from before this branch) | Open; global exercises should be changed by AV only | Backend + founders |
 | EL-L-13 | The list is still ordered by the free-text `body_part`, not by the Joint/Region categories | Open; switch once every exercise is tagged | Backend |
+| EL-L-14 | Imported exercises have no picture, description or categories. 44 "(seated)" variants (found by a name check) describe positions that cannot be done seated (for example "Prone Y raise (seated)", "Glute bridge (seated)"); they were imported as asked and need a physio review. Card titles are shown in title case, so "ROM" reads "Rom" | Open; pictures with the image pipeline, tags and review with the founders | Us + founders |
 
-*Last updated: 2026-10-30 (EL-D-005 Objective list completed, EL-L-11 updated) | Branch: release/el-nov*
+*Last updated: 2026-10-30 (EL-D-007, EL-L-14) | Branch: release/el-nov*
