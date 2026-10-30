@@ -418,3 +418,49 @@ export function saveBlob(blob: Blob, filename: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+// --------------------------------------------------------------- templates (EL-D-009)
+
+export interface TemplateItem {
+  id: string;
+  exercise_id: string;
+  position: number;
+  sets: number;
+  reps: number;
+  hold: number;
+  frequency: string;
+  note: string | null;
+  exercise: Record<string, unknown> | null;
+}
+
+export interface ExerciseTemplate {
+  id: string;
+  clinic_id: string | null;
+  name: string;
+  description: string | null;
+  is_global: boolean;
+  created_at: string;
+  updated_at: string;
+  items: TemplateItem[];
+}
+
+export interface TemplatePayload {
+  name: string;
+  description?: string;
+  items: PrescriptionItemPayload[];
+}
+
+export async function fetchTemplates(): Promise<ExerciseTemplate[]> {
+  return (await json<ExerciseTemplate[]>("/exercise-templates")) || [];
+}
+
+export function createTemplate(template: TemplatePayload): Promise<ExerciseTemplate> {
+  return json<ExerciseTemplate>("/exercise-templates", {
+    method: "POST",
+    body: JSON.stringify(template),
+  });
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  await request(`/exercise-templates/${id}`, { method: "DELETE" });
+}

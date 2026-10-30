@@ -138,6 +138,23 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-009] Exercise templates, minimal version (clinic templates that fill a prescription)
+
+- **Date**: 2026-10-30
+- **Context**: Founders asked EL-7 (is a template per exercise or a generic program?) and EL-8 (whose branding?). The reference platform's templates are generic programs (name, description, several exercises). Onkar decided on 30 Oct: clinic templates first, a template only pre-fills a prescription, and a minimal version goes in this release.
+- **Decision**:
+  - New tables `exercise_templates` (clinic_id, name, description, created_by) and `exercise_template_items` (exercise, position, sets, reps, hold, frequency, note; one row per exercise). Migration `a3d8f1c5e7b2` on `f4a9c2e7b1d3`.
+  - `clinic_id` NULL is kept for AV templates shared with every clinic, the same rule as global exercises. They are listed after the clinic's own and are read-only (403). None exist yet; adding them later is data only.
+  - API `/exercise-templates`: list, get (needs `exercises.view`), create, replace, delete (need `prescriptions.create`, so no new capability and no role template change). Every exercise must be the clinic's own or global, else 422 and nothing is saved. Same dose bounds as prescriptions, at most 50 exercises, no repeats.
+  - Builder: a Templates block under the patient. "Save as template" stores the exercises on screen with their dose, never patient details. "Use" fills a NEW prescription (asks first if there are unsaved exercises, never overwrites a saved one); the physio changes the dose and saves as usual. Own templates can be deleted.
+  - Branding (EL-8): a template has none. The PDF is always made from the saved prescription, with the letterhead of EL-D-002.
+  - Deleting an exercise drops it from templates (cascade); using a template then reports how many are missing.
+- **Verified**: 13 new tests (create, list, get keep order and dose with categories; replace and delete; another clinic gets 404 on all four calls; another clinic's or unknown exercise gives 422 and saves nothing; 6 bad inputs give 422; AV template listed after own and read-only; deleted exercise drops out; migration chain). Migration up, down one, up again on an empty database: one head `a3d8f1c5e7b2`. Full pytest 427 pass / the same 10 known failures. `tsc` and `eslint` clean.
+- **Not verified**: the builder in a browser; live.
+- **Affected Files**: `backend/app/models/exercise_template.py`, `backend/app/models/__init__.py`, `backend/app/schemas/exercise_template.py`, `backend/app/services/exercise_template_service.py`, `backend/app/api/v1/exercise_templates.py`, `backend/app/api/v1/router.py`, `backend/alembic/versions/a3d8f1c5e7b2_exercise_templates.py`, `backend/tests/test_exercise_templates.py`, `frontend/exercise-library/src/components/prescription/TemplatesPanel.tsx`, `PrescriptionBuilder.tsx`, `src/lib/api.ts`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -156,5 +173,6 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-12 | Global exercises could be changed by any clinic | Fixed by EL-D-008 (403). Global changes need an AV staff role later | - |
 | EL-L-13 | The list is still ordered by the free-text `body_part`, not by the Joint/Region categories | Open; switch once every exercise is tagged | Backend |
 | EL-L-14 | Imported exercises have no picture, description or categories. 44 "(seated)" variants (found by a name check) describe positions that cannot be done seated (for example "Prone Y raise (seated)", "Glute bridge (seated)"); they were imported as asked and need a physio review. Card titles in title case ("Rom") fixed by EL-D-008 | Open; pictures with the image pipeline, tags and review with the founders | Us + founders |
+| EL-L-15 | Templates, minimal version (EL-D-009): no AV templates yet (who writes and approves them is open with the founders); no edit screen (change = use, adjust, save as a new template, delete the old); no tags, phases or search; the guidance text is not saved in a template | Open; next release | Us + founders |
 
-*Last updated: 2026-10-30 (EL-D-008, EL-L-10 and EL-L-12 updated) | Branch: release/el-nov*
+*Last updated: 2026-10-30 (EL-D-009, EL-L-15) | Branch: release/el-nov*

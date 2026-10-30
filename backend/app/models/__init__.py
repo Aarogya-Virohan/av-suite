@@ -14,6 +14,7 @@ from app.models.exercise import Exercise
 from app.models.exercise_photo import ExercisePhoto
 from app.models.exercise_category import ExerciseCategory, exercise_category_links
 from app.models.prescription import Prescription, PrescriptionItem
+from app.models.exercise_template import ExerciseTemplate, ExerciseTemplateItem
 from app.models.posture_session import PostureSession, PostureMeasurement
 
 # --- CRM models ---
@@ -47,6 +48,8 @@ __all__ = [
     "exercise_category_links",
     "Prescription",
     "PrescriptionItem",
+    "ExerciseTemplate",
+    "ExerciseTemplateItem",
     "PostureSession",
     "PostureMeasurement",
     "Lead",
