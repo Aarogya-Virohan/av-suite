@@ -107,14 +107,14 @@ async def test_list_shape() -> None:
     sizes = {k: len(v) for k, v in cats.VALUES.items()}
     assert sizes == {
         "joint_region": 25, "position": 11, "movement": 22, "equipment": 73,
-        "difficulty": 3, "specialty": 18, "objective": 37, "condition": 12,
+        "difficulty": 3, "specialty": 18, "objective": 43, "condition": 12,
         "water_property": 8, "assistance": 2, "age_group": 5,
     }
     for key, names in cats.VALUES.items():
         assert len(set(names)) == len(names), key
         assert all(n == n.strip() and 0 < len(n) <= 100 for n in names), key
     ids = [r.id for r in cats.seed_rows()]
-    assert len(set(ids)) == len(ids) == 216
+    assert len(set(ids)) == len(ids) == 222
     # Fixed ids: the same group and name always give the same id.
     assert category_id("joint_region", "Knee") == uuid.uuid5(cats.CATEGORY_NAMESPACE, "joint_region:Knee")
     assert cats.VALUES["joint_region"][:4] == ("Facial", "TMJ", "Vestibular", "Cervical")

@@ -209,6 +209,7 @@ VALUES: dict[str, tuple[str, ...]] = {
     "objective": (
         "AROM",
         "Acceleration/deceleration",
+        "BRRM (modified)",
         "Balance/proprioception",
         "Bone health",
         "Breathlessness management",
@@ -231,6 +232,7 @@ VALUES: dict[str, tuple[str, ...]] = {
         "Plyometrics",
         "Positioning",
         "Postural control",
+        "Postural drainage",
         "Relaxation & breathing",
         "Sensation & spatial awareness",
         "Speed & agility",
@@ -243,6 +245,10 @@ VALUES: dict[str, tuple[str, ...]] = {
         "Stretch",
         "Stretch - dynamic",
         "Stretch - static",
+        "Swallowing",
+        "Taping",
+        "Tonal management",
+        "Traction",
         "Vestibular rehab",
     ),
     "condition": (

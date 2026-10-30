@@ -196,6 +196,7 @@ SEED = (
     ('objective', (
         'AROM',
         'Acceleration/deceleration',
+        'BRRM (modified)',
         'Balance/proprioception',
         'Bone health',
         'Breathlessness management',
@@ -218,6 +219,7 @@ SEED = (
         'Plyometrics',
         'Positioning',
         'Postural control',
+        'Postural drainage',
         'Relaxation & breathing',
         'Sensation & spatial awareness',
         'Speed & agility',
@@ -230,6 +232,10 @@ SEED = (
         'Stretch',
         'Stretch - dynamic',
         'Stretch - static',
+        'Swallowing',
+        'Taping',
+        'Tonal management',
+        'Traction',
         'Vestibular rehab',
     )),
     ('condition', (
