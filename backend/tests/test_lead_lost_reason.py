@@ -10,20 +10,20 @@ async def test_lead_lost_reasons_and_clear_on_reopen(client, auth_headers):
     for reason in reasons:
         response = await client.post(f"{settings.API_V1_PREFIX}/leads", json={**base, "lost_reason": reason}, headers=auth_headers)
         assert response.status_code == 201, response.text
-        assert response.json()["data"]["lost_reason"] == reason
-        assert response.json()["data"]["lost_remark"] is None
+        assert response.json()["lost_reason"] == reason
+        assert response.json()["lost_remark"] is None
     response = await client.post(f"{settings.API_V1_PREFIX}/leads", json={**base, "lost_reason": "other", "lost_remark": "Requested a later follow-up"}, headers=auth_headers)
     assert response.status_code == 201, response.text
-    lead = response.json()["data"]
+    lead = response.json()
     assert lead["lost_reason"] == "other"
     assert len("x" * 500) == 500
     updated = await client.patch(f"{settings.API_V1_PREFIX}/leads/{lead['id']}", json={"lost_reason": "denied", "lost_remark": "x" * 500}, headers=auth_headers)
     assert updated.status_code == 200, updated.text
-    assert len(updated.json()["data"]["lost_remark"]) == 500
+    assert len(updated.json()["lost_remark"]) == 500
     reopened = await client.patch(f"{settings.API_V1_PREFIX}/leads/{lead['id']}", json={"stage": "contacted"}, headers=auth_headers)
     assert reopened.status_code == 200
-    assert reopened.json()["data"]["lost_reason"] is None
-    assert reopened.json()["data"]["lost_remark"] is None
+    assert reopened.json()["lost_reason"] is None
+    assert reopened.json()["lost_remark"] is None
 
 
 @pytest.mark.asyncio
@@ -41,5 +41,5 @@ async def test_lost_reason_validation(client, auth_headers):
 async def test_update_other_reason_requires_remark(client, auth_headers):
     result = await client.post(f"{settings.API_V1_PREFIX}/leads", json={"name": "Update validation", "phone": "9000000002", "stage": "lost"}, headers=auth_headers)
     assert result.status_code == 201
-    updated = await client.patch(f"{settings.API_V1_PREFIX}/leads/{result.json()['data']['id']}", json={"lost_reason": "other"}, headers=auth_headers)
+    updated = await client.patch(f"{settings.API_V1_PREFIX}/leads/{result.json()['id']}", json={"lost_reason": "other"}, headers=auth_headers)
     assert updated.status_code == 422
