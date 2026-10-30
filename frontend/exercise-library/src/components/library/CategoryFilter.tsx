@@ -149,7 +149,7 @@ export function CategoryFilter({ groups, selected, onChange, total, unavailable 
   );
 }
 
-function GroupBox({
+export function GroupBox({
   group,
   selected,
   onToggle,
@@ -166,8 +166,11 @@ function GroupBox({
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (q) return group.values.filter((v) => v.name.toLowerCase().includes(q));
-    return expanded ? group.values : group.values.slice(0, PREVIEW);
-  }, [group.values, query, expanded]);
+    if (expanded) return group.values;
+    // Collapsed: the first few, plus any ticked value further down, so a
+    // ticked value is never hidden.
+    return group.values.filter((v, i) => i < PREVIEW || selected.includes(v.id));
+  }, [group.values, query, expanded, selected]);
 
   return (
     <section className="rounded-xl border border-line bg-card p-3" aria-label={group.label}>

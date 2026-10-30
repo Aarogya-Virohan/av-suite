@@ -9,6 +9,7 @@ import { SearchBar } from "@/components/library/SearchBar";
 import { CategoryFilter } from "@/components/library/CategoryFilter";
 import { ExerciseList } from "@/components/library/ExerciseList";
 import { PhotoDialog } from "@/components/library/PhotoDialog";
+import { CategoryEditDialog } from "@/components/library/CategoryEditDialog";
 import { PrescriptionBuilder } from "@/components/prescription/PrescriptionBuilder";
 import { Exercise, ExercisePhoto, PrescriptionItem } from "@/types/exercise";
 import { can, fetchCategories, fetchExercises, fetchMe, getToken, type CategoryGroup } from "@/lib/api";
@@ -40,6 +41,9 @@ export default function Home() {
   // Clinic photos: who may add them, and which exercise is open.
   const [canEditPhotos, setCanEditPhotos] = useState(false);
   const [photoExerciseId, setPhotoExerciseId] = useState<string | null>(null);
+  // Categories of the clinic's own exercises (EL-L-10, EL-D-008).
+  const [categoryExerciseId, setCategoryExerciseId] = useState<string | null>(null);
+  const [categoriesKey, setCategoriesKey] = useState(0);
   const moreController = useRef<AbortController | null>(null);
 
   // Route guard.
@@ -58,6 +62,11 @@ export default function Home() {
     setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, photos } : e)));
   }, []);
   const photoExercise = exercises.find((e) => e.id === photoExerciseId) ?? null;
+  const categoryExercise = exercises.find((e) => e.id === categoryExerciseId) ?? null;
+  const replaceExercise = useCallback((updated: Exercise) => {
+    setExercises((prev) => prev.map((e) => (e.id === updated.id ? { ...updated, photos: e.photos } : e)));
+    setCategoriesKey((k) => k + 1); // counts in the filter panel
+  }, []);
 
   // Debounce typing so a word is one request, not one per letter.
   useEffect(() => {
@@ -74,7 +83,7 @@ export default function Home() {
         setCategoriesFailed(false);
       })
       .catch(() => setCategoriesFailed(true));
-  }, [reloadKey]);
+  }, [reloadKey, categoriesKey]);
 
   // First page on search or filter change. Older requests are aborted, so a
   // slow response can never overwrite a newer one, and the current list stays
@@ -252,6 +261,7 @@ export default function Home() {
                 loadMoreError={loadMoreError}
                 onLoadMore={loadMore}
                 onEditPhotos={canEditPhotos ? (e) => setPhotoExerciseId(e.id) : undefined}
+                onEditCategories={canEditPhotos ? (e) => setCategoryExerciseId(e.id) : undefined}
               />
             </>
           }
@@ -263,6 +273,14 @@ export default function Home() {
               onReplace={setPrescription}
             />
           }
+        />
+      )}
+      {categoryExercise && (
+        <CategoryEditDialog
+          exercise={categoryExercise}
+          groups={categoryGroups}
+          onClose={() => setCategoryExerciseId(null)}
+          onSaved={replaceExercise}
         />
       )}
       {photoExercise && (

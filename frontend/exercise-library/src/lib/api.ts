@@ -217,6 +217,10 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
     videoUrl: (be.demo_video_url as string) || "",
     imageUrl: (be.image_url as string) || "",
     photos: mapPhotos(be.photos),
+    isGlobal: be.clinic_id == null,
+    categoryIds: Array.isArray(be.categories)
+      ? be.categories.filter((c) => c && typeof c.id === "string").map((c) => c.id as string)
+      : [],
   };
 }
 
@@ -303,6 +307,16 @@ export interface CategoryGroup {
   key: string;
   label: string;
   values: CategoryValue[];
+}
+
+/** Replace an exercise's categories. Only the clinic's own exercises; a
+ * global one gives 403 (EL-D-008). Returns the updated exercise. */
+export async function updateExerciseCategories(exerciseId: string, categoryIds: string[]): Promise<Exercise> {
+  const be = await json<Record<string, unknown>>(`/exercises/${encodeURIComponent(exerciseId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ category_ids: categoryIds }),
+  });
+  return mapBackendExerciseToFrontend(be);
 }
 
 /** Every category group, in panel order, with counts (EL-D-005). */

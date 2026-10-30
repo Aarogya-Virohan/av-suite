@@ -473,3 +473,22 @@ async def test_exercise_picture_is_large_and_above_the_dose() -> None:
     assert card.index('<div class="ex-img"><img') < card.index('<table class="dose">')
     assert "max-height: 60mm" in out
     assert pdf.IMAGE_MAX_PX >= 1200
+
+
+@pytest.mark.parametrize(
+    "raw, shown",
+    [
+        ("CHIN TUCKS", "Chin tucks"),
+        ("Shoulder abduction active ROM", "Shoulder abduction active ROM"),
+        ("LATERAL FLEXION  ISOMETRIC  – Right Side", "Lateral flexion isometric – right side"),
+        ("bridging", "Bridging"),
+        ("Prone Y raise (seated)", "Prone Y raise (seated)"),
+        ("  Wall   angels ", "Wall angels"),
+        ("", ""),
+    ],
+)
+def test_display_title(raw: str, shown: str) -> None:
+    """Titles show as written; only titles mostly in capitals change (EL-D-008)."""
+    from app.services.prescription_pdf import display_title
+
+    assert display_title(raw) == shown

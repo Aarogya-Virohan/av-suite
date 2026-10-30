@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { Exercise } from "@/types/exercise";
-import { Camera, Check, ImageOff, Lock, Maximize2, Play, Plus } from "lucide-react";
+import { Camera, Check, Tags, ImageOff, Lock, Maximize2, Play, Plus } from "lucide-react";
 import { ImageViewer } from "@/components/library/ImageViewer";
 import { cn } from "@/lib/utils";
 import { useExercisePhoto } from "@/lib/exercisePhotos";
+import { displayTitle } from "@/lib/displayTitle";
 
 interface ExerciseCardProps {
   exercise: Exercise;
@@ -11,9 +12,11 @@ interface ExerciseCardProps {
   onAdd: (exercise: Exercise) => void;
   /** Shown only to users who may add clinic photos (exercises.edit). */
   onEditPhotos?: (exercise: Exercise) => void;
+  /** Own exercises only; global ones are read-only for clinics (EL-D-008). */
+  onEditCategories?: (exercise: Exercise) => void;
 }
 
-export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos }: ExerciseCardProps) {
+export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos, onEditCategories }: ExerciseCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const [viewing, setViewing] = useState(false);
   // The clinic's own front photo comes first, then the library picture.
@@ -78,8 +81,8 @@ export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos }: Exercis
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="font-display text-[15px] font-bold capitalize leading-snug text-ink">
-              {exercise.name.toLowerCase()}
+            <h3 className="font-display text-[15px] font-bold leading-snug text-ink">
+              {displayTitle(exercise.name)}
             </h3>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <span className="rounded-md bg-grove-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-grove">
@@ -100,6 +103,17 @@ export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos }: Exercis
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
+          {onEditCategories && !exercise.isGlobal && (
+            <button
+              type="button"
+              onClick={() => onEditCategories(exercise)}
+              aria-label={`Categories for ${exercise.name}`}
+              title="Categories"
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded-[10px] border border-line text-grove transition-colors hover:bg-grove-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+            >
+              <Tags className="h-4 w-4" />
+            </button>
+          )}
           {onEditPhotos && (
             <button
               type="button"

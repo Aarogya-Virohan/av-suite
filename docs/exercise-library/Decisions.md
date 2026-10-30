@@ -124,6 +124,20 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-008] Global exercises read-only for clinics; categories set from the card; titles as written
+
+- **Date**: 2026-10-30
+- **Context**: With 1455 shared exercises (EL-D-007), any clinic with `exercises.edit` could rename, re-tag or delete an exercise every clinic sees (EL-L-12). There was also no screen to set categories (EL-L-10). Onkar chose option A on 30 Oct.
+- **Decision**:
+  - `PUT` and `DELETE /exercises/{id}` on a global exercise give 403 ("part of the AV library") and change nothing. Clinics change only their own exercises. Clinic photos of a global exercise stay allowed (EL-D-004). Global exercises change only through migrations or SQL until an AV staff role exists.
+  - Library card: a Categories button (users with `exercises.edit`, own exercises only) opens a dialog with every category group (same boxes as the filter panel) and saves with `category_ids`. Filter counts refresh after a save. In both the dialog and the filter panel a ticked value always shows, also when its group is collapsed.
+  - Titles show as written, so "ROM" stays "ROM". Titles mostly in capitals (the older "CHIN TUCKS" style) show in sentence case. Same rule in the library (`lib/displayTitle.ts`) and on the PDF (`display_title`).
+- **Verified**: 7 new tests (title, categories, clearing and both on a global give 403 with title and links unchanged; delete of a global gives 403 and the row stays; own exercise changes and deletes; another clinic's exercise stays 404); without the guard 5 fail. 7 title cases, same output from the TypeScript and Python versions. Full pytest 414 pass / the same 10 known failures. `tsc`, `eslint`, `next build` clean. Live API locally: PUT and DELETE on "Chin tuck" give 403, title unchanged. Playwright at 1440 and 390 px: Categories button on the clinic's own exercise only, Knee and Standing saved (card shows Knee, counts 1), dialog reopens with both ticked and visible, clearing works, no page errors.
+- **Not verified**: live.
+- **Affected Files**: `backend/app/services/exercise_service.py`, `backend/app/api/v1/exercises.py`, `backend/app/services/prescription_pdf.py`, `backend/tests/test_global_exercise_read_only.py`, `backend/tests/test_prescription_pdf.py`, `frontend/exercise-library/src/components/library/CategoryEditDialog.tsx`, `CategoryFilter.tsx`, `ExerciseCard.tsx`, `ExerciseList.tsx`, `ImageViewer.tsx`, `PhotoDialog.tsx`, `components/prescription/ExerciseRow.tsx`, `src/app/page.tsx`, `src/lib/api.ts`, `src/lib/displayTitle.ts`, `src/types/exercise.ts`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -137,10 +151,10 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-07 | The PDF names the prescribing therapist. "Head of clinic" needs clinic profile fields that do not exist yet (CRM L-14) | Open; founders to choose, fields come with the CRM clinic profile work | Founders + backend |
 | EL-L-08 | The Exercise Library asks `/auth/me` twice on load (header and page) | Accepted; merge into one call when the header is next changed | Frontend |
 | EL-L-09 | Library pictures and videos still share `video_url`; clinic photos have their own table (EL-D-004). Moving library pictures into the same model waits for the categories work (founders' reference for Q1) | Open | Backend |
-| EL-L-10 | No screen sets an exercise's categories; only the API (`category_ids`) does. The 21 production exercises carry no categories until reviewed tags are applied: the 13 global ones have fixed ids from the seed migration, so a data migration can tag them; the clinic ones need SQL by id | Open; tags to be reviewed first | Us + founders |
+| EL-L-10 | Categories of a clinic's own exercises are set from the card (EL-D-008). Global exercises (1455) carry no categories until reviewed tags come in a data migration | Partly fixed; global tags after review | Us + founders |
 | EL-L-11 | Counts in the panel do not change with the filters picked. (The Objective list was completed on 30 Oct, 43 values.) | Open | Frontend + backend |
-| EL-L-12 | `PUT /exercises/{id}` lets any clinic with `exercises.edit` change a global exercise, now including its categories (behaviour from before this branch) | Open; global exercises should be changed by AV only | Backend + founders |
+| EL-L-12 | Global exercises could be changed by any clinic | Fixed by EL-D-008 (403). Global changes need an AV staff role later | - |
 | EL-L-13 | The list is still ordered by the free-text `body_part`, not by the Joint/Region categories | Open; switch once every exercise is tagged | Backend |
-| EL-L-14 | Imported exercises have no picture, description or categories. 44 "(seated)" variants (found by a name check) describe positions that cannot be done seated (for example "Prone Y raise (seated)", "Glute bridge (seated)"); they were imported as asked and need a physio review. Card titles are shown in title case, so "ROM" reads "Rom" | Open; pictures with the image pipeline, tags and review with the founders | Us + founders |
+| EL-L-14 | Imported exercises have no picture, description or categories. 44 "(seated)" variants (found by a name check) describe positions that cannot be done seated (for example "Prone Y raise (seated)", "Glute bridge (seated)"); they were imported as asked and need a physio review. Card titles in title case ("Rom") fixed by EL-D-008 | Open; pictures with the image pipeline, tags and review with the founders | Us + founders |
 
-*Last updated: 2026-10-30 (EL-D-007, EL-L-14) | Branch: release/el-nov*
+*Last updated: 2026-10-30 (EL-D-008, EL-L-10 and EL-L-12 updated) | Branch: release/el-nov*

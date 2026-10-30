@@ -6,6 +6,7 @@ import { ApiError, deleteExercisePhoto, uploadExercisePhoto } from "@/lib/api";
 import { forgetPhoto, useExercisePhoto } from "@/lib/exercisePhotos";
 import { toast } from "@/components/ui/toaster";
 import type { Exercise, ExercisePhoto, PhotoAngle } from "@/types/exercise";
+import { displayTitle } from "@/lib/displayTitle";
 
 const ANGLES: { angle: PhotoAngle; label: string }[] = [
   { angle: "front", label: "Front" },
@@ -65,8 +66,8 @@ export function PhotoDialog({ exercise, onClose, onPhotosChange }: PhotoDialogPr
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="photo-dialog-title" className="font-display text-base font-bold capitalize text-ink">
-              {exercise.name.toLowerCase()}
+            <h2 id="photo-dialog-title" className="font-display text-base font-bold text-ink">
+              {displayTitle(exercise.name)}
             </h2>
             <p className="mt-0.5 text-xs text-ink-2">Your clinic&apos;s photos. Only your clinic sees them.</p>
           </div>

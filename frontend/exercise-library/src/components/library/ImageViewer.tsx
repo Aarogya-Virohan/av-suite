@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { displayTitle } from "@/lib/displayTitle";
 
 interface ImageViewerProps {
   src: string;
@@ -33,8 +34,8 @@ export function ImageViewer({ src, title, onClose }: ImageViewerProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-          <p className="min-w-0 flex-1 truncate font-display text-[15px] font-bold capitalize text-ink">
-            {title.toLowerCase()}
+          <p className="min-w-0 flex-1 truncate font-display text-[15px] font-bold text-ink">
+            {displayTitle(title)}
           </p>
           <button
             ref={closeRef}

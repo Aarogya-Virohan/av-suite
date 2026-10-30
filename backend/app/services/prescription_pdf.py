@@ -125,6 +125,18 @@ class RxDoc:
 # --------------------------------------------------------------------------
 
 
+def display_title(raw: str) -> str:
+    """Same rule as the library (displayTitle.ts): titles show as written,
+    except titles mostly in capitals ("CHIN TUCKS"), shown in sentence case."""
+    title = " ".join((raw or "").split())
+    letters = [c for c in title if c.isascii() and c.isalpha()]
+    if not letters:
+        return title
+    upper = sum(1 for c in letters if c.isupper())
+    text = title.lower() if upper / len(letters) >= 0.6 else title
+    return text[:1].upper() + text[1:]
+
+
 def _esc(value: object) -> str:
     return html.escape(str(value)) if value not in (None, "") else ""
 
@@ -324,7 +336,7 @@ def _exercise_card(index: int, item: RxItem) -> str:
     return f"""
 <div class="ex-card">
   <p class="ex-head"><span class="ex-num">{index}</span>
-    <span class="ex-title">{_esc(item.title.lower())}</span>
+    <span class="ex-title">{_esc(display_title(item.title))}</span>
     <span class="ex-part">{_esc(item.body_part)}</span></p>
   <div class="{img_class}">{image}</div>
   <table class="ex"><tr>
@@ -437,7 +449,7 @@ p {{ margin: 0; }}
   background: {MIDNIGHT}; color: #fff; text-align: center; font-weight: 700; font-size: 7.6pt;
   margin-right: 2mm; vertical-align: 0.3mm; }}
 .ex-title {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 700; font-size: 11pt;
-  color: {MIDNIGHT}; text-transform: capitalize; }}
+  color: {MIDNIGHT}; }}
 .ex-part {{ font-size: 6.6pt; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
   color: {GROVE}; background: #e3f3ea; border-radius: 1.6mm; padding: 0.5mm 1.8mm; margin-left: 2mm;
   vertical-align: 0.5mm; }}

@@ -494,6 +494,9 @@ async def get_exercise(
         raise
 
 
+GLOBAL_READ_ONLY = "This exercise is part of the AV library and cannot be changed by a clinic."
+
+
 @router.put("/{id}", response_model=ResponseEnvelope[ExerciseRead], tags=["Exercises"])
 async def update_exercise(
     request: Request,
@@ -507,7 +510,10 @@ async def update_exercise(
     clinic_id = request.state.clinic_id
     if exercise_in.category_ids is not None:
         exercise_in.category_ids = await _checked_category_ids(db, exercise_in.category_ids)
-    exercise = await exercise_service.update_exercise(db, clinic_id, id, exercise_in)
+    try:
+        exercise = await exercise_service.update_exercise(db, clinic_id, id, exercise_in)
+    except exercise_service.GlobalExerciseReadOnly:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GLOBAL_READ_ONLY)
     if not exercise:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -526,7 +532,10 @@ async def delete_exercise(
     """Delete an exercise."""
 
     clinic_id = request.state.clinic_id
-    deleted = await exercise_service.delete_exercise(db, clinic_id, id)
+    try:
+        deleted = await exercise_service.delete_exercise(db, clinic_id, id)
+    except exercise_service.GlobalExerciseReadOnly:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GLOBAL_READ_ONLY)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

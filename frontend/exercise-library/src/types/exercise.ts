@@ -13,6 +13,10 @@ export interface Exercise {
   imageUrl?: string;
   /** The clinic's own photos of this exercise (front, side). */
   photos?: ExercisePhoto[];
+  /** Part of the AV library (no clinic). Clinics cannot change it (EL-D-008). */
+  isGlobal?: boolean;
+  /** Ids of the categories the exercise carries (EL-D-005). */
+  categoryIds?: string[];
 }
 
 export type PhotoAngle = "front" | "side";
