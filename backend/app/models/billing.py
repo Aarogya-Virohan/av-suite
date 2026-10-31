@@ -231,6 +231,8 @@ class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     discount_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2), nullable=False, default=Decimal("0.00")
     )
+    discount_percent: Mapped[Decimal | None] = mapped_column(Numeric(precision=5, scale=2), nullable=True)
+    tax_percent: Mapped[Decimal | None] = mapped_column(Numeric(precision=5, scale=2), nullable=True)
     tax_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2), nullable=False, default=Decimal("0.00")
     )

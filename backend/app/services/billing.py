@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
@@ -34,6 +34,13 @@ from app.utils.whatsapp import build_whatsapp_link
 
 class BillingValidationError(Exception):
     """Raised when validation fails for billing operations."""
+
+
+class BillingPayloadValidationError(BillingValidationError):
+    """Raised when calculated payload fields contradict their percentages."""
+
+
+AMOUNT_ROUNDING_TOLERANCE = Decimal("0.005")
 
 
 class BillingNotFoundError(Exception):
@@ -300,13 +307,27 @@ class BillingService:
                     }
                 )
 
-        total_amount = subtotal - payload.discount_amount + payload.tax_amount
+        discount_amount = payload.discount_amount
+        tax_amount = payload.tax_amount
+        if payload.discount_percent is not None:
+            expected_discount = (subtotal * payload.discount_percent / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if "discount_amount" in payload.model_fields_set and abs(discount_amount - expected_discount) > AMOUNT_ROUNDING_TOLERANCE:
+                raise BillingPayloadValidationError("discount_amount does not match discount_percent.")
+            discount_amount = expected_discount
+        taxable_subtotal = subtotal - discount_amount
+        if payload.tax_percent is not None:
+            expected_tax = (taxable_subtotal * payload.tax_percent / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if "tax_amount" in payload.model_fields_set and abs(tax_amount - expected_tax) > AMOUNT_ROUNDING_TOLERANCE:
+                raise BillingPayloadValidationError("tax_amount does not match tax_percent.")
+            tax_amount = expected_tax
+        total_amount = subtotal - discount_amount + tax_amount
         if total_amount < Decimal("0.00"):
             raise BillingValidationError("Total invoice amount cannot be negative.")
 
         invoice_data = payload.model_dump(
             exclude={"items", "line_items", "invoice_number"}
         )
+        invoice_data.update(discount_amount=discount_amount, tax_amount=tax_amount)
         invoice_data.update(
             {
                 "clinic_id": clinic_id,
@@ -427,6 +448,25 @@ class BillingService:
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
         update_data = payload.model_dump(exclude_unset=True)
+
+        discount_percent = update_data.get("discount_percent", invoice.discount_percent)
+        tax_percent = update_data.get("tax_percent", invoice.tax_percent)
+        discount_amount = update_data.get("discount_amount", invoice.discount_amount)
+        tax_amount = update_data.get("tax_amount", invoice.tax_amount)
+        if discount_percent is not None:
+            expected = (invoice.subtotal * discount_percent / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if "discount_amount" in update_data and abs(discount_amount - expected) > AMOUNT_ROUNDING_TOLERANCE:
+                raise BillingPayloadValidationError("discount_amount does not match discount_percent.")
+            discount_amount = expected
+            update_data["discount_amount"] = expected
+        if tax_percent is not None:
+            expected = ((invoice.subtotal - discount_amount) * tax_percent / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if "tax_amount" in update_data and abs(tax_amount - expected) > AMOUNT_ROUNDING_TOLERANCE:
+                raise BillingPayloadValidationError("tax_amount does not match tax_percent.")
+            tax_amount = expected
+            update_data["tax_amount"] = expected
+        if any(k in update_data for k in ("discount_amount", "tax_amount", "discount_percent", "tax_percent")):
+            update_data["total_amount"] = invoice.subtotal - discount_amount + tax_amount
 
         if payload.appointment_id is not None:
             appointment = await self.appointment_repository.get_by_id(

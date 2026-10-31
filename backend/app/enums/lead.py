@@ -22,3 +22,12 @@ class LeadSource(StrEnum):
     WALK_IN = "walk_in"
     ADVERTISEMENT = "advertisement"
     OTHER = "other"
+
+
+class LeadLostReason(StrEnum):
+    DENIED = "denied"
+    BETTER_PRICE = "better_price"
+    ASKED_FOR_DISCOUNT = "asked_for_discount"
+    OFFER = "offer"
+    CALL_NOT_PICKED = "call_not_picked"
+    OTHER = "other"
