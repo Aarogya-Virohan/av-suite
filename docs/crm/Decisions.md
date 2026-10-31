@@ -396,6 +396,22 @@ Each entry follows this structure:
 
 ---
 
+## [D-027] Invoice and Receipt PDF Made by the Server
+
+- **Date**: 2026-10-31
+- **Context**: The backend invoice "PDF" was five lines of text (L-41), so the CRM saved invoices through the browser print dialog (D-025). Email (C-20) and any patient link need a real file from the server. The shared letterhead came with `dev` (Exercise Library round), so `dev` was merged into `release/crm-oct` first.
+- **Decision**:
+  - `GET /api/v1/invoices/{id}/pdf/download` returns a real A4 PDF made with WeasyPrint, same look as the exercise prescription PDF (shared letterhead, brand fonts, "powered by" footer). `?kind=receipt` gives the payment receipt. File names `Invoice-<number>.pdf` and `Receipt-<number>.pdf`.
+  - Content is what the CRM preview prints: clinic name, address, phone, email, Reg. No., GSTIN (empty fields left out), document title, reference, date (India time), due date (invoice only), status, patient name and phone, line items, subtotal, discount and tax with their percent, total, paid and balance due, for a receipt the payments (date, mode, reference, amount, with the status when not completed), notes, the computer-generated line, "Authorised by" and the thank-you line. No signature line (C-19). Nothing is invented (D-008, D-018).
+  - Amounts print as "Rs." because the embedded brand fonts have no rupee sign and the server may have no font with it. The CRM screen keeps the rupee sign.
+  - Receipt payments are read with the same query as the CRM receipt (`/payments?invoice_id=`), not the invoice relationship.
+  - `POST /invoices/{id}/pdf` no longer renders a PDF it throws away, and its `download_url` now points at the real route (`/api/v1/invoices/...`, it said `/api/v1/billing/...`).
+  - CRM: the invoice and receipt preview has "Download PDF" (server file, downloaded with the user's session) next to "Print" and "WhatsApp". `types/schema.ts` regenerated.
+- **Verified**: see the CRM Project tracker for this delivery.
+- **Affected Files**: `backend/app/services/{invoice_pdf,billing}.py`, `backend/app/api/v1/billing.py`, `backend/tests/test_invoice_pdf.py`, `backend/requirements.txt` (pypdf for tests), `frontend/crm/src/features/billing/{api.ts,pdf.test.ts,components/InvoicePreviewModal.tsx}`, `frontend/crm/src/types/schema.ts`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -441,6 +457,7 @@ Each entry follows this structure:
 | L-38 | Exercise images are cached in the server's memory only; the first PDF after a deploy downloads them again (parallel, 6 s cap). An image that fails prints "Image not available" | Accepted for now; move images into our own storage with the exercise image pipeline | Backend |
 | L-39 | Appointments loads at most 500 appointments in one request (backend maximum) and has no paging; the backend has no `order_by` and its `date` filter uses UTC days, so the day filter runs on the client | Open; backend paging, ordering and a local-day filter | Backend + frontend |
 | L-40 | Leads list loads at most 500 leads in one request (backend maximum) and has no rows-per-page or paging (it is not a DataTable). Before 24 Oct it sent no limit and got only the API default of 100. Export CSV and the monthly table use the same 500 | Open; backend paging or a monthly count endpoint once a clinic passes 500 leads | Frontend + backend |
-| L-41 | Backend invoice PDF is a placeholder: `BillingService.generate_invoice_pdf` returns five lines of text with a `%PDF-1.4` header (not a valid PDF), and `generate_invoice_pdf_response` builds the download URL as `/api/v1/billing/invoices/...` while the route is `/api/v1/invoices/...`. The CRM does not call it; invoices are saved through the browser print dialog (D-025) | Open; real server PDF (same approach as the Rx PDF) after the billing backend batch, so the files do not conflict | Backend |
+| L-41 | Backend invoice PDF was a placeholder (five lines of text with a `%PDF-1.4` header) and its download URL pointed at `/api/v1/billing/invoices/...` | Fixed 2026-10-31: real server PDF for invoice and receipt, URL fixed, CRM "Download PDF" (D-027) | - |
+| L-42 | The invoice PDF download needs a signed-in clinic user, so the `download_url` and WhatsApp link from `POST /invoices/{id}/pdf` cannot be opened by a patient. The CRM WhatsApp button only opens a chat; the PDF is attached by hand | Open; a signed, expiring patient link or email with the PDF attached (C-20) | Backend + frontend |
 
-*Last updated: 2026-10-31 (D-026; L-1, L-8, L-14, L-15, L-24, L-26 updated) | Branch: feat/crm-fields-fe*
+*Last updated: 2026-10-31 (D-027; L-41 closed, L-42 added) | Branch: feat/invoice-pdf*

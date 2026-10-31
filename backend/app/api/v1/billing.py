@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -475,20 +475,23 @@ async def download_invoice_pdf_endpoint(
     id: UUID,
     clinic: CurrentClinicDep,
     service: BillingServiceDep,
+    kind: Annotated[Literal["invoice", "receipt"], Query()] = "invoice",
     scope: CapabilityScope = Depends(require_capability("invoices.view")),
 ) -> Response:
-    """Download PDF for an invoice (authenticated, clinic-scoped)."""
+    """Download the invoice, or with `kind=receipt` the payment receipt, as a
+    PDF (authenticated, clinic-scoped). Decisions.md L-41."""
 
     try:
-        pdf_bytes = await service.generate_invoice_pdf(clinic.id, id)
-        headers = {"Content-Disposition": f'attachment; filename="invoice_{id}.pdf"'}
-        return Response(
-            content=pdf_bytes, media_type="application/pdf", headers=headers
-        )
+        pdf_bytes, filename = await service.generate_invoice_pdf(clinic.id, id, kind)
     except BillingNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Cache-Control": "no-store",
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 
 # --- Payment Endpoints ---

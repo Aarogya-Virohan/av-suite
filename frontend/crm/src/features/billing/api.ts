@@ -95,3 +95,31 @@ export function useRecordPayment() {
     },
   });
 }
+
+export type InvoicePdfKind = 'invoice' | 'receipt';
+
+/** Same name the server sends: Invoice-INV-0001.pdf / Receipt-INV-0001.pdf (L-41). */
+export function invoicePdfFilename(kind: InvoicePdfKind, invoiceNumber: string): string {
+  const safe = invoiceNumber.replace(/[^A-Za-z0-9_-]/g, '-').replace(/^-+|-+$/g, '') || 'invoice';
+  return `${kind === 'receipt' ? 'Receipt' : 'Invoice'}-${safe}.pdf`;
+}
+
+/**
+ * Fetch the server-rendered PDF (GET /invoices/{id}/pdf/download) and save it.
+ * The name is built here because CORS does not expose Content-Disposition.
+ */
+export async function downloadInvoicePdf(invoiceId: string, invoiceNumber: string, kind: InvoicePdfKind) {
+  const res = await apiClient.get(`/invoices/${invoiceId}/pdf/download`, {
+    params: kind === 'receipt' ? { kind } : undefined,
+    responseType: 'blob',
+  });
+  const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = invoicePdfFilename(kind, invoiceNumber);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+}

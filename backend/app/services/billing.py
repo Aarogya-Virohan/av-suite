@@ -7,6 +7,13 @@ from uuid import UUID, uuid4
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text, func
 
+from app.services.invoice_pdf import (
+    InvoiceDoc,
+    InvoiceLine,
+    ReceiptPayment,
+    pdf_filename,
+    render_invoice_pdf,
+)
 from app.enums.billing import InvoiceStatus
 from app.enums.package import PackageStatus
 from app.models.billing import Invoice, Package, PatientPackage, Payment, InvoiceCounter
@@ -611,18 +618,97 @@ class BillingService:
         await self.payment_repository.delete(payment)
         await self.payment_repository.session.commit()
 
-    async def generate_invoice_pdf(self, clinic_id: UUID, invoice_id: UUID) -> bytes:
-        """Generate PDF representation of a clinic invoice."""
+    async def build_invoice_document(
+        self, clinic_id: UUID, invoice_id: UUID, kind: str = "invoice"
+    ) -> InvoiceDoc:
+        """Collect everything the invoice or receipt PDF prints (L-41)."""
+
+        from app.models.clinic import Clinic
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
-        pdf_content = (
-            f"%PDF-1.4\n"
-            f"% INVOICE {invoice.invoice_number}\n"
-            f"Clinic: {clinic_id}\n"
-            f"Patient: {invoice.patient_id}\n"
-            f"Total: {invoice.total_amount}\n"
-        ).encode("utf-8")
-        return pdf_content
+        clinic = await self.invoice_repository.session.get(Clinic, clinic_id)
+        patient = invoice.patient
+        if patient is None:
+            patient = await self.patient_repository.get_by_patient_id(
+                invoice.patient_id, clinic_id=clinic_id
+            )
+        patient_name = (patient.full_name if patient else "").strip() or (
+            f"Patient #{str(invoice.patient_id)[:8].upper()}"
+        )
+        if invoice.items:
+            lines = [
+                InvoiceLine(i.description, i.quantity, i.unit_price, i.total_price)
+                for i in invoice.items
+            ]
+        else:
+            lines = [
+                InvoiceLine(
+                    str(li.get("description", "")),
+                    li.get("quantity", ""),
+                    li.get("unit_price"),
+                    li.get("total_price"),
+                )
+                for li in (invoice.line_items or [])
+                if isinstance(li, dict)
+            ]
+        # Same source as the CRM receipt (GET /payments?invoice_id=), not the
+        # invoice.payments relationship, which can be stale in a long session.
+        receipt_rows = (
+            await self.list_payments(clinic_id, invoice_id=invoice.id, limit=500)
+            if kind == "receipt"
+            else []
+        )
+        payments = [
+            ReceiptPayment(
+                p.payment_date,
+                getattr(p.payment_method, "value", p.payment_method),
+                p.transaction_reference,
+                p.amount,
+                getattr(p.status, "value", p.status),
+            )
+            for p in receipt_rows
+        ]
+        return InvoiceDoc(
+            kind="receipt" if kind == "receipt" else "invoice",
+            invoice_number=invoice.invoice_number,
+            status=getattr(invoice.status, "value", invoice.status),
+            issue_date=invoice.issue_date,
+            due_date=invoice.due_date,
+            clinic_name=(clinic.name if clinic else "") or "Clinic",
+            clinic_logo=clinic.branding_logo_url if clinic else None,
+            address_line=clinic.address_line if clinic else None,
+            city=clinic.city if clinic else None,
+            state=clinic.state if clinic else None,
+            pincode=clinic.pincode if clinic else None,
+            phone=clinic.phone if clinic else None,
+            email=clinic.email if clinic else None,
+            registration_number=clinic.registration_number if clinic else None,
+            gstin=clinic.gstin if clinic else None,
+            authorised_person=clinic.authorised_person if clinic else None,
+            patient_name=patient_name,
+            patient_phone=patient.phone if patient else None,
+            subtotal=invoice.subtotal,
+            discount_amount=invoice.discount_amount,
+            discount_percent=invoice.discount_percent,
+            tax_amount=invoice.tax_amount,
+            tax_percent=invoice.tax_percent,
+            total_amount=invoice.total_amount,
+            paid_amount=invoice.paid_amount,
+            notes=invoice.notes,
+            items=lines,
+            payments=payments,
+        )
+
+    async def generate_invoice_pdf(
+        self, clinic_id: UUID, invoice_id: UUID, kind: str = "invoice"
+    ) -> tuple[bytes, str]:
+        """Render the invoice (or payment receipt) PDF. Returns (bytes, file name).
+
+        It was a fake five-line "%PDF" text until 31 Oct 2026 (L-41)."""
+
+        doc = await self.build_invoice_document(clinic_id, invoice_id, kind)
+        pdf = await render_invoice_pdf(doc)
+        return pdf, pdf_filename(doc.kind, doc.invoice_number)
 
     @staticmethod
     def _build_invoice_message(patient_name: str, pdf_url: str) -> str:
@@ -649,8 +735,11 @@ class BillingService:
                 f"Patient '{invoice.patient_id}' not found for clinic '{clinic_id}'."
             )
 
-        pdf_url = f"/api/v1/billing/invoices/{invoice_id}/pdf/download"
-        _ = await self.generate_invoice_pdf(clinic_id, invoice_id)
+        # The route is /api/v1/invoices/..., not /api/v1/billing/... (L-41).
+        # The download needs a signed-in clinic user, so a patient cannot open
+        # this link yet (L-42); sharing with patients is C-20.
+        # The PDF is rendered on download, not here, so this call stays fast.
+        pdf_url = f"/api/v1/invoices/{invoice_id}/pdf/download"
 
         patient_name = getattr(patient, "full_name", "Patient")
         whatsapp_link = build_whatsapp_link(
