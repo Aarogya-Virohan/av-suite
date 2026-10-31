@@ -34,14 +34,10 @@ import httpx
 
 from app.services.posture.pdf_service import (
     BRAND_DARK,
-    DEEP_TEAL,
     GROVE,
     INK,
-    LIME,
     MIDNIGHT,
-    MIDNIGHT_2,
     MUTED,
-    ON_DARK,
     PAGE,
     PAPER,
     POWERED_BY_COMPANY,
@@ -49,6 +45,11 @@ from app.services.posture.pdf_service import (
     RULE,
     _brand_data_uri,
     _font_faces,
+)
+from app.services.report_letterhead import (
+    letterhead_css,
+    letterhead_html,
+    resolve_clinic_logo,
 )
 
 try:
@@ -60,6 +61,8 @@ logger = logging.getLogger(__name__)
 
 IST = ZoneInfo("Asia/Kolkata")
 DOC_TITLE = "Home Exercise Programme"
+# Founders' feedback 23 Oct 2026, item 4 (was "Physical Therapy & Rehabilitation").
+LETTERHEAD_SUBTITLE = "Exercise Prescription Tool"
 
 # Wording taken from the old browser print view (A4PrintView.tsx), not new.
 SAFETY_NOTE = (
@@ -70,7 +73,7 @@ SAFETY_NOTE = (
 # Image fetching limits.
 IMAGE_TIMEOUT_S = 6.0
 IMAGE_MAX_BYTES = 8 * 1024 * 1024
-IMAGE_MAX_PX = 560
+IMAGE_MAX_PX = 1400
 IMAGE_CONCURRENCY = 6
 IMAGE_CACHE_SIZE = 256
 _MAX_REDIRECTS = 3
@@ -108,6 +111,9 @@ class RxDoc:
     prescribed_on: datetime | None
     physio_notes: str | None
     items: list[RxItem] = field(default_factory=list)
+    # Raw clinics.branding_logo_url; resolved into clinic_logo_src at render.
+    clinic_logo: str | None = None
+    clinic_logo_src: str = ""
 
 
 # --------------------------------------------------------------------------
@@ -144,11 +150,6 @@ def pdf_filename(patient_name: str, on: date) -> str:
     """Download name, e.g. Rx_PriyaSharma_20Oct2026.pdf (ASCII only)."""
     safe = "".join(ch for ch in patient_name.title() if ch.isascii() and ch.isalnum())
     return f"Rx_{safe or 'Patient'}_{on.strftime('%d%b%Y')}.pdf"
-
-
-def _initials(name: str) -> str:
-    words = [w for w in name.replace("-", " ").split() if w[:1].isalnum()]
-    return "".join(w[0] for w in words[:2]).upper() or "AV"
 
 
 # --------------------------------------------------------------------------
@@ -254,20 +255,9 @@ async def embed_images(
 
 
 def _letterhead(doc: RxDoc) -> str:
-    return f"""
-<div class="letterhead"><table class="lh"><tr>
-  <td class="lh-clinic"><table class="lh-id"><tr>
-    <td class="tile"><span class="initials">{_esc(_initials(doc.clinic_name))}</span></td>
-    <td><p class="clinic-name">{_esc(doc.clinic_name)}</p>
-        <p class="lh-sub">Physical Therapy &amp; Rehabilitation</p></td>
-  </tr></table></td>
-  <td class="lh-sep"></td>
-  <td class="lh-col">
-    <p class="lh-label">Prescribed by</p>
-    <p class="doc-name">{_esc(doc.physio_name)}</p>
-  </td>
-</tr></table></div>
-"""
+    return letterhead_html(
+        _esc(LETTERHEAD_SUBTITLE), _esc(doc.clinic_name), doc.clinic_logo_src
+    )
 
 
 def _patient_box(doc: RxDoc, on: date) -> str:
@@ -319,12 +309,13 @@ def _exercise_card(index: int, item: RxItem) -> str:
         f'<p class="ex-instr">{_esc(item.instructions)}</p>' if item.instructions else ""
     )
     return f"""
-<div class="ex-card"><table class="ex"><tr>
-  <td class="ex-img">{image}</td>
+<div class="ex-card">
+  <p class="ex-head"><span class="ex-num">{index}</span>
+    <span class="ex-title">{_esc(item.title.lower())}</span>
+    <span class="ex-part">{_esc(item.body_part)}</span></p>
+  <div class="ex-img">{image}</div>
+  <table class="ex"><tr>
   <td class="ex-body">
-    <p class="ex-head"><span class="ex-num">{index}</span>
-      <span class="ex-title">{_esc(item.title.lower())}</span>
-      <span class="ex-part">{_esc(item.body_part)}</span></p>
     <table class="dose"><tr>
       <td><span class="k">Sets</span><span class="v">{item.sets}</span></td>
       <td><span class="k">Reps</span><span class="v">{item.reps}</span></td>
@@ -360,6 +351,16 @@ def build_prescription_html(doc: RxDoc) -> str:
         else ""
     )
 
+    # Founders' feedback items 8 and 13: clinics have no digital signature, so
+    # no signature or date lines; the treating therapist is named instead and
+    # the date stays in the patient box at the top.
+    therapist = (
+        f'<p class="therapist"><span class="k">Treating therapist</span>'
+        f'<span class="v">{_esc(doc.physio_name)}</span></p>'
+        if doc.physio_name
+        else ""
+    )
+
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8" />
 <title>{_esc(DOC_TITLE)} - {_esc(doc.patient_name)}</title>
@@ -377,30 +378,7 @@ body {{ font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; co
   margin: 0; padding: 0 14mm; line-height: 1.45; font-size: 9.3pt; }}
 p {{ margin: 0; }}
 
-.letterhead {{ position: running(letterhead); width: 100%;
-  background: linear-gradient(115deg, {MIDNIGHT} 0%, {MIDNIGHT_2} 55%, {DEEP_TEAL} 100%);
-  padding: 4.6mm 14mm 4.2mm 14mm; color: #fff; }}
-.lh {{ width: 100%; border-collapse: collapse; }}
-.lh td {{ vertical-align: middle; padding: 0; }}
-.lh-clinic {{ width: 62%; padding-right: 5mm !important; }}
-.lh-col {{ padding: 0 0 0 5mm !important; }}
-.lh-sep {{ width: 0.3mm; background: rgba(255,255,255,0.22); }}
-.lh-id {{ border-collapse: collapse; }}
-.lh-id td {{ vertical-align: middle; }}
-.lh-id .tile {{ width: 12mm; height: 12mm; background: #fff; border-radius: 3mm; text-align: center; }}
-.lh-id .tile .initials {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800;
-  font-size: 12pt; color: {GROVE}; }}
-.lh-id td + td {{ padding-left: 3.5mm !important; }}
-.clinic-name {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800;
-  font-size: 12.5pt; line-height: 1.2; color: #fff; }}
-.lh-sub {{ font-size: 7.6pt; color: {ON_DARK}; margin-top: 0.6mm; }}
-.lh-label {{ font-size: 6.4pt; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase;
-  color: {ON_DARK}; margin-bottom: 1mm; }}
-.doc-name {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 700;
-  font-size: 10pt; color: #fff; }}
-.doc-name::after {{ content: ""; display: block; width: 8mm; height: 0.7mm; background: {LIME};
-  margin-top: 1.2mm; border-radius: 1mm; }}
-
+{letterhead_css()}
 .running-footer {{ position: running(runningFooter); width: 100%; padding: 0 14mm; text-align: center; }}
 .running-footer .inner {{ border-top: 1px solid {RULE}; padding-top: 2.4mm; }}
 .running-footer .powered {{ font-size: 7pt; letter-spacing: 0.9px; color: {MUTED}; }}
@@ -431,11 +409,11 @@ p {{ margin: 0; }}
   padding: 3mm; margin: 0 0 3mm 0; page-break-inside: avoid; }}
 .ex {{ width: 100%; border-collapse: collapse; }}
 .ex td {{ vertical-align: top; padding: 0; }}
-.ex-img {{ width: 40mm; padding-right: 4mm !important; }}
-.ex-img img {{ width: 40mm; height: 32mm; object-fit: contain; background: #fff;
-  border-radius: 2.5mm; border: 1px solid {RULE}; display: block; }}
-.noimg {{ width: 40mm; height: 32mm; border-radius: 2.5mm; border: 1px dashed {RULE};
-  color: {MUTED}; font-size: 7pt; text-align: center; line-height: 32mm; }}
+.ex-img {{ margin: 0 0 2.5mm 0; text-align: center; background: #fff;
+  border-radius: 2.5mm; border: 1px solid {RULE}; padding: 1mm; }}
+.ex-img img {{ max-width: 100%; max-height: 60mm; width: auto; height: auto; display: inline-block; }}
+.noimg {{ height: 14mm; border-radius: 2.5mm; border: 1px dashed {RULE};
+  color: {MUTED}; font-size: 7pt; text-align: center; line-height: 14mm; }}
 .ex-head {{ margin-bottom: 2mm; }}
 .ex-num {{ display: inline-block; width: 5.6mm; height: 5.6mm; line-height: 5.6mm; border-radius: 50%;
   background: {MIDNIGHT}; color: #fff; text-align: center; font-weight: 700; font-size: 7.6pt;
@@ -462,13 +440,11 @@ p {{ margin: 0; }}
 .guidance {{ background: {PAPER}; border: 1px solid {RULE}; border-radius: 3.5mm; padding: 3mm 4mm; margin-bottom: 4mm; }}
 .tag {{ font-size: 6.6pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   color: {MUTED}; margin-bottom: 1mm !important; }}
-.safety {{ font-size: 8.4pt; color: {INK}; border-left: 0.7mm solid #b03a2e; padding-left: 2.4mm; margin-bottom: 9mm; }}
-.sign-off {{ width: 100%; border-collapse: collapse; }}
-.sign-off td {{ vertical-align: bottom; }}
-.sign-off .who {{ width: 64%; }}
-.sign-off .gap {{ width: 10mm; }}
-.sign-off .space {{ height: 10mm; border-bottom: 1px solid {INK}; }}
-.sign-off .caption {{ font-size: 7pt; color: {MUTED}; padding-top: 1.2mm; }}
+.safety {{ font-size: 8.4pt; color: {INK}; border-left: 0.7mm solid #b03a2e; padding-left: 2.4mm; margin-bottom: 5mm; }}
+.therapist {{ font-size: 9pt; color: {INK}; }}
+.therapist .k {{ font-size: 6.6pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: {MUTED}; margin-right: 2mm; }}
+.therapist .v {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 700; }}
 </style></head>
 <body>
 {_letterhead(doc)}
@@ -485,11 +461,7 @@ p {{ margin: 0; }}
   {notes}
   <p class="tag">Safety</p>
   <p class="safety">{_esc(SAFETY_NOTE)}</p>
-  <table class="sign-off"><tr>
-    <td class="who"><div class="space"></div><div class="caption">Physiotherapist, name and signature</div></td>
-    <td class="gap"></td>
-    <td><div class="space"></div><div class="caption">Date</div></td>
-  </tr></table>
+  {therapist}
 </div>
 </body></html>
 """
@@ -503,9 +475,26 @@ def _render(html_content: str) -> bytes:
     return HTML(string=html_content).write_pdf()
 
 
+async def fetch_logo(
+    url: str, transport: httpx.AsyncBaseTransport | None = None
+) -> bytes | None:
+    """Download a remote clinic logo with the same rules as exercise images:
+    https only, public hosts only, size cap, timeout. `transport` is for tests."""
+    timeout = httpx.Timeout(IMAGE_TIMEOUT_S, connect=4.0)
+    async with httpx.AsyncClient(
+        timeout=timeout, follow_redirects=False, transport=transport
+    ) as client:
+        return await asyncio.wait_for(_download(client, url), IMAGE_TIMEOUT_S)
+
+
 async def render_prescription_pdf(doc: RxDoc) -> bytes:
-    """Embed images, build the HTML and render it off the event loop."""
-    images = await embed_images([it.image_url for it in doc.items if it.image_url])
+    """Embed images and the clinic logo, build the HTML and render it off the
+    event loop."""
+    images, logo = await asyncio.gather(
+        embed_images([it.image_url for it in doc.items if it.image_url]),
+        resolve_clinic_logo(doc.clinic_logo, fetch_logo),
+    )
+    doc.clinic_logo_src = logo
     for it in doc.items:
         it.image_src = images.get(it.image_url or "", "")
     html_content = build_prescription_html(doc)

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Exercise } from "@/types/exercise";
-import { Check, ImageOff, Lock, Plus } from "lucide-react";
+import { Check, ImageOff, Lock, Maximize2, Play, Plus } from "lucide-react";
+import { ImageViewer } from "@/components/library/ImageViewer";
 import { cn } from "@/lib/utils";
 
 interface ExerciseCardProps {
@@ -11,22 +12,44 @@ interface ExerciseCardProps {
 
 export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
   const [imgFailed, setImgFailed] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const showImage = exercise.imageUrl && !imgFailed;
 
   return (
     <article className="group flex gap-3.5 rounded-2xl border border-line bg-card p-3 shadow-card transition-colors hover:border-grove/30">
-      <div className="grid h-[76px] w-[96px] shrink-0 place-items-center overflow-hidden rounded-xl border border-line-soft bg-white">
+      <div className="grid h-[92px] w-[132px] shrink-0 place-items-center overflow-hidden rounded-xl border border-line-soft bg-white sm:h-[104px] sm:w-[148px]">
         {showImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={exercise.imageUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-            onError={() => setImgFailed(true)}
-            className="h-full w-full object-contain"
-          />
+          <button
+            type="button"
+            onClick={() => setViewing(true)}
+            aria-label={`View the ${exercise.name} picture full size`}
+            className="group/img relative h-full w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={exercise.imageUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              onError={() => setImgFailed(true)}
+              className="h-full w-full object-contain"
+            />
+            <span className="absolute bottom-1 right-1 grid h-6 w-6 place-items-center rounded-md bg-midnight/60 text-white opacity-80 group-hover/img:opacity-100">
+              <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+            </span>
+          </button>
+        ) : exercise.videoUrl ? (
+          <a
+            href={exercise.videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Watch the ${exercise.name} demo video (opens in a new tab)`}
+            className="flex h-full w-full flex-col items-center justify-center gap-1 text-grove transition-colors hover:bg-grove-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+          >
+            <Play className="h-5 w-5" aria-hidden />
+            <span className="text-[11px] font-semibold">Watch video</span>
+          </a>
         ) : (
           <ImageOff className="h-5 w-5 text-[#b9b3a4]" aria-hidden />
         )}
@@ -71,6 +94,9 @@ export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
           <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-ink-2">{exercise.instructions}</p>
         )}
       </div>
+      {viewing && exercise.imageUrl && (
+        <ImageViewer src={exercise.imageUrl} title={exercise.name} onClose={() => setViewing(false)} />
+      )}
     </article>
   );
 }

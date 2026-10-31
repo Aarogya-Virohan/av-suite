@@ -390,8 +390,8 @@ CAPTURE_SOURCE_TEXT: dict[str, str] = {
 # every view, in plain words; the explanation is said once, calmly.
 UPLOAD_NOTE = (
     "Views marked “Uploaded photo” were measured the same way as a "
-    "guided capture, but were not taken with the guided camera’s level "
-    "check. Compare them with later visits with that in mind."
+    "guided capture, but without the guided camera’s tilt correction. "
+    "Compare them with later visits with that in mind."
 )
 
 # "Viewed from the side" captions removed on 13 October 2026: the plane
@@ -423,6 +423,16 @@ def _view_section(title: str, view: dict, key: str = "") -> str:
     # are not equally comparable across visits. Reports saved before
     # 3 October have no value and print nothing.
     source_text = CAPTURE_SOURCE_TEXT.get(view.get("captureSource") or "", "")
+    # 27 October 2026: a guided capture is levelled from the phone's own
+    # tilt reading. Said once, in the same line, only when it was applied.
+    # A new report always carries the key; None there means the device could
+    # not report its tilt. Older reports have no key and print as before.
+    level = view.get("levelCorrection")
+    if view.get("captureSource") == "camera":
+        if isinstance(level, dict) and isinstance(level.get("degrees"), (int, float)):
+            source_text += f", levelled by {abs(level['degrees']):.1f}°"
+        elif "levelCorrection" in view and level is None:
+            source_text += ", tilt not measured"
 
     details = []
     if source_text:

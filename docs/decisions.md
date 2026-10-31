@@ -1510,3 +1510,96 @@ Verified in Claude's container: renders of a real report, a worst case
 pages; 37 PDF, signature and report builder tests; tsc, eslint, next build
 and screenshots at 1280 and 390 px. Labels on a phone print at about
 8.5 px, readable but small; pinch zoom works.
+
+## 27 October 2026
+
+### The 1.5 degree level lock is replaced by tilt correction
+Founders' feedback, and Onkar's own experience: the capture button stayed
+off until the phone was within 1.5 degrees of level in both directions,
+which by hand is close to impossible, and a tripod is not always there.
+This replaces the 10 October guideline (1.5 degrees) and the 11 October
+answer 4a (tripod required) for the capture screen.
+
+What the research showed (sources in the 27 October chat):
+- A phone accelerometer has a fixed offset of its own. ST's application
+  note gives about 20 mg for a typical part, about 1.1 degrees of tilt, and
+  recommends user calibration below 1 degree. The iPhone 5s shipped with a
+  part at about 5 degrees. So the old lock was also less exact than it
+  looked.
+- iOS (WebKit) reports accelerationIncludingGravity with every axis negated
+  compared with Android. Still so in October 2026.
+- PostureScreen, the largest posture app, only turns its display green when
+  level; no correction. Nothing to copy.
+
+What was built (branch feat/posture-capture-level):
+- Shutter needs the phone steady (gyroscope under 3 deg/s for 0.5 s) and
+  within 10 degrees of upright, not level. After the tap it waits 0.3 s for
+  the tap's own shake, then captures at the next steady moment.
+- Side tilt (roll) at capture is the mean of that 0.5 s window, minus the
+  phone's own offset once calibrated, and is sent with the photo.
+- The backend turns the reviewed points (and the pupils) back by that roll
+  before anything is measured (services/posture/level.py). The photograph
+  is not rotated for measurement; only the small display copy used for the
+  annotated picture is turned, so the drawn points still sit on it.
+- Forward tilt is not corrected: a pinhole simulation gave at most 0.2
+  degrees on any graded angle at 10 degrees of pitch.
+- Calibration: reversal method, once per phone per browser. The phone
+  stands on its bottom edge, then upside down on its top edge, on the same
+  spot of any table; the offset is half the difference. Offered on first
+  use, skippable ("Later"); the report data records whether it was done.
+- No tilt sensor (laptop, motion access refused): capture still works, and
+  the report says "tilt not measured".
+- Report: "Guided camera capture, levelled by 2.3°" on the PDF and web
+  report; levelCorrection {degrees, calibrated} saved per view.
+  ANALYSIS_VERSION 2026-10-27.1.
+
+Verified in Claude's container: 162 posture tests (11 new); the whole API
+run on po-1 and po-3 photos turned by +5 and -8 degrees. Correction
+brought the angle rows against the vertical or horizontal (CVA, trunk
+lean, head tilt, pelvic obliquity) back to within about half a degree of
+the level photo. The back view millimetre rows did not come back to the
+level photo's values: po-1 shoulder level read 8.7 mm level, 52 mm at -8
+degrees uncorrected, 2.8 mm corrected. That gap is the model placing the
+points differently on the turned photo (below), not the geometry, which
+the unit tests show is exact. tilt.ts math checked for Android and iOS sign
+conventions and for calibration on a sloping table; tsc, eslint, next
+build; Playwright with simulated motion: shutter off while moving, on when
+steady, off beyond 10 degrees.
+
+Also found, not caused by this change: MediaPipe moves points 4 to 15 px
+(max 25) on a 4096 px photo after a resample of only 0.01 degrees, and 10
+to 26 px on photos turned 2 to 8 degrees. On po-1's back view at 2 and 5
+degrees it swapped the left and right shoulders. The review step is what
+catches these; no correction can.
+
+Not yet verified, needed before this is trusted:
+- The sign on a real phone: door frame photographed with the phone turned
+  about 0, +5, -5, +10, -10 degrees; after correction the frame must read
+  vertical within 1 degree. Also catches a phone whose video stabilisation
+  turns the stream.
+- The same on an iPhone.
+- Whether 3 deg/s is reachable by hand on a normal phone; tune if not.
+
+### Same day, after Onkar's phone tests
+- Steadiness now uses the mean gyroscope speed over 0.4 s with hysteresis
+  (steady at 9 deg/s or less, unsteady above 15). The first limit (3 deg/s
+  on the fastest single reading) flickered by hand; the phone read 8 to 30
+  deg/s while handled.
+- Bubble shows forward lean too, and the hint says which way to fix it.
+  Checked on Onkar's phone: pointing the camera down asks to tilt the top
+  towards you, as intended.
+- Calibration only reads a phone standing within 30 degrees of upright; a
+  phone lying flat had been accepted. Two calibrations on Onkar's phone gave
+  0.88 and 0.84 degrees.
+- Camera screen closed by history popstate, and the effect that pushed the
+  history entry depended on a prop recreated on every parent render, so the
+  screen could stay open holding the camera and the next view opened black.
+  Now pushed once and closed directly. Camera start has a watchdog.
+- ?debug=1 shows live sensor readings; hidden otherwise.
+- case_ref was a required form field on /posture/report while optional on
+  the intake screen, so a blank case reference failed every report at the
+  last step. Now optional. "NA", "N/A", "nil", "none", "-" in case ref or
+  clinician are treated as empty (they printed as "Na" on reports).
+- "Points to check" on the review screen is red (Onkar).
+First real report from the new flow (Sandeep, 27 October): levelled by 0.2,
+0.8 and 0.6 degrees on side, front and back.

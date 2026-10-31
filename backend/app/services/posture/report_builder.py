@@ -182,7 +182,10 @@ def build_side_view_result(
 # tilt, pelvic obliquity, trunk shift and trunk lean; a bent knee now grades.
 # 2026-10-13.1: founders, Q4 and Q5. Values print with one decimal, and the
 # trunk lean and knee rows print the size without a minus sign. No grade moved.
-ANALYSIS_VERSION = "2026-10-13.1"
+# 2026-10-27.1: phone tilt correction. Guided captures are measured with
+# their points turned back by the phone's roll at capture (level.py), so
+# angles against the image vertical or horizontal can move by the roll.
+ANALYSIS_VERSION = "2026-10-27.1"
 
 
 def build_report_response(

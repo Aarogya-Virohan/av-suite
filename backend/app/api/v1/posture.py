@@ -43,6 +43,12 @@ from app.services.posture.exceptions import (
     InsufficientVisibilityError,
 )
 from app.services.posture.pdf_service import generate_posture_pdf
+from app.services.posture.level import (
+    rotate_display_image,
+    rotate_landmarks,
+    rotate_pixel_pair,
+    validate_correction,
+)
 
 from app.services.posture.calculator import (
     calc_cva,
@@ -235,6 +241,16 @@ def _annotate_or_blank(
 # single call with no clinician in between, was removed on 10 October 2026.
 # The founders ruled that no report is generated until the landmarks are
 # confirmed (Q6); /detect then /report replaces it.
+
+# Typed into an optional field to mean "nothing", these printed on reports as
+# "Assessing physiotherapist: Na" (13 and 27 October 2026). Treated as empty.
+_PLACEHOLDERS = {"na", "n/a", "n.a.", "nil", "none", "-", "--", "null", "not applicable"}
+
+
+def blank_if_placeholder(value: str | None) -> str:
+    v = (value or "").strip()
+    return "" if v.lower() in _PLACEHOLDERS else v
+
 
 def report_filename(case_ref: str, now: datetime, unique: str) -> str:
     """
@@ -935,12 +951,24 @@ async def report_from_review(
     patient_name: str = Form(...),
     age: int = Form(...),
     gender: str = Form(...),
-    case_ref: str = Form(...),
+    # Optional on the intake screen. FastAPI treats an empty form value as
+    # missing, so a required field here failed every report where it was
+    # left blank, only at the very last step (phone test, 27 October 2026).
+    case_ref: str = Form(""),
     patient_height_cm: float = Form(...),
     clinician_name: str = Form(""),
     front_source: str = Form("unknown"),
     side_source: str = Form("unknown"),
     back_source: str = Form("unknown"),
+    # Phone tilt at capture, 27 October 2026 (see services/posture/level.py).
+    # Sent only for guided camera captures that had a tilt reading; ignored
+    # for uploads, whose tilt is not known.
+    front_level_deg: float | None = Form(None),
+    side_level_deg: float | None = Form(None),
+    back_level_deg: float | None = Form(None),
+    front_level_calibrated: bool = Form(False),
+    side_level_calibrated: bool = Form(False),
+    back_level_calibrated: bool = Form(False),
 ):
     if not 50 <= patient_height_cm <= 250:
         raise HTTPException(
@@ -950,6 +978,9 @@ async def report_from_review(
                 f"Received: {patient_height_cm} cm."
             ),
         )
+
+    case_ref = blank_if_placeholder(case_ref)
+    clinician_name = blank_if_placeholder(clinician_name)
 
     try:
         token_views = read_detection_token(detection_token)
@@ -976,6 +1007,23 @@ async def report_from_review(
         "back": await back_display.read(),
     }
 
+    sources = {"front": front_source, "side": side_source, "back": back_source}
+    raw_levels = {"front": front_level_deg, "side": side_level_deg, "back": back_level_deg}
+    calibrated = {
+        "front": front_level_calibrated,
+        "side": side_level_calibrated,
+        "back": back_level_calibrated,
+    }
+    levels: dict[str, float | None] = {}
+    for name in ("side", "front", "back"):
+        if sources[name] != "camera":
+            levels[name] = None
+            continue
+        try:
+            levels[name] = validate_correction(raw_levels[name])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=f"{name} photograph: {e}")
+
     views: dict[str, DetectedView] = {}
     audit_views: dict[str, dict] = {}
 
@@ -997,11 +1045,23 @@ async def report_from_review(
                 detail=f"{name} display image does not match the analysed photograph.",
             )
 
+        # Phone tilt: the clinician reviewed the points on the photograph
+        # as taken; measurement uses them turned back to true vertical.
+        level = levels[name]
+        display_bytes = displays[name]
+        if level:
+            landmarks = rotate_landmarks(landmarks, tv["width_px"], tv["height_px"], level)
+            iris = rotate_pixel_pair(iris, tv["width_px"], tv["height_px"], level)
+            try:
+                display_bytes = rotate_display_image(display_bytes, level)
+            except Exception:
+                raise HTTPException(status_code=422, detail=f"{name} display image could not be read.")
+
         views[name] = DetectedView(
             landmarks=landmarks,
             width_px=tv["width_px"],
             height_px=tv["height_px"],
-            image_bytes=displays[name],
+            image_bytes=display_bytes,
             iris=iris,
             model_landmarks=rows_to_landmarks(tv["landmarks"]),
             display_scale=disp_h / tv["height_px"],
@@ -1027,6 +1087,16 @@ async def report_from_review(
             "views": audit_views,
         },
     )
+
+    # What was corrected, per view, so a later visit can be compared and
+    # the correction can be audited. None when no tilt was known (upload,
+    # or a device without a motion sensor).
+    for name in ("side", "front", "back"):
+        report["views"][name]["levelCorrection"] = (
+            None
+            if levels[name] is None
+            else {"degrees": round(levels[name], 2), "calibrated": bool(calibrated[name])}
+        )
 
     return report
 

@@ -120,7 +120,9 @@ export function PatientBox({ patient, reportId, branding }: Props) {
   ]
 
   const column = (rows: [string, string][]) => (
-    <dl className="grid flex-1 content-start grid-cols-[7.5rem_1fr] gap-x-3 gap-y-1.5">
+    // minmax(0, 1fr): a plain 1fr column grows to fit its longest word, so on
+    // a phone the report ID pushed past the box (27 October 2026).
+    <dl className="grid min-w-0 flex-1 content-start grid-cols-[6.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
       {rows
         .filter(([, v]) => present(v))
         .map(([label, value]) => (
@@ -130,7 +132,7 @@ export function PatientBox({ patient, reportId, branding }: Props) {
               className={
                 label === "Patient name"
                   ? "font-display text-[16px] font-bold text-[#141A33] break-words"
-                  : `text-[14px] font-semibold text-[#141A33] ${label === "Report ID" ? "whitespace-nowrap" : "break-words"}`
+                  : `min-w-0 text-[14px] font-semibold text-[#141A33] ${label === "Report ID" ? "break-all text-[13px] tabular-nums sm:whitespace-nowrap sm:text-[14px]" : "break-words"}`
               }
             >
               {value}

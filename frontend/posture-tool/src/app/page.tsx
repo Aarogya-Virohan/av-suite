@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type { CaptureLevel } from "@/lib/tilt"
 
 import UploadZone from "@/components/posture/UploadZone"
 
@@ -153,7 +154,7 @@ const [backFile, setBackFile] =
 useState<File | null>(null)
 
 // Whether each photograph came from the in-app capture screen or from an
-// existing file. An uploaded photo skips the tripod, framing and encoding
+// existing file. An uploaded photo skips the tilt correction, framing and encoding
 // protocol, so a measurement taken from one is not comparable with a
 // guided capture of the same patient. The report records which it was.
 type CaptureSource = "camera" | "upload" | "unknown"
@@ -166,6 +167,17 @@ useState<CaptureSource>("unknown")
 
 const [backSource, setBackSource] =
 useState<CaptureSource>("unknown")
+
+// Phone tilt at capture for each guided photo (lib/tilt.ts), corrected on
+// the server. null for uploads and devices without a tilt sensor.
+const [frontLevel, setFrontLevel] =
+useState<CaptureLevel | null>(null)
+
+const [sideLevel, setSideLevel] =
+useState<CaptureLevel | null>(null)
+
+const [backLevel, setBackLevel] =
+useState<CaptureLevel | null>(null)
 
 const [patientName, setPatientName] =
 useState("")
@@ -335,6 +347,9 @@ const resetAll = () => {
                 setFrontSource("unknown")
                 setSideSource("unknown")
                 setBackSource("unknown")
+                setFrontLevel(null)
+                setSideLevel(null)
+                setBackLevel(null)
 
                 setPatientName("")
                 setAge("")
@@ -375,6 +390,9 @@ try {
     frontSource,
     sideSource,
     backSource,
+    frontLevel,
+    sideLevel,
+    backLevel,
   })
 
   setReport(result)
@@ -449,13 +467,13 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
         <div className="mt-4 rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-5 sm:p-6">
           <h2 className="font-display text-[17px] font-bold text-[#141A33]">Photographs</h2>
           <p className="mt-1 text-[14px] leading-relaxed text-[#5D6380]">
-            The camera only takes the photo when the phone is level. An uploaded photo is measured
-            the same way, but the report marks it as not checked.
+            The camera measures how the phone is tilted and corrects for it. An uploaded photo is
+            measured the same way, but without that correction, and the report marks it.
           </p>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <UploadZone label="Front" view="front" required error={photoError(frontImage, "Front")} setImage={setFrontImage} setImageFile={setFrontFile} setSource={setFrontSource} />
-            <UploadZone label="Side" view="side" required error={photoError(sideImage, "Side")} setImage={setSideImage} setImageFile={setSideFile} setSource={setSideSource} />
-            <UploadZone label="Back" view="back" required error={photoError(backImage, "Back")} setImage={setBackImage} setImageFile={setBackFile} setSource={setBackSource} />
+            <UploadZone label="Front" view="front" required error={photoError(frontImage, "Front")} setImage={setFrontImage} setImageFile={setFrontFile} setSource={setFrontSource} setLevel={setFrontLevel} />
+            <UploadZone label="Side" view="side" required error={photoError(sideImage, "Side")} setImage={setSideImage} setImageFile={setSideFile} setSource={setSideSource} setLevel={setSideLevel} />
+            <UploadZone label="Back" view="back" required error={photoError(backImage, "Back")} setImage={setBackImage} setImageFile={setBackFile} setSource={setBackSource} setLevel={setBackLevel} />
           </div>
           <details className="mt-4 rounded-xl bg-[#F3EEE2] px-4 py-3 text-[13px] leading-relaxed text-[#5D6380]">
             <summary className="cursor-pointer font-medium text-[#141A33]">What makes a good photo?</summary>

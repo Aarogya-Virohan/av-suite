@@ -100,6 +100,27 @@ async def list_prescriptions(
         raise
 
 
+@router.get("/note-suggestions", tags=["Prescriptions"])
+async def note_suggestions(
+    request: Request,
+    user: CurrentUserDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.view")),
+):
+    """
+    Quick-pick phrases for exercise notes and patient guidance, taken from
+    what this clinic already wrote (OWN scope: only the user's own).
+    """
+    from app.services.prescription_suggestions import get_note_suggestions
+
+    data = await get_note_suggestions(
+        db,
+        uuid.UUID(request.state.clinic_id),
+        None if scope == CapabilityScope.ALL else user.id,
+    )
+    return ResponseEnvelope(data=data)
+
+
 @router.get(
     "/{id}", response_model=ResponseEnvelope[PrescriptionRead], tags=["Prescriptions"]
 )
