@@ -10,7 +10,7 @@ import { invoiceFormSchema, InvoiceFormValues } from '../../../lib/schemas';
 // The invoice number is assigned by the backend (per clinic, INV-0001,
 // INV-0002, ...) and any number sent by the client is ignored, so the form
 // has no number field. The number is shown after the invoice is created.
-import { useCreateInvoice, usePackages } from '../api';
+import { useCreateInvoice, usePackages, type InvoiceCreatePayload } from '../api';
 import { usePatients } from '../../patients/api';
 import { hasCapability } from '../../../config/permissions';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
@@ -77,8 +77,9 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   // Packages from the clinic's catalogue can be added as a ready line (C-15).
   const { data: packages = [] } = usePackages(isOpen && hasCapability('packages.view'));
   const activePackages = packages.filter((p) => p.status === 'active');
-  // Discount and tax can be typed in rupees or percent; only the rupee amount
-  // is stored, because the backend has no percent fields yet (C-16).
+  // Discount and tax can be typed in rupees or percent (C-16). A percent is
+  // sent as discount_percent / tax_percent and the server works out the rupee
+  // amount, so the invoice keeps the percent for printing (D-026).
   const [discountMode, setDiscountMode] = React.useState<AdjustMode>('amount');
   const [taxMode, setTaxMode] = React.useState<AdjustMode>('amount');
   const [discountPct, setDiscountPct] = React.useState('');
@@ -153,15 +154,24 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
       setError('discount_amount', { message: 'Discount cannot be more than the subtotal' });
       return;
     }
+    const pctProblem = (mode: AdjustMode, raw: string) =>
+      mode === 'percent' && (raw.trim() === '' || num(raw) < 0 || num(raw) > 100);
+    if (pctProblem(discountMode, discountPct) || pctProblem(taxMode, taxPct)) {
+      setError('discount_amount', { message: 'Percent must be between 0 and 100' });
+      return;
+    }
     if (values.due_date && values.due_date < values.issue_date) {
       setError('due_date', { message: 'Due date cannot be before the issue date' });
       return;
     }
     try {
-      const payload: InvoiceFormValues = {
-        ...values,
-        discount_amount: paise(discountAmount),
-        tax_amount: paise(taxAmount),
+      const { discount_amount: _d, tax_amount: _t, ...rest } = values;
+      const pct = (raw: string) => (Math.round(num(raw) * 100) / 100).toFixed(2);
+      const payload: InvoiceCreatePayload = {
+        ...rest,
+        // In percent mode only the percent is sent; the server computes the amount.
+        ...(discountMode === 'percent' ? { discount_percent: pct(discountPct) } : { discount_amount: paise(discountAmount) }),
+        ...(taxMode === 'percent' ? { tax_percent: pct(taxPct) } : { tax_amount: paise(taxAmount) }),
         subtotal,
         total_amount: totalAmount,
         items: values.items.map((i) => ({
@@ -354,7 +364,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
                 <ModeSwitch mode={taxMode} onChange={setTaxMode} label="Tax" />
               </div>
               {taxMode === 'percent' ? (
-                <input id="inv-tax-pct" value={taxPct} onChange={(e) => setTaxPct(e.target.value)} type="number" min={0} step="0.01" className={smallInput} />
+                <input id="inv-tax-pct" value={taxPct} onChange={(e) => setTaxPct(e.target.value)} type="number" min={0} max={100} step="0.01" className={smallInput} />
               ) : (
                 <input id="inv-tax" {...register('tax_amount', { setValueAs: (v) => num(v) })} type="number" min={0} step="0.01" className={smallInput} />
               )}

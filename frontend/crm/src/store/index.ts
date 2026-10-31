@@ -10,6 +10,16 @@ export interface ClinicBranding {
   slug?: string | null;
   branding_logo_url: string | null;
   branding_color: string | null;
+  /* Clinic profile for invoice headers (D-026). Older backends do not send them. */
+  address_line?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  registration_number?: string | null;
+  gstin?: string | null;
+  authorised_person?: string | null;
 }
 
 interface AuthState {
