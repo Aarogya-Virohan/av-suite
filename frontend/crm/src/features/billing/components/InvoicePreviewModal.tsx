@@ -4,11 +4,12 @@ import React from 'react';
 import { Invoice } from '../../../types/api';
 import { usePatient } from '../../patients/api';
 import { useClinicSettings } from '../../settings/api';
-import { useInvoicePayments } from '../api';
+import { downloadInvoicePdf, useInvoicePayments } from '../api';
 import { hasCapability } from '../../../config/permissions';
 import { useAuthStore } from '../../../store';
 import { formatMoney } from '../../../lib/money';
-import { MessageSquare, Printer, X } from 'lucide-react';
+import { Download, Loader2, MessageSquare, Printer, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { openWhatsApp } from '../../../components/ui/WhatsAppButton';
 import { Badge, type BadgeTone, Button } from '../../../components/ui/brand';
 
@@ -81,6 +82,8 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
     isOpen && isReceipt,
   );
 
+  const [downloading, setDownloading] = React.useState(false);
+
   React.useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -112,9 +115,20 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
   const balance = Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0);
   const docTitle = isReceipt ? 'Payment Receipt' : 'Invoice';
 
+  // The server renders the real PDF with the same content (D-027, L-41).
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      await downloadInvoicePdf(invoice.id, invoice.invoice_number, isReceipt ? 'receipt' : 'invoice');
+    } catch {
+      toast.error(`Could not download the ${isReceipt ? 'receipt' : 'invoice'} PDF. Please try again.`);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   // The browser uses the page title as the PDF file name, so it is set for the
-  // print and restored after (C-20). The backend invoice PDF is a placeholder
-  // and is not used (Decisions.md L-41).
+  // print and restored after (C-20).
   const printOrSave = () => {
     const previous = document.title;
     const safe = (s: string) => s.replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '');
@@ -161,14 +175,18 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
           </h2>
           <div className="flex items-center gap-2">
             {patient?.phone && (
-              <Button variant="secondary" onClick={sendOnWhatsApp} title="Open WhatsApp with a message to the patient. Attach the saved PDF there.">
+              <Button variant="secondary" onClick={sendOnWhatsApp} title="Open WhatsApp with a message to the patient. Attach the downloaded PDF there.">
                 <MessageSquare className="h-4 w-4" />
                 <span className="hidden sm:inline">WhatsApp</span>
               </Button>
             )}
-            <Button onClick={printOrSave} title="Print, or choose Save as PDF in the print dialog">
+            <Button variant="secondary" onClick={printOrSave} title="Print this page">
               <Printer className="h-4 w-4" />
-              <span>Print / Save PDF</span>
+              <span className="hidden sm:inline">Print</span>
+            </Button>
+            <Button onClick={downloadPdf} disabled={downloading} title="Download the PDF made by the server">
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span><span className="hidden sm:inline">Download </span>PDF</span>
             </Button>
             <button
               onClick={onClose}

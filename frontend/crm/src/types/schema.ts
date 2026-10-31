@@ -365,6 +365,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exercises/body-parts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Body Parts
+         * @description Body parts of every exercise the clinic can see, head to toe, with how
+         *     many exercises each has. The library builds its filter from this, so the
+         *     list is complete however many exercises there are (not only one page).
+         *     Exercises without a body part are counted under "Other".
+         */
+        get: operations["list_body_parts_api_v1_exercises_body_parts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exercises/by-condition": {
         parameters: {
             query?: never;
@@ -704,6 +727,27 @@ export interface paths {
          *     Strictly scoped to the clinician's clinic_id and logged-in user_id.
          */
         post: operations["create_prescription_api_v1_prescriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/prescriptions/note-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Note Suggestions
+         * @description Quick-pick phrases for exercise notes and patient guidance, taken from
+         *     what this clinic already wrote (OWN scope: only the user's own).
+         */
+        get: operations["note_suggestions_api_v1_prescriptions_note_suggestions_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1277,7 +1321,8 @@ export interface paths {
         };
         /**
          * Download Invoice Pdf Endpoint
-         * @description Download PDF for an invoice (authenticated, clinic-scoped).
+         * @description Download the invoice, or with `kind=receipt` the payment receipt, as a
+         *     PDF (authenticated, clinic-scoped). Decisions.md L-41.
          */
         get: operations["download_invoice_pdf_endpoint_api_v1_invoices__id__pdf_download_get"];
         put?: never;
@@ -2385,7 +2430,10 @@ export interface components {
             age: number;
             /** Gender */
             gender: string;
-            /** Case Ref */
+            /**
+             * Case Ref
+             * @default
+             */
             case_ref: string;
             /** Patient Height Cm */
             patient_height_cm: number;
@@ -2409,6 +2457,27 @@ export interface components {
              * @default unknown
              */
             back_source: string;
+            /** Front Level Deg */
+            front_level_deg?: number | null;
+            /** Side Level Deg */
+            side_level_deg?: number | null;
+            /** Back Level Deg */
+            back_level_deg?: number | null;
+            /**
+             * Front Level Calibrated
+             * @default false
+             */
+            front_level_calibrated: boolean;
+            /**
+             * Side Level Calibrated
+             * @default false
+             */
+            side_level_calibrated: boolean;
+            /**
+             * Back Level Calibrated
+             * @default false
+             */
+            back_level_calibrated: boolean;
         };
         /** Body_upload_patient_document_api_v1_patients__patient_id__documents_post */
         Body_upload_patient_document_api_v1_patients__patient_id__documents_post: {
@@ -2635,6 +2704,10 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Image Url */
+            readonly image_url: string | null;
+            /** Demo Video Url */
+            readonly demo_video_url: string | null;
         };
         /** ExerciseUpdate */
         ExerciseUpdate: {
@@ -4882,6 +4955,26 @@ export interface operations {
             };
         };
     };
+    list_body_parts_api_v1_exercises_body_parts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     get_exercises_by_condition_api_v1_exercises_by_condition_get: {
         parameters: {
             query: {
@@ -5244,6 +5337,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    note_suggestions_api_v1_prescriptions_note_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -6780,7 +6893,9 @@ export interface operations {
     };
     download_invoice_pdf_endpoint_api_v1_invoices__id__pdf_download_get: {
         parameters: {
-            query?: never;
+            query?: {
+                kind?: "invoice" | "receipt";
+            };
             header?: never;
             path: {
                 id: string;
