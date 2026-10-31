@@ -57,3 +57,14 @@ async def test_public_booking_request_and_approval_flow(client: AsyncClient, aut
     assert approve_res.status_code == 200
     approve_data = approve_res.json().get("data", approve_res.json())
     assert approve_data.get("appointment_id") is not None or approve_data.get("request", {}).get("status") == "approved"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("params", [
+    {"start_date": "2026-10-10"},
+    {"end_date": "2026-10-10"},
+    {"start_date": "2026-10-11", "end_date": "2026-10-10"},
+])
+async def test_appointment_date_range_rejects_incomplete_or_reversed_ranges(client, auth_headers, params):
+    response = await client.get(f"{settings.API_V1_PREFIX}/appointments", params=params, headers=auth_headers)
+    assert response.status_code == 422

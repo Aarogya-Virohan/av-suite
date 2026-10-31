@@ -181,6 +181,7 @@ class InvoiceResponse(InvoiceBase):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     id: UUID
+    patient_name: str | None = None
     clinic_id: UUID
     subtotal: Decimal
     total_amount: Decimal
@@ -227,6 +228,7 @@ class PaymentResponse(PaymentBase):
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
     id: UUID
+    patient_name: str | None = None
     clinic_id: UUID
     created_at: datetime
     updated_at: datetime

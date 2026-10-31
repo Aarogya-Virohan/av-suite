@@ -206,6 +206,10 @@ class Invoice(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
     patient: Mapped[Patient] = relationship()
 
+    @property
+    def patient_name(self) -> str | None:
+        return f"{self.patient.first_name} {self.patient.last_name}".strip() if self.patient else None
+
     appointment_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("appointments.id"),
@@ -323,6 +327,10 @@ class Payment(UUIDMixin, TimestampMixin, Base):
         nullable=False,
     )
     patient: Mapped[Patient] = relationship()
+
+    @property
+    def patient_name(self) -> str | None:
+        return f"{self.patient.first_name} {self.patient.last_name}".strip() if self.patient else None
 
     amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2), nullable=False

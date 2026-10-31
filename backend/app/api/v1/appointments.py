@@ -31,6 +31,7 @@ from app.services.appointment import (
     AppointmentService,
     AppointmentValidationError,
 )
+from app.services.audit import log_event_safely
 
 router = APIRouter()
 
@@ -68,6 +69,8 @@ async def create_appointment(
 
     try:
         appointment = await service.create_appointment(clinic.id, payload)
+        await log_event_safely(service.appointment_repository.session, clinic.id, user.id, "create", "appointment", appointment.id,
+                               {"patient_id": str(appointment.patient_id), "therapist_id": str(appointment.therapist_id)})
         return AppointmentResponse.model_validate(appointment)
     except AppointmentValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -81,6 +84,8 @@ async def list_appointments(
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
     scheduled_date: Annotated[date | None, Query(alias="date")] = None,
+    start_date: Annotated[date | None, Query()] = None,
+    end_date: Annotated[date | None, Query()] = None,
     therapist_id: Annotated[UUID | None, Query(alias="therapist")] = None,
     patient_id: Annotated[UUID | None, Query(alias="patient")] = None,
     status_filter: Annotated[AppointmentStatus | None, Query(alias="status")] = None,
@@ -89,6 +94,10 @@ async def list_appointments(
     """List appointments for the authenticated clinic with filtering by date, therapist, or patient."""
 
     # Enforce own-scope filtering: therapist may only see their own appointments
+    if (start_date is None) != (end_date is None):
+        raise HTTPException(status_code=422, detail="start_date and end_date must be provided together.")
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must be on or before end_date.")
     effective_therapist_id = therapist_id
     if scope == CapabilityScope.OWN:
         effective_therapist_id = user.id
@@ -96,6 +105,8 @@ async def list_appointments(
     appointments = await service.list_appointments(
         clinic.id,
         scheduled_date=scheduled_date,
+        start_date=start_date,
+        end_date=end_date,
         patient_id=patient_id,
         therapist_id=effective_therapist_id,
         status=status_filter,
@@ -104,9 +115,14 @@ async def list_appointments(
     )
 
     items = [AppointmentResponse.model_validate(a) for a in appointments]
+    total = await service.appointment_repository.count_appointments(
+        clinic_id=clinic.id, scheduled_date=scheduled_date, start_date=start_date,
+        end_date=end_date, patient_id=patient_id, therapist_id=effective_therapist_id,
+        status=status_filter,
+    )
     return AppointmentListResponse(
         items=items,
-        total=len(items),
+        total=total,
         offset=offset,
         limit=limit,
     )
@@ -159,6 +175,7 @@ async def update_appointment(
                 detail="You cannot reassign an appointment to another therapist.",
             )
         appointment = await service.update_appointment(clinic.id, id, payload)
+        await log_event_safely(service.appointment_repository.session, clinic.id, user.id, "update", "appointment", id)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -185,6 +202,7 @@ async def soft_cancel_appointment(
                 detail="You can only cancel your own appointments.",
             )
         appointment = await service.soft_cancel(clinic.id, id, deleted_by=user.id)
+        await log_event_safely(service.appointment_repository.session, clinic.id, user.id, "cancel", "appointment", id)
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

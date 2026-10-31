@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.treatment import SoapAssessment, TreatmentSession
@@ -52,7 +52,9 @@ class TreatmentSessionRepository(BaseRepository[TreatmentSession]):
             end_dt = datetime.combine(end_date, time.max, tzinfo=timezone.utc)
             statement = statement.where(TreatmentSession.treatment_date <= end_dt)
 
-        statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
+        statement = self._apply_clinic_scope(statement, clinic_id).order_by(
+            TreatmentSession.treatment_date.desc(), TreatmentSession.created_at.desc()
+        ).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())
 
@@ -64,6 +66,18 @@ class SoapAssessmentRepository(BaseRepository[SoapAssessment]):
         """Initialize repository bound to session."""
 
         super().__init__(session, SoapAssessment)
+
+    async def count_assessments(self, *, clinic_id: UUID, patient_id: UUID | None = None,
+                                appointment_id: UUID | None = None, therapist_id: UUID | None = None,
+                                specialty: str | None = None, is_reassessment: bool | None = None) -> int:
+        statement = select(func.count()).select_from(SoapAssessment)
+        if patient_id is not None: statement = statement.where(SoapAssessment.patient_id == patient_id)
+        if appointment_id is not None: statement = statement.where(SoapAssessment.appointment_id == appointment_id)
+        if therapist_id is not None: statement = statement.where(SoapAssessment.therapist_id == therapist_id)
+        if specialty is not None: statement = statement.where(SoapAssessment.specialty == specialty)
+        if is_reassessment is not None: statement = statement.where(SoapAssessment.is_reassessment == is_reassessment)
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        return int(await self.session.scalar(statement) or 0)
 
     async def list_assessments(
         self,
@@ -97,6 +111,8 @@ class SoapAssessmentRepository(BaseRepository[SoapAssessment]):
         if is_reassessment is not None:
             statement = statement.where(SoapAssessment.is_reassessment == is_reassessment)
 
-        statement = self._apply_clinic_scope(statement, clinic_id).offset(offset).limit(effective_limit)
+        statement = self._apply_clinic_scope(statement, clinic_id).order_by(
+            SoapAssessment.created_at.desc()
+        ).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())
