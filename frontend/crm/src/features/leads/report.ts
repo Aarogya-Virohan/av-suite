@@ -1,5 +1,6 @@
 import type { Lead } from '../../types/api';
 import { localToday } from '../../lib/datetime';
+import { lostReasonLabel } from './lostReasons';
 
 /*
  * Lead export and month-by-month counts (founder feedback C-11). Built from
@@ -15,13 +16,15 @@ const csvCell = (v: unknown) => {
 };
 
 export function leadsToCsv(leads: Lead[]): string {
-  const header = ['Name', 'Phone', 'Email', 'Source', 'Stage', 'Created on', 'Notes'];
+  const header = ['Name', 'Phone', 'Email', 'Source', 'Stage', 'Lost reason', 'Lost remark', 'Created on', 'Notes'];
   const rows = leads.map((l) => [
     l.name,
     l.phone,
     l.email,
     l.source ? l.source.replace(/_/g, ' ') : '',
     l.stage,
+    lostReasonLabel(l.lost_reason),
+    l.lost_remark,
     l.created_at ? localToday(new Date(l.created_at)) : '',
     l.notes,
   ]);

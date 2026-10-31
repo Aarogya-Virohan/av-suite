@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Invoice } from '../../../types/api';
-import { usePatients } from '../../patients/api';
+import { usePatient } from '../../patients/api';
 import { useClinicSettings } from '../../settings/api';
 import { useInvoicePayments } from '../api';
 import { hasCapability } from '../../../config/permissions';
@@ -59,12 +59,18 @@ interface LineItem {
  * clinic settings. It previously printed a hardcoded clinic name
  * ("Aarogya Virohan Health Center"), a made-up address and phone, a fallback
  * phone number for patients without one, and an invented line item.
- * Clinic address/phone/registration are not stored yet (Decisions.md L-14),
- * so they are left out rather than invented.
+ * The clinic's address, contacts, registration number and GSTIN come from
+ * the clinic profile (Settings); empty fields are left out (D-026).
  */
+
+const percentText = (value: string | number | null | undefined) => {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? `${Number(n.toFixed(2))}%` : null;
+};
 export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice' }: InvoicePreviewModalProps) {
-  const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
-  const patients = patientsResponse?.data || [];
+  // The phone (for WhatsApp and the "Billed To" block) is read from the one patient.
+  const { data: patient } = usePatient(invoice?.patient_id ?? '', isOpen && hasCapability('patients.view'));
   const authClinic = useAuthStore((s) => s.clinic);
   const { data: clinicSettings } = useClinicSettings(!authClinic && hasCapability('settings.view'));
   const clinic = authClinic || clinicSettings;
@@ -86,12 +92,18 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
 
   if (!isOpen || !invoice) return null;
 
-  const patient = patients.find((p) => p.id === invoice.patient_id);
-  // Only the first 100 patients are loaded here (Decisions.md L-8).
-  const patientName = patient
-    ? `${patient.first_name} ${patient.last_name}`
-    : `Patient #${invoice.patient_id.slice(0, 8).toUpperCase()}`;
+  const patientName =
+    invoice.patient_name?.trim() ||
+    (patient ? `${patient.first_name} ${patient.last_name}` : `Patient #${invoice.patient_id.slice(0, 8).toUpperCase()}`);
   const clinicName = clinic?.name || 'Clinic';
+  const filled = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+  // "12 MG Road, Sector 18, Noida, Uttar Pradesh 201301"
+  const place = [filled(clinic?.city), filled(clinic?.state)].filter(Boolean).join(', ');
+  const placeWithPin = [place, filled(clinic?.pincode)].filter(Boolean).join(' ');
+  const clinicAddress = [filled(clinic?.address_line), placeWithPin].filter(Boolean).join(', ');
+  const clinicContacts = [clinic?.phone, clinic?.email].filter((v) => v && String(v).trim()).join(' · ');
+  const discountPct = percentText(invoice.discount_percent);
+  const taxPct = percentText(invoice.tax_percent);
 
   const items: LineItem[] = (invoice.items as LineItem[] | undefined)?.length
     ? (invoice.items as LineItem[])
@@ -176,7 +188,18 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={clinic.branding_logo_url} alt="" className="h-12 w-12 rounded object-contain" />
               )}
-              <h1 className="font-display text-xl font-extrabold tracking-tight text-[#0b1238]">{clinicName}</h1>
+              <div>
+                <h1 className="font-display text-xl font-extrabold tracking-tight text-[#0b1238]">{clinicName}</h1>
+                {clinicAddress && <p className="mt-0.5 text-[#5d6380]">{clinicAddress}</p>}
+                {clinicContacts && <p className="text-[#5d6380]">{clinicContacts}</p>}
+                {(clinic?.registration_number || clinic?.gstin) && (
+                  <p className="text-[#5d6380]">
+                    {clinic?.registration_number && <span>Reg. No. {clinic.registration_number}</span>}
+                    {clinic?.registration_number && clinic?.gstin && <span> · </span>}
+                    {clinic?.gstin && <span>GSTIN {clinic.gstin}</span>}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="text-right">
               <span className="block font-display text-lg font-extrabold uppercase text-[#0b1238]">
@@ -248,7 +271,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
               {Number(invoice.discount_amount || 0) > 0 && (
                 <tr>
                   <td className="p-2.5 text-[#5d6380]" colSpan={3}>
-                    Discount
+                    Discount{discountPct ? ` (${discountPct})` : ''}
                   </td>
                   <td className="p-2.5 text-right tabular-nums text-[#5d6380]">- {money(invoice.discount_amount)}</td>
                 </tr>
@@ -256,7 +279,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
               {Number(invoice.tax_amount || 0) > 0 && (
                 <tr>
                   <td className="p-2.5 text-[#5d6380]" colSpan={3}>
-                    Tax
+                    Tax{taxPct ? ` (${taxPct})` : ''}
                   </td>
                   <td className="p-2.5 text-right tabular-nums text-[#5d6380]">{money(invoice.tax_amount)}</td>
                 </tr>
@@ -334,7 +357,10 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
           <div className="flex items-end justify-between border-t border-[#ebe5d8] pt-8 text-[11px] text-[#767b93]">
             {/* Clinics have no digital signature, so no signature line (C-19). */}
             <p>This is a computer-generated {isReceipt ? 'receipt' : 'invoice'} and does not need a signature.</p>
-            <p>Thank you for visiting {clinicName}.</p>
+            <div className="text-right">
+              {clinic?.authorised_person && <p>Authorised by {clinic.authorised_person}</p>}
+              <p>Thank you for visiting {clinicName}.</p>
+            </div>
           </div>
         </div>
       </div>

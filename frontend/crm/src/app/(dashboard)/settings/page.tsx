@@ -11,7 +11,18 @@ import { useAuthStore } from '../../../store';
 import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { Settings as SettingsIcon, Users, FileText, Save, Plus, Loader2, Trash2, Info, RotateCcw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { useClinicSettings, useUpdateClinicSettings } from '../../../features/settings/api';
+import {
+  CLINIC_PROFILE_KEYS,
+  type ClinicProfile,
+  useClinicSettings,
+  useUpdateClinicSettings,
+} from '../../../features/settings/api';
+import {
+  EMPTY_PROFILE,
+  PROFILE_FIELDS,
+  type ProfileForm,
+  clinicProfileErrors,
+} from '../../../features/settings/profile';
 import { AddUserSlideOver } from '../../../features/users/components/AddUserSlideOver';
 import { UserPermissionsSlideOver } from '../../../features/users/components/UserPermissionsSlideOver';
 import { JsonViewerSlideOver } from '../../../components/ui/JsonViewerSlideOver';
@@ -89,6 +100,8 @@ export default function SettingsPage() {
   const [brandColor, setBrandColor] = useState<string | null>(null);
   const [colorDirty, setColorDirty] = useState(false);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
+  const [profileErrors, setProfileErrors] = useState<Partial<Record<keyof ClinicProfile, string>>>({});
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -107,6 +120,10 @@ export default function SettingsPage() {
       setBrandColor(clinicSettings.branding_color ?? null);
       setColorDirty(false);
       setLogoBase64(clinicSettings.branding_logo_url ?? null);
+      const loaded = { ...EMPTY_PROFILE };
+      for (const key of CLINIC_PROFILE_KEYS) loaded[key] = clinicSettings[key] ?? '';
+      setProfile(loaded);
+      setProfileErrors({});
     }
   }, [clinicSettings]);
 
@@ -167,17 +184,30 @@ export default function SettingsPage() {
       toast.error('You do not have permission to edit clinic settings');
       return;
     }
+    const problems = clinicProfileErrors(profile);
+    setProfileErrors(problems);
+    if (Object.keys(problems).length > 0) {
+      toast.error('Check the clinic details');
+      return;
+    }
+    // Empty fields are saved as empty (null), GSTIN in capitals.
+    const profilePayload: Partial<ClinicProfile> = {};
+    for (const key of CLINIC_PROFILE_KEYS) {
+      const value = profile[key].trim();
+      profilePayload[key] = value ? (key === 'gstin' ? value.toUpperCase() : value) : null;
+    }
     try {
       await updateSettings.mutateAsync({
         name: clinicName,
+        ...profilePayload,
         // Only send the colour when it was changed, so saving the name never
         // writes a default colour over the theme (null resets to the theme).
         ...(colorDirty ? { branding_color: brandColor } : {}),
         branding_logo_url: logoBase64,
       });
       toast.success('Clinic settings saved');
-    } catch (err) {
-      toast.error('Failed to save clinic settings');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save clinic settings');
     }
   };
 
@@ -427,6 +457,52 @@ export default function SettingsPage() {
                         )}
                       </div>
                     )}
+                  </div>
+
+                  <div className="space-y-4 border-t border-line pt-5">
+                    <div>
+                      <h3 className="font-display text-sm font-bold text-ink">Clinic details for invoices</h3>
+                      <p className="mt-0.5 text-xs text-muted">
+                        Printed in the header of invoices and receipts. Leave a field empty to keep it off the invoice.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {PROFILE_FIELDS.map((field) => (
+                        <div key={field.key} className={field.wide ? 'sm:col-span-2' : undefined}>
+                          <FieldLabel htmlFor={`clinic-${field.key}`}>{field.label}</FieldLabel>
+                          {field.wide ? (
+                            <textarea
+                              id={`clinic-${field.key}`}
+                              rows={2}
+                              value={profile[field.key]}
+                              maxLength={field.max}
+                              placeholder={field.placeholder}
+                              onChange={(e) => setProfile((p) => ({ ...p, [field.key]: e.target.value }))}
+                              disabled={!canEditClinic}
+                              className={`${inputClass} h-auto py-2`}
+                            />
+                          ) : (
+                            <input
+                              id={`clinic-${field.key}`}
+                              type={field.type ?? 'text'}
+                              value={profile[field.key]}
+                              maxLength={field.max}
+                              placeholder={field.placeholder}
+                              inputMode={field.key === 'pincode' ? 'numeric' : undefined}
+                              onChange={(e) => {
+                                setProfile((p) => ({ ...p, [field.key]: e.target.value }));
+                                setProfileErrors((errs) => ({ ...errs, [field.key]: undefined }));
+                              }}
+                              disabled={!canEditClinic}
+                              className={`${inputClass}${profileErrors[field.key] ? ' border-danger' : ''}`}
+                            />
+                          )}
+                          {profileErrors[field.key] && (
+                            <p className="mt-1.5 text-xs font-medium text-danger">{profileErrors[field.key]}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   {canEditClinic && (

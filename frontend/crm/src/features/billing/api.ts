@@ -62,10 +62,18 @@ export function usePackages(enabled = true) {
   });
 }
 
+/** Form values plus the optional percent fields (D-026); an amount is left out when its percent is sent. */
+export type InvoiceCreatePayload = Omit<InvoiceFormValues, 'discount_amount' | 'tax_amount'> & {
+  discount_amount?: number;
+  tax_amount?: number;
+  discount_percent?: string;
+  tax_percent?: string;
+};
+
 export function useCreateInvoice() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (values: InvoiceFormValues) => {
+    mutationFn: async (values: InvoiceCreatePayload) => {
       const res = await apiClient.post('/invoices', values);
       return res.data?.data || res.data;
     },
