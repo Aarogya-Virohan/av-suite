@@ -29,7 +29,7 @@ export function useLeads(stage?: LeadStage, enabled = true) {
 export function useCreateLead() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (values: LeadFormValues) => {
+    mutationFn: async (values: LeadFormValues & { lost_reason?: string | null; lost_remark?: string | null }) => {
       const res = await apiClient.post('/leads', values);
       return res.data?.data || res.data;
     },
@@ -42,8 +42,20 @@ export function useCreateLead() {
 export function useUpdateLeadStage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, stage }: { id: string; stage: LeadStage }) => {
-      const res = await apiClient.patch(`/leads/${id}`, { stage });
+    mutationFn: async ({
+      id,
+      stage,
+      lost_reason,
+      lost_remark,
+    }: {
+      id: string;
+      stage: LeadStage;
+      lost_reason?: string | null;
+      lost_remark?: string | null;
+    }) => {
+      // Leaving "lost" clears the reason on the server (D-026); it is only sent when moving to lost.
+      const body = stage === 'lost' ? { stage, lost_reason, lost_remark } : { stage };
+      const res = await apiClient.patch(`/leads/${id}`, body);
       return res.data?.data || res.data;
     },
     onSuccess: () => {

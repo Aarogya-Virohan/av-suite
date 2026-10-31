@@ -9,7 +9,13 @@ describe('leads report (C-11)', () => {
   it('escapes commas, quotes, newlines and formula starts', () => {
     const csv = leadsToCsv([lead({ name: 'Rao, K', notes: 'said "call"\nlater', email: '=cmd' })]);
     const line = csv.replace('﻿', '').split('\r\n')[1];
-    expect(line).toBe('"Rao, K",9,"\'=cmd",,new,2026-10-10,"said ""call""\nlater"');
+    expect(line).toBe('"Rao, K",9,"\'=cmd",,new,,,2026-10-10,"said ""call""\nlater"');
+  });
+
+  it('adds the lost reason label and remark (D-026)', () => {
+    const csv = leadsToCsv([lead({ stage: 'lost', lost_reason: 'better_price', lost_remark: 'Clinic nearby' })]);
+    const line = csv.replace('\ufeff', '').split('\r\n')[1];
+    expect(line).toBe('A,9,,,lost,Better price,Clinic nearby,2026-10-10,');
   });
 
   it('counts by local month with converted / lost / open', () => {

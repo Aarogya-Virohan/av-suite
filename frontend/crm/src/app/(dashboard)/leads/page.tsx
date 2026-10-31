@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { useLeads, useUpdateLeadStage, useConvertLead } from '../../../features/leads/api';
 import { AddLeadSlideOver } from '../../../features/leads/components/AddLeadSlideOver';
+import { LostReasonSlideOver } from '../../../features/leads/components/LostReasonSlideOver';
+import { lostReasonLabel } from '../../../features/leads/lostReasons';
 import { Lead, LeadStage } from '../../../types/api';
 import { Plus, UserCheck, Phone, Mail, Search, List, LayoutGrid, CalendarClock, Loader2, Download, BarChart3 } from 'lucide-react';
 import { downloadCsv, leadsToCsv, monthlyLeadCounts } from '../../../features/leads/report';
@@ -67,6 +69,8 @@ export default function LeadsPage() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [showMonthly, setShowMonthly] = useState(false);
+  // Lead waiting for a lost reason before its stage changes (D-026).
+  const [lostLead, setLostLead] = useState<Lead | null>(null);
 
   const handleConvert = async (leadId: string, leadName: string) => {
     try {
@@ -79,6 +83,11 @@ export default function LeadsPage() {
   };
 
   const handleStageChange = async (leadId: string, newStage: LeadStage) => {
+    if (newStage === 'lost') {
+      const lead = leads.find((l) => l.id === leadId);
+      if (lead) setLostLead(lead);
+      return;
+    }
     try {
       await updateStage.mutateAsync({ id: leadId, stage: newStage });
       toast.success('Lead stage updated');
@@ -87,6 +96,45 @@ export default function LeadsPage() {
       toast.error('Failed to update lead stage');
     }
   };
+
+  const handleLostSave = async (reason: string, remark: string) => {
+    if (!lostLead) return;
+    try {
+      await updateStage.mutateAsync({
+        id: lostLead.id,
+        stage: 'lost',
+        lost_reason: reason,
+        lost_remark: remark ? remark : null,
+      });
+      toast.success(lostLead.stage === 'lost' ? 'Lost reason updated' : 'Lead marked as lost');
+      setLostLead(null);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || 'Failed to save the lost reason');
+    }
+  };
+
+  const lostReasonNote = (lead: Lead) =>
+    isLost(lead) && lead.lost_reason ? (
+      <button
+        type="button"
+        onClick={() => canEditLead && setLostLead(lead)}
+        disabled={!canEditLead}
+        title={lead.lost_remark || (canEditLead ? 'Edit lost reason' : undefined)}
+        className="mt-1 block max-w-[220px] truncate text-left text-[11.5px] text-muted enabled:cursor-pointer enabled:hover:text-ink enabled:hover:underline"
+      >
+        {lostReasonLabel(lead.lost_reason)}
+        {lead.lost_remark ? `: ${lead.lost_remark}` : ''}
+      </button>
+    ) : isLost(lead) && canEditLead ? (
+      <button
+        type="button"
+        onClick={() => setLostLead(lead)}
+        className="mt-1 block cursor-pointer text-[11.5px] font-semibold text-grove hover:underline"
+      >
+        Add reason
+      </button>
+    ) : null;
 
   if (!hasAccess) {
     // AccessRestricted renders its own AppShell.
@@ -310,7 +358,10 @@ export default function LeadsPage() {
                             {sourceLabel(lead.source) || 'Unknown'}
                           </Badge>
                         </td>
-                        <td className="px-5 py-3.5">{stageSelect(lead)}</td>
+                        <td className="px-5 py-3.5">
+                          {stageSelect(lead)}
+                          {lostReasonNote(lead)}
+                        </td>
                         <td className="px-5 py-3.5 text-right">
                           {isLost(lead) ? (
                             <span className="text-xs text-muted">Lost</span>
@@ -386,6 +437,7 @@ export default function LeadsPage() {
                             {stageSelect(lead, true)}
                             {!isConverted(lead) && !isLost(lead) && canConvertLead && convertButton(lead, true)}
                           </div>
+                          {lostReasonNote(lead)}
                         </Card>
                       ))
                     )}
@@ -398,6 +450,12 @@ export default function LeadsPage() {
 
         {/* Add Lead Drawer */}
         <AddLeadSlideOver isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
+        <LostReasonSlideOver
+          lead={lostLead}
+          saving={updateStage.isPending}
+          onClose={() => setLostLead(null)}
+          onSave={handleLostSave}
+        />
       </div>
     </AppShell>
   );
