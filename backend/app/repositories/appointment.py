@@ -66,8 +66,12 @@ class AppointmentRepository(BaseRepository[Appointment]):
         status: AppointmentStatus | None = None,
         offset: int = 0,
         limit: int = 100,
+        descending: bool = False,
     ) -> list[Appointment]:
-        """Return clinic-scoped appointments with optional date, patient, therapist, and status filters."""
+        """Return clinic-scoped appointments with optional date, patient, therapist, and status filters.
+
+        Oldest first by default; `descending` gives newest first (past lists).
+        """
 
         effective_limit = min(limit, 500)
         statement = select(Appointment).options(
@@ -95,8 +99,13 @@ class AppointmentRepository(BaseRepository[Appointment]):
         if status is not None:
             statement = statement.where(Appointment.status == status)
 
+        order = (
+            (Appointment.scheduled_at.desc(), Appointment.id.desc())
+            if descending
+            else (Appointment.scheduled_at.asc(), Appointment.id.asc())
+        )
         statement = self._apply_clinic_scope(statement, clinic_id).order_by(
-            Appointment.scheduled_at.asc(), Appointment.id.asc()
+            *order
         ).offset(offset).limit(effective_limit)
         result = await self.session.scalars(statement)
         return list(result.all())

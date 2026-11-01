@@ -412,6 +412,22 @@ Each entry follows this structure:
 
 ---
 
+## [D-028] Appointment Lists Filtered, Ordered and Counted by the Server
+
+- **Date**: 2026-11-01
+- **Context**: The server returns appointments oldest first. Three CRM screens loaded the first N appointments with no date and filtered them in the browser: Appointments (500), the Dashboard card (50) and the double-booking warning in Book Visit (100). Reproduced on 1 Nov with 520 appointments from 2025 and 3 today: Appointments listed only 2025 visits, "?date=today" showed 0 appointments, and the Dashboard card showed 22 to 25 Jan 2025. The backend already filtered by India day (L-24) but the CRM did not use it.
+- **Decision**:
+  - Backend `GET /appointments`: `order=asc|desc` (default asc, as before). `start_date` or `end_date` can now be sent alone (open range: from that day on, or up to and including that day). Until now a single date returned 422 (founders' review backend batch, 30 Oct); `test_appointments_and_requests_api.py` is changed to match. `start_date` after `end_date` is still 422. Dates are India days.
+  - Appointments page: Upcoming (from today, soonest first, default) and Past (up to yesterday, newest first), 50 per page with previous and next, or one day from the date picker or the header calendar (`?date=`). The status filter, including No Show, runs on the server. The count is the server total for the filter. Dates from another year show the year. A failed load says so instead of showing an empty list.
+  - Dashboard card: today in full, the next 7 from tomorrow and the 7 most recent before today, merged as before (upcoming first, then recent past). Today is read whole so its earlier visits cannot fill the list and hide later ones.
+  - Dashboard KPI "Scheduled Appointments" (staff view) counts scheduled visits from today on. It showed the total of every appointment ever made.
+  - Book Visit double-booking warning reads the chosen therapist's appointments from the day before to the day after, and compares time ranges with the new visit's duration. The old check ignored the new visit's duration, so 09:00 for 90 minutes did not warn about a 10:00 visit.
+  - `useAppointments` (first N, no filters) is replaced by `useAppointmentList` with explicit server parameters.
+- **Not changed**: no server-side double-booking check (the warning stays a soft warning). Appointment times still show in the browser time zone (D-017).
+- **Affected Files**: `backend/app/{api/v1/appointments,repositories/appointment,services/appointment}.py`, `backend/tests/{test_appointment_list_order_and_ranges,test_appointments_and_requests_api}.py`, `frontend/crm/src/features/appointments/{api,listing,listing.test}.ts`, `features/appointments/components/AddAppointmentSlideOver.tsx`, `src/app/(dashboard)/{appointments,dashboard}/page.tsx`, `src/types/schema.ts`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -440,7 +456,7 @@ Each entry follows this structure:
 | L-21 | Backend required a client-sent `invoice_number` with no uniqueness | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): backend numbers invoices per clinic (INV-0001, INV-0002, ...), unique per clinic, safe under concurrent requests, client value ignored. Frontend number field removed; the created number is shown | - |
 | L-22 | `POST /users` created no `memberships` row | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): user creation creates a membership, an existing email gets a membership in the new clinic, and migration a8c4e2f1d903 backfills users without one | - |
 | L-23 | Permissions drawer shows "none" for capabilities without an override (ignores the role template) and saves explicit "none" for all of them (PUT replaces all). Harmless while templates are deny-all; would wipe template access once templates are restored | Fix together with role templates: backend returns effective scopes, drawer sends only real overrides | Sparsh + frontend |
-| L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Backend fixed 2026-10-31 in `release/crm-oct`: appointment `date`, `start_date`, `end_date` and analytics periods use India days (`CLINIC_TZ`). CRM screens still filter appointments on the client (L-39) | Frontend |
+| L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Fixed: backend uses India days (31 Oct, `release/crm-oct`); CRM Appointments, Dashboard and Book Visit use the server filters (2026-11-01, D-028) | - |
 | L-25 | DB enum `specialty_type` lacked ortho/neuro/cardiopulm/sports/paeds/general, so saving them returned 500 | Backend fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it) (12 enum values, all save). Frontend still stores pain area in `form_data.area`; moving it into `specialty` is open | Frontend |
 | L-26 | `types/schema.ts` is stale (e.g. SoapAssessment lacks `finalized`) | Fixed 2026-10-31: regenerated from the `release/crm-oct` OpenAPI (D-026) | - |
 | L-27 | Auto-Rx creates a prescription with empty items and the note "Auto-generated prescription." (invented content on a clinical document), and the button shows even for users without prescription permissions. Not changed because Rx scope is parked with founders | Decide with Rx scope | Onkar + founders |
@@ -455,9 +471,9 @@ Each entry follows this structure:
 | L-36 | Prescription PDF letterhead shows the clinic name with initials; the clinic logo and contact details are not printed (no clinic profile fields yet, see L-14) | Open | Frontend + Sparsh |
 | L-37 | "Therapist guidance" on a prescription is the fixed default text from the builder; there is no field to write it | Open, product decision | Onkar |
 | L-38 | Exercise images are cached in the server's memory only; the first PDF after a deploy downloads them again (parallel, 6 s cap). An image that fails prints "Image not available" | Accepted for now; move images into our own storage with the exercise image pipeline | Backend |
-| L-39 | Appointments loads at most 500 appointments in one request (backend maximum) and has no paging; the backend has no `order_by` and its `date` filter uses UTC days, so the day filter runs on the client | Open; backend paging, ordering and a local-day filter | Backend + frontend |
+| L-39 | Appointments loaded at most 500 appointments (oldest first) with no paging and filtered by day in the browser | Fixed 2026-11-01: server paging (50), Upcoming and Past order, India-day filter, status filter and total (D-028) | - |
 | L-40 | Leads list loads at most 500 leads in one request (backend maximum) and has no rows-per-page or paging (it is not a DataTable). Before 24 Oct it sent no limit and got only the API default of 100. Export CSV and the monthly table use the same 500 | Open; backend paging or a monthly count endpoint once a clinic passes 500 leads | Frontend + backend |
 | L-41 | Backend invoice PDF was a placeholder (five lines of text with a `%PDF-1.4` header) and its download URL pointed at `/api/v1/billing/invoices/...` | Fixed 2026-10-31: real server PDF for invoice and receipt, URL fixed, CRM "Download PDF" (D-027) | - |
 | L-42 | The invoice PDF download needs a signed-in clinic user, so the `download_url` and WhatsApp link from `POST /invoices/{id}/pdf` cannot be opened by a patient. The CRM WhatsApp button only opens a chat; the PDF is attached by hand | Open; a signed, expiring patient link or email with the PDF attached (C-20) | Backend + frontend |
 
-*Last updated: 2026-10-31 (D-027; L-41 closed, L-42 added) | Branch: feat/invoice-pdf*
+*Last updated: 2026-11-01 (D-028; L-24, L-39 closed) | Branch: feat/appointments-server-filter*

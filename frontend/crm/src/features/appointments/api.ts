@@ -2,24 +2,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api-client';
 import { Appointment } from '../../types/api';
 import { AppointmentFormValues } from '../../lib/schemas';
+import type { AppointmentListQuery } from './listing';
 
 export const APPOINTMENTS_QUERY_KEY = ['appointments'];
 
-export function useAppointments(startDate?: string, endDate?: string, page = 1, page_size = 10, enabled = true) {
+/**
+ * One page of appointments, filtered, ordered and counted by the server
+ * (India days, D-028). `meta.total` is the server count for the whole filter.
+ */
+export function useAppointmentList(query: AppointmentListQuery, enabled = true) {
   return useQuery({
-    queryKey: [...APPOINTMENTS_QUERY_KEY, { startDate, endDate, page, page_size }],
+    queryKey: [...APPOINTMENTS_QUERY_KEY, query],
     queryFn: async () => {
-      const res = await apiClient.get('/appointments', {
-        params: { 
-          start_date: startDate || undefined, 
-          end_date: endDate || undefined,
-          offset: (page - 1) * page_size,
-          limit: page_size 
-        },
-      });
-      // Backend returns { items: Appointment[], total: number, offset: number, limit: number }
-      const data = res.data?.items || res.data?.data || [];
-      return { data, meta: { total: res.data?.total || 0, page, page_size } };
+      const res = await apiClient.get('/appointments', { params: query });
+      const data: Appointment[] = res.data?.items || res.data?.data || [];
+      return { data, meta: { total: Number(res.data?.total ?? data.length) } };
     },
     enabled,
   });

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -89,15 +89,19 @@ async def list_appointments(
     therapist_id: Annotated[UUID | None, Query(alias="therapist")] = None,
     patient_id: Annotated[UUID | None, Query(alias="patient")] = None,
     status_filter: Annotated[AppointmentStatus | None, Query(alias="status")] = None,
+    order: Annotated[Literal["asc", "desc"], Query()] = "asc",
     scope: CapabilityScope = Depends(require_capability("appointments.view")),
 ) -> AppointmentListResponse:
-    """List appointments for the authenticated clinic with filtering by date, therapist, or patient."""
+    """List appointments for the authenticated clinic with filtering by date, therapist, or patient.
 
-    # Enforce own-scope filtering: therapist may only see their own appointments
-    if (start_date is None) != (end_date is None):
-        raise HTTPException(status_code=422, detail="start_date and end_date must be provided together.")
+    Dates are India days. `start_date` alone means from that day on, `end_date`
+    alone means up to and including that day (CRM "Upcoming" and "Past" lists).
+    `order=desc` puts the newest first. Decisions.md D-028.
+    """
+
     if start_date is not None and end_date is not None and start_date > end_date:
         raise HTTPException(status_code=422, detail="start_date must be on or before end_date.")
+    # Enforce own-scope filtering: therapist may only see their own appointments
     effective_therapist_id = therapist_id
     if scope == CapabilityScope.OWN:
         effective_therapist_id = user.id
@@ -112,6 +116,7 @@ async def list_appointments(
         status=status_filter,
         offset=offset,
         limit=limit,
+        descending=order == "desc",
     )
 
     items = [AppointmentResponse.model_validate(a) for a in appointments]

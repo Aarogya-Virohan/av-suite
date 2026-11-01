@@ -6,7 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { appointmentFormSchema, AppointmentFormValues } from '../../../lib/schemas';
-import { useCreateAppointment, useAppointments } from '../api';
+import { useAppointmentList, useCreateAppointment } from '../api';
+import { addDays, APPOINTMENTS_DAY_LIMIT, overlapsExisting } from '../listing';
 import { usePatients } from '../../patients/api';
 import { hasCapability } from '../../../config/permissions';
 import { useUsers } from '../../users/api';
@@ -46,9 +47,6 @@ const errorText = 'mt-1.5 text-xs font-medium text-danger';
  */
 export function AddAppointmentSlideOver({ isOpen, onClose, defaultDate }: AddAppointmentSlideOverProps) {
   const createAppointment = useCreateAppointment();
-  const { data: aptResponse } = useAppointments(undefined, undefined, 1, 100);
-  const existingAppointments = aptResponse?.data || [];
-
   const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
 
@@ -92,18 +90,34 @@ export function AddAppointmentSlideOver({ isOpen, onClose, defaultDate }: AddApp
 
   const selectedTherapist = watch('therapist_id');
   const selectedTime = watch('scheduled_at');
+  const selectedDuration = watch('duration_minutes');
 
-  // Soft double-booking warning (client side, first 100 appointments).
-  const isOverlapDetected = (() => {
-    if (!selectedTherapist || !selectedTime) return false;
-    const targetTime = new Date(selectedTime).getTime();
-    return existingAppointments.some((apt: any) => {
-      if (apt.therapist_id !== selectedTherapist || apt.status === 'cancelled' || apt.status === 'no_show') return false;
-      const aptTime = new Date(apt.scheduled_at).getTime();
-      const diffMinutes = Math.abs(targetTime - aptTime) / (1000 * 60);
-      return diffMinutes < (apt.duration_minutes || 30);
-    });
-  })();
+  // Soft double-booking warning. The chosen therapist's appointments from the
+  // day before to the day after are read from the server (India days), so a
+  // visit crossing midnight is caught too. It used to check the 100 oldest
+  // appointments of the clinic, which missed every clash once a clinic had
+  // more than 100 (D-028).
+  const selectedDay = /^\d{4}-\d{2}-\d{2}T/.test(selectedTime || '') ? selectedTime.slice(0, 10) : null;
+  const { data: nearbyResponse } = useAppointmentList(
+    {
+      start_date: selectedDay ? addDays(selectedDay, -1) : undefined,
+      end_date: selectedDay ? addDays(selectedDay, 1) : undefined,
+      therapist: selectedTherapist || undefined,
+      order: 'asc',
+      offset: 0,
+      limit: APPOINTMENTS_DAY_LIMIT,
+    },
+    isOpen && !!selectedTherapist && !!selectedDay,
+  );
+  const isOverlapDetected =
+    !!selectedTherapist &&
+    !!selectedDay &&
+    overlapsExisting(
+      nearbyResponse?.data ?? [],
+      selectedTherapist,
+      localDateTimeInputToISO(selectedTime),
+      Number(selectedDuration) || 30,
+    );
 
   const onSubmit = async (values: AppointmentFormValues) => {
     try {
