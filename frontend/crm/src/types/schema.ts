@@ -905,6 +905,10 @@ export interface paths {
         /**
          * List Appointments
          * @description List appointments for the authenticated clinic with filtering by date, therapist, or patient.
+         *
+         *     Dates are India days. `start_date` alone means from that day on, `end_date`
+         *     alone means up to and including that day (CRM "Upcoming" and "Past" lists).
+         *     `order=desc` puts the newest first. Decisions.md D-028.
          */
         get: operations["list_appointments_api_v1_appointments_get"];
         put?: never;
@@ -5726,6 +5730,7 @@ export interface operations {
                 therapist?: string | null;
                 patient?: string | null;
                 status?: components["schemas"]["AppointmentStatus"] | null;
+                order?: "asc" | "desc";
             };
             header?: never;
             path?: never;

@@ -16,7 +16,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useAnalyticsOverview, useMyPerformance } from '../../../features/analytics/api';
-import { useAppointments } from '../../../features/appointments/api';
+import { useAppointmentList } from '../../../features/appointments/api';
+import { addDays, appointmentDayLabel, APPOINTMENTS_DAY_LIMIT, orderForDashboard } from '../../../features/appointments/listing';
+import { localToday } from '../../../lib/datetime';
 import { useLeads } from '../../../features/leads/api';
 import { usePatients } from '../../../features/patients/api';
 import { useAuthStore } from '../../../store';
@@ -65,24 +67,9 @@ function formatTime(iso: string): string {
   );
 }
 
-function formatDay(iso: string): string {
-  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(new Date(iso));
-}
-
-/** Upcoming appointments first (soonest at the top), then the most recent past ones. */
-function orderAppointments(items: Appointment[]): Appointment[] {
-  const now = Date.now();
-  const upcoming = items
-    .filter((a) => new Date(a.scheduled_at).getTime() >= now)
-    .sort((a, b) => +new Date(a.scheduled_at) - +new Date(b.scheduled_at));
-  const past = items
-    .filter((a) => new Date(a.scheduled_at).getTime() < now)
-    .sort((a, b) => +new Date(b.scheduled_at) - +new Date(a.scheduled_at));
-  return [...upcoming, ...past];
-}
-
 function AppointmentsCard({ items }: { items: Appointment[] }) {
-  const rows = orderAppointments(items).slice(0, 7);
+  // Already ordered: upcoming soonest first, then the most recent past ones.
+  const rows = items;
   return (
     <Card className="p-5">
       <CardHeader
@@ -111,7 +98,7 @@ function AppointmentsCard({ items }: { items: Appointment[] }) {
                 <td className="py-2.5 align-middle">
                   <p className="font-semibold tabular-nums text-ink">{formatTime(appt.scheduled_at)}</p>
                   <p className="text-[11.5px] text-slate-400">
-                    {formatDay(appt.scheduled_at)} · {appt.duration_minutes} min
+                    {appointmentDayLabel(appt.scheduled_at)} · {appt.duration_minutes} min
                   </p>
                 </td>
                 <td className="py-2.5 align-middle">
@@ -201,7 +188,31 @@ export default function DashboardPage() {
     useMyPerformance('month', canViewMyPerf && !canViewFinancials);
 
   // Operational queries
-  const { data: appointmentsRes, isLoading: isApptsLoading } = useAppointments(undefined, undefined, 1, 50, canViewAppts);
+  // Server lists by India day (D-028): all of today (one day is small), the
+  // next 7 from tomorrow, and the 7 most recent before today. Today is read
+  // whole because its earlier visits are already past and would otherwise
+  // fill a "from today" list. It used to load the 50 oldest appointments of
+  // the clinic, so after 50 visits the card showed only old ones.
+  const today = localToday();
+  const { data: todayRes, isLoading: isTodayLoading } = useAppointmentList(
+    { date: today, order: 'asc', offset: 0, limit: APPOINTMENTS_DAY_LIMIT },
+    canViewAppts,
+  );
+  const { data: upcomingRes, isLoading: isUpcomingLoading } = useAppointmentList(
+    { start_date: addDays(today, 1), order: 'asc', offset: 0, limit: 7 },
+    canViewAppts,
+  );
+  const { data: recentRes, isLoading: isRecentLoading } = useAppointmentList(
+    { end_date: addDays(today, -1), order: 'desc', offset: 0, limit: 7 },
+    canViewAppts,
+  );
+  // "Scheduled Appointments" KPI: scheduled visits from today on. It showed
+  // the total of every appointment ever made, completed and cancelled too.
+  const { data: scheduledRes, isLoading: isScheduledLoading } = useAppointmentList(
+    { start_date: today, status: 'scheduled', offset: 0, limit: 1 },
+    canViewAppts,
+  );
+  const isApptsLoading = isTodayLoading || isUpcomingLoading || isRecentLoading || isScheduledLoading;
   const { data: leads, isLoading: isLeadsLoading } = useLeads(undefined, canViewLeads);
   const { data: patientsRes, isLoading: isPatientsLoading } = usePatients(undefined, 1, 1, canViewPatients);
 
@@ -221,7 +232,7 @@ export default function DashboardPage() {
     ? isPerfLoading
     : ((canViewAppts && isApptsLoading) || (canViewLeads && isLeadsLoading) || (canViewPatients && isPatientsLoading));
 
-  const appointments: Appointment[] = (appointmentsRes?.data as Appointment[] | undefined) ?? [];
+  const appointments: Appointment[] = orderForDashboard([todayRes?.data ?? [], upcomingRes?.data ?? [], recentRes?.data ?? []]);
   const leadItems: Lead[] = (leads as Lead[] | undefined) ?? [];
   const showLists = !isLoading && hasAnyDashboardView && (canViewAppts || canViewLeads);
 
@@ -334,7 +345,7 @@ export default function DashboardPage() {
               label="Scheduled Appointments"
               icon={Calendar}
               tone="info"
-              value={appointmentsRes?.meta?.total ?? appointmentsRes?.data?.length ?? 0}
+              value={scheduledRes?.meta.total ?? 0}
             />
             <KpiCard label="Active Leads" icon={UserCheck} tone="warn" value={leads?.length ?? 0} />
             <KpiCard
