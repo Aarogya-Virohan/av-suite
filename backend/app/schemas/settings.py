@@ -40,15 +40,18 @@ class ClinicSettingsUpdate(BaseModel):
     branding_logo_url: str | None = Field(default=None, description="Updated branding logo URL.")
     branding_color: str | None = Field(default=None, max_length=32, description="Updated branding color hex string.")
     is_documents_enabled: bool | None = Field(default=None, description="Toggle document storage bucket on/off.")
-    address_line: str | None = None
-    city: str | None = None
-    state: str | None = None
+    # Lengths match the database columns (models/clinic.py); longer values
+    # used to reach the database and return 500 (L-43). The address column is
+    # Text; 500 matches the CRM Settings field.
+    address_line: str | None = Field(default=None, max_length=500)
+    city: str | None = Field(default=None, max_length=120)
+    state: str | None = Field(default=None, max_length=120)
     pincode: str | None = None
-    phone: str | None = None
+    phone: str | None = Field(default=None, max_length=50)
     email: EmailStr | None = None
-    registration_number: str | None = None
+    registration_number: str | None = Field(default=None, max_length=120)
     gstin: str | None = None
-    authorised_person: str | None = None
+    authorised_person: str | None = Field(default=None, max_length=255)
 
     @field_validator("pincode")
     @classmethod
