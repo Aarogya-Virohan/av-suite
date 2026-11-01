@@ -60,11 +60,19 @@ async def test_public_booking_request_and_approval_flow(client: AsyncClient, aut
 
 
 @pytest.mark.asyncio
+async def test_appointment_date_range_rejects_reversed_range(client, auth_headers):
+    params = {"start_date": "2026-10-11", "end_date": "2026-10-10"}
+    response = await client.get(f"{settings.API_V1_PREFIX}/appointments", params=params, headers=auth_headers)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("params", [
     {"start_date": "2026-10-10"},
     {"end_date": "2026-10-10"},
-    {"start_date": "2026-10-11", "end_date": "2026-10-10"},
 ])
-async def test_appointment_date_range_rejects_incomplete_or_reversed_ranges(client, auth_headers, params):
+async def test_appointment_date_range_accepts_open_ranges(client, auth_headers, params):
+    # Open ranges are allowed since D-028 (CRM Upcoming and Past lists); their
+    # filtering is checked in test_appointment_list_order_and_ranges.py.
     response = await client.get(f"{settings.API_V1_PREFIX}/appointments", params=params, headers=auth_headers)
-    assert response.status_code == 422
+    assert response.status_code == 200, response.text

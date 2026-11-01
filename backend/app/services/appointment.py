@@ -85,6 +85,7 @@ class AppointmentService:
         status: AppointmentStatus | None = None,
         offset: int = 0,
         limit: int = 100,
+        descending: bool = False,
     ) -> list[Appointment]:
         """List appointments for a clinic with optional filters."""
 
@@ -98,6 +99,7 @@ class AppointmentService:
             status=status,
             offset=offset,
             limit=limit,
+            descending=descending,
         )
 
     async def update_appointment(
