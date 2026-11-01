@@ -923,6 +923,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/appointments/therapists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Assignable Therapists
+         * @description Active therapists and admins an appointment can be booked with.
+         *
+         *     Book Visit read them from GET /users, which needs `users.view`, so front
+         *     desk and therapists saw an empty list and could not book (D-029). Only
+         *     id, name and role are returned. With own scope the list is the caller
+         *     alone, because own scope may only book for itself.
+         */
+        get: operations["list_assignable_therapists_api_v1_appointments_therapists_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/appointments/{id}": {
         parameters: {
             query?: never;
@@ -2373,6 +2398,20 @@ export interface components {
             duration_minutes?: number | null;
             status?: components["schemas"]["AppointmentStatus"] | null;
             source?: components["schemas"]["AppointmentSource"] | null;
+        };
+        /**
+         * AssignableTherapist
+         * @description A user an appointment can be booked with (Book Visit, D-029).
+         */
+        AssignableTherapist: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            role: components["schemas"]["UserRole"];
         };
         /**
          * AuditLogResponse
@@ -5787,6 +5826,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_assignable_therapists_api_v1_appointments_therapists_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignableTherapist"][];
                 };
             };
         };
