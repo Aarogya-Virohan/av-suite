@@ -60,3 +60,26 @@ export function useUpdateAppointment() {
     },
   });
 }
+
+export interface AssignableTherapist {
+  id: string;
+  name: string;
+  role: string;
+}
+
+/**
+ * Active therapists and admins the user may book with (D-029). It used to
+ * read GET /users, which needs `users.view`, so front desk and therapists
+ * saw an empty list. With own scope the server returns only the user.
+ */
+export function useAssignableTherapists(enabled = true) {
+  return useQuery<AssignableTherapist[]>({
+    queryKey: [...APPOINTMENTS_QUERY_KEY, 'therapists'],
+    queryFn: async () => {
+      const res = await apiClient.get('/appointments/therapists');
+      return Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+    },
+    enabled,
+    staleTime: 60_000,
+  });
+}

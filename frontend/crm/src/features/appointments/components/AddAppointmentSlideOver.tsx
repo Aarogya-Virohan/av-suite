@@ -6,11 +6,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { appointmentFormSchema, AppointmentFormValues } from '../../../lib/schemas';
-import { useAppointmentList, useCreateAppointment } from '../api';
+import { useAppointmentList, useAssignableTherapists, useCreateAppointment } from '../api';
 import { addDays, APPOINTMENTS_DAY_LIMIT, overlapsExisting } from '../listing';
 import { usePatients } from '../../patients/api';
 import { hasCapability } from '../../../config/permissions';
-import { useUsers } from '../../users/api';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
 import { localDateTimeInputToISO, localToday, toLocalDateTimeInput } from '../../../lib/datetime';
@@ -50,15 +49,18 @@ export function AddAppointmentSlideOver({ isOpen, onClose, defaultDate }: AddApp
   const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
   const patients = patientsResponse?.data || [];
 
-  const { data: usersResponse } = useUsers();
-  const users = usersResponse || [];
-  const therapists = users.filter((u) => u.role === 'therapist' || u.role === 'admin');
+  // Only when the drawer is open: it is mounted on the Appointments page all
+  // the time, and the old GET /users ran (and failed with 403) on every visit.
+  const { data: therapists = [], isError: therapistsFailed } = useAssignableTherapists(
+    isOpen && hasCapability('appointments.create'),
+  );
 
   const {
     register,
     handleSubmit,
     watch,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<AppointmentFormValues>({
     resolver: zodResolver(appointmentFormSchema),
@@ -89,6 +91,11 @@ export function AddAppointmentSlideOver({ isOpen, onClose, defaultDate }: AddApp
   }, [isOpen, reset, defaultDate]);
 
   const selectedTherapist = watch('therapist_id');
+  // Own scope gets only the user; choose it so a therapist need not pick themself.
+  const onlyTherapist = therapists.length === 1 ? therapists[0].id : null;
+  React.useEffect(() => {
+    if (isOpen && onlyTherapist && !selectedTherapist) setValue('therapist_id', onlyTherapist);
+  }, [isOpen, onlyTherapist, selectedTherapist, setValue]);
   const selectedTime = watch('scheduled_at');
   const selectedDuration = watch('duration_minutes');
 
@@ -159,11 +166,12 @@ export function AddAppointmentSlideOver({ isOpen, onClose, defaultDate }: AddApp
             <option value="">Select therapist…</option>
             {therapists.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.first_name} {u.last_name} ({u.role.replace(/_/g, ' ')})
+                {u.name} ({u.role.replace(/_/g, ' ')})
               </option>
             ))}
           </select>
           {errors.therapist_id && <p className={errorText}>{errors.therapist_id.message}</p>}
+          {therapistsFailed && <p className={errorText}>Could not load therapists. Close and open the form again.</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">

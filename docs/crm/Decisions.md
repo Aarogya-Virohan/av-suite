@@ -428,6 +428,21 @@ Each entry follows this structure:
 
 ---
 
+## [D-029] Staff Can Book Visits; Clinic Profile Lengths; Treatment Totals and India Days
+
+- **Date**: 2026-11-02
+- **Context**: Role check of the D-026 to D-028 screens as front desk and therapist, with the overrides a clinic would grant (front desk: patients, appointments, invoices, payments, booking requests; therapist: own appointments, patients and treatments). Everything worked except booking: Book Visit read therapists from `GET /users`, which needs `users.view`, so the therapist list was empty for both roles and they could not book. The same call failed with 403 four times on every Appointments visit, because the form is always mounted. Also open: L-43, and the treatment list total.
+- **Decision**:
+  - New `GET /appointments/therapists` (needs `appointments.create`): active therapists and admins of the clinic with id, name and role only (no email or phone). With own scope it returns the caller alone, the only person own scope may book for. `users.view` stays closed to staff.
+  - Book Visit uses it, only while the drawer is open, shows an error if it fails, and selects the therapist when there is only one.
+  - Clinic profile update: city and state 120, phone 50, registration number 120, authorised person 255, address 500 characters. Longer values returned 500 from the database; now 422 and nothing is saved (L-43). Same limits as the CRM Settings fields, so the CRM never sent them; only direct API calls did.
+  - `GET /treatments`: `total` counts every matching session (it was the size of the page), and `start_date` / `end_date` are India days, end inclusive (they were UTC days, as appointments were before L-24).
+  - Checked and left alone: the Recycle Bin total is correct, because that list has no paging.
+- **Not changed**: no API deactivates a user; the Treatments tab still loads at most 100 sessions per patient, newest first.
+- **Affected Files**: `backend/app/api/v1/{appointments,treatments}.py`, `backend/app/schemas/{appointment,settings}.py`, `backend/app/repositories/treatment.py`, `backend/tests/test_profile_limits_and_treatment_totals.py`, `frontend/crm/src/features/appointments/{api.ts,components/AddAppointmentSlideOver.tsx}`, `frontend/crm/src/types/schema.ts`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -475,5 +490,6 @@ Each entry follows this structure:
 | L-40 | Leads list loads at most 500 leads in one request (backend maximum) and has no rows-per-page or paging (it is not a DataTable). Before 24 Oct it sent no limit and got only the API default of 100. Export CSV and the monthly table use the same 500 | Open; backend paging or a monthly count endpoint once a clinic passes 500 leads | Frontend + backend |
 | L-41 | Backend invoice PDF was a placeholder (five lines of text with a `%PDF-1.4` header) and its download URL pointed at `/api/v1/billing/invoices/...` | Fixed 2026-10-31: real server PDF for invoice and receipt, URL fixed, CRM "Download PDF" (D-027) | - |
 | L-42 | The invoice PDF download needs a signed-in clinic user, so the `download_url` and WhatsApp link from `POST /invoices/{id}/pdf` cannot be opened by a patient. The CRM WhatsApp button only opens a chat; the PDF is attached by hand | Open; a signed, expiring patient link or email with the PDF attached (C-20) | Backend + frontend |
+| L-43 | Clinic profile update accepted any length for city, state, phone, registration number and authorised person, so longer values returned 500 from the database | Fixed 2026-11-02: length limits in the API, 422 (D-029) | - |
 
-*Last updated: 2026-11-01 (D-028; L-24, L-39 closed) | Branch: feat/appointments-server-filter*
+*Last updated: 2026-11-02 (D-029; L-43 added and closed) | Branch: fix/staff-booking-and-limits*

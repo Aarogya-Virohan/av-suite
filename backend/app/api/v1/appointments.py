@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -15,7 +16,9 @@ from app.core.dependencies import (
 )
 from app.enums.appointment import AppointmentStatus
 from app.enums.permission import CapabilityScope
+from app.enums.user import UserRole
 from app.models.clinic import Clinic
+from app.models.membership import Membership
 from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.patient import PatientRepository
@@ -25,6 +28,7 @@ from app.schemas.appointment import (
     AppointmentListResponse,
     AppointmentResponse,
     AppointmentUpdate,
+    AssignableTherapist,
 )
 from app.services.appointment import (
     AppointmentNotFoundError,
@@ -131,6 +135,44 @@ async def list_appointments(
         offset=offset,
         limit=limit,
     )
+
+
+@router.get("/therapists", response_model=list[AssignableTherapist])
+async def list_assignable_therapists(
+    clinic: CurrentClinicDep,
+    user: CurrentUserDep,
+    session: SessionDep,
+    scope: CapabilityScope = Depends(require_capability("appointments.create")),
+) -> list[AssignableTherapist]:
+    """Active therapists and admins an appointment can be booked with.
+
+    Book Visit read them from GET /users, which needs `users.view`, so front
+    desk and therapists saw an empty list and could not book (D-029). Only
+    id, name and role are returned. With own scope the list is the caller
+    alone, because own scope may only book for itself.
+    """
+
+    statement = (
+        select(User.id, User.first_name, User.last_name, Membership.role)
+        .join(Membership, Membership.user_id == User.id)
+        .where(
+            Membership.clinic_id == clinic.id,
+            Membership.role.in_([UserRole.THERAPIST, UserRole.ADMIN]),
+            User.is_active.is_(True),
+        )
+        .order_by(User.first_name, User.last_name, User.id)
+    )
+    if scope == CapabilityScope.OWN:
+        statement = statement.where(User.id == user.id)
+    rows = (await session.execute(statement)).all()
+    return [
+        AssignableTherapist(
+            id=row.id,
+            name=f"{row.first_name or ''} {row.last_name or ''}".strip() or "Unnamed",
+            role=row.role,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/{id}", response_model=AppointmentResponse)
