@@ -22,6 +22,15 @@ from app.models.treatment import TreatmentSession, SoapAssessment
 from app.models.billing import Package, PatientPackage, Invoice, InvoiceItem, Payment
 from app.models.document import PatientDocument
 from app.models.audit import AuditLog
+from app.models.psychosocial import (
+    PsychosocialAssignment,
+    PsychosocialClinicSetting,
+    PsychosocialConsent,
+    PsychosocialReferralAction,
+    PsychosocialReferralContact,
+    PsychosocialSchedule,
+    PsychosocialSession,
+)
 
 __all__ = [
     "Base",
@@ -56,4 +65,11 @@ __all__ = [
     "Payment",
     "PatientDocument",
     "AuditLog",
+    "PsychosocialAssignment",
+    "PsychosocialSession",
+    "PsychosocialConsent",
+    "PsychosocialReferralAction",
+    "PsychosocialSchedule",
+    "PsychosocialClinicSetting",
+    "PsychosocialReferralContact",
 ]
