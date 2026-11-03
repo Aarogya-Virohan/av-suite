@@ -78,6 +78,9 @@ async function request<T>(
     if (res.status === 401 && init.auth !== false) {
       clearStoredToken();
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        // A full page load on purpose: it also drops the React Query cache that holds the
+        // previous session's patient data. This helper runs outside React, so useRouter is not available.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
         window.location.assign('/login');
       }
     }

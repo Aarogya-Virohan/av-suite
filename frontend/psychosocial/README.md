@@ -4,6 +4,8 @@ Standalone Next.js app for psycho-social screening: staff views (worklist, patie
 
 ## Run locally
 
+Node 22.12 or later (vitest 5 needs it for `npm test`; S-D-030).
+
 1. Backend on port 8000 with this app's origin allowed: add `http://localhost:3005` to `CORS_ORIGINS` in `backend/.env`, then run the migrations (`alembic upgrade head`).
 2. In this folder: `npm install`, then `npm run dev` (port 3005).
 3. `NEXT_PUBLIC_API_URL` defaults to `http://localhost:8000`.

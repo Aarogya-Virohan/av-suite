@@ -490,3 +490,17 @@ test('admin keeps a referral contact list and the physio refers to a contact fro
   expect(physioProblems).toEqual([]);
   await ctx.close();
 });
+
+test('a session the server rejects goes back to sign-in and clears the stored token', async ({ page }) => {
+  const problems = watch(page, [401]);
+  // Looks valid to the browser (expiry in the future) but the signature is wrong, so the API answers 401.
+  const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const forged = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: 'nobody', exp: Math.floor(Date.now() / 1000) + 3600 })}.bad-signature`;
+  await page.goto('/login');
+  await page.evaluate((t) => window.localStorage.setItem('token', t), forged);
+  await page.goto('/sessions');
+  await page.waitForURL('**/login');
+  await expect(page.getByLabel('Email address')).toBeVisible();
+  expect(await page.evaluate(() => window.localStorage.getItem('token'))).toBeNull();
+  expect(problems.filter((x) => !x.includes('http 401'))).toEqual([]);
+});

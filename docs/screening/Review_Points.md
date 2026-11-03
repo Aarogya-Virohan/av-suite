@@ -2,7 +2,7 @@
 
 One place to see what was decided and what must be looked at again, and when. Details stay in Decisions.md (S-D), Known_Limitations.md (S-L) and Pending.md (P). This file links to them and does not repeat them. Update it in the same commit as any new decision or limitation.
 
-Last updated: 22 Oct 2026 (S-D-029).
+Last updated: 3 Nov 2026 (S-D-030).
 
 ## 1. Decision index
 
@@ -29,7 +29,7 @@ Status: **Onkar** = decided by Onkar. **Founders** = built as a safe default, wa
 | S-D-017 | Risk answer visible to the physio before submit | Founders (with F1) |
 | S-D-018 | Public screener routes, in-process rate limits, client IP header | Onkar (header choice: Sign-off) |
 | S-D-019 | Standalone app `frontend/psychosocial` on the CRM theme | Onkar |
-| S-D-020 | Frontend tooling versions (vitest 3, Node types 22) | Sign-off |
+| S-D-020 | Frontend tooling versions (Node types 22); next and vitest superseded by S-D-030 | Sign-off |
 | S-D-021 | Patient screener behaviour and wording | Founders (F2 wording) |
 | S-D-022 | Validation report generated from the tests | Sign-off |
 | S-D-023 | App icon and vitest scope fixes | Sign-off |
@@ -39,6 +39,7 @@ Status: **Onkar** = decided by Onkar. **Founders** = built as a safe default, wa
 | S-D-027 | Default repeat per screener; thresholds read-only | Onkar (scope), rest Sign-off |
 | S-D-028 | Anonymised statistics with a minimum cell of 5 | Onkar (minimum 5), rest Sign-off |
 | S-D-029 | Referral contact directory; contacts archived, never deleted; name and role copied onto each referral | Sign-off |
+| S-D-030 | Next.js 16.4.4 and vitest 5.1.0 for security advisories; production audit 0 | Sign-off |
 
 ## 2. Before merge and deploy
 
@@ -55,8 +56,9 @@ Nothing here is optional for the first deploy. Work through it in order.
 | 7 | Founders answer F1 (item 9) or explicitly accept the built default for the pilot | F1, S-D-005 | Founders |
 | 8 | Onkar signs off the "Sign-off" rows in section 1 | P-07 | Onkar |
 | 9 | Decide who creates staff logins for the pilot clinic | Q8, S-L-010 | Founders |
-| 10 | Read the `npm ci` audit report (9 findings in an earlier run, not investigated). Report only, never `npm audit fix --force`. | Tracker | Us |
+| 10 | Run `npm audit --omit=dev` in `frontend/psychosocial` on the day of the merge: it must show 0 findings. Advisories for `next` changed twice in two weeks (S-D-030). Never `npm audit fix --force`. | S-D-030 | Us |
 | 11 | Compare thresholds with `AV_Suite_Clinical_Reference_v1.xlsx` once uploaded; published norms win | P-05, S-L-003 | Onkar, then us |
+| 12 | The other live apps on `dev` still run vulnerable `next`, and the backend still has Pillow 10.4.0. Not a blocker for Tool 03, but it should not wait for it. | P-14 | Onkar to assign |
 
 ## 3. After deploy, during the pilot
 

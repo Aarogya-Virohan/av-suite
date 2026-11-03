@@ -116,6 +116,7 @@ A one-line index of every decision, and the points to review before deploy, duri
 - Shared dependencies are pinned to the CRM lockfile versions (Next 16.3.2, React 19.2.4, Tailwind 4.3.3, TanStack Query 5.101.4).
 - Two deliberate differences. `vitest` is 3.2.4: npm 10.9 crashes (`Cannot read properties of null (reading 'edgesOut')`) on install with vitest 4 or 5. And `@types/node` is 22: vitest needs it, and the CRM lockfile has the same peer conflict with 20. Unit tests cover pure logic only. UI behaviour is covered by Playwright 1.56.0.
 - Decided by: proposal, pending Onkar sign-off.
+- Superseded on 3 Nov 2026 by S-D-030 for `next`, `eslint-config-next` and `vitest`.
 
 ## S-D-021 Patient screener behaviour
 - One question per screen. Large option buttons work as a radio group (arrow keys, screen reader). The patient picks an option, then presses Next. Next saves the answer, and from then on it cannot change (SRS 4.2.2).
@@ -201,3 +202,14 @@ A one-line index of every decision, and the points to review before deploy, duri
 - Deletion on request (S-D-024) is unchanged: it removes the patient's referral actions, including their copy of the contact name. The directory itself is not patient data and stays.
 - Verified: 18 backend tests in `test_referral_contacts.py` (create, edit, archive, restore, order, 11 invalid inputs, the database constraint, access, clinic isolation, the copied name and role after an edit and an archive, the PDF, the audit details) and Playwright E2E 9 at 390 px and 1440 px.
 - Decided by: proposal, pending Onkar sign-off (Onkar asked for the SRS fields with an optional note, 22 Oct).
+
+## S-D-030 Security upgrade of Next.js and vitest (3 Nov 2026)
+- Context: `next` 16.3.2 had critical advisories (remote code execution in image optimization and in `use cache`, SSRF, cache poisoning, information disclosure). The fix version moved while we watched: 16.3.8 was enough on 22 Oct, but by 26 Oct three new advisories needed 16.4.1 or later. vitest 3.2.4 had two critical dev-only advisories.
+- Choice: `next` 16.4.4 and `eslint-config-next` 16.4.4 (the latest release on 3 Nov), `vitest` 5.1.0. Exact versions, as before. React, Tailwind and the other shared versions are unchanged.
+- Why vitest 5 now: the npm crash that kept vitest on 3.2.4 (S-D-020) no longer happens with npm 10.9.4; `npm ci` and all 24 unit tests pass on 5.1.0. vitest 5 needs Node 22.12 or later for `npm test`. It is a dev tool only: the Vercel build does not run it.
+- Audit after the change, 3 Nov: production dependencies 0 findings. Dev dependencies 16 moderate, all one `minimatch` advisory inside the ESLint plugins; npm's only offered fix is a downgrade to eslint 4, so it stays (S-L-019).
+- One lint change: `eslint-config-next` 16.4 adds a rule against `window.location.assign` for internal pages. `src/lib/api.ts` keeps it on purpose (a full page load on a 401 also drops the cached patient data of the old session, and the helper runs outside React), so that one line carries a scoped disable with the reason. Behaviour is unchanged.
+- New test: Playwright E2E 10 signs in with a token the browser accepts but the server rejects, and checks the app returns to sign-in and clears the stored token. Mutation check: removing the redirect in `api.ts` alone did not fail it, because the staff layout also redirects once the token is gone; removing both made it fail. So the test covers the behaviour, and `api.ts` is the second of two safety nets.
+- Verified twice: once in the working tree and once on a clean clone after `git am` (see the tracker for the run). tsc, eslint, 24 unit tests, `next build` and 20 Playwright runs (10 tests at 390 px and 1440 px) pass on both.
+- Not in this change: CRM, the exercise library and the posture tool on `dev` are still on vulnerable `next` (the marketplace lockfile already has 16.4.3 and audits clean), and the backend still has Pillow 10.4.0. That is CRM Project code (P-14).
+- Decided by: proposal, pending Onkar sign-off (Onkar asked on 3 Nov to start the work the founders' answers do not affect, verified twice).
