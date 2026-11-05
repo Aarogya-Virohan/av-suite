@@ -18,7 +18,9 @@ Features:
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
-from app.models.patient import Patient
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from app.models.patient import Patient, PatientCounter
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.common import PaginationParams
 from typing import Optional, List, Tuple
@@ -205,8 +207,18 @@ async def create_patient(
         
         # Patient object create karte hain
         # model_dump(): Pydantic schema se dict extract karte hain
+        clinic_uuid = uuid.UUID(clinic_id)
+        insert_counter = sqlite_insert if db.bind.dialect.name == "sqlite" else pg_insert
+        counter_stmt = insert_counter(PatientCounter).values(
+            clinic_id=clinic_uuid, last_number=1
+        ).on_conflict_do_update(
+            index_elements=[PatientCounter.clinic_id],
+            set_={"last_number": PatientCounter.last_number + 1},
+        ).returning(PatientCounter.last_number)
+        display_number = (await db.execute(counter_stmt)).scalar_one()
         patient = Patient(
-            clinic_id=uuid.UUID(clinic_id),
+            clinic_id=clinic_uuid,
+            display_number=display_number,
             **patient_in.model_dump()  # Unpacking schema fields
         )
         
@@ -392,12 +404,21 @@ async def search_patients(
         offset = (pagination.page - 1) * pagination.page_size
         limit = pagination.page_size
         
-        if search.isdigit() and len(search) == 10:
-            query = select(Patient).where(Patient.phone.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
+        term = search.strip()
+        if term.isascii() and term.isdecimal():
+            matches = [Patient.full_name.ilike(f"%{term}%")]
+            if len(term) == 10:
+                matches.append(Patient.phone.ilike(f"%{term}%"))
+            normalized_number = term.lstrip("0") or "0"
+            if len(normalized_number) <= 19:
+                display_number = int(normalized_number)
+                if display_number <= 9223372036854775807:
+                    matches.append(Patient.display_number == display_number)
+            query = select(Patient).where(or_(*matches), Patient.clinic_id == c_id)
         elif '@' in search:
-            query = select(Patient).where(Patient.email.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
+            query = select(Patient).where(Patient.email.ilike(f"%{term}%"), Patient.clinic_id == c_id)
         else:
-            query = select(Patient).where(Patient.full_name.ilike(f"%{search.strip()}%"), Patient.clinic_id == c_id)
+            query = select(Patient).where(Patient.full_name.ilike(f"%{term}%"), Patient.clinic_id == c_id)
             
         query = query.where(Patient.deleted_at.is_(None))
         if status:
