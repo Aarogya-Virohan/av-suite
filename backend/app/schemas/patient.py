@@ -118,6 +118,7 @@ class PatientUpdate(BaseModel):
 class PatientRead(PatientBase):
     id: uuid.UUID
     clinic_id: uuid.UUID
+    display_number: int
     user_id: Optional[uuid.UUID]
     created_at: datetime
     updated_at: datetime
