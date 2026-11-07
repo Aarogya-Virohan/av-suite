@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.psychosocial import PsychosocialClinicSetting
-from app.screening.registry import list_instruments
+from app.screening.registry import list_sendable_instruments
 from app.services.psychosocial import audit
 
 # Flip only together with a stored, confirmed per-clinic threshold and a
@@ -37,7 +37,7 @@ async def default_repeat_weeks(db: AsyncSession, clinic_id: uuid.UUID) -> dict[s
     rows = await clinic_settings(db, clinic_id)
     return {
         inst.id: (rows[inst.id].default_repeat_weeks if inst.id in rows else None)
-        for inst in list_instruments()
+        for inst in list_sendable_instruments()
     }
 
 

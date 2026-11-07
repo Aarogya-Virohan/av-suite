@@ -19,18 +19,22 @@ from sqlalchemy import and_, delete, desc, false, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.permission import CapabilityScope
+from app.enums.product import EntitlementStatus
 from app.models.clinic import Clinic
 from app.models.patient import Patient
+from app.models.product import WorkspaceProduct
 from app.models.psychosocial import (
     PsychosocialAssignment,
     PsychosocialConsent,
     PsychosocialReferralAction,
     PsychosocialSchedule,
     PsychosocialSession,
+    PsychosocialSessionReview,
 )
 from app.models.user import User
 from app.repositories.audit import AuditLogRepository
 from app.screening.consent import CONSENT_TEXT_VERSION
+from app.screening import registry
 from app.screening.registry import get_instrument
 from app.screening.scoring import ScoringError, score
 from app.screening.types import Instrument, Item
@@ -38,6 +42,7 @@ from app.services.audit import AuditLogService
 
 LINK_TTL_DAYS_DEFAULT = 7  # F5 default, pending founder sign-off
 LINK_TTL_DAYS_MAX = 30
+PRODUCT_ID = "psycho-social-screening"
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +189,13 @@ async def create_assignment(
             instruments.append(get_instrument(instrument_id))
         except KeyError:
             raise error(422, "INVALID_INSTRUMENTS", f"Unknown screener: {instrument_id}") from None
+        if not registry.is_sendable(instrument_id):
+            # S-D-031: kept for past results, no longer sent.
+            raise error(
+                422,
+                "INSTRUMENT_RETIRED",
+                f"{instruments[-1].short_name} is no longer sent. Choose PHQ-9 and GAD-7.",
+            )
     if not 1 <= expires_in_days <= LINK_TTL_DAYS_MAX:
         raise error(422, "INVALID_EXPIRY", f"Link expiry must be 1 to {LINK_TTL_DAYS_MAX} days.")
 
@@ -609,8 +621,8 @@ async def delete_patient_screening_data(
 ) -> dict[str, Any]:
     """Erase every screening record for one patient, in one transaction.
 
-    Removed: links, screeners (answers and results), referral actions, repeat
-    schedules and consent records. If the patient's latest consent decision is a
+    Removed: links, screeners (answers and results), referral actions, review
+    marks, repeat schedules and consent records. If the patient's latest consent decision is a
     withdrawal, that single record is kept (status, text version, date) so
     the clinic cannot send a new screener without the patient. Deleting a
     completed session is allowed: the immutability trigger blocks UPDATE only.
@@ -625,6 +637,11 @@ async def delete_patient_screening_data(
         return (model.clinic_id == clinic_id, model.patient_id == patient_id)
 
     # Child rows first, so the result does not depend on FK cascades.
+    await db.execute(
+        delete(PsychosocialSessionReview)
+        .where(*scoped(PsychosocialSessionReview))
+        .execution_options(synchronize_session="fetch")
+    )
     await db.execute(
         delete(PsychosocialReferralAction)
         .where(*scoped(PsychosocialReferralAction))
@@ -682,6 +699,165 @@ async def delete_patient_screening_data(
 
 
 # ---------------------------------------------------------------------------
+# priority review (F4 = 4A, S-D-033)
+# ---------------------------------------------------------------------------
+def risk_answered(session: PsychosocialSession) -> bool:
+    """A risk item (PHQ-9 item 9) answered at or above its rule, submitted or not."""
+    instrument = get_instrument(session.instrument_id, session.instrument_version)
+    responses = session.responses or {}
+    return any(responses.get(rule.item_id, 0) >= rule.min_value for rule in instrument.risk_item_rules)
+
+
+def needs_priority_review(session: PsychosocialSession) -> bool:
+    """Completed with the risk flag, or a risk answer left unsubmitted.
+
+    Unsubmitted covers an in-progress screener and one cancelled by the
+    patient's withdrawal after a risk answer: the patient saw the helpline
+    card, so the provider must see it too.
+    """
+    if session.status == "completed":
+        return bool(session.risk_item_flag)
+    if session.status in ("in_progress", "cancelled"):
+        return risk_answered(session)
+    return False
+
+
+async def record_review(
+    db: AsyncSession, *, clinic_id: uuid.UUID, user_id: uuid.UUID, session: PsychosocialSession
+) -> None:
+    """Mark a risk result as opened by a provider. Other results are not tracked."""
+    if not needs_priority_review(session):
+        return
+    if await _reviewed(db, session):
+        return
+    db.add(
+        PsychosocialSessionReview(
+            id=uuid.uuid4(),
+            clinic_id=clinic_id,
+            patient_id=session.patient_id,
+            session_id=session.id,
+            reviewed_by=user_id,
+            reviewed_at=utcnow(),
+        )
+    )
+    await db.commit()
+
+
+async def _reviewed(db: AsyncSession, session: PsychosocialSession) -> bool:
+    conditions = [PsychosocialSessionReview.session_id == session.id]
+    if session.status == "completed" and session.completed_at is not None:
+        # An earlier look at the unsubmitted answers does not count for the
+        # submitted result.
+        conditions.append(PsychosocialSessionReview.reviewed_at >= session.completed_at)
+    return (await db.scalar(select(func.count()).select_from(PsychosocialSessionReview).where(*conditions))) > 0
+
+
+async def priority_review(
+    db: AsyncSession, *, clinic_id: uuid.UUID, scope: CapabilityScope, user_id: uuid.UUID
+) -> list[tuple[PsychosocialSession, Patient]]:
+    """Risk results no provider has opened yet, newest activity first."""
+    conditions = [
+        PsychosocialSession.clinic_id == clinic_id,
+        Patient.deleted_at.is_(None),
+        PsychosocialSession.instrument_id.in_(
+            [i.id for i in registry.INSTRUMENTS.values() if i.risk_item_rules]
+        ),
+        (
+            and_(PsychosocialSession.status == "completed", PsychosocialSession.risk_item_flag.is_(True))
+            | PsychosocialSession.status.in_(("in_progress", "cancelled"))
+        ),
+    ]
+    scoped = scope_filter(scope, user_id)
+    if scoped is not None:
+        conditions.append(scoped)
+    rows = (
+        await db.execute(
+            select(PsychosocialSession, Patient)
+            .join(Patient, Patient.id == PsychosocialSession.patient_id)
+            .where(*conditions)
+        )
+    ).all()
+    candidates = [(s, p) for s, p in rows if needs_priority_review(s)]
+    if not candidates:
+        return []
+    reviews = await db.execute(
+        select(PsychosocialSessionReview.session_id, func.max(PsychosocialSessionReview.reviewed_at))
+        .where(
+            PsychosocialSessionReview.clinic_id == clinic_id,
+            PsychosocialSessionReview.session_id.in_([s.id for s, _ in candidates]),
+        )
+        .group_by(PsychosocialSessionReview.session_id)
+    )
+    last_review = {sid: aware(at) for sid, at in reviews}
+    out = []
+    for session, patient in candidates:
+        seen = last_review.get(session.id)
+        if seen is None:
+            out.append((session, patient))
+        elif session.status == "completed" and seen < aware(session.completed_at):
+            out.append((session, patient))
+    out.sort(key=lambda r: (aware(r[0].completed_at or r[0].updated_at), r[0].id), reverse=True)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# sent links tracker (F3 = enhanced 3A, S-D-032): operational status only
+# ---------------------------------------------------------------------------
+TRACKER_STATUSES = ("pending", "expired", "completed", "cancelled")
+
+
+async def list_sent_links(
+    db: AsyncSession,
+    *,
+    clinic_id: uuid.UUID,
+    status_filter: str | None,
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[PsychosocialAssignment, Patient]], int]:
+    """Every link the clinic sent, newest first. Never scores, answers or flags."""
+    now = utcnow()
+    conditions = [
+        PsychosocialAssignment.clinic_id == clinic_id,
+        Patient.deleted_at.is_(None),
+    ]
+    if status_filter == "pending":
+        conditions += [PsychosocialAssignment.status == "active", PsychosocialAssignment.expires_at > now]
+    elif status_filter == "expired":
+        conditions += [PsychosocialAssignment.status == "active", PsychosocialAssignment.expires_at <= now]
+    elif status_filter in ("completed", "cancelled"):
+        conditions.append(PsychosocialAssignment.status == status_filter)
+    base = (
+        select(PsychosocialAssignment, Patient)
+        .join(Patient, Patient.id == PsychosocialAssignment.patient_id)
+        .where(*conditions)
+    )
+    total = await db.scalar(
+        select(func.count())
+        .select_from(PsychosocialAssignment)
+        .join(Patient, Patient.id == PsychosocialAssignment.patient_id)
+        .where(*conditions)
+    )
+    rows = await db.execute(
+        base.order_by(desc(PsychosocialAssignment.created_at), PsychosocialAssignment.id).limit(limit).offset(offset)
+    )
+    return [tuple(r) for r in rows.all()], int(total or 0)
+
+
+async def screening_enabled(db: AsyncSession, clinic_id: uuid.UUID) -> bool:
+    return (
+        await db.scalar(
+            select(func.count())
+            .select_from(WorkspaceProduct)
+            .where(
+                WorkspaceProduct.clinic_id == clinic_id,
+                WorkspaceProduct.product_id == PRODUCT_ID,
+                WorkspaceProduct.status == EntitlementStatus.ENABLED,
+            )
+        )
+    ) > 0
+
+
+# ---------------------------------------------------------------------------
 # patient side (public, token)
 # ---------------------------------------------------------------------------
 async def resolve_token(
@@ -692,6 +868,15 @@ async def resolve_token(
     )
     if assignment is None:
         raise error(status.HTTP_404_NOT_FOUND, "LINK_NOT_FOUND", "This link is not valid.")
+    if not await screening_enabled(db, assignment.clinic_id):
+        # Lapsed or uninstalled: no provider would see new answers, so a risk
+        # answer must not be collected (S-D-034). Checked before every other
+        # state so the patient gets one clear message.
+        raise error(
+            status.HTTP_403_FORBIDDEN,
+            "SCREENING_UNAVAILABLE",
+            "This screening is not available right now.",
+        )
     if assignment.status == "cancelled":
         raise error(status.HTTP_410_GONE, "LINK_CANCELLED", "This link is no longer active.")
     if assignment.status == "completed" and not allow_completed:

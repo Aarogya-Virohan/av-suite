@@ -7,6 +7,7 @@ the due ones from the Due list with one click.
 
 State of a schedule, decided by ``schedule_state`` (pure, unit tested):
 - consent_withdrawn: the patient withdrew consent; never due.
+- retired: the screener is no longer sent (S-D-031); never due.
 - waiting: an open link with this screener exists (not expired, not done).
 - due: the next date has passed. Next date = last completed result of this
   screener + interval, or the day the schedule started if there is none yet.
@@ -30,10 +31,11 @@ from app.models.psychosocial import (
     PsychosocialSchedule,
     PsychosocialSession,
 )
+from app.screening.registry import is_sendable
 from app.screening.trend import INSTRUMENT_ORDER
 from app.services import psychosocial as svc
 
-STATES = ("consent_withdrawn", "waiting", "due", "upcoming")
+STATES = ("consent_withdrawn", "retired", "waiting", "due", "upcoming")
 
 
 def schedule_state(
@@ -44,10 +46,13 @@ def schedule_state(
     open_link: bool,
     consent_withdrawn: bool,
     now: datetime,
+    retired: bool = False,
 ) -> tuple[str, datetime | None]:
     """Return (state, next due date). Next date is None while a link is open."""
     if consent_withdrawn:
         return "consent_withdrawn", None
+    if retired:
+        return "retired", None
     if open_link:
         return "waiting", None
     if last_completed_at is not None:
@@ -171,6 +176,7 @@ async def _evaluate(
             open_link=key in open_links,
             consent_withdrawn=latest_consent.get(s.patient_id) == "withdrawn",
             now=now,
+            retired=not is_sendable(s.instrument_id),
         )
         views.append(ScheduleView(s, state, next_due, last.get(key)))
     return views

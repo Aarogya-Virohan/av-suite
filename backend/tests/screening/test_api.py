@@ -21,7 +21,7 @@ from app.models.psychosocial import (
     PsychosocialConsent,
     PsychosocialSession,
 )
-from app.screening import rate_limit
+from app.screening import rate_limit, registry
 from app.screening.consent import CONSENT_TEXT_VERSION
 from app.services.psychosocial import hash_token, utcnow
 from tests.screening.conftest import API, entitle, make_patient, set_overrides
@@ -297,9 +297,14 @@ async def test_second_session_shows_baseline(client, db_session, env, therapist_
     assert d["session"]["scales"][0]["score"] == 8
 
 
-async def test_dass21_severe_subscale_refers(client, db_session, env, therapist_auth_headers):
+async def test_dass21_severe_subscale_refers(client, db_session, env, therapist_auth_headers, monkeypatch):
+    # DASS-21 is retired for new links (S-D-031). A link sent before that
+    # must still be answerable and scored, so send it with retirement off.
+    monkeypatch.setattr(registry, "RETIRED", frozenset())
     patient = await make_patient(db_session, env["clinic"].id)
     token = token_of(await assign(client, therapist_auth_headers, patient.id, ["dass21"]))
+    monkeypatch.undo()
+    assert not registry.is_sendable("dass21")
     await consent(client, token)
     values = [0] * 21
     for n in (2, 4, 7, 9, 15, 19, 20):  # anxiety items

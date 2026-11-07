@@ -101,7 +101,8 @@ async def test_admin_reads_settings_with_fixed_thresholds(client, env, clean_set
     data = res.json()["data"]
     assert data["thresholds_editable"] is False
     rows = by_id(data)
-    assert list(rows) == ["phq9", "gad7", "dass21"]
+    # DASS-21 is retired (S-D-031): no longer configurable.
+    assert list(rows) == ["phq9", "gad7"]
     for row in rows.values():
         assert row["default_repeat_weeks"] is None
         assert row["updated_at"] is None and row["updated_by_name"] is None
@@ -113,7 +114,7 @@ async def test_admin_reads_settings_with_fixed_thresholds(client, env, clean_set
 async def test_admin_sets_default_and_the_assign_form_gets_it(
     client, db_session, env, clean_settings, auth_headers, therapist_auth_headers
 ):
-    assert await instrument_defaults(client, therapist_auth_headers) == {"phq9": None, "gad7": None, "dass21": None}
+    assert await instrument_defaults(client, therapist_auth_headers) == {"phq9": None, "gad7": None}
 
     res = await put(client, auth_headers, "phq9", {"default_repeat_weeks": 4})
     assert res.status_code == 200, res.text
@@ -121,7 +122,7 @@ async def test_admin_sets_default_and_the_assign_form_gets_it(
     assert phq9["default_repeat_weeks"] == 4
     assert phq9["updated_by_name"] and phq9["updated_at"]
 
-    assert await instrument_defaults(client, therapist_auth_headers) == {"phq9": 4, "gad7": None, "dass21": None}
+    assert await instrument_defaults(client, therapist_auth_headers) == {"phq9": 4, "gad7": None}
 
     # Saved in the database, one row for the clinic.
     rows = (

@@ -128,6 +128,35 @@ class WorklistRowOut(BaseModel):
     assignment_effective_status: str
 
 
+class PriorityItemOut(BaseModel):
+    """A risk result no provider has opened yet (F4 = 4A). Providers only."""
+
+    session_id: uuid.UUID
+    patient_id: uuid.UUID
+    patient_name: str
+    short_name: str
+    status: str  # completed | in_progress | cancelled
+    activity_at: datetime
+
+
+class SentLinkOut(BaseModel):
+    """Operational view of one link (F3 = enhanced 3A).
+
+    Deliberately has no scores, answers or flags: admins see this list.
+    """
+
+    id: uuid.UUID
+    patient_id: uuid.UUID
+    patient_name: str
+    screeners: list[str]
+    status: Literal["pending", "expired", "completed", "cancelled"]
+    sent_at: datetime
+    expires_at: datetime
+    sent_by_name: str | None
+    # Not started yet, so it can still be cancelled.
+    can_cancel: bool
+
+
 class ResponseOut(BaseModel):
     item_id: str
     number: int
@@ -207,7 +236,7 @@ class PatientTrendOut(BaseModel):
     series: list[TrendSeriesOut]
 
 
-ScheduleState = Literal["consent_withdrawn", "waiting", "due", "upcoming"]
+ScheduleState = Literal["consent_withdrawn", "retired", "waiting", "due", "upcoming"]
 
 
 class ScheduleOut(BaseModel):

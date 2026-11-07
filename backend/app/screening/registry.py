@@ -3,6 +3,10 @@
 Sessions store both values, so a result scored under an older version can
 always be re-explained even after a definition changes. Tool 04 instruments
 register here the same way.
+
+Retired instruments stay registered so their past results still render,
+score and trend. They can no longer be sent (S-D-031: the founders dropped
+DASS-21 to keep the patient at 16 questions, PHQ-9 + GAD-7).
 """
 
 from __future__ import annotations
@@ -23,6 +27,8 @@ INSTRUMENTS: Mapping[tuple[str, str], Instrument] = MappingProxyType(
 
 LATEST: Mapping[str, Instrument] = MappingProxyType({inst.id: inst for inst in _ALL})
 
+RETIRED: frozenset[str] = frozenset({"dass21"})
+
 
 def get_instrument(instrument_id: str, version: str | None = None) -> Instrument:
     if version is None:
@@ -38,3 +44,11 @@ def get_instrument(instrument_id: str, version: str | None = None) -> Instrument
 
 def list_instruments() -> tuple[Instrument, ...]:
     return tuple(LATEST.values())
+
+
+def is_sendable(instrument_id: str) -> bool:
+    return instrument_id in LATEST and instrument_id not in RETIRED
+
+
+def list_sendable_instruments() -> tuple[Instrument, ...]:
+    return tuple(inst for inst in LATEST.values() if inst.id not in RETIRED)

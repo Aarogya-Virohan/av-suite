@@ -321,6 +321,34 @@ class PsychosocialClinicSetting(Base, TimestampMixin):
     )
 
 
+
+class PsychosocialSessionReview(Base):
+    """A provider opened a result (F4 = 4A, S-D-033).
+
+    Append-only. The Priority review list shows a risk result until a
+    provider who may see it has opened it after it was completed. It is a
+    separate table because completed sessions are immutable.
+    """
+
+    __tablename__ = "psychosocial_session_reviews"
+    __table_args__ = (Index("ix_psy_reviews_clinic_session", "clinic_id", "session_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("psychosocial_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 # --- Immutability guard (Postgres only) ------------------------------------
 # Same SQL as migration b3d7e1f0c2a9, so tests that build the schema with
 # create_all() get exactly the trigger production has. DDL() treats % as a

@@ -28,6 +28,7 @@ from app.schemas.psychosocial import (
     InstrumentSummaryOut,
     PatientSummaryOut,
     PatientTrendOut,
+    PriorityItemOut,
     ReferralActionOut,
     ReferralActionRequest,
     ReferralContactIn,
@@ -37,6 +38,7 @@ from app.schemas.psychosocial import (
     ScaleOut,
     ScheduleOut,
     ScreeningDataOut,
+    SentLinkOut,
     SessionDetailOut,
     SessionSummaryOut,
     TrendBandOut,
@@ -45,7 +47,7 @@ from app.schemas.psychosocial import (
     UpdateInstrumentSettingRequest,
     WorklistRowOut,
 )
-from app.screening.registry import get_instrument, list_instruments
+from app.screening.registry import get_instrument, is_sendable, list_sendable_instruments
 from app.screening.thresholds import thresholds_for
 from app.screening.trend import build_series
 from app.services import psychosocial as svc
@@ -149,7 +151,7 @@ async def list_screeners(
                 citation=i.citation,
                 default_repeat_weeks=defaults.get(i.id),
             )
-            for i in list_instruments()
+            for i in list_sendable_instruments()
         ]
     )
 
@@ -308,6 +310,77 @@ async def clinic_worklist(
     )
 
 
+@router.get(
+    "/psychosocial/priority",
+    response_model=ResponseEnvelope[list[PriorityItemOut]],
+)
+async def priority_review(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    scope: CapabilityScope = Depends(require_capability("screening.view")),
+):
+    """Risk results nobody has opened yet. Leaves the list once a provider opens it."""
+    rows = await svc.priority_review(db, clinic_id=ctx.clinic.id, scope=scope, user_id=ctx.user.id)
+    return ResponseEnvelope(
+        data=[
+            PriorityItemOut(
+                session_id=session.id,
+                patient_id=patient.id,
+                patient_name=f"{patient.first_name} {patient.last_name}".strip(),
+                short_name=get_instrument(session.instrument_id, session.instrument_version).short_name,
+                status=session.status,
+                activity_at=session.completed_at or session.updated_at,
+            )
+            for session, patient in rows
+        ]
+    )
+
+
+@router.get(
+    "/psychosocial/assignments",
+    response_model=ResponseEnvelope[list[SentLinkOut]],
+)
+async def sent_links(
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.assign")),
+    status_filter: Literal["pending", "expired", "completed", "cancelled"] | None = Query(
+        default=None, alias="status"
+    ),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+):
+    """Links sent by the clinic with their status only. No clinical data."""
+    rows, total = await svc.list_sent_links(
+        db,
+        clinic_id=ctx.clinic.id,
+        status_filter=status_filter,
+        limit=page_size,
+        offset=(page - 1) * page_size,
+    )
+    names = await svc.user_names(db, {a.assigned_by for a, _ in rows})
+    data = []
+    for assignment, patient in rows:
+        state = effective_status(assignment)
+        data.append(
+            SentLinkOut(
+                id=assignment.id,
+                patient_id=patient.id,
+                patient_name=f"{patient.first_name} {patient.last_name}".strip(),
+                screeners=[
+                    get_instrument(s.instrument_id, s.instrument_version).short_name
+                    for s in sorted(assignment.sessions, key=lambda s: s.position)
+                ],
+                status="pending" if state == "active" else state,
+                sent_at=assignment.created_at,
+                expires_at=assignment.expires_at,
+                sent_by_name=names.get(assignment.assigned_by) if assignment.assigned_by else None,
+                can_cancel=assignment.status == "active" and not svc.assignment_started(assignment),
+            )
+        )
+    return ResponseEnvelope(data=data, meta=MetaPagination(total=total, page=page, page_size=page_size))
+
+
 def _referral_out(record, names) -> ReferralActionOut:
     return ReferralActionOut(
         id=record.id,
@@ -380,6 +453,7 @@ async def session_detail(
         is_baseline=is_baseline,
         referral_actions=[_referral_out(a, names) for a in actions],
     )
+    await svc.record_review(db, clinic_id=ctx.clinic.id, user_id=ctx.user.id, session=session)
     await svc.audit(
         db,
         clinic_id=ctx.clinic.id,
@@ -610,7 +684,7 @@ async def _settings_out(db, clinic_id: uuid.UUID) -> ClinicSettingsOut:
     rows = await clinic_config.clinic_settings(db, clinic_id)
     names = await svc.user_names(db, {r.updated_by for r in rows.values() if r.updated_by})
     out = []
-    for inst in list_instruments():
+    for inst in list_sendable_instruments():
         row = rows.get(inst.id)
         view = thresholds_for(inst)
         out.append(
@@ -673,6 +747,8 @@ async def update_instrument_setting(
     _scope: CapabilityScope = Depends(require_capability("screening.configure")),
 ):
     """Set the clinic default repeat for one screener. Existing schedules keep their interval."""
+    if not is_sendable(instrument_id):
+        raise svc.error(422, "INSTRUMENT_RETIRED", "This screener is no longer sent.")
     await clinic_config.set_default_repeat(
         db,
         clinic_id=ctx.clinic.id,
