@@ -7,7 +7,7 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'AV Suite Screening',
-  description: 'Psycho-social screening for physiotherapy clinics',
+  description: 'Psycho-social screening for healthcare providers',
   robots: { index: false, follow: false },
 };
 

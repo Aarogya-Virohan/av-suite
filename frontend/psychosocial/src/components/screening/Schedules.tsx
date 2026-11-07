@@ -15,6 +15,7 @@ function StateBadge({ s }: { s: Schedule }) {
   if (s.state === 'due') return <Badge tone="warn">Due</Badge>;
   if (s.state === 'waiting') return <Badge tone="active">Link sent</Badge>;
   if (s.state === 'upcoming') return <Badge tone="neutral">Scheduled</Badge>;
+  if (s.state === 'retired') return <Badge tone="neutral">Retired</Badge>;
   return <Badge tone="neutral">Paused</Badge>;
 }
 

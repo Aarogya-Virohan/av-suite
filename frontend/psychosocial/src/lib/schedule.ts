@@ -19,6 +19,8 @@ export function scheduleStatus(s: Schedule): string {
       return `Next due ${formatDate(s.next_due_at)}`;
     case 'waiting':
       return 'Link sent, waiting for the patient';
+    case 'retired':
+      return 'No longer sent. Stop this repeat; past results stay on record.';
     default:
       return 'Paused: the patient withdrew consent';
   }

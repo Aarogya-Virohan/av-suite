@@ -21,6 +21,7 @@ test('physio sends a screener, patient answers, physio reviews and logs a referr
   const drawer = page.getByRole('dialog', { name: 'Send a screener' });
   await drawer.getByText('PHQ-9').click();
   await drawer.getByText('GAD-7').click();
+  await expect(drawer.getByText(/DASS-21/)).toHaveCount(0); // retired, S-D-031
   await shot(page, '02-assign-drawer');
   await drawer.getByRole('button', { name: 'Create link' }).click();
   const ready = page.getByRole('dialog', { name: 'Send the link' });
@@ -73,7 +74,7 @@ test('physio sends a screener, patient answers, physio reviews and logs a referr
   await p.getByRole('button', { name: 'Send answers' }).click();
 
   await expect(p.getByRole('heading', { name: 'Thank you, that part is done' })).toBeVisible();
-  await expect(p.getByRole('heading', { name: "You don't have to face this alone" })).toBeVisible();
+  await expect(p.getByRole('heading', { name: "You don't have to face it alone" })).toBeVisible();
   await expect(p.getByRole('link', { name: 'Call 14416' })).toHaveAttribute('href', 'tel:14416');
   await shot(p, '07-between-support');
   await p.getByRole('button', { name: 'Continue' }).click();
@@ -85,21 +86,28 @@ test('physio sends a screener, patient answers, physio reviews and logs a referr
   await p.getByRole('button', { name: 'Skip this question' }).click();
   await p.getByRole('button', { name: 'Send answers' }).click();
   await expect(p.getByRole('heading', { name: 'Thank you', exact: true })).toBeVisible();
-  await expect(p.getByText(/may help to talk things through/)).toBeVisible();
-  await expect(p.getByText(/\b7\b/)).toHaveCount(0); // never shows the score
+  // Founders' F2: the same calm message for everyone, never a score or a hint of one.
+  await expect(p.getByText(/securely shared with your healthcare provider/)).toBeVisible();
+  await expect(p.getByText(/may help to talk things through/)).toHaveCount(0);
+  await expect(p.getByText(/physiotherapist/i)).toHaveCount(0);
+  // Never shows the score (7). "24/7" on the helpline card is not a score.
+  await expect(p.getByText(/(?<![\d/])7(?!\d)/)).toHaveCount(0);
   await shot(p, '08-done');
 
   // Nothing went wrong during the real flow (checked before the deliberate
   // 409 below, so a stray conflict mid-flow would still fail the test).
   expect(patientProblems).toEqual([]);
   await p.goto(url);
-  await expect(p.getByRole('heading', { name: 'You have already answered these questions' })).toBeVisible();
+  await expect(p.getByRole('heading', { name: 'You have already completed this screening' })).toBeVisible();
+  await expect(p.getByText('If you need to update your answers, please contact your healthcare provider.')).toBeVisible();
   await patientCtx.close();
 
-  // --- physio: worklist shows the risk first, then the result --------------
+  // --- physio: Priority review pins the risk until it is opened -----------
   await page.goto('/sessions');
-  const row = page.getByRole('link', { name: `Ritu ${c.patientLast}` }).first();
-  await expect(row).toBeVisible();
+  const priority = page.getByRole('region', { name: /Priority review/ });
+  await expect(priority.getByRole('heading', { name: 'Priority review (1)' })).toBeVisible();
+  const row = priority.getByRole('link', { name: new RegExp(`Ritu ${c.patientLast}`) });
+  await expect(row).toContainText('PHQ-9 · Submitted');
   await expect(page.getByText('Risk answer').first()).toBeVisible();
   await shot(page, '09-worklist-attention');
   await row.click();
@@ -116,6 +124,12 @@ test('physio sends a screener, patient answers, physio reviews and logs a referr
   await expect(page.getByText('Discussed in clinic, referred to Dr Iyer.')).toBeVisible();
   await shot(page, '11-referral-logged');
 
+  // Opened once: it leaves Priority review, the worklist still has it.
+  await page.goto('/sessions');
+  await expect(page.getByRole('heading', { name: 'Screenings' })).toBeVisible();
+  await expect(page.getByRole('link', { name: new RegExp(`Ritu ${c.patientLast}`) }).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: /Priority review/ })).toHaveCount(0);
+
   expect(problems).toEqual([]);
 });
 
@@ -125,10 +139,12 @@ test('admin manages access and cannot open individual results', async ({ page, r
   const problems = watch(page, [403]);
 
   await signIn(page, c.adminEmail, c.password);
-  await expect(page.getByText("You don't have access to screening results")).toBeVisible();
+  await expect(page).toHaveURL(/\/links$/);
+  await expect(page.getByText("You don't have access to screening results")).toHaveCount(0);
   if (page.viewportSize()!.width < 600) await page.getByRole('button', { name: 'Open menu' }).click();
   await expect(page.getByRole('link', { name: 'Screenings' })).toHaveCount(0);
   await page.getByRole('link', { name: 'Access' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Access' })).toBeVisible();
   await expect(page.getByText('Arjun Mehta')).toBeVisible();
   const send = page.getByRole('switch', { name: 'Send screeners' });
   await expect(send).toHaveAttribute('aria-checked', 'true');
@@ -172,6 +188,8 @@ test('admin deletes a patient\'s screening data on request', async ({ page, requ
   await signIn(page, c.adminEmail, c.password);
   if (page.viewportSize()!.width < 600) await page.getByRole('button', { name: 'Open menu' }).click();
   await page.getByRole('link', { name: 'Patients' }).first().click();
+  // Admins land on Sent links, which also lists Ritu: wait for the Patients page.
+  await expect(page.getByRole('heading', { level: 1, name: 'Patients' })).toBeVisible();
   await page.getByRole('link', { name: new RegExp(`Ritu ${c.patientLast}`) }).click();
   await expect(page.getByText('2 questionnaires, 2 links, 0 referral notes and 1 consent record')).toBeVisible();
   await shot(page, '14-delete-panel');
@@ -289,7 +307,8 @@ test('admin sets a default repeat that prefills the send form and never override
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.getByText('PHQ-9: referral from Moderate (10 or more, out of 27)')).toBeVisible();
-  await expect(page.getByText('DASS-21 Anxiety: referral from Severe (15 or more, out of 42)')).toBeVisible();
+  // DASS-21 is retired (S-D-031): not configurable, not offered.
+  await expect(page.getByText(/DASS-21/)).toHaveCount(0);
   await expect(page.getByText(/Question 9:/)).toBeVisible();
   await expect(page.getByText('Fixed', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save defaults' })).toBeDisabled();
@@ -503,4 +522,56 @@ test('a session the server rejects goes back to sign-in and clears the stored to
   await expect(page.getByLabel('Email address')).toBeVisible();
   expect(await page.evaluate(() => window.localStorage.getItem('token'))).toBeNull();
   expect(problems.filter((x) => !x.includes('http 401'))).toEqual([]);
+});
+
+test('admin follows sent links: status only, cancels an unopened link, results stay locked', async ({ page, request }) => {
+  const c = await makeClinic(request);
+  // A completed PHQ-9 with a risk answer and an unopened GAD-7 link.
+  const done = await assignVia(request, c.therapistToken, c.patientId, ['phq9']);
+  await completeVia(request, done, 'phq9', [0, 0, 0, 0, 0, 0, 0, 0, 2]);
+  const open = await assignVia(request, c.therapistToken, c.patientId, ['gad7']);
+  const problems = watch(page, [403]);
+
+  await signIn(page, c.adminEmail, c.password);
+  await expect(page).toHaveURL(/\/links$/);
+  const rowWith = (text: string) => page.locator('tr, li').filter({ hasText: text }).filter({ visible: true });
+
+  const completed = rowWith('PHQ-9');
+  await expect(completed).toContainText('Completed');
+  await expect(completed).toContainText('Clinical data restricted to treating provider.');
+  await expect(page.getByText(/risk|self-harm|referral|severe/i)).toHaveCount(0); // status only
+  const pending = rowWith('GAD-7');
+  await expect(pending).toContainText('Pending');
+  await expect(pending).toContainText('by Arjun Mehta');
+  await shot(page, '27-sent-links');
+
+  await pending.getByRole('button', { name: `Cancel link for Ritu ${c.patientLast}` }).click();
+  await expect(page.getByText('Link cancelled. The patient can no longer open it.')).toBeVisible();
+  await expect(rowWith('GAD-7')).toContainText('Cancelled');
+  await expect(rowWith('GAD-7').getByRole('button', { name: /Cancel link/ })).toHaveCount(0);
+  const res = await request.get(`${API}/screener/${open.split('/').pop()}`);
+  expect(res.status()).toBe(410);
+
+  // The patient page says the same: sending yes, results no.
+  await rowWith('GAD-7').getByRole('link', { name: `Ritu ${c.patientLast}` }).click();
+  await expect(page.getByRole('heading', { level: 1, name: `Ritu ${c.patientLast}` })).toBeVisible();
+  await expect(page.getByText(/Clinical data restricted to treating provider/)).toBeVisible();
+  await shot(page, '29-patient-locked');
+  expect(problems.filter((x) => !x.includes('http 403'))).toEqual([]);
+});
+
+test('a link stops working when the clinic turns screening off', async ({ page, request }) => {
+  const c = await makeClinic(request);
+  const path = await assignVia(request, c.therapistToken, c.patientId, ['phq9']);
+  const off = await request.post(`${API}/marketplace/products/psycho-social-screening/disable`, {
+    headers: { Authorization: `Bearer ${c.adminToken}` },
+  });
+  expect(off.ok()).toBeTruthy();
+  const problems = watch(page, [403]);
+  await page.goto(path);
+  await expect(page.getByRole('heading', { name: 'This screening is not available right now' })).toBeVisible();
+  await expect(page.getByText('Please contact your healthcare provider directly.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+  await shot(page, '28-screening-unavailable');
+  expect(problems).toEqual([]);
 });

@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, ChevronRight, ClipboardList, Download, Link2, Loader2, Phone, Send, XCircle } from 'lucide-react';
+import { ArrowLeft, ChevronRight, ClipboardList, Download, Link2, Loader2, Lock, Phone, Send, XCircle } from 'lucide-react';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { contactLabel } from '@/lib/contacts';
@@ -245,9 +245,16 @@ export default function PatientPage() {
       {canAssign ? <PatientSchedules patientId={p.id} onSendDue={openAssign} /> : null}
 
       {!canViewResults ? (
-        <Card className="p-5 text-sm text-ink-2">
-          You can send screeners, but results are visible only to treating physiotherapists with access to
-          screening results.
+        <Card className="flex items-start gap-2 p-5 text-sm text-ink-2">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+          <span>
+            Clinical data restricted to treating provider. You can send screeners here and follow their status
+            on{' '}
+            <Link href="/links" className="font-semibold text-grove hover:underline">
+              Sent links
+            </Link>
+            .
+          </span>
         </Card>
       ) : (
         <>
@@ -318,7 +325,7 @@ export default function PatientPage() {
                 title="No screeners sent yet"
                 action={canAssign ? <Button onClick={() => openAssign()}>Send screener</Button> : undefined}
               >
-                Send PHQ-9, GAD-7 or DASS-21. The patient answers on their phone.
+                Send PHQ-9 and GAD-7. The patient answers on their phone.
               </EmptyState>
             ) : (
               <ul className="space-y-3">

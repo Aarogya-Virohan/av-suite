@@ -192,7 +192,7 @@ export function NoAccess({ what }: { what: string }) {
       <p className="mt-3 font-display text-[15px] font-bold text-ink">You don&apos;t have access to {what}</p>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted">
         Ask a clinic admin to grant it from the Access page. Individual screening results are visible only to
-        treating physiotherapists.
+        treating providers.
       </p>
     </div>
   );

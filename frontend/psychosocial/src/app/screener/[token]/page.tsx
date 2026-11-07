@@ -32,19 +32,23 @@ interface PendingSave {
 const ERROR_COPY: Record<string, { title: string; body: string }> = {
   LINK_NOT_FOUND: {
     title: 'This link is not valid',
-    body: 'Please check that you opened the full link, or ask your physiotherapist to send a new one.',
+    body: 'Please check that you opened the full link, or ask your healthcare provider to send a new one.',
   },
   LINK_EXPIRED: {
     title: 'This link has expired',
-    body: 'For your privacy, links stop working after a few days. Please ask your physiotherapist for a new one.',
+    body: 'For your security, this screening link has expired. Please contact your healthcare provider to request a new link.',
   },
   LINK_CANCELLED: {
     title: 'This link is no longer active',
-    body: 'Your physiotherapist has closed it. If you think this is a mistake, please contact the clinic.',
+    body: 'Your healthcare provider has closed it. If you think this is a mistake, please contact them.',
   },
   ALREADY_COMPLETED: {
-    title: 'You have already answered these questions',
-    body: 'Thank you. Your answers have reached your physiotherapist. There is nothing more to do here.',
+    title: 'You have already completed this screening',
+    body: 'Thank you. If you need to update your answers, please contact your healthcare provider.',
+  },
+  SCREENING_UNAVAILABLE: {
+    title: 'This screening is not available right now',
+    body: 'Please contact your healthcare provider directly.',
   },
   RATE_LIMITED: {
     title: 'Please wait a moment',
@@ -71,12 +75,12 @@ function SupportCard() {
       <div className="flex items-center gap-2 text-logo-teal-ink">
         <HeartHandshake className="h-5 w-5" aria-hidden="true" />
         <h2 id="support-h" className="font-display text-[17px] font-bold">
-          You don&apos;t have to face this alone
+          You don&apos;t have to face it alone
         </h2>
       </div>
       <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-        If you are having thoughts of harming yourself, please talk to someone today. Tele-MANAS, the Government
-        of India&apos;s free mental health helpline, is open 24 hours and speaks many Indian languages.
+        We noticed you might be going through a particularly tough time. Free, confidential support is available
+        24/7. Tele-MANAS is the Government of India&apos;s mental health helpline and speaks many Indian languages.
       </p>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <a href="tel:14416" className="flex h-12 items-center justify-center gap-2 rounded-xl bg-logo-teal-ink font-semibold text-white">
@@ -132,7 +136,7 @@ export default function ScreenerPage() {
   const [busy, setBusy] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
-  const [flags, setFlags] = useState({ referral: false, support: false });
+  const [flags, setFlags] = useState({ support: false });
   const queue = useRef<PendingSave[]>([]);
   const draining = useRef<Promise<void> | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -292,7 +296,7 @@ export default function ScreenerPage() {
       await drain();
       if (queue.current.length) return;
       const res = await publicApi.post<SubmitResult>(`/screener/${token}/submit`, { instrument_id: q.instrument.id });
-      setFlags({ referral: res.show_referral_message, support: res.show_support_contacts });
+      setFlags({ support: res.show_support_contacts });
       const qs = state.questionnaires.map((x, i) => (i === qi ? { ...x, status: 'completed' as const } : x));
       setState({ ...state, questionnaires: qs });
       if (res.assignment_complete || !res.next_instrument_id) {
@@ -326,7 +330,7 @@ export default function ScreenerPage() {
       <div className="space-y-3 border-t border-line pt-4 text-center text-xs text-muted">
         <p className="inline-flex items-center gap-1.5">
           <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-          Only your physiotherapist sees your answers. Link valid until {formatDate(state.expires_at)}.
+          Only your healthcare provider sees your answers. Link valid until {formatDate(state.expires_at)}.
         </p>
         {isDass ? (
           <p>
@@ -393,8 +397,8 @@ export default function ScreenerPage() {
           Withdraw your consent?
         </h2>
         <p id="wd-body" className="mt-2 text-[15px] text-ink-2">
-          Your clinic will not send you these questionnaires again. Answers you have already submitted stay with
-          your physiotherapist unless you ask the clinic to delete them.
+          You will not be sent these questionnaires again. Answers you have already submitted stay with your
+          healthcare provider unless you ask them to delete them.
         </p>
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="secondary" className="h-12" onClick={() => setConfirmWithdraw(false)} autoFocus>
@@ -420,8 +424,8 @@ export default function ScreenerPage() {
             Your consent has been withdrawn
           </h1>
           <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-            You will not be sent these questionnaires again. You can still talk to your physiotherapist about how
-            you are feeling at any time.
+            You will not be sent these questionnaires again. You can still talk to your healthcare provider about
+            how you are feeling at any time.
           </p>
         </div>
       </Shell>
@@ -549,15 +553,12 @@ export default function ScreenerPage() {
             <h1 ref={headingRef} tabIndex={-1} className="mt-4 font-display text-2xl font-bold text-ink outline-none">
               Thank you
             </h1>
+            {/* Founders' decision F2: the same calm message for everyone, no hint of a
+                result. Only a risk answer adds the support card below. */}
             <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-              Your answers have been sent to your physiotherapist. You can close this page.
+              Thank you for completing this screening. Your answers have been securely shared with your healthcare
+              provider, who will discuss them with you at your next appointment.
             </p>
-            {flags.referral ? (
-              <p className="mt-4 rounded-xl bg-canvas p-4 text-left text-[15px] leading-relaxed text-ink-2">
-                Some of your answers suggest it may help to talk things through. Your physiotherapist may bring
-                this up at your next visit, and you are welcome to raise it yourself or call the clinic sooner.
-              </p>
-            ) : null}
           </div>
           {flags.support ? <SupportCard /> : null}
         </div>
@@ -573,7 +574,7 @@ export default function ScreenerPage() {
           <h1 ref={headingRef} tabIndex={-1} className="mt-1 font-display text-xl font-bold text-ink outline-none">
             All questions answered
           </h1>
-          <p className="mt-2 text-[15px] text-ink-2">Send your answers to your physiotherapist.</p>
+          <p className="mt-2 text-[15px] text-ink-2">Send your answers to your healthcare provider.</p>
           {saveState === 'failed' ? (
             <p role="alert" className="mt-4 flex items-center gap-2 rounded-xl bg-warn-wash p-3 text-sm text-warn">
               <CloudOff className="h-4 w-4 shrink-0" /> We could not reach the server. Check your connection and press Send again.

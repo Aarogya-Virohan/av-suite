@@ -51,7 +51,7 @@ export function ReferralContacts() {
         }
       />
       <p className="text-sm text-muted">
-        People and services your physios refer patients to. They pick one when they record a referral. Archived
+        People and services your providers refer patients to. They pick one when they record a referral. Archived
         contacts drop out of that list, and past referrals keep the name they were saved with.
       </p>
 

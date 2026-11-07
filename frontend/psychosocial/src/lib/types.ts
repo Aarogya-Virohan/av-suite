@@ -241,7 +241,7 @@ export interface PatientTrend {
 }
 
 // Repeat schedules and the Due list (SRS 4.1.1)
-export type ScheduleState = 'consent_withdrawn' | 'waiting' | 'due' | 'upcoming';
+export type ScheduleState = 'consent_withdrawn' | 'retired' | 'waiting' | 'due' | 'upcoming';
 
 export interface Schedule {
   id: string;
@@ -258,6 +258,31 @@ export interface Schedule {
 
 export interface DueItem extends Schedule {
   patient_name: string;
+}
+
+// Priority review (F4 = 4A): risk results nobody has opened yet. Providers only.
+export interface PriorityItem {
+  session_id: string;
+  patient_id: string;
+  patient_name: string;
+  short_name: string;
+  status: 'completed' | 'in_progress' | 'cancelled';
+  activity_at: string;
+}
+
+// Sent links (F3 = enhanced 3A): status only, never clinical data.
+export type SentLinkStatus = 'pending' | 'expired' | 'completed' | 'cancelled';
+
+export interface SentLink {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  screeners: string[];
+  status: SentLinkStatus;
+  sent_at: string;
+  expires_at: string;
+  sent_by_name: string | null;
+  can_cancel: boolean;
 }
 
 // --- clinic settings (SRS 4.3.2) ------------------------------------------

@@ -231,7 +231,7 @@ export default function AccessPage() {
       />
       <InfoNote>
         Admins can send screeners but do not see individual results by default, as the screening policy keeps
-        patient answers with the treating physiotherapist.
+        patient answers with the treating provider.
       </InfoNote>
       {users.isPending ? (
         <Loader2 className="h-6 w-6 animate-spin text-grove" aria-label="Loading" />

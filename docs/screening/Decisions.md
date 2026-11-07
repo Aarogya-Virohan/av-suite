@@ -2,6 +2,8 @@
 
 Format: context, choice, reason, decided by. Status "pending sign-off" means it is built as the safe default and can still change.
 
+Founders' answers arrived on 7 Nov 2026 (P-03): F1 = 1A, F2 = refined 2A, F3 = enhanced 3A, F4 = 4A now and 4B next, F5 = 5A, F6 = 6B, Q7 = 7B, Q8 = 8B now and 8A later. They also dropped DASS-21 for new links. S-D-031 to S-D-035 record what changed because of them.
+
 A one-line index of every decision, and the points to review before deploy, during the pilot and before scale, is in Review_Points.md.
 
 ## S-D-001 Branch base
@@ -28,7 +30,7 @@ A one-line index of every decision, and the points to review before deploy, duri
 ## S-D-005 PHQ-9 item 9 risk rule (founder question F1)
 - Context: the SRS has no rule for item 9 (thoughts of self-harm).
 - Choice: any answer above 0 on item 9 sets `risk_item_flag = true` and forces `referral_flag = true`, whatever the total.
-- Decided by: safe default from handoff, pending founder sign-off.
+- Decided by: founders, 7 Nov 2026 (F1 = 1A).
 
 ## S-D-006 Functional difficulty question kept, not scored
 - Context: both published PHQ-9 and GAD-7 forms end with "how difficult have these problems made it...". It is not part of the score.
@@ -71,10 +73,10 @@ A one-line index of every decision, and the points to review before deploy, duri
 - Shared file change: `_admin_template()` now leaves `screening.view` and `screening.refer` at None (`ADMIN_TEMPLATE_EXCLUDED`). SRS 3.2 says administrators never see individual responses. Admins keep `screening.assign`, so they can send links (F5 default) but cannot open results.
 - Therapists start at None for everything, like every other module in this repo. An admin grants the screening keys per physio. Every grant is audited by the existing permissions endpoint.
 - Gap found: the CRM permission grid (`frontend/crm/src/config/permissions.ts`) is a hardcoded list of 64 keys, so the new keys do not show there. The Tool 03 app will carry its own small access page for this (SRS 4.3.1). The CRM list needs the 3 keys later (Pending P-08).
-- Decided by: F3 safe default, pending founder sign-off.
+- Decided by: founders, 7 Nov 2026 (F3 = enhanced 3A: admins send links and see their status, never scores, answers or flags; see S-D-032). F5 = 5A: providers and admins send links.
 
 ## S-D-014 Staff API shape
-- Assign: `POST /api/v1/patients/{id}/psychosocial/sessions` with `{instruments, expires_in_days}` (1 to 30, default 7, F5). Returns the assignment and `screener_path` (`/screener/{token}`), path only. The app that hosts the screener adds its own origin, so the backend needs no frontend URL setting.
+- Assign: `POST /api/v1/patients/{id}/psychosocial/sessions` with `{instruments, expires_in_days}` (1 to 30, default 7, F5 = 5A, founders 7 Nov). Returns the assignment and `screener_path` (`/screener/{token}`), path only. The app that hosts the screener adds its own origin, so the backend needs no frontend URL setting.
 - Review: patient list, clinic worklist (`GET /psychosocial/sessions`, filter by status and flagged, risk-item rows first, which covers the F4 default "flagged badge in the session list"), session detail with every item, the answer label, the reasons for any flag and the baseline compare (first completed session of the same screener).
 - Cancel only while nothing is answered (SRS 4.1.1 "not yet started"). Re-issue link kills the old token.
 - Referral action log only on a completed, flagged session. Actions: referred_gp, referred_psychologist, referred_psychiatrist, already_under_care, patient_declined, monitor_and_rescreen, other, plus an optional note.
@@ -88,14 +90,16 @@ A one-line index of every decision, and the points to review before deploy, duri
 ## S-D-017 Risk answer visible before submit
 - Context: if a patient answers PHQ-9 item 9 above zero and then closes the page, the session never completes and no flag would show.
 - Choice: every staff view computes `partial_risk` for in-progress sessions from the saved answers, so the physio sees it without a submit. The final flags are still written only on submit.
-- Decided by: proposal, pending founder sign-off with F1.
+- 7 Nov: the Priority review list (S-D-033) also covers a risk answer followed by a withdrawal, which cancels the session.
+- Decided by: founders, 7 Nov 2026, with F1 = 1A.
 
 ## S-D-016 Consent (founder question F6)
 - The consent text lives in the backend (`app/screening/consent.py`) with a version string. Every consent row stores that version, so we can always show which wording a patient agreed to. A new version asks the patient again on their next link.
 - Consent is per patient, asked before the first screener and again only when the text version changes (SRS 4.2.1). No answer is saved without it (`CONSENT_REQUIRED`).
 - Withdrawal from the screener page records a `withdrawn` row, cancels every open link for that patient and blocks new links (`CONSENT_WITHDRAWN`). Completed results stay until a deletion request (S-L-005).
-- Text status: draft `2026-10-20.draft1`, pending founder approval.
-- Decided by: F6 safe default, pending founder sign-off.
+- Text status: `2026-11-07.pilot1`, the founders' own wording (7 Nov), replacing draft `2026-10-20.draft1`. Patients who agreed to the draft are asked again on their next link, because `consent_satisfied` checks the version.
+- Approved for pilot clinics only. A legal check under the DPDP Act is required before a wider launch (P-15).
+- Decided by: founders, 7 Nov 2026 (F6 = 6B).
 
 ## S-D-018 Public screener routes and rate limiting
 - Routes under `/api/v1/screener/{token}`: GET (questions and saved answers, no patient identity, no session ids, no scores), `/consent`, `/withdraw`, `/answers` (auto-save, one call per answer), `/submit`. Added to the ClinicGate public allowlist (shared file change).
@@ -121,9 +125,9 @@ A one-line index of every decision, and the points to review before deploy, duri
 ## S-D-021 Patient screener behaviour
 - One question per screen. Large option buttons work as a radio group (arrow keys, screen reader). The patient picks an option, then presses Next. Next saves the answer, and from then on it cannot change (SRS 4.2.2).
 - Answers save in the background in order, so the next question shows at once (SRS 3.5). A dropped call retries with backoff, and Send waits until every answer is saved. If the server disagrees (`ANSWER_LOCKED` or `OUT_OF_ORDER`), the page reloads its state from the server.
-- The patient never sees a score. After submit they see a calm message when a referral flag is set. When the PHQ-9 item 9 risk flag is set, they also see Tele-MANAS (14416 or 1-800-891-4416, 24x7, verified on PIB 11 Feb 2026) and 112 for immediate danger (F2 default, pending founder sign-off).
+- The patient never sees a score. After submit everyone sees the same calm message (S-D-035; until 7 Nov a referral flag added a line, which the founders' F2 answer removed). When the PHQ-9 item 9 risk flag is set, they also see Tele-MANAS (14416 or 1-800-891-4416, 24x7, verified on PIB 11 Feb 2026) and 112 for immediate danger, as tap-to-call links, on the screen only, never by WhatsApp or email.
 - Patient-facing titles are plain ("How you have been feeling"). Question and option text is the published wording. The DASS website reference shows on DASS-21 screens.
-- Decided by: proposal, pending founder sign-off for F2 wording.
+- Decided by: founders, 7 Nov 2026 (F2 = refined 2A) for the messages; proposal, pending Onkar sign-off, for the rest.
 
 ## S-D-022 Scoring validation report is generated from the tests
 - Context: SRS section 7, deliverable 02 asks for a document or test output showing correct PHQ-9 and GAD-7 scores for at least 5 inputs each, matched against published norms.
@@ -213,3 +217,37 @@ A one-line index of every decision, and the points to review before deploy, duri
 - Verified twice: once in the working tree and once on a clean clone after `git am` (see the tracker for the run). tsc, eslint, 24 unit tests, `next build` and 20 Playwright runs (10 tests at 390 px and 1440 px) pass on both.
 - Not in this change: CRM, the exercise library and the posture tool on `dev` are still on vulnerable `next` (the marketplace lockfile already has 16.4.3 and audits clean), and the backend still has Pillow 10.4.0. That is CRM Project code (P-14).
 - Decided by: proposal, pending Onkar sign-off (Onkar asked on 3 Nov to start the work the founders' answers do not affect, verified twice).
+
+## S-D-031 DASS-21 retired for new links (7 Nov 2026)
+- Context: the founders chose PHQ-9 + GAD-7 only, 16 questions instead of 37. DASS-21 asks about depression and anxiety again and has no self-harm item, so it adds questions without adding the risk check.
+- Choice: DASS-21 stays registered (`RETIRED` in `app/screening/registry.py`) so past results still render, score, trend and print. It can no longer be sent: `create_assignment` refuses it with `INSTRUMENT_RETIRED`, the send form and the Settings page list only PHQ-9 and GAD-7, and its default repeat cannot be set. A link sent before the change can still be answered and is scored as before. A DASS-21 repeat schedule shows the state "retired" and is never due; the provider can stop it. Statistics and their filter keep DASS-21 for past data.
+- Not changed: the scoring engine, the validation report (DASS-21 checks stay, they prove past results), the DASS-21 band rules.
+- PHQ-4 as a shorter first step was mentioned as an option for later, not decided. It would need a separate self-harm question.
+- Decided by: founders, 7 Nov 2026.
+
+## S-D-032 Sent links: status for admins, never clinical data (F3)
+- Context: F3 = enhanced 3A. Admins do the paperwork, so they need to see who has not answered, without seeing any result. Before this, an admin could send a link but not see or cancel it (S-L-007).
+- Choice: `GET /psychosocial/assignments` (needs `screening.assign`) lists every link of the clinic, newest first, with patient name, screeners, sent date, sender, expiry, a status (pending, expired, completed, cancelled) and whether it can still be cancelled. The response model has no score, band, answer or flag field, and a test checks the exact field set. Filter by status, paged.
+- UI: a "Sent links" page. Staff who can send but not see results (admins by default) land there after sign-in. A completed row shows "Clinical data restricted to treating provider." unless the user may see results; the patient page says the same. "Cancel link" uses the existing cancel endpoint and only shows while nothing is answered.
+- Decided by: founders, 7 Nov 2026 (F3 = enhanced 3A). Page layout: proposal, pending Onkar sign-off.
+
+## S-D-033 Priority review until a provider opens the result (F4 = 4A)
+- Context: F4 = 4A for launch. The founders asked for a widget at the top of the provider's dashboard that keeps a self-harm result pinned until a provider has opened it, because a sorted list can be scrolled past.
+- Choice: new append-only table `psychosocial_session_reviews` (migration `f2b6d8a4c1e9` on top of `e7a1c4b9d2f6`). Opening a result that needs review writes one row (who, when). Completed sessions stay immutable; that is why it is a separate table.
+- In the list (`GET /psychosocial/priority`, needs `screening.view`, same Own/All scope as the worklist): a completed PHQ-9 with the risk flag; an unsubmitted risk answer (in progress); and a risk answer followed by the patient's withdrawal, which cancels the session. A look at the unsubmitted answers does not count for the submitted result: after submit it comes back until opened again.
+- UI: "Priority review" box above the Screenings tabs, refreshed on every visit and every minute, hidden when empty. Admins never see it.
+- Deletion on request removes the review rows too (S-D-024).
+- Next (4B, not built): an email to the provider that says only that a result needs attention, with no patient name, score or condition. Needs an email provider (P-16).
+- Decided by: founders, 7 Nov 2026 (F4 = 4A). Data model: proposal, pending Onkar sign-off.
+
+## S-D-034 Links stop when the clinic's screening product is not enabled
+- Context: a link stays valid for up to 30 days. If the clinic's product is disabled or removed in that time, nobody would see new answers, so a self-harm answer could sit unseen.
+- Choice: every public screener call checks that `psycho-social-screening` is enabled for the link's clinic, before any other check. If not: 403 `SCREENING_UNAVAILABLE`, and the patient sees "This screening is not available right now. Please contact your healthcare provider directly." Nothing is saved. Turning the product back on makes the same link work again.
+- Decided by: proposal, pending Onkar sign-off (raised in the founders' chat as the lapsed subscription case).
+
+## S-D-035 "Healthcare provider" wording and the founders' patient messages (F2, F5)
+- Context: the SaaS is for healthcare providers in general, not only physiotherapists.
+- Choice: patient-facing text says "healthcare provider" (screener, WhatsApp message, consent, error pages). Staff text says "provider". Instrument wording is unchanged.
+- After submit (F2): "Thank you for completing this screening. Your answers have been securely shared with your healthcare provider, who will discuss them with you at your next appointment." On a risk answer the support card adds: "We noticed you might be going through a particularly tough time. Free, confidential support is available 24/7." with Tele-MANAS and 112.
+- Fallback pages (F5): already completed, "If you need to update your answers, please contact your healthcare provider."; expired, "For your security, this screening link has expired. Please contact your healthcare provider to request a new link."
+- Decided by: founders, 7 Nov 2026.

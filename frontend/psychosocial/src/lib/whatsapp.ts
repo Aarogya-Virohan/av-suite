@@ -22,6 +22,6 @@ export function screenerMessage(opts: {
     `Hi ${opts.firstName},`,
     `${opts.clinicName} has shared a few short questions about how you have been feeling lately. It takes about ${opts.minutes} minutes and helps us plan your care.`,
     `Please open this link: ${opts.url}`,
-    `The link works until ${opts.expires}. Your answers are seen only by your physiotherapist.`,
+    `The link works until ${opts.expires}. Your answers are seen only by your healthcare provider.`,
   ].join('\n\n');
 }

@@ -224,7 +224,7 @@ export default function SessionDetailPage() {
     const notFound = query.error instanceof ApiError && query.error.status === 404;
     return (
       <EmptyState icon={ClipboardList} title={notFound ? 'Screening not found' : 'Could not load this screening'}>
-        {notFound ? 'It may belong to another physiotherapist, or the link is wrong.' : query.error.message}
+        {notFound ? 'It may belong to another provider, or the link is wrong.' : query.error.message}
       </EmptyState>
     );
   }

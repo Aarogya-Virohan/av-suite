@@ -95,7 +95,9 @@ export async function signIn(page: Page, email: string, password: string) {
   await page.getByLabel('Email address').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL('**/sessions');
+  // Providers land on Screenings; staff who only send links (admins) are
+  // moved on to Sent links. Wait for the final page, not the first URL.
+  await expect(page.getByRole('heading', { level: 1, name: /^(Screenings|Sent links)$/ })).toBeVisible();
 }
 
 /**

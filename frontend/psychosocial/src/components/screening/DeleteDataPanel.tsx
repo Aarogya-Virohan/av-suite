@@ -105,7 +105,7 @@ export function DeleteDataPanel({ patientId, patientName }: { patientId: string;
             <div className="rounded-xl border border-danger/40 bg-danger-wash p-4 text-ink">
               <p className="font-semibold">This cannot be undone.</p>
               <p className="mt-1 text-ink-2">
-                Every screening record for this patient is removed for good, including results the physiotherapist
+                Every screening record for this patient is removed for good, including results the provider
                 has already reviewed.
               </p>
             </div>

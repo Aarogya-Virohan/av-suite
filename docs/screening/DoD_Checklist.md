@@ -13,11 +13,12 @@ Status:
 
 Evidence:
 - **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
-- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat, E2E 8 is anonymised statistics and CSV, E2E 9 is the referral contact directory, E2E 10 is a rejected session returning to sign-in.
+- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat, E2E 8 is anonymised statistics and CSV, E2E 9 is the referral contact directory, E2E 10 is a rejected session returning to sign-in, E2E 11 is the admin's Sent links page, E2E 12 is a link of a clinic whose screening product is turned off.
+- **Founders test**: backend test in `backend/tests/screening/test_founder_decisions.py` (the founders' answers of 7 Nov 2026).
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 3 Nov 2026, on this branch: screening backend tests 270 pass, full backend suite 572 pass with the same 10 pre-existing failures (P-09), Playwright 20 of 20 pass (10 tests at two widths), `npm test` 24 of 24 pass, tsc, eslint and `next build` clean, `npm audit --omit=dev` 0 findings.
+Last full run, 7 Nov 2026, on this branch: screening backend tests 283 pass, full backend suite 585 pass with the same 10 pre-existing failures (P-09), Playwright 24 of 24 pass (12 tests at two widths), `npm test` 24 of 24 pass, tsc, eslint and `next build` clean, `npm audit --omit=dev` 0 findings.
 
 ## Summary
 
@@ -28,7 +29,7 @@ Last full run, 3 Nov 2026, on this branch: screening backend tests 270 pass, ful
 | Not built | 2 |
 | Total | 30 |
 
-Items marked "pending founder sign-off" work today with a safe default and may change after the founders answer (Decisions.md).
+The founders answered on 7 Nov 2026 (Decisions.md S-D-031 to S-D-035). DASS-21 is no longer sent; its rows below stay Done because past DASS-21 results are still scored and shown.
 
 ## 4.1 Physiotherapist
 
@@ -36,7 +37,7 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
-| 1 | Assign one or more screeners (PHQ-9, GAD-7, DASS-21) to a patient from the patient's profile | Done | API test `test_full_flow_phq9_then_gad7` (PHQ-9 and GAD-7 on one link), `test_validation_of_assign_payload`. E2E 1: "Send screener" on the patient page, two screeners on one link. |
+| 1 | Assign one or more screeners (PHQ-9, GAD-7, DASS-21) to a patient from the patient's profile | Done | API test `test_full_flow_phq9_then_gad7` (PHQ-9 and GAD-7 on one link), `test_validation_of_assign_payload`. E2E 1: "Send screener" on the patient page, two screeners on one link, DASS-21 not offered. The founders dropped DASS-21 for new links (S-D-031): `test_dass21_cannot_be_sent_and_is_not_offered`. |
 | 2 | One-time or recurring assessment at a defined interval | Done | "Repeat" in the send drawer: just once, or every 2, 4, 6, 8 or 12 weeks (S-D-026). A repeat never sends by itself: when it is due again the patient shows in "Due again" and on their page, and the physio sends it with one click. API tests in `test_schedules.py` (`test_schedule_state`, `test_due_after_interval_and_upcoming_before`, `test_cancelled_or_expired_link_makes_it_due_and_a_new_link_waits`, `test_withdrawn_and_removed_patients_are_never_due`, `test_stop_schedule`). E2E 6. |
 | 3 | View all pending, in-progress and completed sessions per patient | Done | API test `test_full_flow_phq9_then_gad7` (patient list with status per session). UI, not in E2E: patient page history. Clinic-wide worklist with status filter in E2E 1. |
 | 4 | Cancel a pending session the patient has not started | Done | API test `test_cancel_only_before_start` (refused once an answer exists). UI, not in E2E: "Cancel screener" on the patient page. |
@@ -54,7 +55,7 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
-| 1 | Automatic referral at PHQ-9 >= 10, GAD-7 >= 10, any DASS-21 subscale Severe or above | Done | Report: every possible score on all three instruments. API tests `test_full_flow_phq9_then_gad7`, `test_dass21_severe_subscale_refers`. Extra rule: PHQ-9 item 9 above 0 also refers (S-D-005, pending founder sign-off F1). |
+| 1 | Automatic referral at PHQ-9 >= 10, GAD-7 >= 10, any DASS-21 subscale Severe or above | Done | Report: every possible score on all three instruments. API tests `test_full_flow_phq9_then_gad7`, `test_dass21_severe_subscale_refers`. Extra rule: PHQ-9 item 9 above 0 also refers (S-D-005, founders F1 = 1A). Risk results stay in Priority review until a provider opens them (S-D-033): `test_risk_result_stays_pinned_until_a_provider_opens_it`, `test_unsubmitted_risk_answer_is_pinned_and_again_after_submit`, `test_risk_answer_then_withdrawal_is_still_pinned`, E2E 1. |
 | 2 | Document the referral action taken | Done | API test `test_full_flow_phq9_then_gad7` (action saved, refused on an unflagged session). E2E 1: "Referred to psychologist" with a note. |
 | 3 | History of all referral flags and documented actions for a patient | Done | API test `test_full_flow_phq9_then_gad7` (referral action history). UI, not in E2E: flags on each session and a "Referral history" list on the patient page. |
 
@@ -71,9 +72,9 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
-| 1 | Plain-language explanation before the first screener: what is collected, how it is used, who sees it | Done | E2E 1: "Before you start" screen. Text in `backend/app/screening/consent.py`, draft `2026-10-20.draft1`, pending founder sign-off F6. |
+| 1 | Plain-language explanation before the first screener: what is collected, how it is used, who sees it | Done | E2E 1: "Before you start" screen. Text in `backend/app/screening/consent.py`, `2026-11-07.pilot1`, the founders' wording, approved for the pilot (F6 = 6B, legal check P-15). `test_pilot_consent_text_and_old_consent_asked_again`. |
 | 2 | Active consent required, no screening without it | Done | API test `test_full_flow_phq9_then_gad7` (answer before consent gets `CONSENT_REQUIRED`). E2E 1: "Continue" stays disabled until the box is ticked. |
-| 3 | Withdraw consent at any time, which stops future sessions | Done | API test `test_withdraw_consent_cancels_open_and_blocks_new`. UI, not in E2E: withdraw option on the screener page. There is no way back after a withdrawal yet (S-L-006, founder question). |
+| 3 | Withdraw consent at any time, which stops future sessions | Done | API test `test_withdraw_consent_cancels_open_and_blocks_new`. UI, not in E2E: withdraw option on the screener page. There is no way back after a withdrawal yet (S-L-006); the founders chose a consent-only link (7B, P-17). |
 
 ### 4.2.2 Questionnaire Completion
 
@@ -83,7 +84,7 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 | 2 | Response options as in the published instrument | Done | Wording is verbatim (S-D-004). Scoring test `test_published_response_options`. E2E 1 answers by the published option labels. |
 | 3 | Progress saved after each question, resume an unfinished session | Done | API test `test_full_flow_phq9_then_gad7` (saved answers come back on reopen). E2E 1 reloads the page at question 5 and resumes there. |
 | 4 | A response cannot change after moving past it | Done | API test `test_full_flow_phq9_then_gad7` (`ANSWER_LOCKED`, strict order). The screener has no back button. A Postgres trigger also blocks changes to a submitted session (`test_completed_session_rejects_db_update`). |
-| 5 | Confirmation on submit, and a calm message to talk to the physio when referral is flagged | Done | E2E 1: "Thank you", the "may help to talk things through" message, and no score shown. On a risk answer it also shows Tele-MANAS (pending founder sign-off F2). |
+| 5 | Confirmation on submit, and a calm message to talk to the physio when referral is flagged | Done | E2E 1: "Thank you" and the founders' message that the provider will discuss the answers at the next appointment, no score shown. The founders chose one message for everyone, so a referral flag adds nothing the patient can read into (F2, S-D-035). On a risk answer it also shows Tele-MANAS and 112 as tap-to-call links. |
 
 ### 4.2.3 History Access
 
@@ -119,5 +120,7 @@ Items marked "pending founder sign-off" work today with a safe default and may c
 ## Before go-live, outside section 4
 
 - Deletion on request (SRS 3.2): done 22 Oct (S-D-024). The clinic admin deletes a patient's screening data from the patient page. Covered by `backend/tests/screening/test_deletion.py` and the Playwright test "admin deletes a patient's screening data on request".
-- Founder answers F1 to F6, re-consent and staff accounts for screening-only clinics (P-03).
+- Founder answers: received 7 Nov 2026 (P-03). Still to build: re-consent (P-17), provider email (P-16), provider-shared report (P-18).
+- Sent links for admins (F3, S-D-032): `test_admin_tracker_shows_status_and_never_clinical_data`, `test_tracker_needs_send_permission`, E2E 11.
+- Links stop when the clinic's screening product is off (S-D-034): `test_links_stop_when_screening_is_not_enabled`, `test_links_stop_when_screening_was_never_installed`, E2E 12.
 - `AV_Suite_Clinical_Reference_v1.xlsx` comparison (P-05).

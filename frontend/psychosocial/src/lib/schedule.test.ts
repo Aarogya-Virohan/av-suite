@@ -29,6 +29,9 @@ describe('schedule words', () => {
     expect(scheduleStatus({ ...base, state: 'consent_withdrawn', next_due_at: null })).toBe(
       'Paused: the patient withdrew consent',
     );
+    expect(scheduleStatus({ ...base, state: 'retired', next_due_at: null })).toBe(
+      'No longer sent. Stop this repeat; past results stay on record.',
+    );
   });
 
   it('offers only intervals the API accepts (1 to 52 weeks)', () => {

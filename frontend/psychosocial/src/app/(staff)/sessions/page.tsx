@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BellRing, CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Clock, Flag, Hourglass, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
@@ -18,6 +19,7 @@ import {
   SeverityIndicator,
 } from '@/components/screening/indicators';
 import { DueList } from '@/components/screening/Schedules';
+import { PriorityReview } from '@/components/screening/PriorityReview';
 
 type View = 'attention' | 'in_progress' | 'pending' | 'completed' | 'due';
 
@@ -58,6 +60,12 @@ export default function SessionsPage() {
   const [view, setView] = useState<View>('attention');
   const [page, setPage] = useState(1);
   const active = VIEWS.find((v) => v.key === view)!;
+  const router = useRouter();
+  // Staff who send links but may not see results (admins) start on Sent links.
+  const sendOnly = !canView && canAssign;
+  useEffect(() => {
+    if (sendOnly) router.replace('/links');
+  }, [sendOnly, router]);
 
   const query = useQuery({
     queryKey: ['worklist', view, page],
@@ -80,6 +88,7 @@ export default function SessionsPage() {
     },
   });
 
+  if (sendOnly) return null;
   if (!canView) return <NoAccess what="screening results" />;
 
   const rows = query.data?.data ?? [];
@@ -92,6 +101,8 @@ export default function SessionsPage() {
         title="Screenings"
         subtitle="Questionnaires you have sent and their results. Risk answers are listed first."
       />
+
+      <PriorityReview />
 
       <SegmentGroup role="group" aria-label="Filter screenings">
         {VIEWS.filter((v) => v.key !== 'due' || canAssign).map((v) => (

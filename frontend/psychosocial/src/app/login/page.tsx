@@ -123,7 +123,7 @@ export default function LoginPage() {
             See the whole patient, <span className="text-lime">not just the joint.</span>
           </h2>
           <ul className="space-y-3 text-sm text-[#c3c9e6]">
-            {['PHQ-9, GAD-7 and DASS-21, scored to published norms', 'Patients answer on their phone, one question at a time', 'Referral flags and history in one view'].map(
+            {['PHQ-9 and GAD-7, scored to published norms', 'Patients answer on their phone, one question at a time', 'Referral flags and history in one view'].map(
               (item) => (
                 <li key={item} className="flex items-center gap-3">
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-lime/15">
