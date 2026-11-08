@@ -443,6 +443,22 @@ Each entry follows this structure:
 
 ---
 
+## [D-030] Clinic Logo Left, AV Suite Right; Clinic Switcher in the Sidebar; Tax Hidden on New Invoices
+
+- **Date**: 2026-11-08
+- **Context**: Branding rule from Onkar (2 Nov): the client's logo on the left and the AV Suite logo on the right of the CRM header. The header had a clinic name chip on the right, and the sidebar showed the clinic logo in place of the AV mark. On a 390 px phone every page was 461 px wide, because the header search bar and the clinic chip did not fit. Founders were told in Round 2 (7 Nov) that the invoice tax field would be hidden while GST is open (R2-2).
+- **Decision**:
+  - Header: clinic logo (`branding_logo_url`) on the left, after the menu button. When the clinic has no logo, or the saved logo does not load, the clinic name is shown instead. AV Suite wordmark on the right; below 640 px only the AV mark. The clinic chip is removed from the header.
+  - On phones (below 640 px) search is an icon button that opens the same command bar; from 640 px it is the full search bar as before. Pages are now 390 px wide at 390 px (checked on all nine sidebar pages).
+  - Sidebar top always shows the AV Suite mark.
+  - Clinic switcher moves into the clinic card at the foot of the sidebar, next to logout. The card opens the clinic list only when `GET /me` returns more than one workspace; with one clinic it is plain text. Switching works as before: `POST /auth/switch-workspace`, new token, full reload.
+  - Create Invoice: the tax field is hidden and `tax_amount` is sent as 0. The API, types and invoice preview are unchanged, so invoices that already have tax still show it, and tax can return by flipping `SHOW_TAX` in `CreateInvoiceSlideOver.tsx` once the founders decide.
+  - AV wordmark copied from the Posture tool brand folder and resized to 560 x 88 (`public/brand/av-logo-wordmark.png`).
+- **Not changed**: backend, API, invoice PDF and Exercise Library PDF letterhead (to be aligned separately).
+- **Affected Files**: `frontend/crm/src/components/layout/{AppShell,ClinicBrand,SidebarNavigation,WorkspaceSwitcher}.tsx`, `frontend/crm/src/features/billing/components/CreateInvoiceSlideOver.tsx`, `frontend/crm/public/brand/av-logo-wordmark.png`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -491,5 +507,6 @@ Each entry follows this structure:
 | L-41 | Backend invoice PDF was a placeholder (five lines of text with a `%PDF-1.4` header) and its download URL pointed at `/api/v1/billing/invoices/...` | Fixed 2026-10-31: real server PDF for invoice and receipt, URL fixed, CRM "Download PDF" (D-027) | - |
 | L-42 | The invoice PDF download needs a signed-in clinic user, so the `download_url` and WhatsApp link from `POST /invoices/{id}/pdf` cannot be opened by a patient. The CRM WhatsApp button only opens a chat; the PDF is attached by hand | Open; a signed, expiring patient link or email with the PDF attached (C-20) | Backend + frontend |
 | L-43 | Clinic profile update accepted any length for city, state, phone, registration number and authorised person, so longer values returned 500 from the database | Fixed 2026-11-02: length limits in the API, 422 (D-029) | - |
+| L-44 | The clinic switcher is in the sidebar clinic card, which shows only when the sidebar is expanded. With the sidebar collapsed on desktop, a multi-clinic user must expand it to switch | Open; acceptable for now (D-030) | Frontend |
 
-*Last updated: 2026-11-02 (D-029; L-43 added and closed) | Branch: fix/staff-booking-and-limits*
+*Last updated: 2026-11-08 (D-030; L-44 added) | Branch: feat/crm-branding*
