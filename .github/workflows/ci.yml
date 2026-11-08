@@ -39,7 +39,7 @@ jobs:
     outputs:
       apps: ${{ steps.list.outputs.apps }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: list
         run: |
           apps=$(for f in frontend/*/package.json; do basename "$(dirname "$f")"; done | jq -R . | jq -cs .)
@@ -58,8 +58,8 @@ jobs:
       run:
         working-directory: frontend/${{ matrix.app }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -110,14 +110,14 @@ jobs:
       SUPABASE_URL: http://localhost
       SUPABASE_SECRET_KEY: ci-only-not-a-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: System libraries (same as backend/Dockerfile)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libgl1 libglib2.0-0 libpango-1.0-0 libpangocairo-1.0-0 libcairo2 \
             libgdk-pixbuf-xlib-2.0-0 libffi-dev shared-mime-info fonts-liberation
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -170,11 +170,11 @@ jobs:
     runs-on: ubuntu-24.04
     continue-on-error: ${{ vars.AUDIT_BLOCKING != 'true' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: npm audit (production dependencies)
