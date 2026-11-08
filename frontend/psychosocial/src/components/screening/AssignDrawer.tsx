@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Check, Copy, Loader2, MessageCircle } from 'lucide-react';
-import { api } from '@/lib/api';
+import { AlertTriangle, Check, Copy, Loader2, MessageCircle } from 'lucide-react';
+import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import { clinicDefaultRepeat, repeatOptionsWith } from '@/lib/schedule';
@@ -156,6 +156,8 @@ function AssignForm({
   // A select needs string values.
   const [repeatChoice, setRepeatChoice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Same screener sent in the last 14 days (S-D-038): ask once more.
+  const [recent, setRecent] = useState<string | null>(null);
 
   const instruments = useQuery({
     queryKey: ['instruments'],
@@ -177,11 +179,12 @@ function AssignForm({
   const repeatOptions = repeatOptionsWith(repeat ? Number(repeat) : null);
 
   const assign = useMutation({
-    mutationFn: () =>
+    mutationFn: (allowRecent: boolean) =>
       api.post<AssignmentCreated>(`/patients/${patient.id}/psychosocial/sessions`, {
         instruments: selected,
         expires_in_days: days,
         ...(repeat ? { repeat_every_weeks: Number(repeat) } : {}),
+        ...(allowRecent ? { allow_recent: true } : {}),
       }),
     onSuccess: (data) => {
       onCreated(data);
@@ -190,11 +193,16 @@ function AssignForm({
       qc.invalidateQueries({ queryKey: ['worklist'] });
       qc.invalidateQueries({ queryKey: ['due'] });
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => {
+      if (e instanceof ApiError && e.code === 'RECENTLY_SENT') setRecent(e.message);
+      else setError(e.message);
+    },
   });
 
-  const toggle = (id: InstrumentId) =>
+  const toggle = (id: InstrumentId) => {
+    setRecent(null);
     setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  };
 
   return (
     <form
@@ -202,11 +210,12 @@ function AssignForm({
       onSubmit={(e) => {
         e.preventDefault();
         setError(null);
+        setRecent(null);
         if (selected.length === 0) {
           setError('Choose at least one questionnaire.');
           return;
         }
-        assign.mutate();
+        assign.mutate(false);
       }}
     >
       {error ? (
@@ -296,10 +305,28 @@ function AssignForm({
         </p>
       </div>
 
-      <Button type="submit" disabled={assign.isPending} className="w-full">
-        {assign.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-        Create link
-      </Button>
+      {recent ? (
+        <div role="alert" className="space-y-3 rounded-xl border border-warn/40 bg-warn-wash p-4 text-sm text-ink-2">
+          <p className="flex items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
+            <span>{recent}</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => assign.mutate(true)} disabled={assign.isPending}>
+              {assign.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Send anyway
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setRecent(null)}>
+              Change selection
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button type="submit" disabled={assign.isPending} className="w-full">
+          {assign.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Create link
+        </Button>
+      )}
     </form>
   );
 }

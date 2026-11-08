@@ -225,7 +225,8 @@ test('admin deletes a patient\'s screening data on request', async ({ page, requ
 test('physio sees the score trend and downloads the PDF summary', async ({ page, request }) => {
   const c = await makeClinic(request);
   await completeVia(request, await assignVia(request, c.therapistToken, c.patientId, ['phq9']), 'phq9', [2, 2, 2, 2, 2, 1, 1, 1, 0]);
-  await completeVia(request, await assignVia(request, c.therapistToken, c.patientId, ['phq9']), 'phq9', [1, 1, 1, 1, 0, 0, 1, 0, 0]);
+  // Second PHQ-9 on the same day: past the 14-day warning on purpose (S-D-038).
+  await completeVia(request, await assignVia(request, c.therapistToken, c.patientId, ['phq9'], true), 'phq9', [1, 1, 1, 1, 0, 0, 1, 0, 0]);
   const problems = watch(page);
 
   await signIn(page, c.therapistEmail, c.password);
@@ -574,4 +575,65 @@ test('a link stops working when the clinic turns screening off', async ({ page, 
   await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
   await shot(page, '28-screening-unavailable');
   expect(problems).toEqual([]);
+});
+
+test('after a withdrawal the provider asks again and the patient opts back in', async ({ page, request, browser }) => {
+  const c = await makeClinic(request);
+  const path = await assignVia(request, c.therapistToken, c.patientId, ['phq9']);
+  const token = path.split('/').pop();
+  expect((await request.post(`${API}/screener/${token}/consent`, { data: { text_version: (await (await request.get(`${API}/screener/${token}`)).json()).data.consent.text_version } })).ok()).toBeTruthy();
+  expect((await request.post(`${API}/screener/${token}/withdraw`)).ok()).toBeTruthy();
+  const problems = watch(page);
+
+  await signIn(page, c.therapistEmail, c.password);
+  await page.goto(`/patients/${c.patientId}`);
+  const panel = page.getByRole('region', { name: /Consent withdrawn/ });
+  await expect(panel).toContainText('No screeners can be sent.');
+  await expect(page.getByRole('button', { name: 'Send screener' })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Ask to opt back in' }).click();
+  const drawer = page.getByRole('dialog');
+  const url = await drawer.getByLabel('Consent link').inputValue();
+  expect(url).toMatch(/\/consent\/[A-Za-z0-9_-]{20,}$/);
+  await shot(page, '30-consent-link');
+  await drawer.getByRole('button', { name: 'Close' }).click();
+  await expect(panel).toContainText('Waiting for the patient');
+
+  // Patient, on their own phone.
+  const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await phone.goto(new URL(url).pathname);
+  await expect(phone.getByRole('heading', { name: 'Would you like to take part again?' })).toBeVisible();
+  await expect(phone.getByText(/Administrative staff cannot see your answers or scores/)).toBeVisible();
+  const yes = phone.getByRole('button', { name: 'Yes, I agree' });
+  await expect(yes).toBeDisabled();
+  await phone.getByText('I have read this and I agree to take part again.').click();
+  await shot(phone, '31-reconsent-ask');
+  await yes.click();
+  await expect(phone.getByRole('heading', { name: 'Thank you, you are back in' })).toBeVisible();
+  await phone.reload();
+  await expect(phone.getByRole('heading', { name: 'Thank you, you are back in' })).toBeVisible();
+  await phone.close();
+
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1, name: new RegExp(`Ritu ${c.patientLast}`) })).toBeVisible();
+  await expect(page.getByRole('region', { name: /Consent withdrawn/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Send screener' }).first()).toBeVisible();
+  expect(problems).toEqual([]);
+});
+
+test('sending the same screener again within 14 days asks once more', async ({ page, request }) => {
+  const c = await makeClinic(request);
+  await assignVia(request, c.therapistToken, c.patientId, ['phq9']);
+  const problems = watch(page, [409]);
+  await signIn(page, c.therapistEmail, c.password);
+  await page.goto(`/patients/${c.patientId}`);
+  await page.getByRole('button', { name: 'Send screener' }).first().click();
+  const drawer = page.getByRole('dialog');
+  await drawer.getByText('PHQ-9').click();
+  await drawer.getByRole('button', { name: 'Create link' }).click();
+  const warning = drawer.getByRole('alert');
+  await expect(warning).toContainText('PHQ-9 was already sent to this patient in the last 14 days.');
+  await shot(page, '32-recently-sent');
+  await warning.getByRole('button', { name: 'Send anyway' }).click();
+  await expect(drawer.getByText('Link ready')).toBeVisible();
+  expect(problems.filter((x) => !x.includes('409'))).toEqual([]);
 });

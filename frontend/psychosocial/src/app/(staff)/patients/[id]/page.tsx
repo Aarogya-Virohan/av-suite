@@ -11,11 +11,12 @@ import { cn } from '@/lib/cn';
 import { contactLabel } from '@/lib/contacts';
 import { formatDate, formatDateTime, fullName } from '@/lib/format';
 import { REFERRAL_LABELS } from '@/lib/severity';
-import type { Assignment, AssignmentCreated, InstrumentId, Patient, PatientSummary, PatientTrend, ReferralAction } from '@/lib/types';
+import type { Assignment, AssignmentCreated, InstrumentId, Patient, PatientConsent, PatientSummary, PatientTrend, ReferralAction } from '@/lib/types';
 import { Avatar, Badge, Button, Card, CardHeader } from '@/components/ui/brand';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { useCan } from '@/components/staff/session-context';
 import { AssignDrawer, LinkReady } from '@/components/screening/AssignDrawer';
+import { ConsentPanel } from '@/components/screening/ConsentPanel';
 import { DeleteDataPanel } from '@/components/screening/DeleteDataPanel';
 import { TrendChart } from '@/components/screening/TrendChart';
 import { PatientSchedules } from '@/components/screening/Schedules';
@@ -170,6 +171,13 @@ export default function PatientPage() {
     enabled: canViewResults,
     queryFn: () => api.get<PatientTrend>(`/patients/${id}/psychosocial/trend`),
   });
+  const consent = useQuery({
+    queryKey: ['consent', id],
+    enabled: canAssign,
+    queryFn: () => api.get<PatientConsent>(`/patients/${id}/psychosocial/consent`),
+  });
+  // After a withdrawal nothing can be sent until the patient opts back in.
+  const canSend = canAssign && consent.data?.status !== 'withdrawn';
   const [downloading, setDownloading] = useState(false);
 
   if (!canViewPatient) return <NoAccess what="patients" />;
@@ -233,7 +241,7 @@ export default function PatientPage() {
               PDF summary
             </Button>
           ) : null}
-          {canAssign ? (
+          {canSend ? (
             <Button onClick={() => openAssign()}>
               <Send className="h-4 w-4" />
               Send screener
@@ -241,6 +249,8 @@ export default function PatientPage() {
           ) : null}
         </div>
       </div>
+
+      {canAssign && consent.data ? <ConsentPanel patient={p} consent={consent.data} /> : null}
 
       {canAssign ? <PatientSchedules patientId={p.id} onSendDue={openAssign} /> : null}
 
@@ -323,7 +333,7 @@ export default function PatientPage() {
               <EmptyState
                 icon={ClipboardList}
                 title="No screeners sent yet"
-                action={canAssign ? <Button onClick={() => openAssign()}>Send screener</Button> : undefined}
+                action={canSend ? <Button onClick={() => openAssign()}>Send screener</Button> : undefined}
               >
                 Send PHQ-9 and GAD-7. The patient answers on their phone.
               </EmptyState>

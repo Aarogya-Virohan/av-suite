@@ -25,3 +25,12 @@ export function screenerMessage(opts: {
     `The link works until ${opts.expires}. Your answers are seen only by your healthcare provider.`,
   ].join('\n\n');
 }
+
+export function reconsentMessage(opts: { firstName: string; clinicName: string; url: string; expires: string }): string {
+  return [
+    `Hi ${opts.firstName},`,
+    `Earlier you chose not to answer ${opts.clinicName}'s short wellbeing questions. If you would like to take part again, you can say so here. If not, you can say no, or simply ignore this message.`,
+    `Please open this link: ${opts.url}`,
+    `The link works until ${opts.expires}.`,
+  ].join('\n\n');
+}

@@ -371,3 +371,34 @@ export interface ReferralContactInput {
   email: string | null;
   note: string | null;
 }
+
+// Re-consent after a withdrawal (Q7 = 7B, S-D-037).
+export type ConsentRequestState = 'pending' | 'granted' | 'declined' | 'cancelled' | 'expired';
+
+export interface ConsentRequest {
+  id: string;
+  state: ConsentRequestState;
+  created_at: string;
+  expires_at: string;
+  answered_at: string | null;
+  requested_by_name: string | null;
+}
+
+export interface ConsentRequestCreated {
+  request: ConsentRequest;
+  consent_path: string;
+}
+
+export interface PatientConsent {
+  status: 'none' | 'granted' | 'withdrawn';
+  recorded_at: string | null;
+  outdated: boolean;
+  request: ConsentRequest | null;
+}
+
+export interface ReconsentState {
+  clinic_name: string;
+  state: ConsentRequestState;
+  expires_at: string;
+  consent: ScreenerState['consent'];
+}

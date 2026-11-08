@@ -80,11 +80,12 @@ export async function assignVia(
   token: string,
   patientId: string,
   instruments: string[],
+  allowRecent = false,
 ): Promise<string> {
   const data = await ok<{ screener_path: string }>(
     await request.post(`${API}/patients/${patientId}/psychosocial/sessions`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { instruments, expires_in_days: 7 },
+      data: { instruments, expires_in_days: 7, ...(allowRecent ? { allow_recent: true } : {}) },
     }),
   );
   return data.screener_path;

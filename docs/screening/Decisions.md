@@ -262,3 +262,17 @@ A one-line index of every decision, and the points to review before deploy, duri
 - The Tool 03 Access page no longer offers results access for front desk staff and clears an old grant on save.
 - Shared file changed: `backend/app/api/v1/users.py` (one call before the lockout guard). The CRM shows the error message from the structured detail it already reads.
 - Decided by: Onkar, 8 Nov 2026 (rule "clinical role plus owner-provider").
+
+## S-D-037 Consent-only link after a withdrawal (Q7 = 7B, closes S-L-006)
+- Context: a withdrawal stops every link and blocks new ones. A patient who later changes their mind had no way back.
+- Choice: staff with `screening.assign` send a consent-only link from the patient page, only while the patient's latest consent is a withdrawal. The link (`/consent/{token}`, 7 days, token stored only as a SHA-256 hash, new table `psychosocial_consent_requests`, migration `a7c3e9b5d2f8` on `f2b6d8a4c1e9`) shows the current consent text. The patient ticks the box and taps "Yes, I agree", or taps "No, thank you".
+- Yes writes a new granted consent row with the current text version, so the next screener needs no second consent and paused repeat schedules start again. No changes nothing else; the provider can ask again later.
+- A new link stops the previous open one. The same answer twice is accepted; a changed answer is refused (`ALREADY_ANSWERED`). Expired, cancelled and unknown links, and clinics whose screening product is off, behave as for screener links. Public routes `GET /screener/reconsent/{token}` and `POST /screener/reconsent/{token}/answer` go through the same rate limiter.
+- Audit: `psychosocial.reconsent_requested`, `psychosocial.reconsent_granted`, `psychosocial.reconsent_declined`, with no clinical values. Deletion on request removes these links too and keeps the withdrawal.
+- The patient page shows the withdrawal, the latest consent link and its state, and hides "Send screener" until the patient opts back in. The drawer asks staff to send the link only when the patient has said they may want to take part again.
+- Decided by: founders, 7 Nov 2026 (Q7 = 7B). Flow and wording: proposal, pending Onkar sign-off.
+
+## S-D-038 Warning before sending the same screener again within 14 days
+- Context: suggested in the founders' chat. PHQ-9 and GAD-7 ask about the last 2 weeks, so an earlier repeat mostly re-measures the same period.
+- Choice: sending a screener that went to the same patient in the last 14 days (not counting cancelled ones) returns 409 `RECENTLY_SENT` with the screeners and dates. The send drawer shows the warning with "Send anyway", which repeats the request with `allow_recent: true`. It is a warning, not a block.
+- Decided by: proposal, pending Onkar sign-off.
