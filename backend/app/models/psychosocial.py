@@ -353,6 +353,44 @@ class PsychosocialConsentRequest(Base, TimestampMixin):
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class PsychosocialSharedReport(Base, TimestampMixin):
+    """A report the provider shared with the patient after the consultation.
+
+    Founders' F2 follow-up (S-D-039). Holds only what the provider wrote and
+    chose; scores are read from the immutable sessions of `assignment_id`
+    when the patient opens the link. The token is stored only as a hash.
+    """
+
+    __tablename__ = "psychosocial_shared_reports"
+    __table_args__ = (Index("ix_psy_shared_reports_clinic_patient", "clinic_id", "patient_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    assignment_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("psychosocial_assignments.id", ondelete="CASCADE"), nullable=False
+    )
+    shared_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    advice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resource_keys: Mapped[list[str]] = mapped_column(JSONType, nullable=False, default=list)
+    custom_links: Mapped[list[dict[str, str]]] = mapped_column(JSONType, nullable=False, default=list)
+    # Year of birth asked before the page opens, when the patient record has one.
+    birth_year_check: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    open_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
 class PsychosocialSessionReview(Base):
     """A provider opened a result (F4 = 4A, S-D-033).
 

@@ -19,6 +19,11 @@ from app.schemas.psychosocial import (
     ConsentRequest,
     InstrumentOut,
     ReconsentAnswer,
+    ReportGateOut,
+    ReportLineOut,
+    ReportLinkOut,
+    ReportOpen,
+    ReportOut,
     ReconsentOut,
     ItemOut,
     OptionOut,
@@ -32,6 +37,8 @@ from app.screening.rate_limit import enforce_screener_rate_limit
 from app.screening.registry import get_instrument
 from app.screening.types import Instrument
 from app.services import psychosocial as svc
+from app.services import psychosocial_share as sharing
+from app.screening.share import RESOURCES_BY_KEY, link_domain
 
 router = APIRouter(prefix="/screener", dependencies=[Depends(enforce_screener_rate_limit)])
 
@@ -97,6 +104,47 @@ async def answer_reconsent(payload: ReconsentAnswer, db: SessionDep, token: str 
             state=svc.consent_request_state(request),
             expires_at=request.expires_at,
             consent=consent_out(True),
+        )
+    )
+
+
+# Provider-shared report (S-D-039). Two path segments, like the re-consent link.
+@router.get("/report/{token}", response_model=ResponseEnvelope[ReportGateOut])
+async def report_gate(db: SessionDep, token: str = TokenPath):
+    row = await sharing.resolve_share(db, token)
+    return ResponseEnvelope(
+        data=ReportGateOut(clinic_name=await svc.clinic_name(db, row.clinic_id), needs_birth_year=row.birth_year_check)
+    )
+
+
+@router.post("/report/{token}/open", response_model=ResponseEnvelope[ReportOut])
+async def report_open(payload: ReportOpen, db: SessionDep, token: str = TokenPath):
+    opened = await sharing.open_share(db, token, payload.birth_year)
+    row = opened.report
+    links = [
+        ReportLinkOut(
+            title=r.title,
+            description=r.description,
+            url=r.url,
+            domain=link_domain(r.url) if r.url else None,
+            phones=[{"label": label, "tel": tel} for label, tel in r.phones],
+        )
+        for r in (RESOURCES_BY_KEY[k] for k in row.resource_keys if k in RESOURCES_BY_KEY)
+    ] + [
+        ReportLinkOut(title=link["title"], description=None, url=link["url"], domain=link_domain(link["url"]), phones=[])
+        for link in row.custom_links
+    ]
+    return ResponseEnvelope(
+        data=ReportOut(
+            clinic_name=opened.clinic_name,
+            provider_name=opened.provider_name,
+            shared_on=row.created_at,
+            advice=row.advice,
+            summary=[
+                ReportLineOut(short_name=s.short_name, score=s.score, max_score=s.max_score, phrase=s.phrase)
+                for s in opened.summary
+            ],
+            resources=links,
         )
     )
 

@@ -32,6 +32,7 @@ from app.models.psychosocial import (
     PsychosocialSchedule,
     PsychosocialSession,
     PsychosocialSessionReview,
+    PsychosocialSharedReport,
 )
 
 __all__ = [
@@ -76,4 +77,5 @@ __all__ = [
     "PsychosocialReferralContact",
     "PsychosocialSessionReview",
     "PsychosocialConsentRequest",
+    "PsychosocialSharedReport",
 ]

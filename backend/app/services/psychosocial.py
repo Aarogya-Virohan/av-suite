@@ -31,6 +31,7 @@ from app.models.psychosocial import (
     PsychosocialSchedule,
     PsychosocialSession,
     PsychosocialSessionReview,
+    PsychosocialSharedReport,
 )
 from app.models.user import User
 from app.repositories.audit import AuditLogRepository
@@ -643,7 +644,8 @@ async def delete_patient_screening_data(
     """Erase every screening record for one patient, in one transaction.
 
     Removed: links, screeners (answers and results), referral actions, review
-    marks, re-consent links, repeat schedules and consent records. If the patient's latest consent decision is a
+    marks, re-consent links, shared reports, repeat schedules and consent
+    records. If the patient's latest consent decision is a
     withdrawal, that single record is kept (status, text version, date) so
     the clinic cannot send a new screener without the patient. Deleting a
     completed session is allowed: the immutability trigger blocks UPDATE only.
@@ -658,6 +660,11 @@ async def delete_patient_screening_data(
         return (model.clinic_id == clinic_id, model.patient_id == patient_id)
 
     # Child rows first, so the result does not depend on FK cascades.
+    await db.execute(
+        delete(PsychosocialSharedReport)
+        .where(*scoped(PsychosocialSharedReport))
+        .execution_options(synchronize_session="fetch")
+    )
     await db.execute(
         delete(PsychosocialConsentRequest)
         .where(*scoped(PsychosocialConsentRequest))

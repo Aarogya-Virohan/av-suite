@@ -539,3 +539,92 @@ class ReconsentAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
     accept: bool
     text_version: str | None = Field(default=None, max_length=32)
+
+
+# --- provider-shared report (F2 follow-up, S-D-039) ------------------------
+class ResourceOut(BaseModel):
+    key: str
+    title: str
+    description: str
+    url: str | None
+    source: str | None
+    phones: list[dict[str, str]]
+
+
+class ShareOptionsOut(BaseModel):
+    resources: list[ResourceOut]
+    advice_chips: list[str]
+    advice_max: int
+    custom_links_max: int
+
+
+class CustomLinkIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(max_length=200)
+    url: str = Field(max_length=1000)
+
+
+class ShareCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    advice: str | None = Field(default=None, max_length=4000)
+    resources: list[str] = Field(default_factory=list, max_length=20)
+    custom_links: list[CustomLinkIn] = Field(default_factory=list, max_length=10)
+    expires_in_days: int = Field(default=30, ge=1, le=30)
+
+
+class ShareOut(BaseModel):
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    state: Literal["active", "expired", "revoked", "locked"]
+    created_at: datetime
+    expires_at: datetime
+    shared_by_name: str | None
+    birth_year_check: bool
+    first_opened_at: datetime | None
+    open_count: int
+    advice: str | None
+    resource_titles: list[str]
+
+
+class ShareCreatedOut(BaseModel):
+    share: ShareOut
+    # Shown once to the provider, never stored.
+    report_path: str
+
+
+class ReportGateOut(BaseModel):
+    """Before the patient unlocks the page: nothing clinical."""
+
+    clinic_name: str
+    needs_birth_year: bool
+
+
+class ReportOpen(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    birth_year: int | None = Field(default=None, ge=1900, le=2100)
+
+
+class ReportLineOut(BaseModel):
+    short_name: str
+    score: int
+    max_score: int
+    phrase: str
+
+
+class ReportLinkOut(BaseModel):
+    title: str
+    description: str | None
+    url: str | None
+    domain: str | None
+    phones: list[dict[str, str]]
+
+
+class ReportOut(BaseModel):
+    """What the patient sees. Never band names, flags or answers."""
+
+    clinic_name: str
+    provider_name: str | None
+    shared_on: datetime
+    advice: str | None
+    summary: list[ReportLineOut]
+    resources: list[ReportLinkOut]

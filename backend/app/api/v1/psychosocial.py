@@ -33,6 +33,11 @@ from app.schemas.psychosocial import (
     ConsentRequestCreatedOut,
     ConsentRequestOut,
     PatientConsentOut,
+    ResourceOut,
+    ShareCreate,
+    ShareCreatedOut,
+    ShareOptionsOut,
+    ShareOut,
     ReferralActionOut,
     ReferralActionRequest,
     ReferralContactIn,
@@ -60,6 +65,8 @@ from app.services import psychosocial_schedule as schedules
 from app.services import psychosocial_settings as clinic_config
 from app.services import psychosocial_aggregates as stats
 from app.services import psychosocial_contacts as contacts
+from app.services import psychosocial_share as sharing
+from app.screening.share import ADVICE_CHIPS, ADVICE_MAX, CUSTOM_LINKS_MAX, RESOURCES, RESOURCES_BY_KEY
 from app.screening.aggregates import MIN_CELL
 
 router = APIRouter()
@@ -190,6 +197,101 @@ async def assign_screeners(
             screener_path=svc.screener_path(token),
         )
     )
+
+
+def share_out(report_row, names) -> ShareOut:
+    return ShareOut(
+        id=report_row.id,
+        assignment_id=report_row.assignment_id,
+        state=sharing.share_state(report_row),
+        created_at=report_row.created_at,
+        expires_at=report_row.expires_at,
+        shared_by_name=names.get(report_row.shared_by) if report_row.shared_by else None,
+        birth_year_check=report_row.birth_year_check,
+        first_opened_at=report_row.first_opened_at,
+        open_count=report_row.open_count,
+        advice=report_row.advice,
+        resource_titles=[RESOURCES_BY_KEY[k].title for k in report_row.resource_keys if k in RESOURCES_BY_KEY]
+        + [link["title"] for link in report_row.custom_links],
+    )
+
+
+@router.get("/psychosocial/share-options", response_model=ResponseEnvelope[ShareOptionsOut])
+async def share_options(
+    _ctx: AuthenticatedContextDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.view")),
+):
+    """Resources and advice chips for the Share form."""
+    return ResponseEnvelope(
+        data=ShareOptionsOut(
+            resources=[
+                ResourceOut(
+                    key=r.key,
+                    title=r.title,
+                    description=r.description,
+                    url=r.url,
+                    source=r.source,
+                    phones=[{"label": label, "tel": tel} for label, tel in r.phones],
+                )
+                for r in RESOURCES
+            ],
+            advice_chips=list(ADVICE_CHIPS),
+            advice_max=ADVICE_MAX,
+            custom_links_max=CUSTOM_LINKS_MAX,
+        )
+    )
+
+
+@router.post(
+    "/psychosocial/assignments/{assignment_id}/share",
+    response_model=ResponseEnvelope[ShareCreatedOut],
+    status_code=status.HTTP_201_CREATED,
+)
+async def share_with_patient(
+    assignment_id: uuid.UUID,
+    payload: ShareCreate,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    scope: CapabilityScope = Depends(require_capability("screening.view")),
+):
+    """Provider shares the result after the consultation. Never automatic."""
+    row, token = await sharing.create_share(
+        db,
+        clinic_id=ctx.clinic.id,
+        user_id=ctx.user.id,
+        scope=scope,
+        assignment_id=assignment_id,
+        advice=payload.advice,
+        resource_keys=payload.resources,
+        custom_links=[(link.title, link.url) for link in payload.custom_links],
+        expires_in_days=payload.expires_in_days,
+    )
+    names = await svc.user_names(db, {ctx.user.id})
+    return ResponseEnvelope(data=ShareCreatedOut(share=share_out(row, names), report_path=sharing.report_path(token)))
+
+
+@router.get("/patients/{patient_id}/psychosocial/shares", response_model=ResponseEnvelope[list[ShareOut]])
+async def patient_shares(
+    patient_id: uuid.UUID,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    scope: CapabilityScope = Depends(require_capability("screening.view")),
+):
+    rows = await sharing.list_shares(db, clinic_id=ctx.clinic.id, patient_id=patient_id, scope=scope, user_id=ctx.user.id)
+    names = await svc.user_names(db, {r.shared_by for r in rows if r.shared_by})
+    return ResponseEnvelope(data=[share_out(r, names) for r in rows])
+
+
+@router.post("/psychosocial/shares/{share_id}/revoke", response_model=ResponseEnvelope[ShareOut])
+async def revoke_share(
+    share_id: uuid.UUID,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    scope: CapabilityScope = Depends(require_capability("screening.view")),
+):
+    row = await sharing.revoke_share(db, clinic_id=ctx.clinic.id, share_id=share_id, scope=scope, user_id=ctx.user.id)
+    names = await svc.user_names(db, {row.shared_by} if row.shared_by else set())
+    return ResponseEnvelope(data=share_out(row, names))
 
 
 def consent_request_out(request, names) -> ConsentRequestOut:
