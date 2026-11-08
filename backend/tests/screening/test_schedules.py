@@ -57,7 +57,9 @@ def test_schedule_state(kwargs, expected):
 # helpers
 # ---------------------------------------------------------------------------
 async def send(client, headers, patient_id, instruments, weeks=None, days=7):
-    body = {"instruments": instruments, "expires_in_days": days}
+    # These tests send the same screener several times a day on purpose; the
+    # 14-day warning (S-D-038) has its own tests.
+    body = {"instruments": instruments, "expires_in_days": days, "allow_recent": True}
     if weeks is not None:
         body["repeat_every_weeks"] = weeks
     return await client.post(f"{API}/patients/{patient_id}/psychosocial/sessions", json=body, headers=headers)

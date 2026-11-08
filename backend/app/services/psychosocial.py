@@ -26,6 +26,7 @@ from app.models.product import WorkspaceProduct
 from app.models.psychosocial import (
     PsychosocialAssignment,
     PsychosocialConsent,
+    PsychosocialConsentRequest,
     PsychosocialReferralAction,
     PsychosocialSchedule,
     PsychosocialSession,
@@ -43,6 +44,9 @@ from app.services.audit import AuditLogService
 LINK_TTL_DAYS_DEFAULT = 7  # F5 default, pending founder sign-off
 LINK_TTL_DAYS_MAX = 30
 PRODUCT_ID = "psycho-social-screening"
+# Founders' suggestion (7 Nov): warn before sending the same screener again
+# within this window. PHQ-9 and GAD-7 ask about the last 2 weeks.
+RECENT_SEND_DAYS = 14
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +182,7 @@ async def create_assignment(
     instrument_ids: list[str],
     expires_in_days: int,
     repeat_every_days: int | None = None,
+    allow_recent: bool = False,
 ) -> tuple[PsychosocialAssignment, str]:
     await get_patient(db, clinic_id, patient_id)
 
@@ -206,6 +211,22 @@ async def create_assignment(
             "CONSENT_WITHDRAWN",
             "This patient has withdrawn consent for screening. No new screeners can be sent.",
         )
+
+    if not allow_recent:
+        recent = await recently_sent(db, clinic_id, patient_id, [i.id for i in instruments])
+        if recent:
+            names = ", ".join(get_instrument(r["instrument_id"]).short_name for r in recent)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "RECENTLY_SENT",
+                    "message": (
+                        f"{names} was already sent to this patient in the last {RECENT_SEND_DAYS} days. "
+                        "These questionnaires ask about the last 2 weeks, so an earlier repeat adds little."
+                    ),
+                    "recent": recent,
+                },
+            )
 
     token, token_hash = new_token()
     assignment = PsychosocialAssignment(
@@ -622,7 +643,7 @@ async def delete_patient_screening_data(
     """Erase every screening record for one patient, in one transaction.
 
     Removed: links, screeners (answers and results), referral actions, review
-    marks, repeat schedules and consent records. If the patient's latest consent decision is a
+    marks, re-consent links, repeat schedules and consent records. If the patient's latest consent decision is a
     withdrawal, that single record is kept (status, text version, date) so
     the clinic cannot send a new screener without the patient. Deleting a
     completed session is allowed: the immutability trigger blocks UPDATE only.
@@ -637,6 +658,11 @@ async def delete_patient_screening_data(
         return (model.clinic_id == clinic_id, model.patient_id == patient_id)
 
     # Child rows first, so the result does not depend on FK cascades.
+    await db.execute(
+        delete(PsychosocialConsentRequest)
+        .where(*scoped(PsychosocialConsentRequest))
+        .execution_options(synchronize_session="fetch")
+    )
     await db.execute(
         delete(PsychosocialSessionReview)
         .where(*scoped(PsychosocialSessionReview))
@@ -696,6 +722,171 @@ async def delete_patient_screening_data(
         },
     )
     return counts
+
+
+async def recently_sent(
+    db: AsyncSession, clinic_id: uuid.UUID, patient_id: uuid.UUID, instrument_ids: list[str]
+) -> list[dict[str, str]]:
+    """Screeners sent within RECENT_SEND_DAYS, not cancelled: latest send per screener."""
+    since = utcnow() - timedelta(days=RECENT_SEND_DAYS)
+    rows = await db.execute(
+        select(PsychosocialSession.instrument_id, func.max(PsychosocialAssignment.created_at))
+        .join(PsychosocialAssignment, PsychosocialAssignment.id == PsychosocialSession.assignment_id)
+        .where(
+            PsychosocialSession.clinic_id == clinic_id,
+            PsychosocialSession.patient_id == patient_id,
+            PsychosocialSession.instrument_id.in_(instrument_ids),
+            PsychosocialSession.status != "cancelled",
+            PsychosocialAssignment.created_at >= since,
+        )
+        .group_by(PsychosocialSession.instrument_id)
+    )
+    found = {instrument_id: aware(sent_at) for instrument_id, sent_at in rows}
+    return [
+        {"instrument_id": i, "sent_at": found[i].isoformat()} for i in instrument_ids if i in found
+    ]
+
+
+# ---------------------------------------------------------------------------
+# re-consent after a withdrawal (Q7 = 7B, S-D-037)
+# ---------------------------------------------------------------------------
+def consent_request_path(token: str) -> str:
+    return f"/consent/{token}"
+
+
+def consent_request_state(request: PsychosocialConsentRequest) -> str:
+    if request.status == "pending" and aware(request.expires_at) <= utcnow():
+        return "expired"
+    return request.status
+
+
+async def latest_consent_request(
+    db: AsyncSession, clinic_id: uuid.UUID, patient_id: uuid.UUID
+) -> PsychosocialConsentRequest | None:
+    return await db.scalar(
+        select(PsychosocialConsentRequest)
+        .where(
+            PsychosocialConsentRequest.clinic_id == clinic_id,
+            PsychosocialConsentRequest.patient_id == patient_id,
+        )
+        .order_by(desc(PsychosocialConsentRequest.created_at), desc(PsychosocialConsentRequest.id))
+        .limit(1)
+    )
+
+
+async def create_consent_request(
+    db: AsyncSession,
+    *,
+    clinic_id: uuid.UUID,
+    user_id: uuid.UUID,
+    patient_id: uuid.UUID,
+    expires_in_days: int,
+) -> tuple[PsychosocialConsentRequest, str]:
+    """One open request per patient: a new one stops the previous link."""
+    await get_patient(db, clinic_id, patient_id)
+    if not 1 <= expires_in_days <= LINK_TTL_DAYS_MAX:
+        raise error(422, "INVALID_EXPIRY", f"Link expiry must be 1 to {LINK_TTL_DAYS_MAX} days.")
+    consent = await latest_consent(db, clinic_id, patient_id)
+    if consent is None or consent.status != "withdrawn":
+        raise error(
+            status.HTTP_409_CONFLICT,
+            "CONSENT_NOT_WITHDRAWN",
+            "This patient has not withdrawn consent. Send a screener instead.",
+        )
+    now = utcnow()
+    await db.execute(
+        update(PsychosocialConsentRequest)
+        .where(
+            PsychosocialConsentRequest.clinic_id == clinic_id,
+            PsychosocialConsentRequest.patient_id == patient_id,
+            PsychosocialConsentRequest.status == "pending",
+        )
+        .values(status="cancelled")
+        .execution_options(synchronize_session="fetch")
+    )
+    token, token_hash = new_token()
+    request = PsychosocialConsentRequest(
+        id=uuid.uuid4(),
+        clinic_id=clinic_id,
+        patient_id=patient_id,
+        requested_by=user_id,
+        token_hash=token_hash,
+        status="pending",
+        expires_at=now + timedelta(days=expires_in_days),
+    )
+    db.add(request)
+    await db.commit()
+    await db.refresh(request)
+    await audit(
+        db,
+        clinic_id=clinic_id,
+        user_id=user_id,
+        action="psychosocial.reconsent_requested",
+        entity_type="psychosocial_consent_request",
+        entity_id=request.id,
+        details={"patient_id": str(patient_id)},
+    )
+    return request, token
+
+
+async def resolve_consent_request(db: AsyncSession, token: str) -> PsychosocialConsentRequest:
+    request = await db.scalar(
+        select(PsychosocialConsentRequest).where(PsychosocialConsentRequest.token_hash == hash_token(token))
+    )
+    if request is None:
+        raise error(status.HTTP_404_NOT_FOUND, "LINK_NOT_FOUND", "This link is not valid.")
+    if not await screening_enabled(db, request.clinic_id):
+        raise error(status.HTTP_403_FORBIDDEN, "SCREENING_UNAVAILABLE", "This screening is not available right now.")
+    if request.status == "cancelled":
+        raise error(status.HTTP_410_GONE, "LINK_CANCELLED", "This link is no longer active.")
+    if consent_request_state(request) == "expired":
+        raise error(status.HTTP_410_GONE, "LINK_EXPIRED", "This link has expired.")
+    return request
+
+
+async def answer_consent_request(
+    db: AsyncSession, token: str, *, accept: bool, text_version: str | None
+) -> PsychosocialConsentRequest:
+    """Record the patient's choice. Repeating the same choice is a no-op."""
+    request = await resolve_consent_request(db, token)
+    choice = "granted" if accept else "declined"
+    if request.status != "pending":
+        if request.status == choice:
+            return request
+        raise error(status.HTTP_409_CONFLICT, "ALREADY_ANSWERED", "You have already answered this request.")
+    if accept and text_version != CONSENT_TEXT_VERSION:
+        raise error(
+            status.HTTP_409_CONFLICT,
+            "CONSENT_TEXT_CHANGED",
+            "The consent text has been updated. Please reload the page.",
+        )
+    now = utcnow()
+    request.status = choice
+    request.answered_at = now
+    if accept:
+        db.add(
+            PsychosocialConsent(
+                id=uuid.uuid4(),
+                clinic_id=request.clinic_id,
+                patient_id=request.patient_id,
+                assignment_id=None,
+                status="granted",
+                text_version=CONSENT_TEXT_VERSION,
+                recorded_at=now,
+            )
+        )
+    await db.commit()
+    await audit(
+        db,
+        clinic_id=request.clinic_id,
+        user_id=None,
+        action="psychosocial.reconsent_granted" if accept else "psychosocial.reconsent_declined",
+        entity_type="psychosocial_consent_request",
+        entity_id=request.id,
+        details={"patient_id": str(request.patient_id)}
+        | ({"text_version": CONSENT_TEXT_VERSION} if accept else {}),
+    )
+    return request
 
 
 # ---------------------------------------------------------------------------

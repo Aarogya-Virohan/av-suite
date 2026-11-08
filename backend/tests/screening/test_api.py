@@ -37,10 +37,10 @@ def code_of(response) -> str | None:
     return (meta.get("error") or {}).get("code")
 
 
-async def assign(client, headers, patient_id, instruments, days=7):
+async def assign(client, headers, patient_id, instruments, days=7, **extra):
     res = await client.post(
         f"{API}/patients/{patient_id}/psychosocial/sessions",
-        json={"instruments": instruments, "expires_in_days": days},
+        json={"instruments": instruments, "expires_in_days": days, **extra},
         headers=headers,
     )
     return res
@@ -284,7 +284,8 @@ async def test_second_session_shows_baseline(client, db_session, env, therapist_
     patient = await make_patient(db_session, env["clinic"].id)
     ids = []
     for values in ([3] * 9, [1] * 8 + [0]):
-        res = await assign(client, therapist_auth_headers, patient.id, ["phq9"])
+        # Two PHQ-9s on the same day: past the 14-day warning on purpose (S-D-038).
+        res = await assign(client, therapist_auth_headers, patient.id, ["phq9"], allow_recent=True)
         token = token_of(res)
         await consent(client, token)
         await answer_all(client, token, "phq9", values)

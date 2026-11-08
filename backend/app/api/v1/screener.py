@@ -18,6 +18,8 @@ from app.schemas.psychosocial import (
     ConsentOut,
     ConsentRequest,
     InstrumentOut,
+    ReconsentAnswer,
+    ReconsentOut,
     ItemOut,
     OptionOut,
     ScreenerInstrumentOut,
@@ -59,6 +61,43 @@ def instrument_out(instrument: Instrument) -> InstrumentOut:
             for item in instrument.items
         ],
         licence_note=instrument.licence_note,
+    )
+
+
+def consent_out(required: bool) -> ConsentOut:
+    return ConsentOut(
+        required=required,
+        text_version=CONSENT_TEXT_VERSION,
+        title=CONSENT_TITLE,
+        paragraphs=list(CONSENT_PARAGRAPHS),
+    )
+
+
+# Re-consent link (Q7 = 7B, S-D-037). Two path segments, so it never clashes
+# with GET /{token}.
+@router.get("/reconsent/{token}", response_model=ResponseEnvelope[ReconsentOut])
+async def open_reconsent(db: SessionDep, token: str = TokenPath):
+    request = await svc.resolve_consent_request(db, token)
+    return ResponseEnvelope(
+        data=ReconsentOut(
+            clinic_name=await svc.clinic_name(db, request.clinic_id),
+            state=svc.consent_request_state(request),
+            expires_at=request.expires_at,
+            consent=consent_out(True),
+        )
+    )
+
+
+@router.post("/reconsent/{token}/answer", response_model=ResponseEnvelope[ReconsentOut])
+async def answer_reconsent(payload: ReconsentAnswer, db: SessionDep, token: str = TokenPath):
+    request = await svc.answer_consent_request(db, token, accept=payload.accept, text_version=payload.text_version)
+    return ResponseEnvelope(
+        data=ReconsentOut(
+            clinic_name=await svc.clinic_name(db, request.clinic_id),
+            state=svc.consent_request_state(request),
+            expires_at=request.expires_at,
+            consent=consent_out(True),
+        )
     )
 
 

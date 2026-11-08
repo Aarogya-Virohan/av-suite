@@ -29,6 +29,10 @@ from app.schemas.psychosocial import (
     PatientSummaryOut,
     PatientTrendOut,
     PriorityItemOut,
+    ConsentRequestCreate,
+    ConsentRequestCreatedOut,
+    ConsentRequestOut,
+    PatientConsentOut,
     ReferralActionOut,
     ReferralActionRequest,
     ReferralContactIn,
@@ -177,12 +181,77 @@ async def assign_screeners(
         instrument_ids=list(payload.instruments),
         expires_in_days=payload.expires_in_days,
         repeat_every_days=payload.repeat_every_weeks * 7 if payload.repeat_every_weeks else None,
+        allow_recent=payload.allow_recent,
     )
     names = await svc.user_names(db, {ctx.user.id})
     return ResponseEnvelope(
         data=AssignmentCreatedOut(
             assignment=assignment_out(assignment, names),
             screener_path=svc.screener_path(token),
+        )
+    )
+
+
+def consent_request_out(request, names) -> ConsentRequestOut:
+    return ConsentRequestOut(
+        id=request.id,
+        state=svc.consent_request_state(request),
+        created_at=request.created_at,
+        expires_at=request.expires_at,
+        answered_at=request.answered_at,
+        requested_by_name=names.get(request.requested_by) if request.requested_by else None,
+    )
+
+
+@router.get(
+    "/patients/{patient_id}/psychosocial/consent",
+    response_model=ResponseEnvelope[PatientConsentOut],
+)
+async def patient_consent(
+    patient_id: uuid.UUID,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.assign")),
+):
+    """Consent state and the latest re-consent link, for staff who send links."""
+    await svc.get_patient(db, ctx.clinic.id, patient_id)
+    consent = await svc.latest_consent(db, ctx.clinic.id, patient_id)
+    request = await svc.latest_consent_request(db, ctx.clinic.id, patient_id)
+    names = await svc.user_names(db, {request.requested_by} if request and request.requested_by else set())
+    return ResponseEnvelope(
+        data=PatientConsentOut(
+            status=consent.status if consent else "none",
+            recorded_at=consent.recorded_at if consent else None,
+            outdated=consent is not None and consent.status == "granted" and not svc.consent_satisfied(consent),
+            request=consent_request_out(request, names) if request else None,
+        )
+    )
+
+
+@router.post(
+    "/patients/{patient_id}/psychosocial/consent-request",
+    response_model=ResponseEnvelope[ConsentRequestCreatedOut],
+    status_code=status.HTTP_201_CREATED,
+)
+async def request_consent_again(
+    patient_id: uuid.UUID,
+    payload: ConsentRequestCreate,
+    ctx: AuthenticatedContextDep,
+    db: SessionDep,
+    _scope: CapabilityScope = Depends(require_capability("screening.assign")),
+):
+    """Consent-only link after a withdrawal (Q7 = 7B). The link is shown once."""
+    request, token = await svc.create_consent_request(
+        db,
+        clinic_id=ctx.clinic.id,
+        user_id=ctx.user.id,
+        patient_id=patient_id,
+        expires_in_days=payload.expires_in_days,
+    )
+    names = await svc.user_names(db, {ctx.user.id})
+    return ResponseEnvelope(
+        data=ConsentRequestCreatedOut(
+            request=consent_request_out(request, names), consent_path=svc.consent_request_path(token)
         )
     )
 

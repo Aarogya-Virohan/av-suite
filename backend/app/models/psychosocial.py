@@ -42,6 +42,7 @@ JSONType = JSON().with_variant(JSONB(), "postgresql")
 ASSIGNMENT_STATUSES = ("active", "completed", "cancelled")
 SESSION_STATUSES = ("pending", "in_progress", "completed", "cancelled")
 CONSENT_STATUSES = ("granted", "withdrawn")
+CONSENT_REQUEST_STATUSES = ("pending", "granted", "declined", "cancelled")
 SCHEDULE_MIN_DAYS = 7
 SCHEDULE_MAX_DAYS = 364
 REFERRAL_ACTIONS = (
@@ -320,6 +321,36 @@ class PsychosocialClinicSetting(Base, TimestampMixin):
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
+
+
+class PsychosocialConsentRequest(Base, TimestampMixin):
+    """Consent-only link after a withdrawal (Q7 = 7B, S-D-037).
+
+    The patient opens it on their own phone and chooses again. Accepting
+    writes a new granted consent row; declining changes nothing else.
+    """
+
+    __tablename__ = "psychosocial_consent_requests"
+    __table_args__ = (
+        CheckConstraint(_in("status", CONSENT_REQUEST_STATUSES), name="ck_psy_consent_request_status"),
+        Index("ix_psy_consent_requests_clinic_patient", "clinic_id", "patient_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # SHA-256 hex of the URL token. The token itself is never stored.
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PsychosocialSessionReview(Base):

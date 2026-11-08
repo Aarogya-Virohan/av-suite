@@ -64,6 +64,8 @@ class AssignRequest(BaseModel):
     expires_in_days: int = Field(default=7, ge=1, le=30)
     # Repeat these screeners every N weeks (SRS 4.1.1). None = just once.
     repeat_every_weeks: int | None = Field(default=None, ge=1, le=52)
+    # Send even when the same screener went out in the last 14 days (S-D-038).
+    allow_recent: bool = False
 
 
 class ReissueLinkRequest(BaseModel):
@@ -488,3 +490,52 @@ class ReferralContactOut(BaseModel):
     archived: bool
     updated_at: datetime
     updated_by_name: str | None
+
+
+# --- re-consent after a withdrawal (Q7 = 7B, S-D-037) ----------------------
+ConsentRequestState = Literal["pending", "granted", "declined", "cancelled", "expired"]
+
+
+class ConsentRequestCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expires_in_days: int = Field(default=7, ge=1, le=30)
+
+
+class ConsentRequestOut(BaseModel):
+    id: uuid.UUID
+    state: ConsentRequestState
+    created_at: datetime
+    expires_at: datetime
+    answered_at: datetime | None
+    requested_by_name: str | None
+
+
+class ConsentRequestCreatedOut(BaseModel):
+    request: ConsentRequestOut
+    # Shown once to staff, never stored.
+    consent_path: str
+
+
+class PatientConsentOut(BaseModel):
+    """Consent state for staff who send links. No clinical data."""
+
+    status: Literal["none", "granted", "withdrawn"]
+    recorded_at: datetime | None
+    # The current text needs a fresh yes on the next link.
+    outdated: bool
+    request: ConsentRequestOut | None
+
+
+class ReconsentOut(BaseModel):
+    """What the patient sees on the consent-only link. No identity, no scores."""
+
+    clinic_name: str
+    state: ConsentRequestState
+    expires_at: datetime
+    consent: "ConsentOut"
+
+
+class ReconsentAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    accept: bool
+    text_version: str | None = Field(default=None, max_length=32)
