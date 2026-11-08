@@ -15,10 +15,11 @@ Evidence:
 - **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
 - **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat, E2E 8 is anonymised statistics and CSV, E2E 9 is the referral contact directory, E2E 10 is a rejected session returning to sign-in, E2E 11 is the admin's Sent links page, E2E 12 is a link of a clinic whose screening product is turned off.
 - **Founders test**: backend test in `backend/tests/screening/test_founder_decisions.py` (the founders' answers of 7 Nov 2026).
+- **Access rule test**: backend test in `backend/tests/screening/test_clinical_access.py` (who may see results, S-D-036).
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 7 Nov 2026, on this branch: screening backend tests 283 pass, full backend suite 585 pass with the same 10 pre-existing failures (P-09), Playwright 24 of 24 pass (12 tests at two widths), `npm test` 24 of 24 pass, tsc, eslint and `next build` clean, `npm audit --omit=dev` 0 findings.
+Last full run, 8 Nov 2026, on this branch: screening backend tests 292 pass, full backend suite 594 pass with the same 10 pre-existing failures (P-09), Playwright 24 of 24 pass (12 tests at two widths), `npm test` 24 of 24 pass, tsc, eslint and `next build` clean, `npm audit --omit=dev` 0 findings.
 
 ## Summary
 

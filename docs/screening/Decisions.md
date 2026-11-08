@@ -251,3 +251,14 @@ A one-line index of every decision, and the points to review before deploy, duri
 - After submit (F2): "Thank you for completing this screening. Your answers have been securely shared with your healthcare provider, who will discuss them with you at your next appointment." On a risk answer the support card adds: "We noticed you might be going through a particularly tough time. Free, confidential support is available 24/7." with Tele-MANAS and 112.
 - Fallback pages (F5): already completed, "If you need to update your answers, please contact your healthcare provider."; expired, "For your security, this screening link has expired. Please contact your healthcare provider to request a new link."
 - Decided by: founders, 7 Nov 2026.
+
+## S-D-036 Results access only for treating providers (closes S-L-008)
+- Context: the pilot consent text (S-D-016) tells patients that administrative staff cannot see their answers or scores. Until now an admin could grant `screening.view` to themselves, or to front desk staff, through the permissions endpoint.
+- Choice: `PUT /api/v1/users/{id}/permissions` checks every new or widened grant of `screening.view` or `screening.refer` (`app/screening/access.py`):
+  - therapist: allowed;
+  - front desk: refused, 403 `SCREENING_CLINICAL_ROLE`;
+  - admin: allowed when another user grants it (audited as before), or when the admin is the only active staff member of the clinic (a solo owner who treats patients); refused when an admin grants it to themselves in a clinic with other staff, 403 `SCREENING_SELF_GRANT`.
+- Revoking is always allowed. An unchanged existing override is not re-checked, so saving other permissions never fails because of an old grant.
+- The Tool 03 Access page no longer offers results access for front desk staff and clears an old grant on save.
+- Shared file changed: `backend/app/api/v1/users.py` (one call before the lockout guard). The CRM shows the error message from the structured detail it already reads.
+- Decided by: Onkar, 8 Nov 2026 (rule "clinical role plus owner-provider").

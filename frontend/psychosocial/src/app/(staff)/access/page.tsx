@@ -160,7 +160,12 @@ function AccessForm({ user, saved }: { user: ClinicUser; saved: PermissionOverri
   const dirty = JSON.stringify(state) !== JSON.stringify(original);
 
   const save = useMutation({
-    mutationFn: () => api.put<PermissionOverride[]>(`/users/${user.id}/permissions`, toOverrides(saved, state)),
+    mutationFn: () =>
+      api.put<PermissionOverride[]>(
+        `/users/${user.id}/permissions`,
+        // Front desk never keeps results access (S-D-036): saving clears any old grant.
+        toOverrides(saved, user.role === 'front_desk' ? { ...state, results: 'none' } : state),
+      ),
     onSuccess: () => {
       toast.success(`Access updated for ${user.name}`);
       qc.invalidateQueries({ queryKey: ['overrides', user.id] });
@@ -192,7 +197,17 @@ function AccessForm({ user, saved }: { user: ClinicUser; saved: PermissionOverri
           checked={state.assign === 'all'}
           onChange={(v) => setState({ ...state, assign: v ? 'all' : 'none' })}
         />
-        <ResultsScope userId={user.id} value={state.results} onChange={(v) => setState({ ...state, results: v })} />
+        {user.role === 'front_desk' ? (
+          // S-D-036: the backend refuses this grant; say so instead of offering it.
+          <div className="py-3">
+            <p className="text-sm font-semibold text-ink">Results and referral actions</p>
+            <p className="text-xs text-muted">
+              Not available for front desk staff. Only treating providers can see screening answers.
+            </p>
+          </div>
+        ) : (
+          <ResultsScope userId={user.id} value={state.results} onChange={(v) => setState({ ...state, results: v })} />
+        )}
       </div>
       <div className="mt-3 flex items-center justify-end gap-2">
         {dirty ? (

@@ -23,6 +23,7 @@ from app.schemas.user_permission import UserPermissionRead, UserPermissionCreate
 from app.enums.user import UserRole
 from app.repositories.audit import AuditLogRepository
 from app.services.audit import AuditLogService
+from app.screening.access import check_clinical_grant
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +235,17 @@ async def update_user_permissions(
         raise HTTPException(status_code=404, detail="User not found")
         
     granted_by = current_user.id
+
+    # Tool 03: only treating providers may see screening answers (S-D-036).
+    await check_clinical_grant(
+        db,
+        clinic_id=clinic_id,
+        actor_id=current_user.id,
+        target_id=user_id,
+        target_role=target_role,
+        requested=permissions,
+        existing=await repo.list_for_user_in_clinic(clinic_id, user_id),
+    )
     
     # Lockout Guard: Prevent removing 'permissions.edit' or 'users.edit' capability from last admin
     new_perms_override = next((p.scope for p in permissions if p.capability_key in ('permissions.edit', 'permissions.manage')), None)

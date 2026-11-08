@@ -2,7 +2,7 @@
 
 One place to see what was decided and what must be looked at again, and when. Details stay in Decisions.md (S-D), Known_Limitations.md (S-L) and Pending.md (P). This file links to them and does not repeat them. Update it in the same commit as any new decision or limitation.
 
-Last updated: 7 Nov 2026 (founders' answers, S-D-031 to S-D-035).
+Last updated: 8 Nov 2026 (S-D-036).
 
 ## 1. Decision index
 
@@ -45,6 +45,7 @@ Status: **Onkar** = decided by Onkar. **Founders** = decided by the founders on 
 | S-D-033 | Priority review pinned until a provider opens the result | Founders (F4 = 4A), data model Sign-off |
 | S-D-034 | Links stop when the clinic's screening product is not enabled | Sign-off |
 | S-D-035 | "Healthcare provider" wording and the founders' patient messages | Founders |
+| S-D-036 | Results access only for treating providers; no self-grant except a solo owner | Onkar |
 
 ## 2. Before merge and deploy
 
@@ -64,7 +65,7 @@ Nothing here is optional for the first deploy. Work through it in order.
 | 10 | Run `npm audit --omit=dev` in `frontend/psychosocial` on the day of the merge: it must show 0 findings. Advisories for `next` changed twice in two weeks (S-D-030). Never `npm audit fix --force`. | S-D-030 | Us |
 | 11 | Compare thresholds with `AV_Suite_Clinical_Reference_v1.xlsx` once uploaded; published norms win | P-05, S-L-003 | Onkar, then us |
 | 12 | The other live apps on `dev` still run vulnerable `next`, and the backend still has Pillow 10.4.0. Not a blocker for Tool 03, but it should not wait for it. | P-14 | Onkar to assign |
-| 13 | Stop admins granting themselves `screening.view`: the pilot consent text promises administrative staff cannot see answers or scores | S-L-008, S-D-016 | Us, after Onkar agrees (shared permissions code) |
+| 13 | Done 8 Nov: results access only for treating providers (S-D-036) | S-L-008, S-D-016 | Onkar |
 
 ## 3. After deploy, during the pilot
 
