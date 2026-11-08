@@ -23,6 +23,10 @@ import {
   SessionStatusBadge,
   SeverityIndicator,
 } from '@/components/screening/indicators';
+import { ShareWithPatient } from '@/components/screening/ShareReport';
+
+// PHQ-9 and GAD-7 have patient-friendly wording; DASS-21 is retired (S-D-031).
+const SHAREABLE = new Set(['phq9', 'gad7']);
 
 function Delta({ delta }: { delta: number | null }) {
   if (delta === null) return null;
@@ -254,6 +258,10 @@ export default function SessionDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {s.status === 'completed' && SHAREABLE.has(s.instrument_id) ? (
+            // Founders: share manually, after the consultation (S-D-039).
+            <ShareWithPatient assignmentId={s.assignment_id} patientId={s.patient_id} />
+          ) : null}
           <SessionStatusBadge status={s.status} />
           <FlagChips referral={s.referral_flag} risk={s.risk_item_flag} partialRisk={s.partial_risk} />
         </div>

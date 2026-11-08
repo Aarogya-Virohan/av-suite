@@ -17,6 +17,7 @@ import { SlideOver } from '@/components/ui/SlideOver';
 import { useCan } from '@/components/staff/session-context';
 import { AssignDrawer, LinkReady } from '@/components/screening/AssignDrawer';
 import { ConsentPanel } from '@/components/screening/ConsentPanel';
+import { SharedReports } from '@/components/screening/ShareReport';
 import { DeleteDataPanel } from '@/components/screening/DeleteDataPanel';
 import { TrendChart } from '@/components/screening/TrendChart';
 import { PatientSchedules } from '@/components/screening/Schedules';
@@ -253,6 +254,8 @@ export default function PatientPage() {
       {canAssign && consent.data ? <ConsentPanel patient={p} consent={consent.data} /> : null}
 
       {canAssign ? <PatientSchedules patientId={p.id} onSendDue={openAssign} /> : null}
+
+      {canViewResults ? <SharedReports patientId={p.id} /> : null}
 
       {!canViewResults ? (
         <Card className="flex items-start gap-2 p-5 text-sm text-ink-2">

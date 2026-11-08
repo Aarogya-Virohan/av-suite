@@ -2,7 +2,7 @@
 
 One place to see what was decided and what must be looked at again, and when. Details stay in Decisions.md (S-D), Known_Limitations.md (S-L) and Pending.md (P). This file links to them and does not repeat them. Update it in the same commit as any new decision or limitation.
 
-Last updated: 8 Nov 2026 (S-D-036 to S-D-038).
+Last updated: 9 Nov 2026 (S-D-036 to S-D-039).
 
 ## 1. Decision index
 
@@ -48,6 +48,7 @@ Status: **Onkar** = decided by Onkar. **Founders** = decided by the founders on 
 | S-D-036 | Results access only for treating providers; no self-grant except a solo owner | Onkar |
 | S-D-037 | Consent-only link after a withdrawal | Founders (Q7 = 7B), flow Sign-off |
 | S-D-038 | Warning before sending the same screener again within 14 days | Sign-off |
+| S-D-039 | Provider-shared report: advice, plain score summary, resources; year of birth check | Founders (F2 follow-up), checks Sign-off |
 
 ## 2. Before merge and deploy
 
@@ -56,7 +57,7 @@ Nothing here is optional for the first deploy. Work through it in order.
 | # | Point | Source | Owner |
 |---|---|---|---|
 | 1 | Set `SCREENER_CLIENT_IP_HEADER=X-Real-IP` on Railway | P-04, S-D-018 | Onkar |
-| 2 | Before migrating, check the target database: `alembic current` must show a revision from `dev`, and `\dt` and `\dT` must match it. A stale revision stamp on an empty database made a local upgrade fail on 22 Oct. Then run `alembic upgrade head`; it must end at `a7c3e9b5d2f8` (six Tool 03 migrations). Nothing in the repo runs migrations on deploy, so confirm how the CRM Project applies them. | PR #33 | Onkar |
+| 2 | Before migrating, check the target database: `alembic current` must show a revision from `dev`, and `\dt` and `\dT` must match it. A stale revision stamp on an empty database made a local upgrade fail on 22 Oct. Then run `alembic upgrade head`; it must end at `b8d4f0c6e3a1` (seven Tool 03 migrations). Nothing in the repo runs migrations on deploy, so confirm how the CRM Project applies them. | PR #33 | Onkar |
 | 3 | Create the Vercel project for `frontend/psychosocial` and add its origin to `CORS_ORIGINS` | P-01, P-11 | Onkar |
 | 4 | Re-check the merge with the latest `dev`: no conflicts, a single Alembic head, the same 10 pre-existing failures | PR #33 | Us |
 | 5 | Install `psycho-social-screening` for the pilot clinic only | S-D-012 | Onkar |
@@ -86,6 +87,7 @@ Look at these with real use, not before.
 | 9 | PDF and CSV file names are built in the browser; expose Content-Disposition when the CRM Project next changes CORS | S-L-013 |
 | 10 | Do patients who withdrew come back when asked, and do providers ask only when the patient said so? | S-D-037 |
 | 11 | Is the 14-day warning overridden often? If yes, the window or the wording needs a look | S-D-038 |
+| 12 | Do providers share reports, which resources do they pick, and do patients open them? Opens are counted per share | S-D-039 |
 | 11 | CRM permission grid lacks the six screening keys | P-08 |
 
 ## 4. Before scale (more clinics, more replicas, more data)

@@ -90,8 +90,9 @@ test('physio sends a screener, patient answers, physio reviews and logs a referr
   await expect(p.getByText(/securely shared with your healthcare provider/)).toBeVisible();
   await expect(p.getByText(/may help to talk things through/)).toHaveCount(0);
   await expect(p.getByText(/physiotherapist/i)).toHaveCount(0);
-  // Never shows the score (7). "24/7" on the helpline card is not a score.
-  await expect(p.getByText(/(?<![\d/])7(?!\d)/)).toHaveCount(0);
+  // Never shows the score (7). "24/7" on the helpline card and a random
+  // clinic tag such as "u7eer5" are not scores: match 7 as a word only.
+  await expect(p.getByText(/(?<![\w/])7(?!\w)/)).toHaveCount(0);
   await shot(p, '08-done');
 
   // Nothing went wrong during the real flow (checked before the deliberate
@@ -636,4 +637,62 @@ test('sending the same screener again within 14 days asks once more', async ({ p
   await warning.getByRole('button', { name: 'Send anyway' }).click();
   await expect(drawer.getByText('Link ready')).toBeVisible();
   expect(problems.filter((x) => !x.includes('409'))).toEqual([]);
+});
+
+test('provider shares a report after the consultation and the patient opens it', async ({ page, request, browser }) => {
+  const c = await makeClinic(request);
+  const path = await assignVia(request, c.therapistToken, c.patientId, ['phq9']);
+  await completeVia(request, path, 'phq9', [2, 2, 2, 2, 2, 2, 2, 2, 2]); // 18, with a risk answer
+  const problems = watch(page);
+
+  await signIn(page, c.therapistEmail, c.password);
+  await page.goto(`/patients/${c.patientId}`);
+  await page.getByRole('link', { name: /PHQ-9/ }).first().click();
+  await expect(page.getByRole('heading', { level: 1, name: /PHQ-9/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Share with patient' }).click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer.getByText('Add clinical advice or next steps (This will be visible to the patient)')).toBeVisible();
+  await drawer.getByRole('button', { name: /Review your sleep routine/ }).click();
+  await drawer.getByLabel('Add clinical advice or next steps (This will be visible to the patient)').press('End');
+  await drawer.getByLabel('Add clinical advice or next steps (This will be visible to the patient)').pressSequentially('\nSee you on Monday.');
+  await drawer.getByText('Guide to sleep hygiene').click();
+  await drawer.getByText('Tele-MANAS mental health helpline').click();
+  await shot(page, '33-share-form');
+  await drawer.getByRole('button', { name: 'Create patient link' }).click();
+  await expect(drawer.getByText('Report link ready')).toBeVisible();
+  await expect(drawer.getByRole('link', { name: 'Send on WhatsApp' })).toHaveAttribute('href', /wa\.me\/919876543210/);
+  const url = await drawer.getByLabel('Patient link').inputValue();
+  expect(url).toMatch(/\/report\/[A-Za-z0-9_-]{20,}$/);
+  await drawer.getByRole('button', { name: 'Close' }).click();
+
+  // Patient, on their own phone.
+  const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const patientProblems = watch(phone, [403]);
+  await phone.goto(new URL(url).pathname);
+  await expect(phone.getByRole('heading', { name: /Your report from Sunrise Physio/ })).toBeVisible();
+  await phone.getByLabel('Year of birth').fill('1990');
+  await phone.getByRole('button', { name: 'Open my report' }).click();
+  await expect(phone.getByText('That year does not match our records. 4 tries left.')).toBeVisible();
+  await phone.getByLabel('Year of birth').fill('1985');
+  await phone.getByRole('button', { name: 'Open my report' }).click();
+  await expect(phone.getByRole('heading', { name: 'Your care notes' })).toBeVisible();
+  await expect(phone.getByText(/Review your sleep routine/)).toBeVisible();
+  await expect(phone.getByText('PHQ-9 score: 18 out of 27')).toBeVisible();
+  await expect(phone.getByText('Elevated indicators of low mood or tiredness.')).toBeVisible();
+  await expect(phone.getByRole('link', { name: /Guide to sleep hygiene/ })).toHaveAttribute('href', /nhs\.uk/);
+  await expect(phone.getByRole('link', { name: 'Call 14416' })).toBeVisible();
+  await expect(phone.getByText(/severe|moderate|risk|urgent|flag|referral/i)).toHaveCount(0);
+  await shot(phone, '34-shared-report');
+  await phone.close();
+  expect(patientProblems.filter((x) => !x.includes('403'))).toEqual([]);
+
+  // Provider sees it was opened, and can stop sharing.
+  await page.goto(`/patients/${c.patientId}`);
+  const shared = page.getByRole('region', { name: 'Shared with patient' });
+  await expect(shared).toContainText('Opened 1 time');
+  await shared.getByRole('button', { name: 'Stop sharing' }).click();
+  await expect(shared).toContainText('Stopped');
+  const gone = await request.get(`${API}/screener/report/${url.split('/').pop()}`);
+  expect(gone.status()).toBe(410);
+  expect(problems).toEqual([]);
 });

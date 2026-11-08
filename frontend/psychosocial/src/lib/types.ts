@@ -402,3 +402,55 @@ export interface ReconsentState {
   expires_at: string;
   consent: ScreenerState['consent'];
 }
+
+// Provider-shared report (founders' F2 follow-up, S-D-039).
+export interface ShareResource {
+  key: string;
+  title: string;
+  description: string;
+  url: string | null;
+  source: string | null;
+  phones: { label: string; tel: string }[];
+}
+
+export interface ShareOptions {
+  resources: ShareResource[];
+  advice_chips: string[];
+  advice_max: number;
+  custom_links_max: number;
+}
+
+export type ShareState = 'active' | 'expired' | 'revoked' | 'locked';
+
+export interface SharedReport {
+  id: string;
+  assignment_id: string;
+  state: ShareState;
+  created_at: string;
+  expires_at: string;
+  shared_by_name: string | null;
+  birth_year_check: boolean;
+  first_opened_at: string | null;
+  open_count: number;
+  advice: string | null;
+  resource_titles: string[];
+}
+
+export interface SharedReportCreated {
+  share: SharedReport;
+  report_path: string;
+}
+
+export interface ReportGate {
+  clinic_name: string;
+  needs_birth_year: boolean;
+}
+
+export interface PatientReport {
+  clinic_name: string;
+  provider_name: string | null;
+  shared_on: string;
+  advice: string | null;
+  summary: { short_name: string; score: number; max_score: number; phrase: string }[];
+  resources: { title: string; description: string | null; url: string | null; domain: string | null; phones: { label: string; tel: string }[] }[];
+}

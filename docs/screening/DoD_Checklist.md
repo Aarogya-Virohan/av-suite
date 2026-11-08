@@ -13,22 +13,23 @@ Status:
 
 Evidence:
 - **API test**: backend test in `backend/tests/screening/test_api.py`, run against Postgres.
-- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat, E2E 8 is anonymised statistics and CSV, E2E 9 is the referral contact directory, E2E 10 is a rejected session returning to sign-in, E2E 11 is the admin's Sent links page, E2E 12 is a link of a clinic whose screening product is turned off, E2E 13 is a patient opting back in after a withdrawal, E2E 14 is the 14-day warning.
+- **E2E**: Playwright test in `frontend/psychosocial/e2e/screening.spec.ts`, run at 390 px and 1440 px. E2E 1 is the physio and patient flow, E2E 2 is admin access, E2E 3 is the invalid link, E2E 4 is admin deletion, E2E 5 is the trend chart and PDF download, E2E 6 is repeat and the Due list, E2E 7 is clinic settings and the default repeat, E2E 8 is anonymised statistics and CSV, E2E 9 is the referral contact directory, E2E 10 is a rejected session returning to sign-in, E2E 11 is the admin's Sent links page, E2E 12 is a link of a clinic whose screening product is turned off, E2E 13 is a patient opting back in after a withdrawal, E2E 14 is the 14-day warning, E2E 15 is a provider sharing a report and the patient opening it.
 - **Founders test**: backend test in `backend/tests/screening/test_founder_decisions.py` (the founders' answers of 7 Nov 2026).
 - **Access rule test**: backend test in `backend/tests/screening/test_clinical_access.py` (who may see results, S-D-036).
 - **Re-consent test**: backend test in `backend/tests/screening/test_reconsent.py` (S-D-037, S-D-038).
+- **Share test**: backend test in `backend/tests/screening/test_share.py` (S-D-039).
 - **Report**: `docs/screening/Scoring_Validation_Report.md` (153 checks).
 - **UI, not in E2E**: the screen exists and was reviewed by hand, but no automated browser test clicks it. The API behind it is tested.
 
-Last full run, 8 Nov 2026 (delivery 15), on this branch: screening backend tests 302 pass, full backend suite 604 pass with the same 10 pre-existing failures (P-09), Playwright 28 of 28 pass (14 tests at two widths), `npm test` 24 of 24 pass, tsc, eslint and `next build` clean, `npm audit --omit=dev` 0 findings.
+Last full run, 9 Nov 2026 (delivery 16), on this branch: screening backend tests 326 pass, full backend suite 628 pass with the same 10 pre-existing failures (P-09), Playwright 30 of 30 pass (15 tests at two widths), `npm test` 26 of 26 pass, tsc, eslint and `next build` clean, `npm audit --omit=dev` 0 findings.
 
 ## Summary
 
 | Status | Requirements |
 |---|---|
-| Done | 26 |
-| Partial | 2 |
-| Not built | 2 |
+| Done | 27 |
+| Partial | 3 |
+| Not built | 0 |
 | Total | 30 |
 
 The founders answered on 7 Nov 2026 (Decisions.md S-D-031 to S-D-035). DASS-21 is no longer sent; its rows below stay Done because past DASS-21 results are still scored and shown.
@@ -92,8 +93,8 @@ The founders answered on 7 Nov 2026 (Decisions.md S-D-031 to S-D-035). DASS-21 i
 
 | # | Requirement | Status | Evidence and notes |
 |---|---|---|---|
-| 1 | Patient sees own score history if the physio enables it | Not built | v1.1. |
-| 2 | Simplified labels (Low, Moderate, High), no clinical wording in the patient view | Not built | v1.1, with item 1. Today the patient never sees a score or a band. |
+| 1 | Patient sees own score history if the physio enables it | Partial | The founders chose a report the provider shares after the consultation (S-D-039): one screening link per share, with advice and resources. A running history across all screenings is not shown to the patient. `test_provider_shares_and_patient_reads_a_sanitised_report`, E2E 15. |
+| 2 | Simplified labels (Low, Moderate, High), no clinical wording in the patient view | Done | The founders' wording replaces the SRS labels: "Within the typical range", "Mild indicators of ...", "Elevated indicators of ...", with the score out of its maximum. Band names, flags and answers never reach the patient. `test_summary_wording`, `test_provider_shares_and_patient_reads_a_sanitised_report`. |
 
 ## 4.3 Clinic Administrator
 

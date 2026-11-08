@@ -34,3 +34,21 @@ export function reconsentMessage(opts: { firstName: string; clinicName: string; 
     `The link works until ${opts.expires}.`,
   ].join('\n\n');
 }
+
+// Founders' wording (7 Nov): no scores or condition in the chat bubble.
+export function reportMessage(opts: {
+  firstName: string;
+  clinicName: string;
+  url: string;
+  expires: string;
+  birthYear: boolean;
+}): string {
+  return [
+    `Hi ${opts.firstName},`,
+    `Your healthcare provider at ${opts.clinicName} has shared your recent wellness screening report and care notes. Please click here to view it: ${opts.url}`,
+    opts.birthYear ? 'For your privacy, the page will ask for your year of birth.' : null,
+    `The link works until ${opts.expires}.`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}

@@ -276,3 +276,16 @@ A one-line index of every decision, and the points to review before deploy, duri
 - Context: suggested in the founders' chat. PHQ-9 and GAD-7 ask about the last 2 weeks, so an earlier repeat mostly re-measures the same period.
 - Choice: sending a screener that went to the same patient in the last 14 days (not counting cancelled ones) returns 409 `RECENTLY_SENT` with the screeners and dates. The send drawer shows the warning with "Send anyway", which repeats the request with `allow_recent: true`. It is a warning, not a block.
 - Decided by: proposal, pending Onkar sign-off.
+
+## S-D-039 Provider-shared report (founders' F2 follow-up)
+- Context: the founders chose the "provider-in-the-loop" model (7 Nov): no automatic sharing; after the consultation the provider shares a report with their advice and helpful resources.
+- Choice, as the founders described it:
+  - A "Share with patient" button on a completed PHQ-9 or GAD-7 result (screening.view, same Own/All scope). It shares the whole link, so PHQ-9 and GAD-7 sent together go together. DASS-21 is not shareable (retired, no patient wording).
+  - The form: "Add clinical advice or next steps (This will be visible to the patient)" with 4 quick-fill chips, "Attach resources" with a checklist (Tele-MANAS, sleep hygiene, progressive muscle relaxation, the pain-stress connection, a breathing exercise), and up to 3 links of the provider's own (https only). Advice or at least one resource is required.
+  - Delivery: a WhatsApp message with no scores or condition, only the link (`/report/{token}`, 30 days by default, 1 to 30).
+  - The patient page shows the provider's advice first, then "PHQ-9 score: 18 out of 27. Elevated indicators of low mood or tiredness.", then "Your prescribed resources". Band names, flags and answers are never sent to the page. Every page ends with the Tele-MANAS and 112 line, shown to everyone so it says nothing about one result.
+- Access check: the founders' chat suggested the year of birth. A year of birth alone has about 100 likely values, so it is not the security; the 256-bit link token is. The year is a second check against a link that reaches the wrong person: it is asked when the patient record has a date of birth, and 5 wrong tries lock the link (the provider shares again). A one-time code to the phone is the long-term check (P-19).
+- Resources: every link was opened and checked on 9 Nov 2026 (NHS Every Mind Matters sleep page, NHS breathing exercise, UCLH relaxation techniques, Tame the Beast). Tele-MANAS has no verified official web page, so it shows the verified numbers as call buttons. Resources live in `app/screening/share.py`.
+- Data: table `psychosocial_shared_reports` (migration `b8d4f0c6e3a1` on `a7c3e9b5d2f8`) stores the advice, chosen resources, own links, expiry, lock and open counts, and only a hash of the token. Scores are read from the completed sessions when the page opens. The provider can stop sharing at any time and sees whether and how often the patient opened it.
+- Audit: `psychosocial.report_shared`, `report_opened` (first open), `report_locked`, `report_revoked`, without scores. Deletion on request removes shared reports.
+- Decided by: founders, 7 Nov 2026 (flow, form, wording, order). Year-of-birth lock, link length and resource list: proposal, pending Onkar sign-off.

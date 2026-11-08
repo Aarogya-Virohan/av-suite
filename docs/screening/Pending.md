@@ -4,7 +4,7 @@
 |---|---|---|---|---|
 | P-01 | Separate `frontend/psychosocial` app | Onkar | Approved 20 Oct. Local build and test only. Vercel project and CORS origin are added by Onkar at deploy time. | No |
 | P-02 | Sparsh's chatbot branch name | Onkar | Later, not needed for Tool 03 | No |
-| P-03 | Founder answers F1 to F6, Q7 and Q8 | Founders | Answered 7 Nov 2026: 1A, refined 2A, enhanced 3A, 4A then 4B, 5A, 6B, 7B, 8B then 8A, and DASS-21 dropped for new links. Built in S-D-031 to S-D-035. Still to build: 7B re-consent (P-17), 4B email (P-16), provider-shared report (P-18). | No |
+| P-03 | Founder answers F1 to F6, Q7 and Q8 | Founders | Answered 7 Nov 2026: 1A, refined 2A, enhanced 3A, 4A then 4B, 5A, 6B, 7B, 8B then 8A, and DASS-21 dropped for new links. Built in S-D-031 to S-D-035. Still to build: 4B email (P-16). 7B re-consent (P-17) and the provider-shared report (P-18) are done. | No |
 | P-04 | Railway env var `SCREENER_CLIENT_IP_HEADER=X-Real-IP` (S-D-018). Optional but recommended, set before merge. | Onkar | Open | No |
 | P-05 | `AV_Suite_Clinical_Reference_v1.xlsx` (Severity_Logic sheet) | Onkar | Onkar is looking for it to upload to the Project | No |
 | P-06 | Tele-MANAS number | Us | Done 20 Oct: 14416 or 1-800-891-4416, 24x7, per PIB release of 11 Feb 2026 | No |
@@ -19,7 +19,9 @@
 | P-15 | Legal check of the consent text `2026-11-07.pilot1` under the DPDP Act, and the B2B contract wording (clinic as data fiduciary, Aarogya Virohan as processor) | Founders | Required before any clinic beyond the pilot (F6 = 6B) | Yes, for scale |
 | P-16 | Email to the provider when a risk result arrives (F4 = 4B): no patient name, score or condition, only "a result needs attention, please sign in". Needs an email provider; the backend has none today. Could also say "screenings are due" (S-L-014). | Us, after a provider choice by Onkar | Next | No |
 | P-17 | Re-consent after a withdrawal (Q7 = 7B) | Us | Done 8 Nov 2026 (S-D-037) | No |
-| P-18 | Provider-shared report (F2 follow-up): after the consultation the provider clicks Share, adds advice and resources, and the patient gets a WhatsApp message with a secure link to a patient-friendly page. Also covers SRS 4.2.3. Access check for that page to be agreed (we advise against Year of Birth as the only check). | Us | After P-17 | No |
+| P-18 | Provider-shared report (F2 follow-up) | Us | Done 9 Nov 2026 (S-D-039) | No |
+| P-19 | One-time code to the patient's phone before a shared report opens, replacing or adding to the year of birth (S-L-024, S-L-025). Needs an SMS or WhatsApp provider; the same provider can carry the 4B email or alerts later | Onkar to choose a provider | Open | No |
+| P-20 | Checked Indian-language resources for the shared report (S-L-026). Each link opened and verified before it goes in | Us, with a provider's review | Open | No |
 
 ## Founder answers: what to rewire
 

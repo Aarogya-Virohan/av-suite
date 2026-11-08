@@ -5,11 +5,14 @@ export const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:800
 export class ApiError extends Error {
   status: number;
   code: string | null;
+  // Extra fields of a {detail: {code, message, ...}} error, e.g. attempts_left.
+  details?: Record<string, unknown>;
 
-  constructor(status: number, message: string, code: string | null) {
+  constructor(status: number, message: string, code: string | null, details?: Record<string, unknown>) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -34,8 +37,8 @@ function readError(status: number, body: unknown): ApiError {
     return new ApiError(status, msg || 'Please check the form and try again.', 'VALIDATION');
   }
   if (b.detail && typeof b.detail === 'object') {
-    const d = b.detail as { code?: string; message?: string };
-    return new ApiError(status, d.message || 'Something went wrong.', d.code ?? null);
+    const d = b.detail as { code?: string; message?: string } & Record<string, unknown>;
+    return new ApiError(status, d.message || 'Something went wrong.', d.code ?? null, d);
   }
   if (b.meta?.error) {
     return new ApiError(status, b.meta.error.message || 'Something went wrong.', b.meta.error.code ?? null);

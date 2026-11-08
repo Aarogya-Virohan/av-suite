@@ -60,7 +60,7 @@ export async function makeClinic(request: APIRequestContext): Promise<Clinic> {
   const patient = await ok<{ id: string }>(
     await request.post(`${API}/patients`, {
       headers: admin,
-      data: { first_name: 'Ritu', last_name: `Sharma${tag}`, phone: '9876543210' },
+      data: { first_name: 'Ritu', last_name: `Sharma${tag}`, phone: '9876543210', date_of_birth: '1985-04-02' },
     }),
   );
   return {
