@@ -459,6 +459,19 @@ Each entry follows this structure:
 
 ---
 
+## [D-031] CRM Production Dependencies Upgraded for Security Advisories; CI Actions on Node 24
+
+- **Date**: 2026-11-08
+- **Context**: The CI security audit (report only) found 7 advisories in the CRM production dependencies: 1 critical in `next` 16.3.2 (remote code execution in the image optimizer and `use cache`, SSRF, cache poisoning), 5 high (`axios`, `follow-redirects`, `sharp`, `source-map-js`, `zod`) and 1 moderate (`baseline-browser-mapping`). The CRM runs on Vercel in production. The same run warned that `actions/checkout@v4`, `actions/setup-node@v4` and `actions/setup-python@v5` target the deprecated Node 20 runtime.
+- **Decision**:
+  - `npm audit fix` in `frontend/crm`, inside the existing version ranges (no `package.json` change): `next` 16.4.5 (with its own `sharp` 0.35.5), `axios` 1.21.0, `zod` 4.6.7, `follow-redirects` 1.16.3, `source-map-js` 1.2.2, `baseline-browser-mapping` 2.11.35. `npm audit --omit=dev` now reports 0.
+  - CI uses `actions/checkout@v5`, `actions/setup-node@v5` and `actions/setup-python@v6` (all Node 24; same inputs).
+  - Only the CRM app in this change. Exercise Library and Posture tool have the same `next` advisories and are upgraded in their own rounds. Backend advisories (python-jose without a fix, weasyprint, Pillow, protobuf) are a separate change.
+- **Verified**: tsc, vitest 49 pass, `next build` on Next.js 16.4.5; Playwright on the production build against a local backend at 390 and 1440 px on nine pages, single and multi clinic users: page width equals the viewport, no page errors, no failed calls except the expected Rx 403 (L-30) and the first step of the multi-clinic login; clinic switch, invoice creation (tax 0) and the old taxed invoice preview still work; CSP and security headers unchanged; image optimizer returns 200.
+- **Affected Files**: `frontend/crm/package-lock.json`, `.github/workflows/ci.yml`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -508,5 +521,6 @@ Each entry follows this structure:
 | L-42 | The invoice PDF download needs a signed-in clinic user, so the `download_url` and WhatsApp link from `POST /invoices/{id}/pdf` cannot be opened by a patient. The CRM WhatsApp button only opens a chat; the PDF is attached by hand | Open; a signed, expiring patient link or email with the PDF attached (C-20) | Backend + frontend |
 | L-43 | Clinic profile update accepted any length for city, state, phone, registration number and authorised person, so longer values returned 500 from the database | Fixed 2026-11-02: length limits in the API, 422 (D-029) | - |
 | L-44 | The clinic switcher is in the sidebar clinic card, which shows only when the sidebar is expanded. With the sidebar collapsed on desktop, a multi-clinic user must expand it to switch | Open; acceptable for now (D-030) | Frontend |
+| L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
 
-*Last updated: 2026-11-08 (D-030; L-44 added) | Branch: feat/crm-branding*
+*Last updated: 2026-11-08 (D-031; L-45 added) | Branch: fix/crm-deps-security*
