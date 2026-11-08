@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronDown, Loader2 } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/api-client';
 import { setStoredToken } from '../../lib/auth';
@@ -30,14 +30,26 @@ function useWorkspaces(enabled: boolean) {
   });
 }
 
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
 /**
- * Clinic name in the top bar. When the account belongs to more than one
- * clinic it opens a list to switch; switching gets a new token for that clinic
- * and reloads, so no data from the previous clinic stays in memory.
+ * Clinic card at the foot of the sidebar, with logout (D-030). When the account
+ * belongs to more than one clinic the card opens a list to switch; switching
+ * gets a new token for that clinic and reloads, so no data from the previous
+ * clinic stays in memory. With one clinic the card is plain text.
  */
-export function WorkspaceSwitcher({ fallbackName }: { fallbackName?: string | null }) {
+export function WorkspaceCard({ clinicName, roleText }: { clinicName: string; roleText: string }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const activeClinicId = useAuthStore((s) => s.clinic?.id ?? s.clinicId ?? null);
+  const logout = useAuthStore((s) => s.logout);
   const { data: workspaces = [] } = useWorkspaces(isAuthenticated);
   const [open, setOpen] = React.useState(false);
   const [switchingTo, setSwitchingTo] = React.useState<string | null>(null);
@@ -59,20 +71,7 @@ export function WorkspaceSwitcher({ fallbackName }: { fallbackName?: string | nu
     };
   }, [open]);
 
-  const label = fallbackName || 'Your clinic';
   const canSwitch = workspaces.length > 1;
-
-  const chipClass =
-    'inline-flex h-10 items-center gap-2 rounded-[10px] border border-line bg-card px-3 text-sm font-semibold text-ink-2';
-
-  if (!canSwitch) {
-    return (
-      <span className={chipClass}>
-        <span className="h-2 w-2 rounded-full bg-logo-teal" aria-hidden="true" />
-        {label}
-      </span>
-    );
-  }
 
   const switchTo = async (clinicId: string) => {
     if (clinicId === activeClinicId) {
@@ -89,30 +88,30 @@ export function WorkspaceSwitcher({ fallbackName }: { fallbackName?: string | nu
       window.location.assign('/dashboard');
     } catch (err: unknown) {
       console.error('Workspace switch failed', err);
-      toast.error(err instanceof Error ? err.message : 'Could not switch workspace.');
+      toast.error(err instanceof Error ? err.message : 'Could not switch clinic.');
       setSwitchingTo(null);
     }
   };
 
+  const identity = (
+    <>
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lime to-fresh text-[11px] font-bold text-midnight">
+        {initials(clinicName)}
+      </span>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="block truncate text-[13px] font-semibold">{clinicName}</span>
+        <span className="block text-[11px] text-[#aab2d6]">{roleText}</span>
+      </span>
+    </>
+  );
+
   return (
     <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={cn(chipClass, 'cursor-pointer transition-colors hover:border-grove')}
-      >
-        <span className="h-2 w-2 rounded-full bg-logo-teal" aria-hidden="true" />
-        {label}
-        <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', open && 'rotate-180')} />
-      </button>
-
-      {open && (
+      {open && canSwitch && (
         <ul
           role="listbox"
-          aria-label="Switch workspace"
-          className="absolute right-0 top-12 z-30 w-64 overflow-hidden rounded-xl border border-line bg-card py-1 shadow-card"
+          aria-label="Switch clinic"
+          className="absolute bottom-full left-0 right-0 z-40 mb-2 overflow-hidden rounded-xl border border-line bg-card py-1 text-ink shadow-card"
         >
           {workspaces.map((w) => {
             const isActive = w.id === activeClinicId;
@@ -141,6 +140,36 @@ export function WorkspaceSwitcher({ fallbackName }: { fallbackName?: string | nu
           })}
         </ul>
       )}
+
+      <div className="flex items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.06] p-2.5">
+        {canSwitch ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-label={`Switch clinic, current: ${clinicName}`}
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg transition-colors hover:bg-white/[0.06]"
+          >
+            {identity}
+            <ChevronsUpDown className="h-4 w-4 shrink-0 text-[#aab2d6]" />
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">{identity}</div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            window.location.replace('/login');
+          }}
+          className="cursor-pointer rounded-md p-1.5 text-[#aab2d6] transition-colors hover:bg-white/10 hover:text-[#ffb4a8]"
+          aria-label="Logout"
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
