@@ -472,6 +472,28 @@ Each entry follows this structure:
 
 ---
 
+## [D-032] Backend JWT on PyJWT Instead of python-jose; WeasyPrint 70
+
+- **Date**: 2026-11-09
+- **Context**: The CI security audit (pip-audit) reports `python-jose` 3.5.0 (no fixed release exists), its dependency `ecdsa` 0.19.2, and two advisories in `weasyprint` 69.0. python-jose signs and checks every login token (`app/core/security.py`, `app/middleware/clinic_gate.py`) and the posture detection token (`app/services/posture/review.py`, shared Posture code). Tokens already given out by production must keep working through the deploy.
+- **Decision**:
+  - Tokens are signed and checked with PyJWT 2.15.1 (`requirements.txt`; `pyproject.toml` no longer lists python-jose). PyJWT 2.15.1 was already installed in production as a dependency of `supabase-auth`, so no new package is added; `python-jose` and `ecdsa` are removed.
+  - Same algorithm (`JWT_ALGORITHM`, HS256), same secret (`JWT_SECRET_KEY`), same claims (`sub`, `clinic_id`, `role`, `exp`, `iat`; posture: `purpose`, `views`, `exp`, `iat`), same expiry setting. Code catches `PyJWTError`; the middleware raises `InvalidTokenError` for a token without `sub` or `clinic_id`. No alias keeps the old `JWTError` name.
+  - PyJWT checks are kept at their defaults. One check is stricter than python-jose: a token whose `iat` is in the future is rejected. Our server issues and verifies its own tokens with one clock, so this does not affect real users; it was kept instead of switching the check off.
+  - `weasyprint` 69.0 to 70.0. The only visible change is the angled gradient in the PDF letterhead band (colour values differ by up to 12 of 255 inside the band); text, fonts, layout and page count are the same.
+  - Posture shares `app/services/posture/review.py` and the letterhead; the Posture report PDF uses the same gradient. The Tool 03 branch has the same five python-jose files and needs this change after it merges.
+- **Verified**:
+  - Tokens made by the old code (python-jose) verify with the new code, and tokens made by the new code verify with the old code; header and claims are identical. Expired, signature-tampered and claim-tampered tokens are rejected by both; `alg: none` is rejected. Posture detection token works both ways.
+  - Running API on PyJWT: register, login, `/auth/me`, patients, appointments, leads, invoices return 200; a token made by python-jose for the same user returns 200; expired python-jose token, tampered token and no token return 401 with the same error body. Live invoice PDF download 200.
+  - Invoice, receipt and prescription PDFs rendered with 69.0 and 70.0 from the same data and compared page by page (see above).
+  - Full pytest on a fresh Postgres 16 on this branch and on its base: 435 passed, 10 failed on both, and the failures are exactly `tests/known_failures.txt`.
+  - CRM production build, Playwright login and Dashboard, Patients, Billing and Appointments at 1440 and 390 px: no page errors, no failed API calls, page width equals the viewport.
+  - pip-audit on `requirements.txt`: python-jose, ecdsa and weasyprint no longer reported. Pillow, pillow-heif and protobuf remain (Posture dependencies, separate change).
+  - Not tested: the Docker image build (Docker Hub not reachable from the test machine); the first CI run and the Railway deploy are the check.
+- **Affected Files**: `backend/requirements.txt`, `backend/pyproject.toml`, `backend/app/core/security.py`, `backend/app/middleware/clinic_gate.py`, `backend/app/services/posture/review.py`, `backend/tests/test_appointments_and_requests_api.py`, `backend/tests/test_recycle_bin_soft_delete.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -522,5 +544,6 @@ Each entry follows this structure:
 | L-43 | Clinic profile update accepted any length for city, state, phone, registration number and authorised person, so longer values returned 500 from the database | Fixed 2026-11-02: length limits in the API, 422 (D-029) | - |
 | L-44 | The clinic switcher is in the sidebar clinic card, which shows only when the sidebar is expanded. With the sidebar collapsed on desktop, a multi-clinic user must expand it to switch | Open; acceptable for now (D-030) | Frontend |
 | L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
+| L-46 | WeasyPrint 70 warns that a future version will need the HarfBuzz subset library, which the backend Docker image does not install. PDFs are made correctly today | Open; add the library to the Docker image and check a deploy before the next WeasyPrint major upgrade (D-032) | Backend |
 
-*Last updated: 2026-11-08 (D-031; L-45 added) | Branch: fix/crm-deps-security*
+*Last updated: 2026-11-09 (D-032; L-46 added) | Branch: fix/backend-jwt*

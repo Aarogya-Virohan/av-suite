@@ -19,7 +19,8 @@ Security Considerations:
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-from jose import jwt, JWTError
+import jwt
+from jwt import InvalidTokenError, PyJWTError
 from app.core.config import settings
 import logging
 
@@ -143,7 +144,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             # - Signature verify karta hai (tampering detection)
             # - Expiration check karta hai
             # - Algorithm validation karta hai
-            # Agar invalid = JWTError exception
+            # Agar invalid = PyJWTError exception
             payload = jwt.decode(
                 token,
                 settings.JWT_SECRET_KEY,
@@ -162,7 +163,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             # Missing claims = corrupted token
             if not clinic_id or not user_id:
                 logger.warning(f"Missing required JWT claims for {path}")
-                raise JWTError("Invalid token payload")
+                raise InvalidTokenError("Invalid token payload")
 
             # Set request context
             # request.state mein middleware data store karte hain
@@ -172,7 +173,7 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
             request.state.user_id = user_id
             logger.info(f"Authorization token accepted - user: {user_id}, clinic: {clinic_id}")
 
-        except JWTError as e:
+        except PyJWTError as e:
             # JWT validation failed
             # Reasons:
             # - Invalid signature (tampered token)

@@ -1,7 +1,7 @@
 import pytest
 from httpx import AsyncClient
 from app.core.config import settings
-from jose import jwt
+import jwt
 
 @pytest.mark.asyncio
 async def test_public_booking_request_and_approval_flow(client: AsyncClient, auth_headers: dict):
@@ -19,7 +19,7 @@ async def test_public_booking_request_and_approval_flow(client: AsyncClient, aut
     })
     assert reg_response.status_code in (200, 201)
     token = reg_response.json()["data"]["access_token"]
-    decoded = jwt.decode(token, key="", options={"verify_signature": False})
+    decoded = jwt.decode(token, options={"verify_signature": False})
     clinic_id = decoded["clinic_id"]
     user_id = decoded["sub"]
 
