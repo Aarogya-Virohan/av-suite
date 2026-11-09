@@ -1,0 +1,453 @@
+"""Tool 03 Psycho-Social Screening tables.
+
+One assignment is one patient link. It holds a hashed access token and one
+session per instrument (PHQ-9, GAD-7, DASS-21). Sessions keep the raw
+responses, the instrument id and version, and the computed result, so a
+result can always be re-derived and explained.
+
+Completed sessions are immutable. Besides the service-layer checks, a
+Postgres trigger rejects any UPDATE of a session row whose status is
+already 'completed' (see the DDL at the bottom of this file and migration
+b3d7e1f0c2a9).
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    event,
+)
+from sqlalchemy import DDL, text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
+
+from app.models.base import Base, TimestampMixin
+
+# JSONB on Postgres, plain JSON elsewhere (SQLite test runs).
+JSONType = JSON().with_variant(JSONB(), "postgresql")
+
+ASSIGNMENT_STATUSES = ("active", "completed", "cancelled")
+SESSION_STATUSES = ("pending", "in_progress", "completed", "cancelled")
+CONSENT_STATUSES = ("granted", "withdrawn")
+CONSENT_REQUEST_STATUSES = ("pending", "granted", "declined", "cancelled")
+SCHEDULE_MIN_DAYS = 7
+SCHEDULE_MAX_DAYS = 364
+REFERRAL_ACTIONS = (
+    "referred_gp",
+    "referred_psychologist",
+    "referred_psychiatrist",
+    "already_under_care",
+    "patient_declined",
+    "monitor_and_rescreen",
+    "other",
+)
+
+
+def _in(column: str, values: tuple[str, ...]) -> str:
+    quoted = ", ".join(f"'{v}'" for v in values)
+    return f"{column} IN ({quoted})"
+
+
+class PsychosocialAssignment(Base, TimestampMixin):
+    __tablename__ = "psychosocial_assignments"
+    __table_args__ = (
+        CheckConstraint(_in("status", ASSIGNMENT_STATUSES), name="ck_psy_assignment_status"),
+        Index("ix_psy_assignments_clinic_patient", "clinic_id", "patient_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # SHA-256 hex of the URL token. The token itself is never stored.
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    sessions: Mapped[list["PsychosocialSession"]] = relationship(
+        back_populates="assignment",
+        cascade="all, delete-orphan",
+        order_by="PsychosocialSession.position",
+        lazy="selectin",
+    )
+
+
+class PsychosocialSession(Base, TimestampMixin):
+    __tablename__ = "psychosocial_sessions"
+    __table_args__ = (
+        CheckConstraint(_in("status", SESSION_STATUSES), name="ck_psy_session_status"),
+        Index("ix_psy_sessions_clinic_patient_instrument", "clinic_id", "patient_id", "instrument_id"),
+        Index("ix_psy_sessions_clinic_status", "clinic_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    assignment_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("psychosocial_assignments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    instrument_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    instrument_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    # {item_id: value}. Items are answered strictly in order.
+    responses: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False, default=dict)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Serialised ScoreResult, written once on submit.
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
+    referral_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    risk_item_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    assignment: Mapped[PsychosocialAssignment] = relationship(back_populates="sessions")
+
+
+class PsychosocialConsent(Base):
+    """Append-only consent log. The latest row per patient is the current state."""
+
+    __tablename__ = "psychosocial_consents"
+    __table_args__ = (
+        CheckConstraint(_in("status", CONSENT_STATUSES), name="ck_psy_consent_status"),
+        Index("ix_psy_consents_clinic_patient", "clinic_id", "patient_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    assignment_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("psychosocial_assignments.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    text_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# Referral contact directory (SRS 4.3.1). Kept identical to migration e7a1c4b9d2f6.
+CONTACT_NAME_MAX = 120
+CONTACT_ROLE_MAX = 80
+CONTACT_PHONE_MAX = 32
+CONTACT_EMAIL_MAX = 254
+CONTACT_NOTE_MAX = 500
+
+
+class PsychosocialReferralContact(Base, TimestampMixin):
+    """A person or service the clinic refers patients to (SRS 4.3.1, S-D-029).
+
+    Clinic-level data, no patient information. Never deleted: archiving hides
+    it from the picker while referral actions that named it keep their copy of
+    the name and role. At least one of phone or email is required.
+    """
+
+    __tablename__ = "psychosocial_referral_contacts"
+    __table_args__ = (
+        CheckConstraint("phone IS NOT NULL OR email IS NOT NULL", name="ck_psy_contact_reachable"),
+        Index("ix_psy_contacts_clinic", "clinic_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(CONTACT_NAME_MAX), nullable=False)
+    role: Mapped[str] = mapped_column(String(CONTACT_ROLE_MAX), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(CONTACT_PHONE_MAX), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(CONTACT_EMAIL_MAX), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(CONTACT_NOTE_MAX), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class PsychosocialReferralAction(Base):
+    """Append-only log of what the physio did about a referral flag."""
+
+    __tablename__ = "psychosocial_referral_actions"
+    __table_args__ = (
+        CheckConstraint(_in("action", REFERRAL_ACTIONS), name="ck_psy_referral_action"),
+        Index("ix_psy_referrals_clinic_patient", "clinic_id", "patient_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("psychosocial_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recorded_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Referral contact chosen from the clinic directory (SRS 4.3.1, S-D-029).
+    # Name and role are copied at the time, so the log still says who it was
+    # after the contact is edited or archived.
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("psychosocial_referral_contacts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    contact_name: Mapped[str | None] = mapped_column(String(CONTACT_NAME_MAX), nullable=True)
+    contact_role: Mapped[str | None] = mapped_column(String(CONTACT_ROLE_MAX), nullable=True)
+
+
+class PsychosocialSchedule(Base, TimestampMixin):
+    """Repeat a screener for a patient every ``interval_days`` (SRS 4.1.1).
+
+    The schedule never sends anything by itself: links go out through the
+    physio's WhatsApp. It only decides when a screener is due again, so the
+    clinic sees it in the Due list (S-D-026). One active schedule per patient
+    and screener; stopping it keeps the row with ``stopped_at`` set.
+    """
+
+    __tablename__ = "psychosocial_schedules"
+    __table_args__ = (
+        CheckConstraint(
+            f"interval_days BETWEEN {SCHEDULE_MIN_DAYS} AND {SCHEDULE_MAX_DAYS}",
+            name="ck_psy_schedule_interval",
+        ),
+        Index("ix_psy_schedules_clinic_patient", "clinic_id", "patient_id"),
+        Index(
+            "uq_psy_schedules_active",
+            "clinic_id",
+            "patient_id",
+            "instrument_id",
+            unique=True,
+            postgresql_where=text("stopped_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    instrument_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    interval_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    stopped_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+# Clinic-wide default repeat per screener (SRS 4.3.2). Weeks, same range the
+# assign form accepts. Kept identical to migration d5f9b3c7e2a4.
+DEFAULT_REPEAT_MIN_WEEKS = 1
+DEFAULT_REPEAT_MAX_WEEKS = 52
+
+
+class PsychosocialClinicSetting(Base, TimestampMixin):
+    """Per-clinic, per-screener configuration (SRS 4.3.2, S-D-027).
+
+    Today it holds only the default repeat interval that prefills the Repeat
+    field when a screener is sent. ``None`` means "just once". Changing it
+    never touches repeat schedules that already exist. Referral thresholds are
+    not stored here: they are fixed at the published norms until the founders
+    decide otherwise (Pending P-13).
+    """
+
+    __tablename__ = "psychosocial_clinic_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "default_repeat_weeks IS NULL OR default_repeat_weeks BETWEEN "
+            f"{DEFAULT_REPEAT_MIN_WEEKS} AND {DEFAULT_REPEAT_MAX_WEEKS}",
+            name="ck_psy_setting_repeat_weeks",
+        ),
+        Index("uq_psy_settings_clinic_instrument", "clinic_id", "instrument_id", unique=True),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    instrument_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    default_repeat_weeks: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+
+class PsychosocialConsentRequest(Base, TimestampMixin):
+    """Consent-only link after a withdrawal (Q7 = 7B, S-D-037).
+
+    The patient opens it on their own phone and chooses again. Accepting
+    writes a new granted consent row; declining changes nothing else.
+    """
+
+    __tablename__ = "psychosocial_consent_requests"
+    __table_args__ = (
+        CheckConstraint(_in("status", CONSENT_REQUEST_STATUSES), name="ck_psy_consent_request_status"),
+        Index("ix_psy_consent_requests_clinic_patient", "clinic_id", "patient_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # SHA-256 hex of the URL token. The token itself is never stored.
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PsychosocialSharedReport(Base, TimestampMixin):
+    """A report the provider shared with the patient after the consultation.
+
+    Founders' F2 follow-up (S-D-039). Holds only what the provider wrote and
+    chose; scores are read from the immutable sessions of `assignment_id`
+    when the patient opens the link. The token is stored only as a hash.
+    """
+
+    __tablename__ = "psychosocial_shared_reports"
+    __table_args__ = (Index("ix_psy_shared_reports_clinic_patient", "clinic_id", "patient_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    assignment_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("psychosocial_assignments.id", ondelete="CASCADE"), nullable=False
+    )
+    shared_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    advice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resource_keys: Mapped[list[str]] = mapped_column(JSONType, nullable=False, default=list)
+    custom_links: Mapped[list[dict[str, str]]] = mapped_column(JSONType, nullable=False, default=list)
+    # Year of birth asked before the page opens, when the patient record has one.
+    birth_year_check: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    open_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class PsychosocialSessionReview(Base):
+    """A provider opened a result (F4 = 4A, S-D-033).
+
+    Append-only. The Priority review list shows a risk result until a
+    provider who may see it has opened it after it was completed. It is a
+    separate table because completed sessions are immutable.
+    """
+
+    __tablename__ = "psychosocial_session_reviews"
+    __table_args__ = (Index("ix_psy_reviews_clinic_session", "clinic_id", "session_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("clinics.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("psychosocial_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# --- Immutability guard (Postgres only) ------------------------------------
+# Same SQL as migration b3d7e1f0c2a9, so tests that build the schema with
+# create_all() get exactly the trigger production has. DDL() treats % as a
+# format character, hence the escaping below.
+IMMUTABLE_FUNCTION_SQL = """
+CREATE OR REPLACE FUNCTION psychosocial_sessions_block_completed_update()
+RETURNS trigger AS $$
+BEGIN
+    IF OLD.status = 'completed' THEN
+        RAISE EXCEPTION 'psychosocial session % is completed and immutable', OLD.id
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+"""
+
+IMMUTABLE_TRIGGER_SQL = """
+CREATE TRIGGER trg_psychosocial_sessions_immutable
+BEFORE UPDATE ON psychosocial_sessions
+FOR EACH ROW EXECUTE FUNCTION psychosocial_sessions_block_completed_update();
+"""
+
+event.listen(
+    PsychosocialSession.__table__,
+    "after_create",
+    DDL(IMMUTABLE_FUNCTION_SQL.replace("%", "%%")).execute_if(dialect="postgresql"),
+)
+event.listen(
+    PsychosocialSession.__table__,
+    "after_create",
+    DDL(IMMUTABLE_TRIGGER_SQL).execute_if(dialect="postgresql"),
+)

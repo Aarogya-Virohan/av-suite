@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     
     # Cloudflare Turnstile Configuration (Optional)
     TURNSTILE_SECRET_KEY: str | None = None
+
+    # Tool 03 public screener rate limiting. Name of a request header that
+    # the edge proxy always overwrites with the real client IP (on Railway:
+    # X-Real-IP). Unset means request.client.host, which uvicorn derives from
+    # X-Forwarded-For because the Dockerfile runs it with --proxy-headers.
+    SCREENER_CLIENT_IP_HEADER: str | None = None
     
     # Database Configuration
     # DATABASE_URL: PostgreSQL async connection string
