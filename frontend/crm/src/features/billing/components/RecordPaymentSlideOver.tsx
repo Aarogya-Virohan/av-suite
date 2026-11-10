@@ -8,8 +8,6 @@ import { Loader2 } from 'lucide-react';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { paymentFormSchema, PaymentFormValues } from '../../../lib/schemas';
 import { useRecordPayment, useInvoices } from '../api';
-import { usePatients } from '../../patients/api';
-import { hasCapability } from '../../../config/permissions';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
 import { formatMoney } from '../../../lib/money';
 import { localDateTimeInputToISO, localToday } from '../../../lib/datetime';
@@ -42,15 +40,12 @@ function balanceOf(inv: { total_amount: number | string; paid_amount: number | s
 export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOverProps) {
   const recordPayment = useRecordPayment();
   const { data: invoices = [] } = useInvoices();
-  const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
-  const patients = patientsResponse?.data || [];
 
   const payable = invoices.filter((inv) => inv.status !== 'cancelled' && balanceOf(inv) > 0);
 
-  const patientName = (id: string) => {
-    const p = patients.find((x) => x.id === id);
-    return p ? `${p.first_name} ${p.last_name}` : `Patient #${id.slice(0, 8).toUpperCase()}`;
-  };
+  // The invoice carries the patient's name (Decisions.md L-8 closed).
+  const patientName = (inv: { patient_id: string; patient_name?: string | null }) =>
+    inv.patient_name?.trim() || `Patient #${inv.patient_id.slice(0, 8).toUpperCase()}`;
 
   const {
     register,
@@ -143,7 +138,7 @@ export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOv
             <option value="">{payable.length ? 'Select invoice…' : 'No invoices with a balance due'}</option>
             {payable.map((inv) => (
               <option key={inv.id} value={inv.id}>
-                {inv.invoice_number} · {patientName(inv.patient_id)} · Balance {formatMoney(balanceOf(inv).toFixed(2))}
+                {inv.invoice_number} · {patientName(inv)} · Balance {formatMoney(balanceOf(inv).toFixed(2))}
               </option>
             ))}
           </select>
@@ -154,7 +149,7 @@ export function RecordPaymentSlideOver({ isOpen, onClose }: RecordPaymentSlideOv
           <div className="grid grid-cols-3 gap-3 rounded-xl border border-line bg-canvas p-3 text-xs">
             <div>
               <p className="text-muted">Patient</p>
-              <p className="mt-0.5 font-semibold text-ink">{patientName(selected.patient_id)}</p>
+              <p className="mt-0.5 font-semibold text-ink">{patientName(selected)}</p>
             </div>
             <div>
               <p className="text-muted">Total / Paid</p>

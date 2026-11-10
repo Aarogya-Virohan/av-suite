@@ -2,13 +2,15 @@
 
 import React from 'react';
 import { Invoice } from '../../../types/api';
-import { usePatients } from '../../patients/api';
+import { usePatient } from '../../patients/api';
 import { useClinicSettings } from '../../settings/api';
-import { useInvoicePayments } from '../api';
+import { downloadInvoicePdf, useInvoicePayments } from '../api';
 import { hasCapability } from '../../../config/permissions';
 import { useAuthStore } from '../../../store';
 import { formatMoney } from '../../../lib/money';
-import { Printer, X } from 'lucide-react';
+import { Download, Loader2, MessageSquare, Printer, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { openWhatsApp } from '../../../components/ui/WhatsAppButton';
 import { Badge, type BadgeTone, Button } from '../../../components/ui/brand';
 
 interface InvoicePreviewModalProps {
@@ -58,12 +60,18 @@ interface LineItem {
  * clinic settings. It previously printed a hardcoded clinic name
  * ("Aarogya Virohan Health Center"), a made-up address and phone, a fallback
  * phone number for patients without one, and an invented line item.
- * Clinic address/phone/registration are not stored yet (Decisions.md L-14),
- * so they are left out rather than invented.
+ * The clinic's address, contacts, registration number and GSTIN come from
+ * the clinic profile (Settings); empty fields are left out (D-026).
  */
+
+const percentText = (value: string | number | null | undefined) => {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? `${Number(n.toFixed(2))}%` : null;
+};
 export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice' }: InvoicePreviewModalProps) {
-  const { data: patientsResponse } = usePatients(undefined, 1, 100, isOpen && hasCapability('patients.view'));
-  const patients = patientsResponse?.data || [];
+  // The phone (for WhatsApp and the "Billed To" block) is read from the one patient.
+  const { data: patient } = usePatient(invoice?.patient_id ?? '', isOpen && hasCapability('patients.view'));
   const authClinic = useAuthStore((s) => s.clinic);
   const { data: clinicSettings } = useClinicSettings(!authClinic && hasCapability('settings.view'));
   const clinic = authClinic || clinicSettings;
@@ -73,6 +81,8 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
     invoice?.id,
     isOpen && isReceipt,
   );
+
+  const [downloading, setDownloading] = React.useState(false);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -85,12 +95,18 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
 
   if (!isOpen || !invoice) return null;
 
-  const patient = patients.find((p) => p.id === invoice.patient_id);
-  // Only the first 100 patients are loaded here (Decisions.md L-8).
-  const patientName = patient
-    ? `${patient.first_name} ${patient.last_name}`
-    : `Patient #${invoice.patient_id.slice(0, 8).toUpperCase()}`;
+  const patientName =
+    invoice.patient_name?.trim() ||
+    (patient ? `${patient.first_name} ${patient.last_name}` : `Patient #${invoice.patient_id.slice(0, 8).toUpperCase()}`);
   const clinicName = clinic?.name || 'Clinic';
+  const filled = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+  // "12 MG Road, Sector 18, Noida, Uttar Pradesh 201301"
+  const place = [filled(clinic?.city), filled(clinic?.state)].filter(Boolean).join(', ');
+  const placeWithPin = [place, filled(clinic?.pincode)].filter(Boolean).join(' ');
+  const clinicAddress = [filled(clinic?.address_line), placeWithPin].filter(Boolean).join(', ');
+  const clinicContacts = [clinic?.phone, clinic?.email].filter((v) => v && String(v).trim()).join(' · ');
+  const discountPct = percentText(invoice.discount_percent);
+  const taxPct = percentText(invoice.tax_percent);
 
   const items: LineItem[] = (invoice.items as LineItem[] | undefined)?.length
     ? (invoice.items as LineItem[])
@@ -98,6 +114,46 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
 
   const balance = Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0);
   const docTitle = isReceipt ? 'Payment Receipt' : 'Invoice';
+
+  // The server renders the real PDF with the same content (D-027, L-41).
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      await downloadInvoicePdf(invoice.id, invoice.invoice_number, isReceipt ? 'receipt' : 'invoice');
+    } catch {
+      toast.error(`Could not download the ${isReceipt ? 'receipt' : 'invoice'} PDF. Please try again.`);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  // The browser uses the page title as the PDF file name, so it is set for the
+  // print and restored after (C-20).
+  const printOrSave = () => {
+    const previous = document.title;
+    const safe = (s: string) => s.replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '');
+    document.title = `${isReceipt ? 'Receipt' : 'Invoice'}_${safe(invoice.invoice_number)}_${safe(patientName)}`;
+    const restore = () => {
+      document.title = previous;
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    window.print();
+  };
+
+  // Click-to-chat with the patient; the PDF is attached by hand in WhatsApp.
+  const sendOnWhatsApp = () => {
+    const lines = [
+      `Hi ${patientName},`,
+      '',
+      `${isReceipt ? 'Payment receipt' : 'Invoice'} ${invoice.invoice_number} from ${clinicName}`,
+      `Total: ${money(invoice.total_amount)}`,
+      `Paid: ${money(invoice.paid_amount)}`,
+    ];
+    if (!isReceipt && balance > 0) lines.push(`Balance due: ${money(balance)}`);
+    lines.push('', `The ${isReceipt ? 'receipt' : 'invoice'} PDF is attached.`, '', 'Thank you.');
+    openWhatsApp(patient?.phone, patientName, lines.join('\n'), clinicName);
+  };
 
   return (
     <div
@@ -118,9 +174,19 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
             {docTitle} · {invoice.invoice_number}
           </h2>
           <div className="flex items-center gap-2">
-            <Button onClick={() => window.print()}>
+            {patient?.phone && (
+              <Button variant="secondary" onClick={sendOnWhatsApp} title="Open WhatsApp with a message to the patient. Attach the downloaded PDF there.">
+                <MessageSquare className="h-4 w-4" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </Button>
+            )}
+            <Button variant="secondary" onClick={printOrSave} title="Print this page">
               <Printer className="h-4 w-4" />
-              <span>Print {isReceipt ? 'Receipt' : 'Invoice'}</span>
+              <span className="hidden sm:inline">Print</span>
+            </Button>
+            <Button onClick={downloadPdf} disabled={downloading} title="Download the PDF made by the server">
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <span><span className="hidden sm:inline">Download </span>PDF</span>
             </Button>
             <button
               onClick={onClose}
@@ -140,7 +206,18 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={clinic.branding_logo_url} alt="" className="h-12 w-12 rounded object-contain" />
               )}
-              <h1 className="font-display text-xl font-extrabold tracking-tight text-[#0b1238]">{clinicName}</h1>
+              <div>
+                <h1 className="font-display text-xl font-extrabold tracking-tight text-[#0b1238]">{clinicName}</h1>
+                {clinicAddress && <p className="mt-0.5 text-[#5d6380]">{clinicAddress}</p>}
+                {clinicContacts && <p className="text-[#5d6380]">{clinicContacts}</p>}
+                {(clinic?.registration_number || clinic?.gstin) && (
+                  <p className="text-[#5d6380]">
+                    {clinic?.registration_number && <span>Reg. No. {clinic.registration_number}</span>}
+                    {clinic?.registration_number && clinic?.gstin && <span> · </span>}
+                    {clinic?.gstin && <span>GSTIN {clinic.gstin}</span>}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="text-right">
               <span className="block font-display text-lg font-extrabold uppercase text-[#0b1238]">
@@ -212,7 +289,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
               {Number(invoice.discount_amount || 0) > 0 && (
                 <tr>
                   <td className="p-2.5 text-[#5d6380]" colSpan={3}>
-                    Discount
+                    Discount{discountPct ? ` (${discountPct})` : ''}
                   </td>
                   <td className="p-2.5 text-right tabular-nums text-[#5d6380]">- {money(invoice.discount_amount)}</td>
                 </tr>
@@ -220,7 +297,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
               {Number(invoice.tax_amount || 0) > 0 && (
                 <tr>
                   <td className="p-2.5 text-[#5d6380]" colSpan={3}>
-                    Tax
+                    Tax{taxPct ? ` (${taxPct})` : ''}
                   </td>
                   <td className="p-2.5 text-right tabular-nums text-[#5d6380]">{money(invoice.tax_amount)}</td>
                 </tr>
@@ -296,9 +373,11 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
           )}
 
           <div className="flex items-end justify-between border-t border-[#ebe5d8] pt-8 text-[11px] text-[#767b93]">
-            <p>Computer-generated document. Thank you for visiting {clinicName}.</p>
-            <div className="w-36 border-t border-[#767b93] pt-1 text-center">
-              <p className="font-bold text-[#141a33]">Authorized Signatory</p>
+            {/* Clinics have no digital signature, so no signature line (C-19). */}
+            <p>This is a computer-generated {isReceipt ? 'receipt' : 'invoice'} and does not need a signature.</p>
+            <div className="text-right">
+              {clinic?.authorised_person && <p>Authorised by {clinic.authorised_person}</p>}
+              <p>Thank you for visiting {clinicName}.</p>
             </div>
           </div>
         </div>
