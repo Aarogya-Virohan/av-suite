@@ -2,7 +2,7 @@
 
 One place to see what was decided and what must be looked at again, and when. Details stay in Decisions.md (S-D), Known_Limitations.md (S-L) and Pending.md (P). This file links to them and does not repeat them. Update it in the same commit as any new decision or limitation.
 
-Last updated: 9 Nov 2026 (S-D-036 to S-D-039).
+Last updated: 10 Nov 2026 (S-D-040; P-08, P-14 and the deploy rows checked against `release/crm-oct` 68adf0d).
 
 ## 1. Decision index
 
@@ -49,6 +49,7 @@ Status: **Onkar** = decided by Onkar. **Founders** = decided by the founders on 
 | S-D-037 | Consent-only link after a withdrawal | Founders (Q7 = 7B), flow Sign-off |
 | S-D-038 | Warning before sending the same screener again within 14 days | Sign-off |
 | S-D-039 | Provider-shared report: advice, plain score summary, resources; year of birth check | Founders (F2 follow-up), checks Sign-off |
+| S-D-040 | Next.js 16.4.5, same release as the CRM; production audit 0 | Onkar |
 
 ## 2. Before merge and deploy
 
@@ -57,9 +58,9 @@ Nothing here is optional for the first deploy. Work through it in order.
 | # | Point | Source | Owner |
 |---|---|---|---|
 | 1 | Set `SCREENER_CLIENT_IP_HEADER=X-Real-IP` on Railway | P-04, S-D-018 | Onkar |
-| 2 | Before migrating, check the target database: `alembic current` must show a revision from `dev`, and `\dt` and `\dT` must match it. A stale revision stamp on an empty database made a local upgrade fail on 22 Oct. Then run `alembic upgrade head`; it must end at `b8d4f0c6e3a1` (seven Tool 03 migrations). Nothing in the repo runs migrations on deploy, so confirm how the CRM Project applies them. | PR #33 | Onkar |
+| 2 | Before migrating, check the target database: `alembic current` must show a revision from `dev`, and `\dt` and `\dT` must match it. A stale revision stamp on an empty database made a local upgrade fail on 22 Oct. Production needs no manual run: the Railway backend service runs `alembic upgrade head` as its pre-deploy command, so migrations run on every deploy (Onkar checked Settings > Deploy on 10 Nov 2026). For a local database, run `alembic upgrade head`; it must end at the single head of the merged branch (row 4). | PR #33 | Onkar |
 | 3 | Create the Vercel project for `frontend/psychosocial` and add its origin to `CORS_ORIGINS` | P-01, P-11 | Onkar |
-| 4 | Re-check the merge with the latest `dev`: no conflicts, a single Alembic head, the same 10 pre-existing failures | PR #33 | Us |
+| 4 | Re-check the merge with the latest `dev`: the same 10 pre-existing failures and a single Alembic head. Once `release/crm-oct` reaches `dev`, merging `dev` into PR #33 gives two heads, `f2b6c8d0a134` (CRM) and `b8d4f0c6e3a1` (Tool 03), and `alembic upgrade head` fails with multiple heads, including in the Railway pre-deploy. Add a merge revision with both as `down_revision` in the same change. Expect one conflict, in the imports of `backend/app/api/v1/users.py` (trial merge of `release/crm-oct` 68adf0d on 10 Nov): keep both lines, `from app.screening.access import check_clinical_grant` and `from app.services.audit import log_event_safely`. | PR #33 | Us |
 | 5 | Install `psycho-social-screening` for the pilot clinic only | S-D-012 | Onkar |
 | 6 | Done 7 Nov: consent text approved for the pilot (6B). The DPDP legal check is due before a wider launch | F6, S-D-016, P-15 | Founders |
 | 7 | Done 7 Nov: F1 = 1A | F1, S-D-005 | Founders |
@@ -67,7 +68,7 @@ Nothing here is optional for the first deploy. Work through it in order.
 | 9 | Done 7 Nov (8B): our team creates staff logins for a screening-only clinic | Q8, S-L-010 | Founders |
 | 10 | Run `npm audit --omit=dev` in `frontend/psychosocial` on the day of the merge: it must show 0 findings. Advisories for `next` changed twice in two weeks (S-D-030). Never `npm audit fix --force`. | S-D-030 | Us |
 | 11 | Compare thresholds with `AV_Suite_Clinical_Reference_v1.xlsx` once uploaded; published norms win | P-05, S-L-003 | Onkar, then us |
-| 12 | The other live apps on `dev` still run vulnerable `next`, and the backend still has Pillow 10.4.0. Not a blocker for Tool 03, but it should not wait for it. | P-14 | Onkar to assign |
+| 12 | The exercise library and the posture tool still run `next` 16.2.4, and the backend `requirements.txt` still has Pillow 10.4.0, pillow-heif 0.18.0 and protobuf 4.25.9. CRM and Tool 03 are on `next` 16.4.5. Not a blocker for Tool 03, but it should not wait for it. | P-14 | Onkar to assign |
 | 13 | Done 8 Nov: results access only for treating providers (S-D-036) | S-L-008, S-D-016 | Onkar |
 
 ## 3. After deploy, during the pilot
@@ -88,7 +89,7 @@ Look at these with real use, not before.
 | 10 | Do patients who withdrew come back when asked, and do providers ask only when the patient said so? | S-D-037 |
 | 11 | Is the 14-day warning overridden often? If yes, the window or the wording needs a look | S-D-038 |
 | 12 | Do providers share reports, which resources do they pick, and do patients open them? Opens are counted per share | S-D-039 |
-| 11 | CRM permission grid lacks the six screening keys | P-08 |
+| 13 | CRM permission grid lacks the six screening keys, and a failed permissions load in the CRM lets Save wipe all of a user's overrides | P-08 |
 
 ## 4. Before scale (more clinics, more replicas, more data)
 

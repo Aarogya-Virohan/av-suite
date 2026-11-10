@@ -289,3 +289,10 @@ A one-line index of every decision, and the points to review before deploy, duri
 - Data: table `psychosocial_shared_reports` (migration `b8d4f0c6e3a1` on `a7c3e9b5d2f8`) stores the advice, chosen resources, own links, expiry, lock and open counts, and only a hash of the token. Scores are read from the completed sessions when the page opens. The provider can stop sharing at any time and sees whether and how often the patient opened it.
 - Audit: `psychosocial.report_shared`, `report_opened` (first open), `report_locked`, `report_revoked`, without scores. Deletion on request removes shared reports.
 - Decided by: founders, 7 Nov 2026 (flow, form, wording, order). Year-of-birth lock, link length and resource list: proposal, pending Onkar sign-off.
+
+## S-D-040 Next.js 16.4.5 in `frontend/psychosocial` (10 Nov 2026)
+- Context: the CRM Project moved `frontend/crm` to `next` 16.4.5 and reported 16.4.4 as still vulnerable (P-14).
+- Choice: `next` and `eslint-config-next` 16.4.5, exact versions, the same release as the CRM. `package.json` and `package-lock.json` only; no code change.
+- Audit, 10 Nov: `npm audit --omit=dev` shows 0 findings on 16.4.5. The same audit on the old 16.4.4 lockfile also showed 0 findings: npm's advisory data lists the latest `next` advisories for 16.0.0 to 16.4.0 only. So this is a patch update that keeps Tool 03 on the same `next` as the CRM, not a fix for a finding npm reports today.
+- Verified: tsc, eslint, 26 unit tests, `next build`. Playwright not run for this change (version only).
+- Decided by: Onkar, 10 Nov 2026.
