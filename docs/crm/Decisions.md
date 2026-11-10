@@ -495,6 +495,19 @@ Each entry follows this structure:
 
 ---
 
+## [D-033] User Permissions Editor Stays Locked Until the Saved Permissions Load
+
+- **Date**: 2026-11-10
+- **Context**: `PUT /users/{id}/permissions` replaces every saved override of that user: keys missing from the request are deleted. The Edit Permissions slide-over (Settings, User Management) builds its request from the overrides it loaded with `GET /users/{id}/permissions`, so keys the form does not list (for example Tool 03 `screening.*` keys) are sent back unchanged. When that GET failed, the slide-over still opened the form with role defaults and Save enabled; one Save then reset the user to role defaults and deleted every other saved override. A response without a `data` list was treated as "no overrides" in the same way. This slide-over is the only caller of the PUT in the frontends.
+- **Decision**:
+  - The permissions query throws when the response has no `data` list, so a wrong shape is an error, never an empty list.
+  - Until the saved overrides are loaded, the slide-over shows a loading state or an error with **Try again** and **Close**. No scope selects and no Save button are shown, and `handleSave` returns early, so no PUT can be sent without the saved list.
+  - The role-default branch for a user without loaded data is removed. Defaults still fill canonical keys that have no saved row, as before.
+- **Verified**: tsc; vitest 53 pass (new tests: loading state, GET failure with retry and no PUT, wrong response shape, save keeps a key the form does not list); `next build`; Playwright on the production build against a local backend at 1440 and 390 px: with the GET forced to fail the error shows, no select and no Save; after Try again a save with no edits sends `screening.view` back and the database row `screening.view = own` is still there after the save; page width equals the viewport, no page errors, no failed calls.
+- **Affected Files**: `frontend/crm/src/features/users/api.ts`, `frontend/crm/src/features/users/components/UserPermissionsSlideOver.tsx`, `frontend/crm/src/features/users/user-permissions-slideover.test.tsx`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
