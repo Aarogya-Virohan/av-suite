@@ -155,6 +155,20 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-010] Exercise Library on Next.js 16.4.6 for the security advisories
+
+- **Date**: 2026-11-10
+- **Context**: `npm audit --omit=dev` in `frontend/exercise-library` reported 6 advisories: `next` 16.2.4 (critical), `postcss`, `sharp`, `nanoid`, `source-map-js` (high) and `baseline-browser-mapping` (moderate). The CRM moved to 16.4.5 (D-031) and the Posture tool to 16.4.6 (PR #52, already on `dev`).
+- **Decision**:
+  - `next` and `eslint-config-next` 16.2.4 to 16.4.6 (exact pins, same as Posture on `dev`), then `npm audit fix` inside the existing ranges. Resolved: `postcss` 8.5.23, `sharp` 0.35.5, `nanoid` 3.3.20, `source-map-js` 1.2.2, `baseline-browser-mapping` 2.11.35. `npm audit --omit=dev` now reports 0.
+  - No code change. `next.config.ts` is empty and the app uses no `next/image` and no middleware, so the 16.3 and 16.4 changes in those areas do not apply.
+  - ESLint with the new config reports one warning (not an error) for `window.location.assign("/login?expired=1")` in `src/lib/api.ts`. Left as it is: a full page load on session expiry is intended.
+- **Verified**: `npm ci` (Node 22, npm 10), `tsc`, `eslint` (0 errors), `next build` on 16.4.6. Production build against a local backend on `release/el-nov` (fresh database, migrations to `a3d8f1c5e7b2`) at 1440 and 390 px: login, library loads all 1455 exercises, search "squat" filters the list; page width equals the viewport, no page errors, no failed calls. The test clinic was given the exercise-library and exercise-prescription products by hand (a new clinic has only CRM, see L-30 in the CRM decisions).
+- **Not verified**: prescription PDF (made by the backend, not changed here); live.
+- **Affected Files**: `frontend/exercise-library/package.json`, `frontend/exercise-library/package-lock.json`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -174,5 +188,6 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-13 | The list is still ordered by the free-text `body_part`, not by the Joint/Region categories | Open; switch once every exercise is tagged | Backend |
 | EL-L-14 | Imported exercises have no picture, description or categories. 44 "(seated)" variants (found by a name check) describe positions that cannot be done seated (for example "Prone Y raise (seated)", "Glute bridge (seated)"); they were imported as asked and need a physio review. Card titles in title case ("Rom") fixed by EL-D-008 | Open; pictures with the image pipeline, tags and review with the founders | Us + founders |
 | EL-L-15 | Templates, minimal version (EL-D-009): no AV templates yet (who writes and approves them is open with the founders); no edit screen (change = use, adjust, save as a new template, delete the old); no tags, phases or search; the guidance text is not saved in a template | Open; next release | Us + founders |
+| EL-L-16 | `release/el-nov` has no CI workflow (`.github/workflows/ci.yml` came to `release/crm-oct` in PR #47), so pull requests into it run no checks. Fixed when the round merges `dev` after the CRM round, or by merging `release/crm-oct`'s workflow earlier | Open | Us |
 
-*Last updated: 2026-10-30 (EL-D-009, EL-L-15) | Branch: release/el-nov*
+*Last updated: 2026-11-10 (EL-D-010, EL-L-16) | Branch: release/el-nov*
