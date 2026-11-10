@@ -490,6 +490,7 @@ Each entry follows this structure:
   - CRM production build, Playwright login and Dashboard, Patients, Billing and Appointments at 1440 and 390 px: no page errors, no failed API calls, page width equals the viewport.
   - pip-audit on `requirements.txt`: python-jose, ecdsa and weasyprint no longer reported. Pillow, pillow-heif and protobuf remain (Posture dependencies, separate change).
   - Not tested: the Docker image build (Docker Hub not reachable from the test machine); the first CI run and the Railway deploy are the check.
+- **Follow-up (2026-11-10)**: `backend/uv.lock` still locked python-jose, ecdsa, rsa and pyasn1 after this change (the first search covered only .py, .txt and .toml files). Regenerated with `uv lock`: those four removed, PyJWT 2.14.0 to 2.15.1, nothing else changed; `uv lock --check` passes. Docker and CI install from `requirements.txt` and never read `uv.lock`, so production was not affected. `backend/SETUP_GUIDE.md` now names PyJWT.
 - **Affected Files**: `backend/requirements.txt`, `backend/pyproject.toml`, `backend/app/core/security.py`, `backend/app/middleware/clinic_gate.py`, `backend/app/services/posture/review.py`, `backend/tests/test_appointments_and_requests_api.py`, `backend/tests/test_recycle_bin_soft_delete.py`
 
 ---
@@ -546,4 +547,4 @@ Each entry follows this structure:
 | L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
 | L-46 | WeasyPrint 70 warns that a future version will need the HarfBuzz subset library, which the backend Docker image does not install. PDFs are made correctly today | Open; add the library to the Docker image and check a deploy before the next WeasyPrint major upgrade (D-032) | Backend |
 
-*Last updated: 2026-11-09 (D-032; L-46 added) | Branch: fix/backend-jwt*
+*Last updated: 2026-11-10 (D-032 follow-up: uv.lock) | Branch: fix/backend-uv-lock*
