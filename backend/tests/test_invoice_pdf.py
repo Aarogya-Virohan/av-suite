@@ -8,7 +8,13 @@ import pytest
 from pypdf import PdfReader
 
 from app.core.config import settings
-from app.services.invoice_pdf import money, pdf_filename, percent_text
+from app.services.invoice_pdf import (
+    InvoiceDoc,
+    build_invoice_html,
+    money,
+    pdf_filename,
+    percent_text,
+)
 
 API = settings.API_V1_PREFIX
 
@@ -165,3 +171,37 @@ def test_formatting_helpers():
     assert percent_text("12.50") == "12.5%"
     assert percent_text(None) is None
     assert pdf_filename("receipt", "INV/2026 01") == "Receipt-INV-2026-01.pdf"
+
+
+def _letterhead_doc(**kw) -> InvoiceDoc:
+    base = {
+        "kind": "invoice",
+        "invoice_number": "INV-0001",
+        "status": "issued",
+        "issue_date": None,
+        "due_date": None,
+        "clinic_name": "SpineAct <Physio>",
+        "patient_name": "Test Patient",
+    }
+    base.update(kw)
+    return InvoiceDoc(**base)
+
+
+@pytest.mark.parametrize("kind", ["invoice", "receipt"])
+def test_letterhead_clinic_left_av_right(kind):
+    """Founders' rule 12 Nov: clinic logo and name left, Aarogya Virohan right."""
+    out = build_invoice_html(
+        _letterhead_doc(kind=kind, clinic_logo_src="data:image/png;base64,iVBORw0KGgo=")
+    )
+    head = out[out.index('<div class="letterhead">') :]
+    head = head[: head.index("</div></td>") + 200]
+    assert head.index('class="lh-logo"') < head.index('class="lh-clinic"')
+    assert head.index('class="lh-clinic"') < head.index('class="lh-av lh-partner"')
+    assert "SpineAct &lt;Physio&gt;" in head
+    assert ("Payment Receipt" if kind == "receipt" else "Invoice") in head
+
+
+def test_letterhead_without_clinic_logo_keeps_name_left():
+    out = build_invoice_html(_letterhead_doc())
+    assert 'class="lh-logo"' not in out
+    assert out.index('class="lh-clinic"') < out.index('class="lh-av lh-partner"')
