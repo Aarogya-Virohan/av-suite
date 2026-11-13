@@ -1,12 +1,15 @@
 """
-Shared report letterhead: Aarogya Virohan logo top-left, clinic co-branding
+Shared report letterhead: the clinic's branding on the left, Aarogya Virohan
 on the right.
 
-Founders' feedback of 23 October 2026 (Exercise Library items 4 to 7): our
-single logo on the top-left of every report, the clinic's own branding on
-the right, and only our branding when the clinic has none. The exercise
-prescription PDF uses this first. Other reports (posture, invoice) can adopt
-it in their own work; nothing in the posture module is changed by this file.
+Founders' rule of 12 November 2026: "the clinic is the hero, Aarogya Virohan
+is the backend partner". On every patient-facing document the clinic's logo
+and name sit top-left as the primary brand and the Aarogya Virohan wordmark
+sits top-right, smaller. A clinic without branding gets an Aarogya Virohan
+only letterhead, wordmark on the left as before. This replaces the 23 October
+feedback (items 6 and 7, our logo top-left). The exercise prescription and
+the invoice / receipt PDFs use this file; the posture report has its own
+letterhead in the posture module and is not changed here.
 
 The clinic logo comes from `clinics.branding_logo_url`. The CRM settings page
 saves it as a data URI of any `image/*` file under 200 KB, and the API
@@ -127,8 +130,12 @@ def letterhead_css() -> str:
 .lh-sub {{ font-size: 7.6pt; color: {ON_DARK}; margin-top: 1.4mm; letter-spacing: 0.4px; }}
 .lh-sub::after {{ content: ""; display: block; width: 8mm; height: 0.7mm; background: {LIME};
   margin-top: 1.2mm; border-radius: 1mm; }}
-.lh-clinic {{ text-align: right; }}
-.lh-logo {{ width: 13mm; padding-left: 3.5mm !important; }}
+.lh-clinic {{ text-align: left; }}
+.lh-logo {{ width: 13mm; padding-right: 3.5mm !important; }}
+.lh-av.lh-partner {{ width: 34%; text-align: right; }}
+.lh-partner .lh-label {{ margin-bottom: 1.2mm; }}
+.lh-partner .av-wordmark {{ height: 5.2mm; display: inline-block; }}
+.lh-partner .av-text {{ font-size: 10pt; }}
 .lh-logo .tile {{ width: 13mm; height: 13mm; background: #fff; border-radius: 3mm;
   text-align: center; line-height: 13mm; }}
 .lh-logo .tile img {{ max-width: 11mm; max-height: 11mm; vertical-align: middle; }}
@@ -145,7 +152,10 @@ def letterhead_html(
     """
     The running letterhead band. Arguments are already HTML-escaped by the
     caller; `clinic_logo_src` must be a data URI from `resolve_clinic_logo`.
-    With no clinic name the right side is left empty (Aarogya Virohan only).
+
+    With a clinic name: clinic logo (when usable) and name with the document
+    subtitle on the left, a smaller Aarogya Virohan wordmark on the right.
+    Without one: Aarogya Virohan only, wordmark and subtitle on the left.
     """
     wordmark = _brand_data_uri("av_logo_wordmark_white.png")
     av = (
@@ -153,20 +163,22 @@ def letterhead_html(
         if wordmark
         else '<span class="av-text">Aarogya Virohan</span>'
     )
-    clinic, logo = "", ""
-    if clinic_name_html:
-        clinic = (
-            f'<td class="lh-clinic"><p class="lh-label">Clinic</p>'
-            f'<p class="clinic-name">{clinic_name_html}</p></td>'
-        )
-        if clinic_logo_src:
-            logo = (
-                f'<td class="lh-logo"><div class="tile"><img src="{clinic_logo_src}" alt="" />'
-                "</div></td>"
-            )
-    return f"""
+    if not clinic_name_html:
+        return f"""
 <div class="letterhead"><table class="lh"><tr>
   <td class="lh-av">{av}<p class="lh-sub">{subtitle_html}</p></td>
-  {clinic}{logo}
+</tr></table></div>
+"""
+    logo = (
+        f'<td class="lh-logo"><div class="tile"><img src="{clinic_logo_src}" alt="" />'
+        "</div></td>"
+        if clinic_logo_src
+        else ""
+    )
+    return f"""
+<div class="letterhead"><table class="lh"><tr>
+  {logo}<td class="lh-clinic"><p class="clinic-name">{clinic_name_html}</p>
+  <p class="lh-sub">{subtitle_html}</p></td>
+  <td class="lh-av lh-partner"><p class="lh-label">Powered by</p>{av}</td>
 </tr></table></div>
 """

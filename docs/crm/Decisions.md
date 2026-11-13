@@ -508,6 +508,19 @@ Each entry follows this structure:
 
 ---
 
+## [D-034] Report Letterhead: Clinic Left, Aarogya Virohan Right
+
+- **Date**: 2026-11-12
+- **Context**: The shared report letterhead (`report_letterhead.py`, used by the exercise prescription PDF and the invoice / receipt PDF) put the Aarogya Virohan wordmark on the left and the clinic on the right, following the founders' Exercise Library feedback of 23 Oct (items 6 and 7). The CRM header already shows the clinic on the left and Aarogya Virohan on the right (D-030). On 12 Nov Shivank sir set one rule for every patient-facing document and the CRM: "the clinic is the hero, Aarogya Virohan is the backend partner", clinic logo left, Aarogya Virohan right and smaller. This replaces the 23 Oct items 6 and 7.
+- **Decision**:
+  - With a clinic name: clinic logo (when usable) and clinic name with the document subtitle ("Invoice", "Payment Receipt", "Exercise Prescription Tool") on the left; on the right a smaller Aarogya Virohan wordmark under a "Powered by" label. Same letterhead for invoice and receipt (one rule; founders can ask for a footer-only invoice later).
+  - Without a clinic name: Aarogya Virohan only, wordmark and subtitle on the left, as before.
+  - `letterhead_html()` keeps its signature and class names, so the callers do not change. The posture report has its own letterhead in the posture module and is aligned in the Posture work, not here.
+- **Verified**: full pytest on Postgres 16, same 10 known failures as dev 6ca4499 (dev 435 passed, this change 438: three new invoice / receipt letterhead tests); prescription letterhead tests assert the new order; PDFs rendered for prescription, invoice and receipt with a logo, with a name only and without a clinic, every page checked as an image.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_invoice_pdf.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -560,4 +573,4 @@ Each entry follows this structure:
 | L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
 | L-46 | WeasyPrint 70 warns that a future version will need the HarfBuzz subset library, which the backend Docker image does not install. PDFs are made correctly today | Open; add the library to the Docker image and check a deploy before the next WeasyPrint major upgrade (D-032) | Backend |
 
-*Last updated: 2026-11-10 (D-032 follow-up: uv.lock) | Branch: fix/backend-uv-lock*
+*Last updated: 2026-11-12 (D-034 report letterhead sides) | Branch: feat/report-letterhead-sides*

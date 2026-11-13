@@ -323,9 +323,10 @@ async def test_letterhead_wording_and_no_signature() -> None:
     assert "signature" not in out.lower()
     assert '<div class="caption">Date</div>' not in out
     assert "Treating therapist" in out and "Asha Rao" in out
-    # AV logo top-left, clinic on the right.
+    # Founders' rule 12 Nov: clinic on the left, Aarogya Virohan on the right.
     assert 'class="av-wordmark"' in out
-    assert out.index('class="lh-av"') < out.index('class="lh-clinic"')
+    assert out.index('class="lh-clinic"') < out.index('class="lh-av lh-partner"')
+    assert "Powered by" in out
     assert "Grove &lt;Physio&gt;" in out
     # No logo stored: clinic name only, no logo cell.
     assert 'class="lh-logo"' not in out
@@ -337,6 +338,8 @@ async def test_letterhead_av_only_without_clinic_and_no_empty_therapist() -> Non
     out = build_prescription_html(_doc(clinic_name="", physio_name=""))
     assert 'class="lh-clinic"' not in out and 'class="lh-logo"' not in out
     assert ">Clinic<" not in out
+    # Aarogya Virohan only: wordmark on the left, no "Powered by" partner cell.
+    assert 'class="lh-partner' not in out and "Powered by" not in out
     assert "Treating therapist" not in out
     assert 'class="av-wordmark"' in out
 
@@ -352,6 +355,9 @@ async def test_clinic_logo_is_used_when_valid() -> None:
         assert max(img.size) <= 400  # shrunk
     out = build_prescription_html(_doc(clinic_logo_src=src))
     assert f'<td class="lh-logo"><div class="tile"><img src="{src}"' in out
+    # Logo, then clinic name, then Aarogya Virohan on the right.
+    assert out.index('class="lh-logo"') < out.index('class="lh-clinic"')
+    assert out.index('class="lh-clinic"') < out.index('class="lh-av lh-partner"')
 
 
 @pytest.mark.parametrize(
