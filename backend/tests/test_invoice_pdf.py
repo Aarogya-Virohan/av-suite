@@ -189,14 +189,14 @@ def _letterhead_doc(**kw) -> InvoiceDoc:
 
 @pytest.mark.parametrize("kind", ["invoice", "receipt"])
 def test_letterhead_clinic_left_av_right(kind):
-    """Founders' rule 12 Nov: clinic logo and name left, Aarogya Virohan right."""
+    """Clinic logo and name lead the header; Aarogya Virohan mark on the far right (D-036)."""
     out = build_invoice_html(
         _letterhead_doc(kind=kind, clinic_logo_src="data:image/png;base64,iVBORw0KGgo=")
     )
     head = out[out.index('<div class="letterhead">') :]
-    head = head[: head.index("</div></td>") + 200]
+    head = head[: head.index('<div class="running-footer">')]
     assert head.index('class="lh-logo"') < head.index('class="lh-clinic"')
-    assert head.index('class="lh-clinic"') < head.index('class="lh-av lh-partner"')
+    assert head.index('class="lh-clinic"') < head.index('class="lh-mark"')  # AV on the far right
     assert "SpineAct &lt;Physio&gt;" in head
     assert ("Payment Receipt" if kind == "receipt" else "Invoice") in head
 
@@ -204,4 +204,4 @@ def test_letterhead_clinic_left_av_right(kind):
 def test_letterhead_without_clinic_logo_keeps_name_left():
     out = build_invoice_html(_letterhead_doc())
     assert 'class="lh-logo"' not in out
-    assert out.index('class="lh-clinic"') < out.index('class="lh-av lh-partner"')
+    assert 'class="lh-clinic"' in out

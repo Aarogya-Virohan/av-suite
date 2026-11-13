@@ -27,20 +27,20 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from app.services.posture.pdf_service import (
-    GROVE,
     INK,
     MIDNIGHT,
     MUTED,
     PAPER,
-    POWERED_BY_COMPANY,
-    POWERED_BY_PRODUCT,
     RULE,
-    _brand_data_uri,
     _font_faces,
 )
 from app.services.report_letterhead import (
+    clinic_details,
+    footer_css,
+    footer_html,
     letterhead_css,
     letterhead_html,
+    letterhead_page_top_mm,
     resolve_clinic_logo,
 )
 
@@ -102,6 +102,7 @@ class InvoiceDoc:
     registration_number: str | None = None
     gstin: str | None = None
     authorised_person: str | None = None
+    website: str | None = None
     subtotal: Decimal | str | None = None
     discount_amount: Decimal | str | None = None
     discount_percent: Decimal | str | None = None
@@ -194,29 +195,6 @@ def pdf_filename(kind: DocKind, invoice_number: str) -> str:
 # --------------------------------------------------------------------------
 
 
-def _clinic_block(doc: InvoiceDoc) -> str:
-    place = ", ".join(v for v in (_filled(doc.city), _filled(doc.state)) if v)
-    place_pin = " ".join(v for v in (place, _filled(doc.pincode)) if v)
-    address = ", ".join(v for v in (_filled(doc.address_line), place_pin) if v)
-    contacts = " &middot; ".join(_esc(v) for v in (_filled(doc.phone), _filled(doc.email)) if v)
-    ids = " &middot; ".join(
-        v
-        for v in (
-            f"Reg. No. {_esc(doc.registration_number)}" if _filled(doc.registration_number) else "",
-            f"GSTIN {_esc(doc.gstin)}" if _filled(doc.gstin) else "",
-        )
-        if v
-    )
-    lines = [f'<p class="c-name">{_esc(doc.clinic_name)}</p>']
-    if address:
-        lines.append(f'<p class="c-line">{_esc(address)}</p>')
-    if contacts:
-        lines.append(f'<p class="c-line">{contacts}</p>')
-    if ids:
-        lines.append(f'<p class="c-line">{ids}</p>')
-    return "".join(lines)
-
-
 def _meta_rows(doc: InvoiceDoc) -> str:
     rows = [("Ref", _esc(doc.invoice_number)), ("Date", _esc(display_date(doc.issue_date)))]
     # A due date means nothing on a receipt for money already received.
@@ -286,8 +264,6 @@ def _payments_table(doc: InvoiceDoc) -> str:
 def build_invoice_html(doc: InvoiceDoc) -> str:
     title = "Payment Receipt" if doc.kind == "receipt" else "Invoice"
     word = "receipt" if doc.kind == "receipt" else "invoice"
-    mark = _brand_data_uri("av_mark.png")
-    footer_mark = f'<img class="mark" src="{mark}" alt="" />' if mark else ""
     phone = f'<p class="p-line">{_esc(doc.patient_phone)}</p>' if _filled(doc.patient_phone) else ""
     notes = (
         f'<div class="block"><p class="tag">Notes</p><p>{_esc(doc.notes)}</p></div>'
@@ -297,11 +273,25 @@ def build_invoice_html(doc: InvoiceDoc) -> str:
     authorised = (
         f"<p>Authorised by {_esc(doc.authorised_person)}</p>" if _filled(doc.authorised_person) else ""
     )
-    letterhead = letterhead_html(
-        _esc(LETTERHEAD_SUBTITLE[doc.kind]), _esc(doc.clinic_name), doc.clinic_logo_src
+    thanks = (
+        f"<p>Thank you for visiting {_esc(doc.clinic_name)}.</p>"
+        if _filled(doc.clinic_name)
+        else "<p>Thank you.</p>"
     )
-    footer_who = " &nbsp;&middot;&nbsp; ".join(
-        v for v in (_esc(doc.clinic_name), _esc(doc.invoice_number)) if v
+    details = clinic_details(
+        address_line=doc.address_line,
+        city=doc.city,
+        state=doc.state,
+        pincode=doc.pincode,
+        phone=doc.phone,
+        email=doc.email,
+        website=doc.website,
+        registration_number=doc.registration_number,
+        gstin=doc.gstin,
+    )
+    page_top = letterhead_page_top_mm(details if _filled(doc.clinic_name) else [])
+    letterhead = letterhead_html(
+        _esc(LETTERHEAD_SUBTITLE[doc.kind]), _esc(doc.clinic_name), doc.clinic_logo_src, details
     )
 
     return f"""<!DOCTYPE html>
@@ -311,7 +301,7 @@ def build_invoice_html(doc: InvoiceDoc) -> str:
 {_font_faces()}
 @page {{
   size: A4;
-  margin: 27mm 0 20mm 0;
+  margin: {page_top}mm 0 20mm 0;
   background-color: #ffffff;
   @top-center {{ content: element(letterhead); width: 100%; vertical-align: top; }}
   @bottom-center {{ content: element(runningFooter); width: 100%; vertical-align: top; }}
@@ -320,21 +310,10 @@ body {{ font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; co
   margin: 0; padding: 0 14mm; line-height: 1.45; font-size: 9pt; }}
 p {{ margin: 0; }}
 {letterhead_css()}
-.running-footer {{ position: running(runningFooter); width: 100%; padding: 0 14mm; text-align: center; }}
-.running-footer .inner {{ border-top: 1px solid {RULE}; padding-top: 2.4mm; }}
-.running-footer .powered {{ font-size: 7pt; letter-spacing: 0.9px; color: {MUTED}; }}
-.running-footer .powered .by {{ font-weight: 700; }}
-.running-footer .powered .company {{ font-weight: 700; color: {MIDNIGHT}; }}
-.running-footer .powered .dot {{ color: {GROVE}; margin: 0 3px; }}
-.running-footer .powered .product {{ font-weight: 700; color: {GROVE}; }}
-.running-footer .powered .mark {{ height: 3.6mm; width: auto; vertical-align: -0.9mm; margin-right: 1.6mm; }}
-.running-footer .meta {{ margin-top: 1.2mm; font-size: 6.8pt; color: {MUTED}; }}
-.running-footer .meta .page::after {{ content: "Page " counter(page) " of " counter(pages); }}
+{footer_css()}
 
 .head {{ width: 100%; border-collapse: collapse; margin-bottom: 5mm; }}
 .head td {{ vertical-align: top; padding: 0; }}
-.c-name {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 13pt; color: {MIDNIGHT}; }}
-.c-line {{ font-size: 8.4pt; color: {MUTED}; margin-top: 0.8mm !important; }}
 .doc {{ text-align: right; width: 42%; }}
 .doc .t {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 15pt;
   letter-spacing: 1.6px; text-transform: uppercase; color: {MIDNIGHT}; }}
@@ -343,7 +322,8 @@ p {{ margin: 0; }}
 .meta-t .k {{ color: {MUTED}; padding-right: 3mm; text-align: right; }}
 .meta-t .v {{ font-weight: 600; text-align: right; }}
 .status {{ text-transform: capitalize; }}
-.bill {{ background: {PAPER}; border: 1px solid {RULE}; border-radius: 3mm; padding: 3mm 4mm; margin-bottom: 5mm; }}
+.head td.bill {{ background: {PAPER}; border: 1px solid {RULE}; border-radius: 3mm; padding: 3mm 4mm; width: 50%; }}
+.head td.gap {{ width: 8%; }}
 .tag {{ font-size: 6.6pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
   color: {MUTED}; margin-bottom: 1.2mm !important; }}
 .p-name {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 700; font-size: 10.5pt; }}
@@ -368,18 +348,13 @@ p {{ margin: 0; }}
 </style></head>
 <body>
 {letterhead}
-<div class="running-footer"><div class="inner">
-  <p class="powered">{footer_mark}<span class="by">POWERED BY</span>
-    <span class="company">{POWERED_BY_COMPANY}</span><span class="dot">&bull;</span><span class="product">{POWERED_BY_PRODUCT}</span></p>
-  <p class="meta"><span class="who">{footer_who}</span>&nbsp;&nbsp;&middot;&nbsp;&nbsp;<span class="page"></span></p>
-</div></div>
+{footer_html()}
 
 <table class="head"><tr>
-  <td>{_clinic_block(doc)}</td>
+  <td class="bill"><p class="tag">Billed to</p><p class="p-name">{_esc(doc.patient_name)}</p>{phone}</td>
+  <td class="gap"></td>
   <td class="doc"><p class="t">{_esc(title)}</p><table class="meta-t">{_meta_rows(doc)}</table></td>
 </tr></table>
-
-<div class="bill"><p class="tag">Billed to</p><p class="p-name">{_esc(doc.patient_name)}</p>{phone}</div>
 
 {_items_table(doc)}
 {_payments_table(doc)}
@@ -387,7 +362,7 @@ p {{ margin: 0; }}
 
 <div class="closing">
   <p>This is a computer-generated {word} and does not need a signature.</p>
-  <div class="right">{authorised}<p>Thank you for visiting {_esc(doc.clinic_name)}.</p></div>
+  <div class="right">{authorised}{thanks}</div>
 </div>
 </body></html>
 """
