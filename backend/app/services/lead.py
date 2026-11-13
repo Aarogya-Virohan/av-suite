@@ -16,6 +16,10 @@ class LeadValidationError(Exception):
     """Raised when validation fails for lead operations."""
 
 
+class LeadPayloadValidationError(LeadValidationError):
+    """Raised when lead loss fields are inconsistent for the target stage."""
+
+
 class LeadNotFoundError(Exception):
     """Raised when a lead resource is not found."""
 
@@ -50,6 +54,8 @@ class LeadService:
                 )
 
         lead_data = payload.model_dump()
+        if lead_data.get("stage") != LeadStage.LOST:
+            lead_data.update(lost_reason=None, lost_remark=None)
         lead_data["clinic_id"] = clinic_id
         lead = await self.lead_repository.create(lead_data)
         await self.lead_repository.session.commit()
@@ -91,6 +97,14 @@ class LeadService:
 
         lead = await self.get_lead(clinic_id, lead_id)
         update_data = payload.model_dump(exclude_unset=True)
+
+        target_stage = update_data.get("stage", lead.stage)
+        target_reason = update_data.get("lost_reason", lead.lost_reason)
+        target_remark = update_data.get("lost_remark", lead.lost_remark)
+        if target_stage == LeadStage.LOST and target_reason is not None and target_reason.value == "other" and not target_remark:
+            raise LeadPayloadValidationError("lost_remark is required when lost_reason is 'other'.")
+        if target_stage != LeadStage.LOST:
+            update_data.update(lost_reason=None, lost_remark=None)
 
         if payload.assigned_to is not None:
             user = await self.user_repository.get_by_id(payload.assigned_to, clinic_id=clinic_id)

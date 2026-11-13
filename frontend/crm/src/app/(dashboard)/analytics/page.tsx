@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
-import { useAnalyticsOverview, useMyPerformance } from '../../../features/analytics/api';
+import { type CustomRange, customRangeError, useAnalyticsOverview, useMyPerformance } from '../../../features/analytics/api';
+import { localToday } from '../../../lib/datetime';
 import { Stethoscope, ClipboardList, TrendingUp, Users, Calendar, IndianRupee, Wallet, ArrowDownRight, Info } from 'lucide-react';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { formatMoney } from '../../../lib/money';
@@ -15,6 +16,8 @@ import { cn } from '../../../lib/cn';
 export default function AnalyticsPage() {
   const capabilities = useAuthStore((state) => state.capabilities);
   const [period, setPeriod] = useState<AnalyticsPeriod>('month');
+  // Applied custom range; the inputs only take effect on Apply (D-026).
+  const [range, setRange] = useState<CustomRange | null>(null);
   const [patientRevenueSort, setPatientRevenueSort] = useState<PatientRevenueSort>('collected_amount');
 
   const clinicFinancialsKeyPresent = Object.prototype.hasOwnProperty.call(capabilities, 'analytics.clinic_financials');
@@ -25,12 +28,16 @@ export default function AnalyticsPage() {
     myPerformanceKeyPresent && hasCapability('analytics.my_performance');
 
   const { data: performanceEnvelope, isLoading: myPerfLoading, isError: myPerfError } =
-    useMyPerformance(period, canViewMyPerf && !canViewFinancials);
+    useMyPerformance(period, canViewMyPerf && !canViewFinancials, range);
   const myPerformance = performanceEnvelope?.data;
   const { data: overviewEnvelope, isLoading: overviewLoading, isError: overviewError } =
-    useAnalyticsOverview({ period, enabled: canViewFinancials, patientRevenueSort });
+    useAnalyticsOverview({ period, range, enabled: canViewFinancials, patientRevenueSort });
   const analyticsOverview = overviewEnvelope?.data;
-  const selectedPeriodLabel = period[0].toUpperCase() + period.slice(1);
+  const selectedPeriodLabel = period === 'custom' ? 'Selected range' : period[0].toUpperCase() + period.slice(1);
+  const selector = <PeriodSelector period={period} range={range} onChange={setPeriod} onApplyRange={setRange} />;
+  // The note shows the range the server used, only once it matches what is selected.
+  const metaMatches = (meta?: { period: AnalyticsPeriod; start: string; end: string }) =>
+    !!meta && meta.period === period && (period !== 'custom' || (!!range && meta.start.slice(0, 10) === range.start));
 
   if (!canAccessModule('analytics')) {
     return <AccessRestricted message="Analytics access is restricted for your role." />;
@@ -53,13 +60,14 @@ export default function AnalyticsPage() {
           <PageHeader
             title="My Performance"
             subtitle="Your own activity for the selected reporting period"
-            actions={<PeriodSelector period={period} onChange={setPeriod} />}
+            actions={selector}
           />
-          {performanceEnvelope?.meta.period === period && (
+          {period === 'custom' && !range && <PickRangeNote />}
+          {performanceEnvelope && metaMatches(performanceEnvelope.meta) && (
             <RangeNote start={performanceEnvelope.meta.start} end={performanceEnvelope.meta.end} />
           )}
 
-          {myPerfLoading ? (
+          {period === 'custom' && !range ? null : myPerfLoading ? (
             <Card className="p-6 text-sm text-muted">Loading your performance data...</Card>
           ) : myPerfError ? (
             <Card role="alert" className="border-danger/30 bg-danger-wash p-4 text-sm font-medium text-danger">
@@ -89,14 +97,17 @@ export default function AnalyticsPage() {
         <PageHeader
           title="Analytics & Financial Summary"
           subtitle="Clinic financial activity for the selected reporting period"
-          actions={<PeriodSelector period={period} onChange={setPeriod} />}
+          actions={selector}
         />
-        {overviewEnvelope?.meta.period === period && (
+        {period === 'custom' && !range && <PickRangeNote />}
+        {overviewEnvelope && metaMatches(overviewEnvelope.meta) && (
           <RangeNote start={overviewEnvelope.meta.start} end={overviewEnvelope.meta.end} />
         )}
 
-        {overviewLoading ? (
-          <Card role="status" className="p-6 text-sm text-muted">Loading analytics for {period}...</Card>
+        {period === 'custom' && !range ? null : overviewLoading ? (
+          <Card role="status" className="p-6 text-sm text-muted">
+            Loading analytics for {period === 'custom' ? 'the selected range' : period}...
+          </Card>
         ) : overviewError ? (
           <Card role="alert" className="border-danger/30 bg-danger-wash p-4 text-sm font-medium text-danger">
             Unable to load clinic analytics.
@@ -222,33 +233,100 @@ function RangeNote({ start, end }: { start: string; end: string }) {
   );
 }
 
+function PickRangeNote() {
+  return (
+    <Card className="p-6 text-sm text-muted">Choose a start and end date, then Apply.</Card>
+  );
+}
+
 function PeriodSelector({
   period,
+  range,
   onChange,
+  onApplyRange,
 }: {
   period: AnalyticsPeriod;
+  range: CustomRange | null;
   onChange: (period: AnalyticsPeriod) => void;
+  onApplyRange: (range: CustomRange | null) => void;
 }) {
+  const [start, setStart] = useState(range?.start ?? '');
+  const [end, setEnd] = useState(range?.end ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const today = localToday();
+
+  const apply = () => {
+    const problem = customRangeError(start, end);
+    setError(problem);
+    if (!problem) onApplyRange({ start, end });
+  };
+
   return (
-    <div
-      role="group"
-      aria-label="Reporting period"
-      className="flex items-center gap-1 rounded-xl border border-line bg-card p-1 shadow-card dark:border-slate-800 dark:bg-slate-900"
-    >
-      {(['today', 'week', 'month', 'year'] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          aria-pressed={period === value}
-          onClick={() => onChange(value)}
-          className={cn(
-            'cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-semibold capitalize transition-colors',
-            period === value ? 'bg-midnight text-white shadow-sm' : 'text-muted hover:bg-canvas hover:text-ink',
+    <div className="flex flex-col items-end gap-2">
+      <div
+        role="group"
+        aria-label="Reporting period"
+        className="flex flex-wrap items-center gap-1 rounded-xl border border-line bg-card p-1 shadow-card dark:border-slate-800 dark:bg-slate-900"
+      >
+        {(['today', 'week', 'month', 'year', 'custom'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={period === value}
+            onClick={() => onChange(value)}
+            className={cn(
+              'cursor-pointer rounded-lg px-3.5 py-1.5 text-xs font-semibold capitalize transition-colors',
+              period === value ? 'bg-midnight text-white shadow-sm' : 'text-muted hover:bg-canvas hover:text-ink',
+            )}
+          >
+            {value}
+          </button>
+        ))}
+      </div>
+      {period === 'custom' && (
+        <div className="flex flex-wrap items-end justify-end gap-2">
+          <label className="text-[11px] font-medium text-muted">
+            From
+            <input
+              type="date"
+              aria-label="Start date"
+              value={start}
+              max={end || today}
+              onChange={(e) => {
+                setStart(e.target.value);
+                setError(null);
+              }}
+              className="mt-0.5 block h-9 rounded-lg border border-line bg-card px-2 text-xs text-ink focus:border-grove focus:outline-none"
+            />
+          </label>
+          <label className="text-[11px] font-medium text-muted">
+            To
+            <input
+              type="date"
+              aria-label="End date"
+              value={end}
+              min={start || undefined}
+              onChange={(e) => {
+                setEnd(e.target.value);
+                setError(null);
+              }}
+              className="mt-0.5 block h-9 rounded-lg border border-line bg-card px-2 text-xs text-ink focus:border-grove focus:outline-none"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={apply}
+            className="h-9 cursor-pointer rounded-lg bg-grove px-3.5 text-xs font-semibold text-white hover:bg-grove-hover"
+          >
+            Apply
+          </button>
+          {error && (
+            <p role="alert" className="basis-full text-right text-xs font-medium text-danger">
+              {error}
+            </p>
           )}
-        >
-          {value}
-        </button>
-      ))}
+        </div>
+      )}
     </div>
   );
 }

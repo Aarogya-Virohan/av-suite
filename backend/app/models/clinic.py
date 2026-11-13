@@ -26,6 +26,15 @@ class Clinic(Base, TimestampMixin):
     )
     branding_logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     branding_color: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    address_line: Mapped[str | None] = mapped_column(Text, nullable=True)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    pincode: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    registration_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    gstin: Mapped[str | None] = mapped_column(String(15), nullable=True)
+    authorised_person: Mapped[str | None] = mapped_column(String(255), nullable=True)
     plan_tier: Mapped[ClinicPlanTier] = mapped_column(
         Enum(
             ClinicPlanTier,

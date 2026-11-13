@@ -112,7 +112,7 @@ Virtual environment isolate karta hai dependencies ko project ke liye.
    - FastAPI, Uvicorn (web framework)
    - SQLAlchemy, asyncpg (database)
    - Pydantic (validation)
-   - python-jose (JWT tokens)
+   - PyJWT (JWT tokens)
    - passlib, bcrypt (password hashing)
    - pytest, pytest-asyncio (testing)
    - And more...

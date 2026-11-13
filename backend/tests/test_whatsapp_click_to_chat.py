@@ -167,9 +167,10 @@ async def test_invoice_pdf_response_includes_whatsapp_link() -> None:
     response = await service.generate_invoice_pdf_response(clinic_id, invoice.id)
 
     assert response["invoice_id"] == str(invoice.id)
+    # The route is /api/v1/invoices/..., the old URL was wrong (L-41).
     assert (
         response["download_url"]
-        == f"/api/v1/billing/invoices/{invoice.id}/pdf/download"
+        == f"/api/v1/invoices/{invoice.id}/pdf/download"
     )
     assert response["whatsapp_link"].startswith("https://wa.me/919876543210?text=")
     assert (

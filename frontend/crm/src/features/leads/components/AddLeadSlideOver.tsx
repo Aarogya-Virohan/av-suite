@@ -10,6 +10,8 @@ import { leadFormSchema, LeadFormValues } from '../../../lib/schemas';
 import { useCreateLead } from '../api';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
+import { lostReasonError } from '../lostReasons';
+import { LostReasonFields } from './LostReasonFields';
 
 interface AddLeadSlideOverProps {
   isOpen: boolean;
@@ -35,17 +37,33 @@ export function AddLeadSlideOver({ isOpen, onClose }: AddLeadSlideOverProps) {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<LeadFormValues>({
     resolver: zodResolver(leadFormSchema),
     defaultValues: EMPTY,
   });
 
+  const [lostReason, setLostReason] = React.useState('');
+  const [lostRemark, setLostRemark] = React.useState('');
+  const [lostError, setLostError] = React.useState<string | null>(null);
+  const isLost = watch('stage') === 'lost';
+
   React.useEffect(() => {
-    if (isOpen) reset(EMPTY);
+    if (isOpen) {
+      reset(EMPTY);
+      setLostReason('');
+      setLostRemark('');
+      setLostError(null);
+    }
   }, [isOpen, reset]);
 
   const onSubmit = async (values: LeadFormValues) => {
+    if (values.stage === 'lost') {
+      const problem = lostReasonError(lostReason, lostRemark);
+      setLostError(problem);
+      if (problem) return;
+    }
     try {
       await createLead.mutateAsync({
         ...values,
@@ -53,6 +71,9 @@ export function AddLeadSlideOver({ isOpen, onClose }: AddLeadSlideOverProps) {
         phone: values.phone.trim(),
         email: values.email?.trim() ? values.email.trim() : null,
         source: values.source ? values.source : null,
+        ...(values.stage === 'lost'
+          ? { lost_reason: lostReason, lost_remark: lostRemark.trim() ? lostRemark.trim() : null }
+          : {}),
       });
       toast.success(`Lead ${values.name.trim()} created successfully`);
       onClose();
@@ -107,6 +128,23 @@ export function AddLeadSlideOver({ isOpen, onClose }: AddLeadSlideOverProps) {
             </select>
           </div>
         </div>
+
+        {isLost && (
+          <LostReasonFields
+            idPrefix="lead-lost"
+            reason={lostReason}
+            remark={lostRemark}
+            onReasonChange={(v) => {
+              setLostReason(v);
+              setLostError(null);
+            }}
+            onRemarkChange={(v) => {
+              setLostRemark(v);
+              setLostError(null);
+            }}
+            error={lostError}
+          />
+        )}
 
         <div>
           <FieldLabel htmlFor="lead-notes">Notes</FieldLabel>

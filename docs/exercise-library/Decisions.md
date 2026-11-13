@@ -169,6 +169,21 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-011] Merge dev into release/el-nov with one Alembic merge revision
+
+- **Date**: 2026-11-12
+- **Context**: The October CRM round reached `dev` (production) on 11 Nov with migration `f2b6c8d0a134`. `release/el-nov` has its own head `a3d8f1c5e7b2` (exercise templates). Rule of 10 Nov: each later branch merges `dev` and adds one merge revision in the same change, so the two heads never reach production apart.
+- **Decision**:
+  - Merge `dev` into `release/el-nov` (no file conflicts: the two sides changed no file in common since `a61aa1e`).
+  - Merge revision `81ebc274f369` with parents `a3d8f1c5e7b2` and `f2b6c8d0a134`; no schema change.
+  - `backend/tests/test_alembic_single_head.py` fails if the chain has more than one head or if either parent drops out.
+  - The merge brings `.github/workflows/ci.yml` to this branch, so pull requests into it now run CI (closes EL-L-16).
+- **Verified**: fresh database (PostgreSQL 16 and 17.11) and the production schema-only dump of 11 Nov on 17.11 (upgraded to `f2b6c8d0a134` with `dev` code first, as production did): upgrade, one step down, upgrade. The schema is the same before and after, and the production path gives the same schema as a fresh database (columns, constraints, indexes, enums, RLS). Full pytest on PostgreSQL 16: 494 passed and the 10 known failures; `dev` 435 passed and the same 10.
+  - `alembic downgrade -1` from a merge revision stops with "Ambiguous walk". One step down is `alembic downgrade a3d8f1c5e7b2`: it removes only the merge row and leaves both parents in `alembic_version`, no schema change.
+- **Affected Files**: `backend/alembic/versions/81ebc274f369_merge_el_nov_and_dev_heads.py`, `backend/tests/test_alembic_single_head.py`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -188,6 +203,6 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-13 | The list is still ordered by the free-text `body_part`, not by the Joint/Region categories | Open; switch once every exercise is tagged | Backend |
 | EL-L-14 | Imported exercises have no picture, description or categories. 44 "(seated)" variants (found by a name check) describe positions that cannot be done seated (for example "Prone Y raise (seated)", "Glute bridge (seated)"); they were imported as asked and need a physio review. Card titles in title case ("Rom") fixed by EL-D-008 | Open; pictures with the image pipeline, tags and review with the founders | Us + founders |
 | EL-L-15 | Templates, minimal version (EL-D-009): no AV templates yet (who writes and approves them is open with the founders); no edit screen (change = use, adjust, save as a new template, delete the old); no tags, phases or search; the guidance text is not saved in a template | Open; next release | Us + founders |
-| EL-L-16 | `release/el-nov` has no CI workflow (`.github/workflows/ci.yml` came to `release/crm-oct` in PR #47), so pull requests into it run no checks. Fixed when the round merges `dev` after the CRM round, or by merging `release/crm-oct`'s workflow earlier | Open | Us |
+| EL-L-16 | `release/el-nov` has no CI workflow (`.github/workflows/ci.yml` came to `release/crm-oct` in PR #47), so pull requests into it run no checks. Fixed when the round merges `dev` after the CRM round, or by merging `release/crm-oct`'s workflow earlier | Fixed by EL-D-011 (CI came with the merge of `dev`) | - |
 
-*Last updated: 2026-11-10 (EL-D-010, EL-L-16) | Branch: release/el-nov*
+*Last updated: 2026-11-12 (EL-D-011, EL-L-16 fixed) | Branch: release/el-nov*
