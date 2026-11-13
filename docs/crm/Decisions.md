@@ -521,6 +521,16 @@ Each entry follows this structure:
 
 ---
 
+## [D-035] Letterhead Logo Keeps the Clinic Logo's Shape
+
+- **Date**: 2026-11-13
+- **Context**: The letterhead (D-034) put every clinic logo inside a 13 mm square tile. Most clinic logos are wide wordmarks; the first real one (a 3:1 logo with a tagline) shrank to about 11 x 4 mm and its tagline could not be read.
+- **Decision**: The logo keeps its own ratio. Square and tall logos stay as before (11 mm inside a 13 mm tile). A wide logo keeps the 11 mm height and grows sideways up to 40 mm (tile = logo + 2 mm); a wider logo is capped at 40 mm and gets shorter. Size comes from the PNG header of the normalised logo (`resolve_clinic_logo` always returns PNG); anything unreadable falls back to the square box. The clinic name stays next to the logo.
+- **Verified**: full pytest on Postgres 16 against release/el-nov (only the known failures); new tests for square, wide, very wide, tall and unreadable logos and for the tile markup; PDFs rendered with square, 3:1, 8:1 and 1:2 logos and with a real clinic logo, every page checked.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/tests/test_prescription_pdf.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -573,4 +583,4 @@ Each entry follows this structure:
 | L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
 | L-46 | WeasyPrint 70 warns that a future version will need the HarfBuzz subset library, which the backend Docker image does not install. PDFs are made correctly today | Open; add the library to the Docker image and check a deploy before the next WeasyPrint major upgrade (D-032) | Backend |
 
-*Last updated: 2026-11-12 (D-034 report letterhead sides) | Branch: feat/report-letterhead-sides*
+*Last updated: 2026-11-13 (D-035 letterhead logo shape) | Branch: feat/letterhead-wide-logo*

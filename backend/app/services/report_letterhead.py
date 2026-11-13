@@ -131,19 +131,58 @@ def letterhead_css() -> str:
 .lh-sub::after {{ content: ""; display: block; width: 8mm; height: 0.7mm; background: {LIME};
   margin-top: 1.2mm; border-radius: 1mm; }}
 .lh-clinic {{ text-align: left; }}
-.lh-logo {{ width: 13mm; padding-right: 3.5mm !important; }}
+.lh-logo {{ width: 1%; padding-right: 3.5mm !important; }}
 .lh-av.lh-partner {{ width: 34%; text-align: right; }}
 .lh-partner .lh-label {{ margin-bottom: 1.2mm; }}
 .lh-partner .av-wordmark {{ height: 5.2mm; display: inline-block; }}
 .lh-partner .av-text {{ font-size: 10pt; }}
-.lh-logo .tile {{ width: 13mm; height: 13mm; background: #fff; border-radius: 3mm;
+.lh-logo .tile {{ height: 13mm; background: #fff; border-radius: 3mm;
   text-align: center; line-height: 13mm; }}
-.lh-logo .tile img {{ max-width: 11mm; max-height: 11mm; vertical-align: middle; }}
+.lh-logo .tile img {{ vertical-align: middle; }}
 .lh-label {{ font-size: 6.4pt; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase;
   color: {ON_DARK}; margin-bottom: 0.8mm; }}
 .clinic-name {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800;
   font-size: 11.5pt; line-height: 1.2; color: #fff; }}
 """
+
+
+# Clinic logo box in the letterhead, in millimetres. Square logos keep the
+# old 11 mm square inside a 13 mm tile; wide wordmarks (most clinic logos)
+# keep the 11 mm height and grow sideways up to LOGO_MAX_W_MM, so they are
+# not shrunk into a square tile until the text is unreadable.
+LOGO_H_MM = 11.0
+LOGO_MAX_W_MM = 40.0
+LOGO_TILE_PAD_MM = 2.0
+
+
+def _png_size(data_uri: str) -> tuple[int, int] | None:
+    """Width and height from the IHDR chunk of a base64 PNG data URI."""
+    prefix = "data:image/png;base64,"
+    if not data_uri.startswith(prefix):
+        return None
+    try:
+        head = base64.b64decode(data_uri[len(prefix) : len(prefix) + 44])
+    except (binascii.Error, ValueError):
+        return None
+    if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        return None
+    width = int.from_bytes(head[16:20], "big")
+    height = int.from_bytes(head[20:24], "big")
+    return (width, height) if width > 0 and height > 0 else None
+
+
+def _logo_box_mm(data_uri: str) -> tuple[float, float, float]:
+    """(image width, image height, tile width) in mm, keeping the logo's ratio."""
+    size = _png_size(data_uri)
+    if size is None:
+        return LOGO_H_MM, LOGO_H_MM, LOGO_H_MM + LOGO_TILE_PAD_MM
+    w, h = size
+    if w <= h:  # square or tall: fit the 11 mm square as before
+        return round(LOGO_H_MM * w / h, 2), LOGO_H_MM, LOGO_H_MM + LOGO_TILE_PAD_MM
+    width, height = LOGO_H_MM * w / h, LOGO_H_MM
+    if width > LOGO_MAX_W_MM:
+        width, height = LOGO_MAX_W_MM, LOGO_MAX_W_MM * h / w
+    return round(width, 2), round(height, 2), round(width + LOGO_TILE_PAD_MM, 2)
 
 
 def letterhead_html(
@@ -169,12 +208,14 @@ def letterhead_html(
   <td class="lh-av">{av}<p class="lh-sub">{subtitle_html}</p></td>
 </tr></table></div>
 """
-    logo = (
-        f'<td class="lh-logo"><div class="tile"><img src="{clinic_logo_src}" alt="" />'
-        "</div></td>"
-        if clinic_logo_src
-        else ""
-    )
+    logo = ""
+    if clinic_logo_src:
+        img_w, img_h, tile_w = _logo_box_mm(clinic_logo_src)
+        logo = (
+            f'<td class="lh-logo"><div class="tile" style="width: {tile_w}mm">'
+            f'<img src="{clinic_logo_src}" alt="" '
+            f'style="width: {img_w}mm; height: {img_h}mm" /></div></td>'
+        )
     return f"""
 <div class="letterhead"><table class="lh"><tr>
   {logo}<td class="lh-clinic"><p class="clinic-name">{clinic_name_html}</p>
