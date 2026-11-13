@@ -7,8 +7,19 @@ from uuid import UUID
 
 from app.models.audit import AuditLog
 from app.repositories.audit import AuditLogRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+async def log_event_safely(session: AsyncSession, clinic_id: UUID, user_id: UUID | None,
+                           action: str, entity_type: str, entity_id: UUID | None = None,
+                           details: dict[str, Any] | None = None) -> None:
+    """Write an audit event using the established failure-safe service pattern."""
+    await AuditLogService(AuditLogRepository(session)).log_event(
+        clinic_id=clinic_id, user_id=user_id, action=action,
+        entity_type=entity_type, entity_id=entity_id, details=details,
+    )
 
 
 class AuditLogService:

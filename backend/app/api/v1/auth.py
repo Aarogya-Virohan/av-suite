@@ -46,12 +46,12 @@ router = APIRouter()
 
 @router.get(
     "/me",
-    response_model=ResponseEnvelope[AuthMeResponse],
+    response_model=None,
     tags=["Authentication"],
 )
 async def get_me(
     perm_ctx: PermissionContextDep,
-) -> ResponseEnvelope[AuthMeResponse]:
+) -> dict:
     """
     Get the currently authenticated user's details, clinic branding, and full effective capabilities.
     Accessible to any active authenticated user.
@@ -72,21 +72,24 @@ async def get_me(
         is_active=perm_ctx.user.is_active,
     )
 
-    clinic_info = ClinicInfoResponse(
-        id=perm_ctx.clinic.id,
-        name=perm_ctx.clinic.name,
-        slug=perm_ctx.clinic.slug,
-        branding_logo_url=perm_ctx.clinic.branding_logo_url,
-        branding_color=perm_ctx.clinic.branding_color,
-    )
+    clinic_info = {
+        "id": perm_ctx.clinic.id,
+        "name": perm_ctx.clinic.name,
+        "slug": perm_ctx.clinic.slug,
+        "branding_logo_url": perm_ctx.clinic.branding_logo_url,
+        "branding_color": perm_ctx.clinic.branding_color,
+        "address_line": perm_ctx.clinic.address_line,
+        "city": perm_ctx.clinic.city,
+        "state": perm_ctx.clinic.state,
+        "pincode": perm_ctx.clinic.pincode,
+        "phone": perm_ctx.clinic.phone,
+        "email": perm_ctx.clinic.email,
+        "registration_number": perm_ctx.clinic.registration_number,
+        "gstin": perm_ctx.clinic.gstin,
+        "authorised_person": perm_ctx.clinic.authorised_person,
+    }
 
-    return ResponseEnvelope(
-        data=AuthMeResponse(
-            user=user_info,
-            clinic=clinic_info,
-            capabilities=capabilities,
-        )
-    )
+    return {"data": {"user": user_info, "clinic": clinic_info, "capabilities": capabilities}}
 
 
 @router.post(

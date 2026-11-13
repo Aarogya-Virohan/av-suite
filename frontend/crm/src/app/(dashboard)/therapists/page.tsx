@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { PASSWORD_TOO_LONG_MESSAGE, passwordTooLong } from '../../../lib/password';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
 import { SlideOver } from '../../../components/ui/SlideOver';
@@ -35,6 +36,10 @@ export default function TherapistsPage() {
     e.preventDefault();
     if (!firstName || !lastName || !email || !password) {
       toast.error('First Name, Last Name, Email, and Password are required');
+      return;
+    }
+    if (passwordTooLong(password)) {
+      toast.error(PASSWORD_TOO_LONG_MESSAGE);
       return;
     }
 

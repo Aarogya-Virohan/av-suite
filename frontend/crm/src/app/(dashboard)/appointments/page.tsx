@@ -2,13 +2,21 @@
 
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
-import { useAppointments, useUpdateAppointmentStatus } from '../../../features/appointments/api';
+import { useAppointmentList, useUpdateAppointmentStatus } from '../../../features/appointments/api';
+import {
+  appointmentDayLabel,
+  appointmentListQuery,
+  APPOINTMENTS_PAGE_SIZE,
+  pageInfo,
+  type AppointmentListView,
+  type AppointmentStatusFilter,
+} from '../../../features/appointments/listing';
 import { useClinicSettings } from '../../../features/settings/api';
 import { AddAppointmentSlideOver } from '../../../features/appointments/components/AddAppointmentSlideOver';
 import { RescheduleSlideOver } from '../../../features/appointments/components/RescheduleSlideOver';
 import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
 import { AppointmentStatus, Appointment } from '../../../types/api';
-import { Plus, Calendar as CalendarIcon, Clock, CheckCircle2, XCircle, Copy, ExternalLink, QrCode, Phone } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, CalendarClock, ChevronLeft, History, ChevronRight, Clock, CheckCircle2, XCircle, Copy, ExternalLink, QrCode, Phone } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { apiClient } from '../../../lib/api-client';
@@ -35,10 +43,6 @@ const REQUEST_TONE: Record<BookingRequest['status'], BadgeTone> = {
   approved: 'ok',
   rejected: 'danger',
 };
-
-function apptDay(iso: string): string {
-  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(new Date(iso));
-}
 
 function apptTime(iso: string): string {
   return new Intl.DateTimeFormat('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
@@ -71,40 +75,68 @@ function AppointmentsPageContent() {
   usePermissionSubscription(); // see Decisions.md D-013
   const role = useAuthStore((s) => s.role);
   const isAllowed = canAccessModule('appointments');
-  // This page used to request only 10 appointments with no pagination, so
-  // anything beyond the first 10 was never shown. 500 is the backend maximum
-  // until real paging exists (Decisions.md L-39).
-  const { data: appointmentsResponse, isLoading } = useAppointments(undefined, undefined, 1, 500, isAllowed);
-  // ?date=YYYY-MM-DD comes from the header calendar (C-01). Filtered by the
-  // local (IST) day here, because the backend's date filter uses UTC days.
+  // ?date=YYYY-MM-DD comes from the header calendar (C-01).
   const router = useRouter();
   const searchParams = useSearchParams();
   const dateParam = searchParams.get('date');
   const selectedDate = isDateParam(dateParam) ? dateParam : null;
-  const appointments: Appointment[] = appointmentsResponse?.data || [];
   const updateStatus = useUpdateAppointmentStatus();
 
   const [activeSubTab, setActiveSubTab] = useState<SubTabKey>('list');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
+  const [statusFilter, setStatusFilter] = useState<AppointmentStatusFilter>('all');
+  // Without a day the list shows Upcoming (from today) or Past (newest first),
+  // a page at a time. The server filters by India day, status and order and
+  // sends the total (D-028, L-24, L-39). It used to load the 500 oldest
+  // appointments and filter them here, so newer ones went missing.
+  const [range, setRange] = useState<Exclude<AppointmentListView, 'day'>>('upcoming');
+  const [page, setPage] = useState(1);
+  const view: AppointmentListView = selectedDate ? 'day' : range;
+  const today = localToday();
+  const listQuery = appointmentListQuery({ view, today, day: selectedDate, status: statusFilter, page });
+  const { data: appointmentsResponse, isLoading, isError } = useAppointmentList(listQuery, isAllowed);
+  const appointments: Appointment[] = appointmentsResponse?.data || [];
+  const total = appointmentsResponse?.meta.total ?? 0;
+  const pager = pageInfo(page, APPOINTMENTS_PAGE_SIZE, total, appointments.length);
+  // Any filter change starts again at page 1.
+  React.useEffect(() => {
+    setPage(1);
+  }, [view, statusFilter, selectedDate]);
   const [requests, setRequests] = useState<BookingRequest[]>([]);
 
   const canViewBookingRequests = hasCapability('booking.view');
 
-  // Fetch pending appointment requests from backend on mount (only for authorized roles)
+  // Pending booking requests used to load once, so new public requests only
+  // showed after a page refresh. They now refresh every 60 s while the tab is
+  // visible and when the user comes back to the tab.
   React.useEffect(() => {
     if (!canViewBookingRequests) return;
+    let first = true;
     const fetchRequests = async () => {
       try {
         const res = await apiClient.get('/appointment-requests');
         setRequests(res.data?.data || res.data || []);
       } catch {
-        // If endpoint isn't live yet, stay empty rather than showing mock data
-        setRequests([]);
+        // First load: stay empty rather than show mock data. Later polls keep
+        // the list on screen if one request fails.
+        if (first) setRequests([]);
+      } finally {
+        first = false;
       }
     };
     fetchRequests();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') fetchRequests();
+    }, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchRequests();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [canViewBookingRequests]);
 
   // Booking link uses the clinic's unique slug from /auth/me (exact match on
@@ -124,14 +156,6 @@ function AppointmentsPageContent() {
     }
   }, [bookingKey]);
   const [showQr, setShowQr] = useState(false);
-
-  const filteredAppointments = appointments
-    .filter((apt) => {
-      if (statusFilter !== 'all' && apt.status !== statusFilter) return false;
-      if (selectedDate && localToday(new Date(apt.scheduled_at)) !== selectedDate) return false;
-      return true;
-    })
-    .sort((a, b) => (selectedDate ? String(a.scheduled_at).localeCompare(String(b.scheduled_at)) : 0));
 
   if (!isAllowed) {
     return <AccessRestricted message="Appointments access is restricted for your role." />;
@@ -226,8 +250,18 @@ function AppointmentsPageContent() {
         {/* Sub-Tab 1: Appointments List */}
         {activeSubTab === 'list' && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
+              {!selectedDate && (
+                <SegmentGroup>
+                  <SegmentTab active={range === 'upcoming'} onClick={() => setRange('upcoming')} icon={CalendarClock}>
+                    Upcoming
+                  </SegmentTab>
+                  <SegmentTab active={range === 'past'} onClick={() => setRange('past')} icon={History}>
+                    Past
+                  </SegmentTab>
+                </SegmentGroup>
+              )}
               <input
                 type="date"
                 aria-label="Show appointments on a day"
@@ -243,12 +277,13 @@ function AppointmentsPageContent() {
                 >
                   {dayTitle.format(new Date(`${selectedDate}T00:00:00`))}
                   <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span className="sr-only">Show all days</span>
+                  <span className="sr-only">Back to upcoming and past</span>
                 </button>
               )}
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'scheduled' | 'completed' | 'cancelled')}
+                aria-label="Filter by status"
+                onChange={(e) => setStatusFilter(e.target.value as AppointmentStatusFilter)}
                 className="h-10 rounded-[10px] border border-line bg-card px-3 text-sm font-medium text-ink-2"
               >
                 <option value="all">All Statuses</option>
@@ -258,21 +293,25 @@ function AppointmentsPageContent() {
                 <option value="no_show">No Show</option>
               </select>
               </div>
-              <span className="text-xs text-muted">
-                {filteredAppointments.length} {filteredAppointments.length === 1 ? 'appointment' : 'appointments'}
+              <span className="text-xs text-muted" data-testid="appointments-count">
+                {total} {total === 1 ? 'appointment' : 'appointments'}
               </span>
             </div>
 
             {isLoading ? (
               <Card className="p-8 text-center text-sm text-muted">Loading appointments…</Card>
-            ) : filteredAppointments.length === 0 ? (
+            ) : isError ? (
+              <Card className="p-8 text-center text-sm text-danger">Could not load appointments. Please refresh the page.</Card>
+            ) : appointments.length === 0 ? (
               <Card className="p-10 text-center">
                 <CalendarIcon className="mx-auto h-8 w-8 text-slate-300" />
-                <p className="mt-2 text-sm text-muted">No appointments found.</p>
+                <p className="mt-2 text-sm text-muted">
+                  {view === 'day' ? 'No appointments on this day.' : view === 'past' ? 'No past appointments.' : 'No upcoming appointments.'}
+                </p>
               </Card>
             ) : (
               <Card className="divide-y divide-line-soft">
-                {filteredAppointments.map((apt) => (
+                {appointments.map((apt) => (
                   <div
                     key={apt.id}
                     className="flex flex-col items-start justify-between gap-4 px-5 py-4 md:flex-row md:items-center"
@@ -282,7 +321,7 @@ function AppointmentsPageContent() {
                         <p className="font-display text-lg font-bold leading-none tabular-nums text-ink">
                           {apptTime(apt.scheduled_at)}
                         </p>
-                        <p className="mt-1 text-[11px] font-medium text-muted">{apptDay(apt.scheduled_at)}</p>
+                        <p className="mt-1 text-[11px] font-medium text-muted">{appointmentDayLabel(apt.scheduled_at)}</p>
                       </div>
                       <Avatar name={apt.patient_name} size={40} />
                       <div className="min-w-0">
@@ -333,6 +372,37 @@ function AppointmentsPageContent() {
                   </div>
                 ))}
               </Card>
+            )}
+
+            {view !== 'day' && total > APPOINTMENTS_PAGE_SIZE && (
+              <div className="flex items-center justify-between gap-3 px-1">
+                <span className="text-xs text-muted" data-testid="appointments-range">
+                  {pager.first}-{pager.last} of {total}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1 || isLoading}
+                    aria-label="Previous page"
+                    className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-line bg-card text-ink-2 transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-xs font-medium text-ink-2">
+                    Page {page} of {pager.pages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(pager.pages, p + 1))}
+                    disabled={page >= pager.pages || isLoading}
+                    aria-label="Next page"
+                    className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-line bg-card text-ink-2 transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
