@@ -26,13 +26,13 @@ from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from app.services.posture.pdf_service import (
+from app.services.brand import (
     INK,
     MIDNIGHT,
     MUTED,
     PAPER,
     RULE,
-    _font_faces,
+    font_faces,
 )
 from app.services.report_letterhead import (
     clinic_details,
@@ -298,7 +298,7 @@ def build_invoice_html(doc: InvoiceDoc) -> str:
 <html><head><meta charset="utf-8" />
 <title>{_esc(title)} {_esc(doc.invoice_number)}</title>
 <style>
-{_font_faces()}
+{font_faces()}
 @page {{
   size: A4;
   margin: {page_top}mm 0 20mm 0;
