@@ -955,7 +955,9 @@ async def report_from_review(
     back_display: UploadFile = File(...),
     patient_name: str = Form(...),
     age: int = Form(...),
-    gender: str = Form(...),
+    # Optional, as on the intake screen ("Not given"). Required here failed
+    # every report with no gender at the last step.
+    gender: str = Form(""),
     # Optional on the intake screen. FastAPI treats an empty form value as
     # missing, so a required field here failed every report where it was
     # left blank, only at the very last step (phone test, 27 October 2026).
