@@ -348,7 +348,7 @@ p {{ margin: 0; }}
 </style></head>
 <body>
 {letterhead}
-{footer_html()}
+{footer_html(('Receipt ' if doc.kind == 'receipt' else 'Invoice ') + doc.invoice_number)}
 
 <table class="head"><tr>
   <td class="bill"><p class="tag">Billed to</p><p class="p-name">{_esc(doc.patient_name)}</p>{phone}</td>

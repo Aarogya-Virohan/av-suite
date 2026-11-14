@@ -12,6 +12,7 @@ circular import. posture/pdf_service.py re-exports the old names.
 from __future__ import annotations
 
 import base64
+import io
 from functools import lru_cache
 from pathlib import Path
 
@@ -92,3 +93,37 @@ def font_faces() -> str:
             f"font-style: normal; src: url(data:font/woff;base64,{encoded}) format('woff'); }}"
         )
     return "\n".join(rules)
+
+
+# Prescription watermark (D-038, Onkar 14 Nov 2026): the new round mark,
+# faded to WATERMARK_OPACITY. WeasyPrint has no opacity for @page
+# backgrounds, so the fade is baked into the image here. To drop the
+# watermark (if the founders say no), set WATERMARK_FILE = "".
+WATERMARK_FILE = "av_logo_round.png"
+WATERMARK_OPACITY = 0.06
+WATERMARK_WHITE = 235  # luminance at or above this counts as the white background
+
+
+@lru_cache(maxsize=None)
+def watermark_data_uri() -> str:
+    """The watermark as a faded PNG data URI; empty when switched off or missing."""
+
+    if not WATERMARK_FILE:
+        return ""
+    path = BRAND_DIR / WATERMARK_FILE
+    if not path.is_file():
+        return ""
+    from PIL import Image
+
+    with Image.open(path) as source:
+        image = source.convert("RGBA")
+    # The mark sits on a white disc; faded, that disc would show as a pale
+    # patch on the cream page. Near-white pixels are dropped, the artwork kept.
+    red, green, blue, alpha = image.split()
+    light = Image.merge("RGB", (red, green, blue)).convert("L").point(lambda v: 0 if v >= WATERMARK_WHITE else 255)
+    alpha = Image.composite(alpha, Image.new("L", image.size, 0), light)
+    image.putalpha(alpha.point(lambda a: round(a * WATERMARK_OPACITY)))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
