@@ -9,6 +9,8 @@ import ReportCard from "@/components/report/ReportCard"
 
 import LandmarkReview from "@/components/review/LandmarkReview"
 
+import AuthGate, { useSession } from "@/components/auth/AuthGate"
+
 import { detectLandmarks, downloadPostureReportPdf, generateReport } from "@/lib/api"
 
 import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@/types/posture"
@@ -30,6 +32,11 @@ const STEP_ORDER: { key: Step; label: string }[] = [
 
 function Header({ step }: { step: Step }) {
   const current = STEP_ORDER.findIndex((s) => s.key === step)
+  const { me, signOut } = useSession()
+  const leave = () => {
+    if (step !== "upload" && !window.confirm("Sign out? This assessment will be lost.")) return
+    signOut()
+  }
   return (
     <header className="bg-[linear-gradient(115deg,#0B1238_0%,#121F4A_60%,#1B4A54_100%)] text-white">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
@@ -42,6 +49,14 @@ function Header({ step }: { step: Step }) {
         <span className="rounded-full bg-[#C1FF72] px-2.5 py-0.5 text-[11.5px] font-bold text-[#0B1238]">
           Posture Tool
         </span>
+        <div className="ml-auto flex min-w-0 items-center gap-3 text-[12px] sm:order-last sm:ml-4">
+          <span className="max-w-[160px] truncate text-[#C3C9E6]" title={me.user.email}>
+            {me.clinic?.name ?? me.user.email}
+          </span>
+          <button type="button" onClick={leave} className="font-semibold text-white underline-offset-2 hover:underline">
+            Sign out
+          </button>
+        </div>
         <ol className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto" aria-label="Assessment steps">
           {STEP_ORDER.map((s, i) => {
             const active = i === current
@@ -131,7 +146,7 @@ function HeightHint() {
   )
 }
 
-export default function Page() {
+function Assessment() {
 const [step, setStep] =
 useState<Step>("upload")
 
@@ -583,4 +598,14 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
 </div>
 
 )
+}
+
+// Signed-in only (U1, 14 November 2026). Also served at /analyze, the
+// address the CRM patient page opens.
+export default function Page() {
+  return (
+    <AuthGate>
+      <Assessment />
+    </AuthGate>
+  )
 }

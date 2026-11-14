@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000"
+const API = `${BASE_URL}/api/v1`
 
 import type {
   DetectionResult,
@@ -7,27 +8,250 @@ import type {
 } from "@/types/posture"
 import type { CaptureLevel } from "@/lib/tilt"
 
-// The server explains a refused review (a point not reviewed, an expired
-// detection) in its error detail; show that rather than a generic failure.
-async function errorDetail(response: Response, fallback: string): Promise<string> {
+// ------------------------------------------------------------------ session
+// Same storage keys as the Exercise Library. Each app runs on its own origin,
+// so the clinician signs in to each one separately.
+
+const TOKEN_KEY = "token"
+const EMAIL_KEY = "userEmail"
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null
   try {
-    const body = await response.json()
-    if (typeof body?.detail === "string") return body.detail
-    // FastAPI's own validation errors (a form field missing or of the wrong
-    // type) arrive as a list. Name the field so the failure is not silent.
-    if (Array.isArray(body?.detail)) {
-      return body.detail
-        .map((d: { loc?: unknown[]; msg?: string }) => {
-          const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "request"
-          return `${String(field)}: ${d.msg ?? "invalid"}`
-        })
-        .join("; ")
-    }
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function getSavedEmail(): string {
+  if (typeof window === "undefined") return ""
+  try {
+    return localStorage.getItem(EMAIL_KEY) ?? ""
+  } catch {
+    return ""
+  }
+}
+
+export function setSession(token: string, email: string) {
+  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(EMAIL_KEY, email)
+}
+
+export function clearSession() {
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(EMAIL_KEY)
+  } catch {
+    // storage blocked: nothing to clear
+  }
+}
+
+/** The workspace (clinic) the current token was issued for, read from its claims. */
+export function tokenClinicId(token: string | null = getToken()): string | null {
+  if (!token) return null
+  try {
+    const part = token.split(".")[1]
+    const json = atob(part.replace(/-/g, "+").replace(/_/g, "/"))
+    const claims = JSON.parse(json) as { clinic_id?: unknown }
+    return typeof claims.clinic_id === "string" ? claims.clinic_id : null
+  } catch {
+    return null
+  }
+}
+
+// ------------------------------------------------------------------ errors
+
+export interface WorkspaceOption {
+  clinic_id: string
+  name: string
+  role?: string
+}
+
+/**
+ * Error from the API with the backend's message. The backend sends
+ * detail: "text", detail: {code, message, workspaces} (for example
+ * WORKSPACE_SELECTION_REQUIRED), detail: [...] (validation) or
+ * meta.error.{code, message} (the envelope).
+ */
+export class ApiError extends Error {
+  status: number
+  code?: string
+  workspaces?: WorkspaceOption[]
+
+  constructor(message: string, status: number, code?: string, workspaces?: WorkspaceOption[]) {
+    super(message)
+    this.status = status
+    this.code = code
+    this.workspaces = workspaces
+  }
+}
+
+function friendlyStatus(status: number): string {
+  if (status === 401) return "Your session has ended. Please sign in again."
+  if (status === 403) return "You do not have access to this."
+  if (status === 404) return "Not found."
+  if (status >= 500) return "The server ran into a problem. Please try again."
+  return "Something went wrong. Please try again."
+}
+
+async function toApiError(response: Response, fallback?: string): Promise<ApiError> {
+  let body: unknown = null
+  try {
+    body = await response.json()
   } catch {
     // not JSON
   }
-  return fallback
+  const b = body as {
+    detail?: unknown
+    message?: unknown
+    meta?: { error?: { message?: unknown; code?: unknown } }
+  } | null
+  const detail = b?.detail
+
+  let message: string | undefined
+  let code: string | undefined
+  let workspaces: WorkspaceOption[] | undefined
+
+  if (typeof detail === "string") {
+    message = detail
+  } else if (Array.isArray(detail)) {
+    // FastAPI validation errors: name the field so the failure is not silent.
+    message = detail
+      .map((d: { loc?: unknown[]; msg?: string }) => {
+        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "request"
+        return `${String(field)}: ${d.msg ?? "invalid"}`
+      })
+      .join("; ")
+  } else if (detail && typeof detail === "object") {
+    const d = detail as { message?: unknown; code?: unknown; workspaces?: unknown }
+    if (typeof d.message === "string") message = d.message
+    if (typeof d.code === "string") code = d.code
+    if (Array.isArray(d.workspaces)) {
+      workspaces = d.workspaces.filter(
+        (w): w is WorkspaceOption =>
+          !!w &&
+          typeof (w as WorkspaceOption).clinic_id === "string" &&
+          typeof (w as WorkspaceOption).name === "string",
+      )
+    }
+  }
+  if (!message && typeof b?.meta?.error?.message === "string") message = b.meta.error.message
+  if (!code && typeof b?.meta?.error?.code === "string") code = b.meta.error.code
+  if (!message && typeof b?.message === "string") message = b.message
+
+  // Plain words for the two ways a signed-in clinician can be refused.
+  if (response.status === 403 && code === "PRODUCT_NOT_ENTITLED") {
+    message = "The Posture Tool is not enabled for this clinic. Ask your clinic admin to enable it."
+  } else if (response.status === 403 && message?.includes("posture.create")) {
+    message =
+      "Your account is not allowed to run posture analyses. Ask your clinic admin to grant \"Run Posture Analysis\" in Permissions."
+  }
+
+  return new ApiError(
+    message || fallback || friendlyStatus(response.status),
+    response.status,
+    code,
+    workspaces,
+  )
 }
+
+function networkError(): ApiError {
+  return new ApiError(
+    "Could not reach the server. Check your internet connection and try again.",
+    0,
+    "NETWORK",
+  )
+}
+
+// ------------------------------------------------------------------ re-login
+// A session can end in the middle of an assessment (photos taken, points
+// reviewed). Sending the clinician to the login page would throw that work
+// away, so the page registers a handler that asks for the password in a
+// dialog and resolves once a new token is stored. The request is then sent
+// once more. Without a handler (or if the clinician cancels) the error stands.
+
+type ReauthHandler = () => Promise<boolean>
+let reauthHandler: ReauthHandler | null = null
+let reauthInFlight: Promise<boolean> | null = null
+
+export function setReauthHandler(handler: ReauthHandler | null) {
+  reauthHandler = handler
+}
+
+function reauthenticate(): Promise<boolean> {
+  if (!reauthHandler) return Promise.resolve(false)
+  if (!reauthInFlight) {
+    reauthInFlight = reauthHandler().finally(() => {
+      reauthInFlight = null
+    })
+  }
+  return reauthInFlight
+}
+
+async function send(path: string, init: RequestInit): Promise<Response> {
+  const headers = new Headers(init.headers)
+  const token = getToken()
+  if (token) headers.set("Authorization", `Bearer ${token}`)
+  try {
+    return await fetch(`${API}${path}`, { ...init, headers })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err
+    throw networkError()
+  }
+}
+
+/** Authenticated request. One retry after a successful re-login on 401. */
+async function request(path: string, init: RequestInit, fallback: string): Promise<Response> {
+  let response = await send(path, init)
+  if (response.status === 401 && (await reauthenticate())) {
+    response = await send(path, init)
+  }
+  if (response.ok) return response
+  throw await toApiError(response, fallback)
+}
+
+// ------------------------------------------------------------------ auth
+
+export async function login(email: string, password: string, clinicId?: string): Promise<string> {
+  let response: Response
+  try {
+    response = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(clinicId ? { email, password, clinic_id: clinicId } : { email, password }),
+    })
+  } catch {
+    throw networkError()
+  }
+  if (!response.ok) {
+    const error = await toApiError(response)
+    if (response.status === 401) error.message = "Incorrect email or password."
+    throw error
+  }
+  const body = await response.json()
+  const token = body?.data?.access_token
+  if (typeof token !== "string" || !token) {
+    throw new ApiError("The server did not return a session. Please try again.", response.status)
+  }
+  return token
+}
+
+export interface Me {
+  user: { first_name?: string | null; last_name?: string | null; email: string; role?: string }
+  clinic: { id: string; name: string } | null
+  capabilities?: Record<string, string>
+}
+
+/** No re-login dialog here: the gate that calls this sends a 401 to /login. */
+export async function fetchMe(): Promise<Me> {
+  const response = await send("/auth/me", {})
+  if (!response.ok) throw await toApiError(response)
+  const body = await response.json()
+  return body.data as Me
+}
+
+// ------------------------------------------------------------------ posture
 
 /**
  * Step one of the landmark review: detection only. Nothing is measured or
@@ -43,15 +267,11 @@ export async function detectLandmarks(files: {
   formData.append("side_image", files.sideFile)
   formData.append("back_image", files.backFile)
 
-  const response = await fetch(`${API_URL}/posture/detect`, {
-    method: "POST",
-    body: formData,
-  })
-
-  if (!response.ok) {
-    throw new Error(await errorDetail(response, "Landmark detection failed"))
-  }
-
+  const response = await request(
+    "/posture/detect",
+    { method: "POST", body: formData },
+    "Landmark detection failed",
+  )
   return response.json()
 }
 
@@ -112,15 +332,11 @@ export async function generateReport(payload: ReportPayload): Promise<PostureRep
     }
   }
 
-  const response = await fetch(`${API_URL}/posture/report`, {
-    method: "POST",
-    body: formData,
-  })
-
-  if (!response.ok) {
-    throw new Error(await errorDetail(response, "Report generation failed"))
-  }
-
+  const response = await request(
+    "/posture/report",
+    { method: "POST", body: formData },
+    "Report generation failed",
+  )
   return response.json()
 }
 
@@ -133,26 +349,16 @@ export async function generateReport(payload: ReportPayload): Promise<PostureRep
  * landed on a different page from the image they were derived from. The PDF
  * is now rendered server-side from a layout designed for paper.
  */
-export async function downloadPostureReportPdf(
-  report: PostureReport,
-): Promise<void> {
-
-  const response = await fetch(
-    `${API_URL}/posture/report/pdf`,
+export async function downloadPostureReportPdf(report: PostureReport): Promise<void> {
+  const response = await request(
+    "/posture/report/pdf",
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(report),
     },
+    "Failed to generate report PDF",
   )
-
-  if (!response.ok) {
-    throw new Error(
-      "Failed to generate report PDF",
-    )
-  }
 
   const blob = await response.blob()
 

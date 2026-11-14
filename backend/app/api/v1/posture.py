@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Body
 from fastapi import File
 from fastapi import Form
@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 from mediapipe.framework.formats import landmark_pb2
 
+from app.core.dependencies import require_capability
 from app.services.posture.decoder import decode_image_bytes
 from app.services.posture.schemas import Landmark
 from app.services.posture.review import (
@@ -155,7 +156,11 @@ def _rearfoot_label(value: float, side_label: str) -> str:
     return f"Rearfoot Alignment ({side_label})"
 
 
-router = APIRouter(prefix="/posture", tags=["posture"])
+# Mounted under /api/v1/posture in app/api/v1/router.py. Every endpoint runs
+# an analysis or renders its report, so each needs posture.create (which also
+# checks the clinic has the posture-tool product enabled).
+router = APIRouter()
+_CAN_RUN = [Depends(require_capability("posture.create"))]
 
 
 
@@ -882,7 +887,7 @@ def _review_view_payload(view: str, detected: "DetectedView", lateral_side: str 
     return payload
 
 
-@router.post("/detect")
+@router.post("/detect", dependencies=_CAN_RUN)
 async def detect_for_review(
     front_image: UploadFile = File(...),
     side_image: UploadFile = File(...),
@@ -941,7 +946,7 @@ async def detect_for_review(
 _ASPECT_TOLERANCE = 0.01
 
 
-@router.post("/report")
+@router.post("/report", dependencies=_CAN_RUN)
 async def report_from_review(
     detection_token: str = Form(...),
     review: str = Form(...),
@@ -950,7 +955,9 @@ async def report_from_review(
     back_display: UploadFile = File(...),
     patient_name: str = Form(...),
     age: int = Form(...),
-    gender: str = Form(...),
+    # Optional, as on the intake screen ("Not given"). Required here failed
+    # every report with no gender at the last step.
+    gender: str = Form(""),
     # Optional on the intake screen. FastAPI treats an empty form value as
     # missing, so a required field here failed every report where it was
     # left blank, only at the very last step (phone test, 27 October 2026).
@@ -1111,7 +1118,7 @@ async def report_from_review(
 # report data as a document designed for paper instead.
 
 
-@router.post("/report/pdf")
+@router.post("/report/pdf", dependencies=_CAN_RUN)
 async def export_posture_pdf(report: dict = Body(...)):
     """
     Render an already-computed posture report to a clinical PDF.
