@@ -3,9 +3,8 @@ Exercise prescription PDF: template, image embedding and rendering.
 
 The look follows the posture report (app/services/posture/pdf_service.py):
 same palette, fonts, letterhead band, cream page, watermark and "powered by"
-footer. The brand helpers are imported from there, not copied, so both
-documents stay in step when the brand changes. Nothing in the posture module
-is modified by this file.
+footer. The brand helpers come from app/services/brand.py, shared with the
+posture report, so both documents stay in step when the brand changes.
 
 Speed, 20 October 2026: the old template pointed <img> at the exercise's
 remote image URL, so WeasyPrint downloaded every image one after another at
@@ -32,7 +31,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from app.services.posture.pdf_service import (
+from app.services.brand import (
     BRAND_DARK,
     GROVE,
     INK,
@@ -41,8 +40,8 @@ from app.services.posture.pdf_service import (
     PAGE,
     PAPER,
     RULE,
-    _brand_data_uri,
-    _font_faces,
+    brand_data_uri,
+    font_faces,
 )
 from app.services.report_letterhead import (
     clinic_details,
@@ -383,7 +382,7 @@ def build_prescription_html(doc: RxDoc) -> str:
     cards = "".join(_exercise_card(i + 1, it) for i, it in enumerate(doc.items))
 
     page_top = letterhead_page_top_mm(_clinic_details(doc) if doc.clinic_name else [])
-    watermark = _brand_data_uri("av_watermark.png")
+    watermark = brand_data_uri("av_watermark.png")
     watermark_css = (
         f'background-image: url("{watermark}"); background-repeat: no-repeat; '
         "background-position: center 55%; background-size: 95mm auto;"
@@ -410,7 +409,7 @@ def build_prescription_html(doc: RxDoc) -> str:
 <html><head><meta charset="utf-8" />
 <title>{_esc(DOC_TITLE)} - {_esc(doc.patient_name)}</title>
 <style>
-{_font_faces()}
+{font_faces()}
 @page {{
   size: A4;
   margin: {page_top}mm 0 20mm 0;

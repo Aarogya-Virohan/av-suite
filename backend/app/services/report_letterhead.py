@@ -31,7 +31,7 @@ import re
 from collections.abc import Awaitable, Callable
 from functools import cache
 
-from app.services.posture.pdf_service import (
+from app.services.brand import (
     DEEP_TEAL,
     GROVE,
     INK,
@@ -41,7 +41,7 @@ from app.services.posture.pdf_service import (
     POWERED_BY_COMPANY,
     POWERED_BY_PRODUCT,
     RULE,
-    _brand_data_uri,
+    brand_data_uri,
 )
 
 logger = logging.getLogger(__name__)
@@ -413,7 +413,7 @@ def footer_css() -> str:
 
 
 def footer_html() -> str:
-    mark = _brand_data_uri("av_mark.png")
+    mark = brand_data_uri("av_mark.png")
     footer_mark = f'<img class="mark" src="{mark}" alt="" />' if mark else ""
     return f"""<div class="running-footer"><div class="inner">
   <p class="powered">{footer_mark}<span class="by">POWERED BY</span>
@@ -480,7 +480,7 @@ def letterhead_html(
     """
     rule = '<div class="lh-rule"></div>'
     if not clinic_name_html:
-        av_src = _brand_data_uri("av_logo_round.png")
+        av_src = brand_data_uri("av_logo_round.png")
         mark = (
             f'<td class="av-only"><img class="av-round" src="{av_src}" alt="Aarogya Virohan" /></td>'
             if av_src
@@ -494,7 +494,7 @@ def letterhead_html(
 """
     # Aarogya Virohan mark on the far right, kept apart from the clinic's
     # contacts by a thin standing rule, so the contacts read as the clinic's.
-    av_src = _brand_data_uri("av_logo_round.png")
+    av_src = brand_data_uri("av_logo_round.png")
     mark = f'<td class="lh-mark"><img class="av-round" src="{av_src}" alt="Aarogya Virohan" /></td>' if av_src else ""
     divider = '<td class="lh-divider"></td>' if mark and details else ""
     logo = ""
