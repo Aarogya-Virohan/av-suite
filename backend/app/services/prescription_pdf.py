@@ -40,15 +40,17 @@ from app.services.posture.pdf_service import (
     MUTED,
     PAGE,
     PAPER,
-    POWERED_BY_COMPANY,
-    POWERED_BY_PRODUCT,
     RULE,
     _brand_data_uri,
     _font_faces,
 )
 from app.services.report_letterhead import (
+    clinic_details,
+    footer_css,
+    footer_html,
     letterhead_css,
     letterhead_html,
+    letterhead_page_top_mm,
     resolve_clinic_logo,
 )
 
@@ -118,6 +120,14 @@ class RxDoc:
     # Raw clinics.branding_logo_url; resolved into clinic_logo_src at render.
     clinic_logo: str | None = None
     clinic_logo_src: str = ""
+    # Clinic profile shown on the letterhead (D-036); empty fields are left out.
+    address_line: str | None = None
+    city: str | None = None
+    state: str | None = None
+    pincode: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    website: str | None = None
 
 
 # --------------------------------------------------------------------------
@@ -270,9 +280,23 @@ async def embed_images(
 # --------------------------------------------------------------------------
 
 
+def _clinic_details(doc: RxDoc):
+    # A prescription carries the clinic's address and contacts, not its tax
+    # or registration ids (those belong on invoices).
+    return clinic_details(
+        address_line=doc.address_line,
+        city=doc.city,
+        state=doc.state,
+        pincode=doc.pincode,
+        phone=doc.phone,
+        email=doc.email,
+        website=doc.website,
+    )
+
+
 def _letterhead(doc: RxDoc) -> str:
     return letterhead_html(
-        _esc(LETTERHEAD_SUBTITLE), _esc(doc.clinic_name), doc.clinic_logo_src
+        _esc(LETTERHEAD_SUBTITLE), _esc(doc.clinic_name), doc.clinic_logo_src, _clinic_details(doc)
     )
 
 
@@ -358,17 +382,13 @@ def build_prescription_html(doc: RxDoc) -> str:
     on = ist_date(doc.prescribed_on)
     cards = "".join(_exercise_card(i + 1, it) for i, it in enumerate(doc.items))
 
-    mark = _brand_data_uri("av_mark.png")
-    footer_mark = f'<img class="mark" src="{mark}" alt="" />' if mark else ""
+    page_top = letterhead_page_top_mm(_clinic_details(doc) if doc.clinic_name else [])
     watermark = _brand_data_uri("av_watermark.png")
     watermark_css = (
         f'background-image: url("{watermark}"); background-repeat: no-repeat; '
         "background-position: center 55%; background-size: 95mm auto;"
         if watermark
         else ""
-    )
-    footer_who = " &nbsp;&middot;&nbsp; ".join(
-        v for v in (_esc(doc.patient_name), _esc(rx_reference(doc.rx_id))) if v
     )
     notes = (
         f'<div class="guidance"><p class="tag">Therapist guidance</p><p>{_esc(doc.physio_notes)}</p></div>'
@@ -393,7 +413,7 @@ def build_prescription_html(doc: RxDoc) -> str:
 {_font_faces()}
 @page {{
   size: A4;
-  margin: 27mm 0 20mm 0;
+  margin: {page_top}mm 0 20mm 0;
   background-color: {PAGE};
   {watermark_css}
   @top-center {{ content: element(letterhead); width: 100%; vertical-align: top; }}
@@ -404,16 +424,7 @@ body {{ font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; co
 p {{ margin: 0; }}
 
 {letterhead_css()}
-.running-footer {{ position: running(runningFooter); width: 100%; padding: 0 14mm; text-align: center; }}
-.running-footer .inner {{ border-top: 1px solid {RULE}; padding-top: 2.4mm; }}
-.running-footer .powered {{ font-size: 7pt; letter-spacing: 0.9px; color: {MUTED}; }}
-.running-footer .powered .by {{ font-weight: 700; }}
-.running-footer .powered .company {{ font-weight: 700; color: {MIDNIGHT}; }}
-.running-footer .powered .dot {{ color: {GROVE}; margin: 0 3px; }}
-.running-footer .powered .product {{ font-weight: 700; color: {GROVE}; }}
-.running-footer .powered .mark {{ height: 3.6mm; width: auto; vertical-align: -0.9mm; margin-right: 1.6mm; }}
-.running-footer .meta {{ margin-top: 1.2mm; font-size: 6.8pt; color: {MUTED}; }}
-.running-footer .meta .page::after {{ content: "Page " counter(page) " of " counter(pages); }}
+{footer_css()}
 
 .patient-box {{ width: 100%; border-collapse: separate; border: 1.3px solid #d9d1bf;
   border-radius: 4mm; background: {PAPER}; margin: 0 0 3.4mm 0; }}
@@ -478,11 +489,7 @@ p {{ margin: 0; }}
 </style></head>
 <body>
 {_letterhead(doc)}
-<div class="running-footer"><div class="inner">
-  <p class="powered">{footer_mark}<span class="by">POWERED BY</span>
-    <span class="company">{POWERED_BY_COMPANY}</span><span class="dot">&bull;</span><span class="product">{POWERED_BY_PRODUCT}</span></p>
-  <p class="meta"><span class="who">{footer_who}</span>&nbsp;&nbsp;&middot;&nbsp;&nbsp;<span class="page"></span></p>
-</div></div>
+{footer_html()}
 
 {_patient_box(doc, on)}
 {cards}

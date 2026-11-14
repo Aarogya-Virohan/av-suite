@@ -324,10 +324,12 @@ async def test_letterhead_wording_and_no_signature() -> None:
     assert "signature" not in out.lower()
     assert '<div class="caption">Date</div>' not in out
     assert "Treating therapist" in out and "Asha Rao" in out
-    # Founders' rule 12 Nov: clinic on the left, Aarogya Virohan on the right.
-    assert 'class="av-wordmark"' in out
-    assert out.index('class="lh-clinic"') < out.index('class="lh-av lh-partner"')
-    assert "Powered by" in out
+    # D-036 (14 Nov): Aarogya Virohan mark on the far right of the header;
+    # "Powered by" only in the footer.
+    head = out[out.index('<div class="letterhead">') : out.index('<div class="running-footer">')]
+    assert "av-round" in head and "Powered by" not in head and "POWERED BY" not in head
+    foot = out[out.index('<div class="running-footer">') :]
+    assert "POWERED BY" in foot and "AAROGYA VIROHAN" in foot
     assert "Grove &lt;Physio&gt;" in out
     # No logo stored: clinic name only, no logo cell.
     assert 'class="lh-logo"' not in out
@@ -339,10 +341,10 @@ async def test_letterhead_av_only_without_clinic_and_no_empty_therapist() -> Non
     out = build_prescription_html(_doc(clinic_name="", physio_name=""))
     assert 'class="lh-clinic"' not in out and 'class="lh-logo"' not in out
     assert ">Clinic<" not in out
-    # Aarogya Virohan only: wordmark on the left, no "Powered by" partner cell.
-    assert 'class="lh-partner' not in out and "Powered by" not in out
+    # Aarogya Virohan only: round logo and name on the left, nothing on the right.
+    assert 'class="av-only"' in out and 'class="av-round"' in out
+    assert 'class="lh-contact' not in out
     assert "Treating therapist" not in out
-    assert 'class="av-wordmark"' in out
 
 
 async def test_clinic_logo_is_used_when_valid() -> None:
@@ -359,7 +361,6 @@ async def test_clinic_logo_is_used_when_valid() -> None:
     assert f'<img src="{src}"' in out[out.index('class="lh-logo"') :]
     # Logo, then clinic name, then Aarogya Virohan on the right.
     assert out.index('class="lh-logo"') < out.index('class="lh-clinic"')
-    assert out.index('class="lh-clinic"') < out.index('class="lh-av lh-partner"')
 
 
 @pytest.mark.parametrize(

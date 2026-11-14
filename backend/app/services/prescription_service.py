@@ -192,6 +192,12 @@ def _rx_doc(rx: Prescription) -> RxDoc:
         rx_id=str(rx.id),
         clinic_name=(rx.clinic.name if rx.clinic else ""),
         clinic_logo=(rx.clinic.branding_logo_url if rx.clinic else None),
+        address_line=(rx.clinic.address_line if rx.clinic else None),
+        city=(rx.clinic.city if rx.clinic else None),
+        state=(rx.clinic.state if rx.clinic else None),
+        pincode=(rx.clinic.pincode if rx.clinic else None),
+        phone=(rx.clinic.phone if rx.clinic else None),
+        email=(rx.clinic.email if rx.clinic else None),
         physio_name=physio_name,
         patient_name=(
             f"{patient.first_name} {patient.last_name}".strip() if patient else "Patient"

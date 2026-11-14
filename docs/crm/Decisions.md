@@ -531,6 +531,26 @@ Each entry follows this structure:
 
 ---
 
+## [D-036] Report Identity: One Set of Rules for Letterhead and Footer
+
+- **Date**: 2026-11-14
+- **Context**: Founders (13-14 Nov) asked for the new Aarogya Virohan round logo on the right of the letterhead with no "Powered by" label there, "Powered by Aarogya Virohan . AV Suite" only in the footer, no patient name or ID in the footer (the footer itself to stay as it was, centred), and the clinic's full details (address, phone, email, website) on every report, filled from the clinic profile and never hard-coded. A missing optional field must not leave a gap.
+- **Decision**:
+  - `report_letterhead.py` owns the rules for every report: `clinic_details()` returns the clinic's details as labelled pairs in a fixed order (Address, Phone, Email, Website, Reg. No., GSTIN); empty fields are dropped, never shown as an empty label. Address is "line, city, state pincode" without repeating parts already in the line; an invalid pincode is dropped; the website is shown without scheme and trailing slash. `clinic_detail_lines()` gives the same as plain lines.
+  - Letterhead (final, 14 Nov): white, shallow, print-friendly header. Clinic logo, name and document type on the left; the clinic's contacts next, one per row with a small line icon (address, phone, email, website; Reg. No. / GSTIN with a short label); then a thin standing rule and the Aarogya Virohan round mark alone on the far right; one accent rule underneath. A missing field has no row; no contacts means no standing rule. Long names get a smaller font (over 30 and 45 characters) and wrap; nothing is cut. Without a clinic name: Aarogya Virohan mark, name and document type.
+  - Why: earlier drafts put the clinic's details right next to the AV mark (first in a dark band, then in a strip under it) and they read as Aarogya Virohan's; a draft with no AV mark in the header was rejected by Onkar (the mark stays). The standing rule separates the two owners. Medical letterhead practice keeps the header shallow with the provider's name and contacts prominent; a full dark band also costs clinics toner on every printed prescription.
+  - `letterhead_page_top_mm(details)` sizes each report's @page top margin from the contact rows (address wrap estimate capped at 3 lines), so the header never runs into the body; without details it is 29 mm (27 mm before; 2 mm more space under the rule).
+  - Logos: empty margins are trimmed before sizing; an opaque logo on a near-white canvas has that outer background made transparent (flood fill from the corners), so it sits cleanly on the cream prescription page; white inside the artwork is kept; dark backgrounds are left as they are.
+  - Prescriptions show address and contacts only; invoices and receipts also show Reg. No. and GSTIN when filled. The invoice's own clinic block moved into the letterhead; "Billed to" now sits beside the invoice title.
+  - Shared footer (`footer_html`, `footer_css`): exactly the footer used before D-036 (centred, old Aarogya Virohan mark, "POWERED BY AAROGYA VIROHAN . AV SUITE", "Page x of y" centred on the next line), minus the patient name and prescription reference (founders 14 Nov: no patient data in the footer).
+  - Uploaded logos lose their empty margins before sizing (transparent margins by alpha; an opaque background only when all four corners share one colour).
+  - New asset `av_logo_round.png` (the founders' round logo, cut to a transparent circle), used in the header. The footer keeps the old mark. The old wordmark stays in the repo for the posture report until the Posture work adopts this module.
+- **Not in this change**: website field in the clinic profile (the PDFs accept it, nothing stores it yet), display name vs legal name, practitioner degree, authorised-person rules, per-document snapshot of clinic details, the Rx watermark (still the old mark), the posture report (Posture Project).
+- **Verified**: full pytest on Postgres 16 against release/el-nov; new `tests/test_report_letterhead.py` (detail order and labels, missing cells, ids row, page margin, escaping, address, website, name size, footer without patient data on Rx / invoice / receipt, logo trim); PDFs rendered with all details, with phone and website missing, without a clinic, and a multi-page Rx, every page checked.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/prescription_service.py`, `backend/app/services/invoice_pdf.py`, `backend/app/services/posture/brand/av_logo_round.png`, `backend/tests/test_report_letterhead.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_invoice_pdf.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -582,5 +602,8 @@ Each entry follows this structure:
 | L-44 | The clinic switcher is in the sidebar clinic card, which shows only when the sidebar is expanded. With the sidebar collapsed on desktop, a multi-clinic user must expand it to switch | Open; acceptable for now (D-030) | Frontend |
 | L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
 | L-46 | WeasyPrint 70 warns that a future version will need the HarfBuzz subset library, which the backend Docker image does not install. PDFs are made correctly today | Open; add the library to the Docker image and check a deploy before the next WeasyPrint major upgrade (D-032) | Backend |
+| L-47 | `GET /api/v1/auth/me` with a malformed Bearer token returns 500 instead of 401 (found in the 11 Nov prod-schema rehearsal) | Open, next CRM round | Backend |
+| L-48 | Invoice / receipt with an empty clinic name printed "Thank you for visiting ." | Fixed 2026-11-14 in D-036 (plain "Thank you." without a name) | Backend |
+| L-49 | The backend Docker image installs only `fonts-liberation`, which has no Devanagari; a clinic or patient name in Hindi would print as boxes on Railway (renders locally only because other fonts are installed). Needs a Devanagari font package in the Dockerfile, tested on a real image build | Open | Backend / deploy |
 
-*Last updated: 2026-11-13 (D-035 letterhead logo shape) | Branch: feat/letterhead-wide-logo*
+*Last updated: 2026-11-14 (D-036 report identity) | Branch: feat/report-identity*
