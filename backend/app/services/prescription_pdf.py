@@ -40,8 +40,8 @@ from app.services.brand import (
     PAGE,
     PAPER,
     RULE,
-    brand_data_uri,
     font_faces,
+    watermark_data_uri,
 )
 from app.services.report_letterhead import (
     clinic_details,
@@ -382,7 +382,7 @@ def build_prescription_html(doc: RxDoc) -> str:
     cards = "".join(_exercise_card(i + 1, it) for i, it in enumerate(doc.items))
 
     page_top = letterhead_page_top_mm(_clinic_details(doc) if doc.clinic_name else [])
-    watermark = brand_data_uri("av_watermark.png")
+    watermark = watermark_data_uri()
     watermark_css = (
         f'background-image: url("{watermark}"); background-repeat: no-repeat; '
         "background-position: center 55%; background-size: 95mm auto;"
@@ -488,7 +488,7 @@ p {{ margin: 0; }}
 </style></head>
 <body>
 {_letterhead(doc)}
-{footer_html()}
+{footer_html(f'Rx {rx_reference(doc.rx_id)}')}
 
 {_patient_box(doc, on)}
 {cards}

@@ -249,20 +249,30 @@ def _footer(out: str) -> str:
     return out[start : out.index("</div></div>", start)]
 
 
-def test_rx_footer_has_no_patient_name_or_reference():
+def test_rx_footer_has_the_rx_number_but_no_patient_name():
+    # D-038: the document number (not the patient) identifies page 2 onwards.
     out = build_prescription_html(_rx())
     foot = _footer(out)
-    assert "Unique Patientname" not in foot
-    assert "RX-" not in foot
+    assert "Unique Patientname" not in foot and "9876543210" not in foot
+    assert '<span class="ref">Rx RX-7B825459</span>' in foot
     assert "Unique Patientname" in out  # still in the patient box
 
 
-@pytest.mark.parametrize("kind", ["invoice", "receipt"])
-def test_invoice_footer_has_no_patient_name_or_number(kind):
+@pytest.mark.parametrize("kind,label", [("invoice", "Invoice"), ("receipt", "Receipt")])
+def test_invoice_footer_has_the_number_but_no_patient_name(kind, label):
     out = build_invoice_html(_inv(kind=kind))
     foot = _footer(out)
-    assert "Unique Patientname" not in foot and "INV-0042" not in foot
-    assert "Unique Patientname" in out and "INV-0042" in out
+    assert "Unique Patientname" not in foot
+    assert f'<span class="ref">{label} INV-0042</span>' in foot
+    assert "Unique Patientname" in out
+
+
+def test_footer_reference_is_escaped_and_optional():
+    assert '<span class="ref">' not in footer_html()
+    assert '<span class="ref">' not in footer_html("   ")
+    out = footer_html("Invoice <b>1</b>")
+    assert "<b>1</b>" not in out and "Invoice &lt;b&gt;1&lt;/b&gt;" in out
+    assert out.index('class="ref"') < out.index('class="page"')
 
 
 def test_rx_letterhead_shows_clinic_contacts_but_no_tax_ids():

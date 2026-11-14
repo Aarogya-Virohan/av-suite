@@ -48,3 +48,40 @@ def test_shared_pdf_modules_do_not_import_the_posture_package():
         [sys.executable, "-c", code], cwd=BACKEND, capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_watermark_is_the_round_mark_faded(monkeypatch):
+    import base64, io
+    from PIL import Image
+
+    uri = brand.watermark_data_uri()
+    assert uri.startswith("data:image/png;base64,")
+    image = Image.open(io.BytesIO(base64.b64decode(uri.split(",", 1)[1])))
+    source = Image.open(brand.BRAND_DIR / brand.WATERMARK_FILE)
+    assert image.size == source.size
+    assert image.getchannel("A").getextrema()[1] == round(255 * brand.WATERMARK_OPACITY)
+    # The white disc behind the artwork is dropped, not faded into a pale patch.
+    rgba = source.convert("RGBA")
+    white = [xy for xy in ((x, y) for x in range(0, rgba.width, 7) for y in range(0, rgba.height, 7))
+             if rgba.getpixel(xy)[3] == 255 and min(rgba.getpixel(xy)[:3]) >= 250]
+    assert white and all(image.getpixel(xy)[3] == 0 for xy in white)
+
+    brand.watermark_data_uri.cache_clear()
+    monkeypatch.setattr(brand, "WATERMARK_FILE", "")
+    try:
+        assert brand.watermark_data_uri() == ""
+    finally:
+        monkeypatch.undo()
+        brand.watermark_data_uri.cache_clear()
+
+
+def test_prescription_uses_the_watermark_switch(monkeypatch):
+    from app.services import prescription_pdf
+    from app.services.prescription_pdf import RxDoc, build_prescription_html
+
+    doc = RxDoc(rx_id="7b825459-0000-0000-0000-000000000000", clinic_name="", physio_name="",
+                patient_name="P", patient_phone=None, patient_dob=None, prescribed_on=None,
+                physio_notes=None)
+    assert brand.watermark_data_uri() in build_prescription_html(doc)
+    monkeypatch.setattr(prescription_pdf, "watermark_data_uri", lambda: "")
+    assert "background-image" not in build_prescription_html(doc)

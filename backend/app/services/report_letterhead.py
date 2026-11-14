@@ -409,16 +409,28 @@ def footer_css() -> str:
 .running-footer .powered .mark {{ height: 3.6mm; width: auto; vertical-align: -0.9mm; margin-right: 1.6mm; }}
 .running-footer .meta {{ margin-top: 1.2mm; font-size: 6.8pt; color: {MUTED}; }}
 .running-footer .meta .page::after {{ content: "Page " counter(page) " of " counter(pages); }}
+.running-footer .meta .sep {{ margin: 0 1.6mm; color: {GROVE}; }}
 """
 
 
-def footer_html() -> str:
+def footer_html(reference: str = "") -> str:
+    """
+    Shared footer. `reference` is the document number shown before the page
+    count, e.g. "Rx RX-7B825459" or "Invoice INV-0042" (D-038): page 2 of a
+    long prescription then still says which document it belongs to, without
+    any patient data. Empty reference = page count only.
+    """
+
     mark = brand_data_uri("av_mark.png")
     footer_mark = f'<img class="mark" src="{mark}" alt="" />' if mark else ""
+    ref = reference.strip()
+    ref_html = (
+        f'<span class="ref">{html.escape(ref)}</span><span class="sep">&middot;</span>' if ref else ""
+    )
     return f"""<div class="running-footer"><div class="inner">
   <p class="powered">{footer_mark}<span class="by">POWERED BY</span>
     <span class="company">{POWERED_BY_COMPANY}</span><span class="dot">&bull;</span><span class="product">{POWERED_BY_PRODUCT}</span></p>
-  <p class="meta"><span class="page"></span></p>
+  <p class="meta">{ref_html}<span class="page"></span></p>
 </div></div>"""
 
 
