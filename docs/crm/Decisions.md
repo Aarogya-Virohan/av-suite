@@ -551,6 +551,20 @@ Each entry follows this structure:
 
 ---
 
+## [D-037] Shared Brand Module Outside the Posture Package
+
+- **Date**: 2026-11-14
+- **Context**: `report_letterhead.py`, `prescription_pdf.py` and `invoice_pdf.py` took the brand palette, the "powered by" words, `_brand_data_uri` and `_font_faces` from `app/services/posture/pdf_service.py`. The posture report is to adopt `report_letterhead` (Posture work, U1); with the old imports that would be a circular import (posture -> letterhead -> posture).
+- **Decision**:
+  - New `backend/app/services/brand.py` holds the palette (MIDNIGHT to ZEBRA), `POWERED_BY_COMPANY` / `POWERED_BY_PRODUCT`, `BRAND_DIR`, `brand_data_uri()` and `font_faces()`. Moved, not copied; values and code unchanged.
+  - `posture/pdf_service.py` re-exports every moved name under its old name (`_brand_data_uri`, `_font_faces` included), so existing importers and posture tests work unchanged.
+  - The three shared PDF modules import from `app.services.brand` and no longer load the posture package at all.
+  - The image and font files stay in `app/services/posture/brand/` for now; `BRAND_DIR` points there. Moving the files is a separate step, planned with the Posture work so it does not conflict with its open branch.
+- **Verified**: Rx, invoice, receipt and posture report (with and without clinic branding) rendered before and after: generated HTML byte-identical, PDF pages pixel-identical. Full pytest on Postgres 16 on this branch and on release/el-nov: same failure set (the known failures only). New `tests/test_brand.py`: re-exports are the same objects, assets resolve, and the shared PDF modules import without the posture package (checked in a fresh interpreter).
+- **Affected Files**: `backend/app/services/brand.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/invoice_pdf.py`, `backend/tests/test_brand.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
