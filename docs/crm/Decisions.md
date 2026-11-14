@@ -565,6 +565,19 @@ Each entry follows this structure:
 
 ---
 
+## [D-038] Document Number in the Report Footer; New Round Mark as the Prescription Watermark
+
+- **Date**: 2026-11-14
+- **Context**: D-036 took the patient name and ID out of the footer. On a prescription of two or more pages, page 2 onwards then carried nothing that says which document it belongs to. The prescription watermark was still the old Aarogya Virohan hands mark while the letterhead uses the new round mark.
+- **Decision** (Onkar, 14 Nov):
+  - The shared footer shows the document number before the page count: "Rx RX-7B825459 . Page 2 of 3", "Invoice INV-0042 . Page 1 of 1", "Receipt INV-0042 . Page 1 of 1". Numbers only, never the patient's name or phone. `footer_html(reference)` escapes the text; an empty reference gives the page count alone, as before.
+  - Prescription watermark: the new round mark (`av_logo_round.png`) faded to 6%. WeasyPrint has no opacity for @page backgrounds, so `brand.watermark_data_uri()` bakes the fade into the image and drops the mark's white background disc (otherwise a pale patch shows on the cream page). One switch: `WATERMARK_FILE = ""` in `app/services/brand.py` removes the watermark; `WATERMARK_OPACITY` sets the strength.
+  - Pending founders' view (Round 3: R3-2 footer number, R3-3 watermark). The posture report keeps its own footer and the old watermark until the Posture work adopts the shared letterhead.
+- **Verified**: full pytest on Postgres 16 on this branch and on release/el-nov (same known failures); Rx (multi-page), invoice and receipt rendered and every page looked at, footer zoomed; watermark checked on a near-empty page; posture report HTML unchanged.
+- **Affected Files**: `backend/app/services/brand.py`, `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/invoice_pdf.py`, `backend/tests/test_brand.py`, `backend/tests/test_report_letterhead.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
