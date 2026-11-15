@@ -79,8 +79,10 @@ export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos, onEditCat
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        {/* The buttons drop under the title when the column is too narrow
+            for both (phones), so a long title is never hidden behind them. */}
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <div className="min-w-0 flex-1 basis-32">
             <h3 className="font-display text-[15px] font-bold leading-snug text-ink">
               {displayTitle(exercise.name)}
             </h3>
