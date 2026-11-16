@@ -24,6 +24,7 @@ from app.api.v1 import (
     users,
     marketplace,
     me,
+    posture,
     # memory,
 )
 import logging
@@ -39,8 +40,7 @@ api_router.include_router(
     exercise_templates.router, prefix="/exercise-templates", tags=["Exercise templates"]
 )
 api_router.include_router(patients.router, prefix="/patients", tags=["Patients"])
-# Posture is mounted once in main.py at /posture (the include that was
-# here served a duplicate /api/v1/posture/posture/* path; dev removed it).
+api_router.include_router(posture.router, prefix="/posture", tags=["posture"])
 api_router.include_router(
     prescriptions.router, prefix="/prescriptions", tags=["Prescriptions"]
 )

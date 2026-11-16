@@ -22,3 +22,10 @@ def test_case_ref_is_optional_on_the_report_route():
     # at the last step with "case_ref: Field required".
     default = inspect.signature(posture.report_from_review).parameters["case_ref"].default
     assert getattr(default, "default", None) == ""
+
+
+def test_gender_is_optional_on_the_report_route():
+    # The intake offers "Not given"; required here failed those reports at
+    # the last step with "gender: Field required" (found 14 November 2026).
+    default = inspect.signature(posture.report_from_review).parameters["gender"].default
+    assert getattr(default, "default", None) == ""
