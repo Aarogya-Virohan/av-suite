@@ -19,6 +19,8 @@ import math
 from html import escape
 from typing import Any
 
+from app.services.posture.reference_ranges import chart_label
+
 # Same colours as the PDF badges (pdf_service.SEVERITY_STYLES). The outline
 # is the brand teal since 11 October 2026.
 COLOUR = {
@@ -28,6 +30,7 @@ COLOUR = {
     "severe": "#b91c1c",
 }
 GREY = "#94a3b8"
+
 
 RING_LABELS = ["Normal", "Mild", "Moderate", "Severe"]
 _RING_KEYS = ["none", "mild", "moderate", "severe"]
@@ -43,15 +46,9 @@ def _tint(hex_colour: str, amount: float) -> str:
     m = [round(p + (q - p) * amount) for p, q in zip(_PAPER, c)]
     return "#" + "".join(f"{v:02x}" for v in m)
 
-SHORT_LABEL = {
-    "PT-L01": "Forward head",
-    "PT-A01": "Head tilt",
-    "PT-P02": "Shoulder level",
-    "PT-P01": "Trunk shift",
-    "PT-L05": "Trunk lean",
-    "PT-A04": "Pelvis",
-    "PT-L06": "Knee, side",
-}
+# Axis names, 17 November 2026 (Onkar's review): the same names as the
+# report tables, from the row's own label (reference_ranges.chart_label),
+# so the chart can never call a measure something the table does not.
 
 FONT = "Inter, Helvetica, Arial, sans-serif"
 LABEL_SIZE = 13
@@ -61,16 +58,20 @@ DEFAULT_WIDTH = 520
 DEFAULT_HEIGHT = 400
 
 
+WRAP_AT = 14
+
+
+def _wrap(name: str) -> list[str]:
+    """Two lines for a long axis name, split at the space nearest the middle."""
+    if len(name) <= WRAP_AT or " " not in name:
+        return [name]
+    spaces = [i for i, c in enumerate(name) if c == " "]
+    cut = min(spaces, key=lambda i: abs(i - len(name) / 2))
+    return [name[:cut], name[cut + 1 :]]
+
+
 def _short(p: dict[str, Any]) -> str:
-    pid = p.get("paramId")
-    if pid in ("PT-A05", "PT-A06"):
-        label = p.get("label") or ""
-        if label.startswith("Left"):
-            return "Left knee"
-        if label.startswith("Right"):
-            return "Right knee"
-        return "Knee"
-    return SHORT_LABEL.get(pid, p.get("label") or "")
+    return chart_label(p.get("label") or "")
 
 
 def render_signature_svg(
@@ -116,8 +117,8 @@ def render_signature_svg(
         lx, ly = cx + (outer + gap) * math.cos(a), cy + (outer + gap) * math.sin(a)
         anchor = "middle" if abs(math.cos(a)) < 0.3 else ("start" if math.cos(a) > 0 else "end")
         measured = p.get("tier") is not None
-        label = escape(_short(p))
-        lines = 1 if measured else 2
+        name_lines = _wrap(_short(p))
+        lines = len(name_lines) + (0 if measured else 1)
         # Labels below the chart hang down from the ring, labels above sit
         # on it, side labels are centred on the axis.
         s = math.sin(a)
@@ -127,6 +128,10 @@ def render_signature_svg(
             y0 = ly - (lines - 1) * LABEL_SIZE * 1.05 - 2
         else:
             y0 = ly + LABEL_SIZE * 0.35 - (lines - 1) * LABEL_SIZE * 0.5
+        label = escape(name_lines[0]) + "".join(
+            f'<tspan x="{lx:.1f}" dy="{LABEL_SIZE * 1.05:.1f}">{escape(line)}</tspan>'
+            for line in name_lines[1:]
+        )
         second = "" if measured else (
             f'<tspan x="{lx:.1f}" dy="{LABEL_SIZE * 1.05:.1f}" '
             f'font-size="{LABEL_SIZE - 2}">not measured</tspan>'

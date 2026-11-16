@@ -22,6 +22,8 @@ saved reports and the synthesis mapping are unchanged.
 
 from __future__ import annotations
 
+import re
+
 from app.services.posture.classifier import THRESHOLDS
 
 # Report labels that are not built from the measurement itself. The knee
@@ -44,14 +46,16 @@ UNITS: dict[str, str] = {
 
 AV_TEAM = "AV clinical team, Oct 2026"
 
-# Footnote lead line, shared by the PDF and the web report.
+# Shared by the PDF and the web report (Onkar's review, 17 Nov: the column
+# is "Normal range", the section below explains the basis).
+RANGE_HEADING = "Normal range"
+SOURCES_HEADING = "Normal ranges: basis and sources"
 SCREENING_NOTE = (
-    "Ranges are those the AV screening grade treats as Normal; not "
-    "population reference values."
+    "Normal range is the band the AV screening grade treats as Normal. "
+    "It is a screening range, not a population reference value."
 )
 
-# One footnote entry per row on the report. Pelvic obliquity, the longest
-# entry, is last so the footnote columns balance. "basis" is the
+# One entry per report row, in report order. "basis" is the
 # published work the AV clinical team cited when setting the band (code
 # comments in classifier.py); "AV_TEAM" alone where none was given.
 SOURCES: list[dict[str, str]] = [
@@ -77,6 +81,13 @@ SOURCES: list[dict[str, str]] = [
         "note": "",
     },
     {
+        "params": "PT-A04",
+        "basis": f"{AV_TEAM}, informed by Ferreira et al. 2011.",
+        "note": "Published reference 0 to 5.6\u00b0 (Moharrami et al. 2023, J Exp "
+        "Orthop; standing pelvic radiographs, 134 adults); not directly "
+        "comparable with this photograph-based angle.",
+    },
+    {
         "params": "PT-A05,PT-A06",
         "basis": f"{AV_TEAM}, informed by Bellemans et al. 2012 (standing "
         "radiographs).",
@@ -92,12 +103,6 @@ SOURCES: list[dict[str, str]] = [
         "basis": AV_TEAM,
         "note": "",
     },
-    {
-        "params": "PT-A04",
-        "basis": f"{AV_TEAM}, informed by Ferreira et al. 2011.",
-        "note": "Published reference 0 to 5.6\u00b0 (Moharrami et al. 2023, "
-        "standing pelvic radiographs); not directly comparable.",
-    },
 ]
 
 # Footnote names, so a footnote line reads the same as the row it explains.
@@ -107,7 +112,7 @@ SOURCE_NAMES: dict[str, str] = {
     "PT-L06": "Knee Flexion / Hyperextension",
     "PT-A01": "Head Lateral Tilt",
     "PT-A04": "Pelvic Obliquity",
-    "PT-A05,PT-A06": "Knee Alignment (Hip-Knee-Ankle)",
+    "PT-A05": "Knee Alignment (Hip-Knee-Ankle)",
     "PT-P01": "Trunk Lateral Deviation",
     "PT-P02": "Shoulder Level Asymmetry",
 }
@@ -119,39 +124,48 @@ def _num(value: float) -> str:
 
 def screening_range(param_id: str) -> str:
     """
-    The Normal band of `param_id` as printed text, read from THRESHOLDS.
+    The Normal band of `param_id` as printed text, read from THRESHOLDS, in
+    one format on every surface: "\u2264 5\u00b0", "\u2265 50\u00b0",
+    "\u00b1 4\u00b0", "\u2264 10 mm" (Onkar's review, 17 November 2026).
     Empty when the parameter has no band or no unit here.
     """
     rule = THRESHOLDS.get(param_id)
     unit = UNITS.get(param_id)
     if not rule or unit is None:
         return ""
-    sep = "" if unit == "°" else " "
+    sep = "" if unit == "\u00b0" else " "
     direction = rule.get("direction")
     if direction == "higher_worse" and "none_max" in rule:
-        return f"0 to {_num(rule['none_max'])}{sep}{unit}"
+        return f"\u2264 {_num(rule['none_max'])}{sep}{unit}"
     if direction == "lower_worse" and "none_min" in rule:
-        return f"{_num(rule['none_min'])}{sep}{unit} or more"
+        return f"\u2265 {_num(rule['none_min'])}{sep}{unit}"
     if direction == "centred" and "none_low" in rule and "none_high" in rule:
         low, high = rule["none_low"], rule["none_high"]
         if low == -high:
             # These rows print the size only and name the direction in the
             # label (report_builder.DIRECTION_NAMED_PARAMS).
-            return f"Up to {_num(high)}{sep}{unit} either way"
+            return f"\u00b1 {_num(high)}{sep}{unit}"
         return f"{_num(low)} to {_num(high)}{sep}{unit}"
     return ""
 
 
 def source_lines() -> list[tuple[str, str]]:
-    """
-    (row names, footnote text) for the sources footnote, in report order.
-    Rows with the same source share one line, so the footnote fits the
-    last page (the report stays three pages).
-    """
-    grouped: dict[str, list[str]] = {}
+    """(row name, basis) for the sources section, one line per measure."""
+    lines = []
     for entry in SOURCES:
         text = entry["basis"].rstrip(".") + "."
         if entry["note"]:
             text += " " + entry["note"]
-        grouped.setdefault(text, []).append(SOURCE_NAMES[entry["params"]])
-    return [(", ".join(names), text) for text, names in grouped.items()]
+        name = SOURCE_NAMES[entry["params"].split(",")[0]]
+        lines.append((name, text))
+    return lines
+
+
+def chart_label(row_label: str) -> str:
+    """
+    The radar chart name for a report row: the table's own label in sentence
+    case, without the bracketed detail, so the chart and the tables name a
+    measure the same way ("Head position", not "Forward head").
+    """
+    base = re.sub(r"\s*\(.*\)\s*$", "", row_label or "").strip()
+    return base[:1].upper() + base[1:].lower() if base else ""

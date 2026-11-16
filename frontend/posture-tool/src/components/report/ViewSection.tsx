@@ -81,7 +81,7 @@ export default function ViewSection({ viewName, data }: Props) {
                     <p className="text-[15px] leading-snug text-[#141A33]">{m.label}</p>
                     {showSide && <p className="mt-0.5 text-[12.5px] text-[#5D6380]">{m.sideLabel}</p>}
                     {m.screeningRange && (
-                      <p className="mt-0.5 text-[12px] text-[#5D6380]">AV screening range: {m.screeningRange}</p>
+                      <p className="mt-0.5 text-[14px] text-[#141A33]">Normal range: {m.screeningRange}</p>
                     )}
                     <div className="mt-1.5 flex items-center justify-between gap-3">
                       <span className="font-display text-[17px] font-bold tabular-nums text-[#0B1238]">
@@ -98,12 +98,20 @@ export default function ViewSection({ viewName, data }: Props) {
           {data.measurements.length === 0 ? (
             <p className="py-3 text-sm italic text-[#5D6380]">No measurements available for this view.</p>
           ) : (
-            <table className="hidden w-full border-collapse sm:table">
+            // Fixed column widths, the same in every view, as on the PDF
+            // (17 November 2026); headers stay on one line.
+            <table className="hidden w-full table-fixed border-collapse sm:table">
+              <colgroup>
+                <col className="w-[38%]" />
+                <col className="w-[16%]" />
+                <col className="w-[18%]" />
+                <col className="w-[28%]" />
+              </colgroup>
               <thead>
-                <tr className="text-[10.5px] uppercase tracking-[0.1em] text-[#5D6380]">
+                <tr className="whitespace-nowrap text-[10.5px] uppercase tracking-[0.1em] text-[#5D6380]">
                   <th className="px-3 pb-2 text-left font-bold">Parameter</th>
                   <th className="px-3 pb-2 text-right font-bold sm:px-4">Value</th>
-                  <th className="px-3 pb-2 text-left font-bold">AV screening range</th>
+                  <th className="px-3 pb-2 text-left font-bold">Normal range</th>
                   <th className="px-3 pb-2 text-left font-bold">Finding</th>
                 </tr>
               </thead>
@@ -122,7 +130,7 @@ export default function ViewSection({ viewName, data }: Props) {
                       <td className="whitespace-nowrap px-3 py-3 text-right font-display text-[15px] font-bold tabular-nums text-[#0B1238] sm:px-4">
                         {formatValue(m.value, m.unit)}
                       </td>
-                      <td className="px-3 py-3 text-[12.5px] text-[#5D6380]">{m.screeningRange ?? ""}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-[14px] text-[#141A33]">{m.screeningRange ?? ""}</td>
                       <td className="w-px whitespace-nowrap rounded-r-lg px-3 py-3">
                         <SeverityBadge severity={m.severity} label={m.severityLabel} />
                       </td>
