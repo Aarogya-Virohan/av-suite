@@ -19,6 +19,7 @@ import { ExerciseRow } from "./ExerciseRow";
 import { PatientPicker } from "./PatientPicker";
 import { AddPatientForm } from "./AddPatientForm";
 import { QuickPicks, addPhrase } from "./QuickPicks";
+import { TemplatesPanel } from "./TemplatesPanel";
 
 interface PrescriptionBuilderProps {
   prescription: PrescriptionItem[];
@@ -169,6 +170,18 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
     setSaved(null);
     setGuidance(DEFAULT_PHYSIO_NOTES);
     onReplace([]);
+  };
+
+  /** A template fills a NEW prescription (EL-D-009): it never overwrites a
+   * saved one, so the saved link is dropped. The guidance text is kept. */
+  const applyTemplate = (items: PrescriptionItem[], name: string) => {
+    if (prescription.length > 0 && !isSaved) {
+      const ok = window.confirm(`Replace the exercises on screen with the template "${name}"? Unsaved changes will be lost.`);
+      if (!ok) return;
+    }
+    setSaved(null);
+    onReplace(items);
+    toast(`Template "${name}" added. Adjust the dose for this patient, then save.`);
   };
 
   const validate = (): boolean => {
@@ -338,6 +351,10 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
         )}
       </div>
 
+      <div className="mb-4 shrink-0">
+        <TemplatesPanel current={prescription} onUse={applyTemplate} />
+      </div>
+
       {/* Exercises */}
       {prescription.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-line p-8 text-center">
@@ -346,7 +363,7 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
           </span>
           <p className="font-semibold text-ink">No exercises yet</p>
           <p className="mt-1 max-w-[260px] text-sm text-muted-foreground">
-            Add exercises from the library, then set the dose for each.
+            Add exercises from the library or use a template, then set the dose for each.
           </p>
         </div>
       ) : (

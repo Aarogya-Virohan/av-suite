@@ -508,6 +508,76 @@ Each entry follows this structure:
 
 ---
 
+## [D-034] Report Letterhead: Clinic Left, Aarogya Virohan Right
+
+- **Date**: 2026-11-12
+- **Context**: The shared report letterhead (`report_letterhead.py`, used by the exercise prescription PDF and the invoice / receipt PDF) put the Aarogya Virohan wordmark on the left and the clinic on the right, following the founders' Exercise Library feedback of 23 Oct (items 6 and 7). The CRM header already shows the clinic on the left and Aarogya Virohan on the right (D-030). On 12 Nov Shivank sir set one rule for every patient-facing document and the CRM: "the clinic is the hero, Aarogya Virohan is the backend partner", clinic logo left, Aarogya Virohan right and smaller. This replaces the 23 Oct items 6 and 7.
+- **Decision**:
+  - With a clinic name: clinic logo (when usable) and clinic name with the document subtitle ("Invoice", "Payment Receipt", "Exercise Prescription Tool") on the left; on the right a smaller Aarogya Virohan wordmark under a "Powered by" label. Same letterhead for invoice and receipt (one rule; founders can ask for a footer-only invoice later).
+  - Without a clinic name: Aarogya Virohan only, wordmark and subtitle on the left, as before.
+  - `letterhead_html()` keeps its signature and class names, so the callers do not change. The posture report has its own letterhead in the posture module and is aligned in the Posture work, not here.
+- **Verified**: full pytest on Postgres 16, same 10 known failures as dev 6ca4499 (dev 435 passed, this change 438: three new invoice / receipt letterhead tests); prescription letterhead tests assert the new order; PDFs rendered for prescription, invoice and receipt with a logo, with a name only and without a clinic, every page checked as an image.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_invoice_pdf.py`
+
+---
+
+## [D-035] Letterhead Logo Keeps the Clinic Logo's Shape
+
+- **Date**: 2026-11-13
+- **Context**: The letterhead (D-034) put every clinic logo inside a 13 mm square tile. Most clinic logos are wide wordmarks; the first real one (a 3:1 logo with a tagline) shrank to about 11 x 4 mm and its tagline could not be read.
+- **Decision**: The logo keeps its own ratio. Square and tall logos stay as before (11 mm inside a 13 mm tile). A wide logo keeps the 11 mm height and grows sideways up to 40 mm (tile = logo + 2 mm); a wider logo is capped at 40 mm and gets shorter. Size comes from the PNG header of the normalised logo (`resolve_clinic_logo` always returns PNG); anything unreadable falls back to the square box. The clinic name stays next to the logo.
+- **Verified**: full pytest on Postgres 16 against release/el-nov (only the known failures); new tests for square, wide, very wide, tall and unreadable logos and for the tile markup; PDFs rendered with square, 3:1, 8:1 and 1:2 logos and with a real clinic logo, every page checked.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/tests/test_prescription_pdf.py`
+
+---
+
+## [D-036] Report Identity: One Set of Rules for Letterhead and Footer
+
+- **Date**: 2026-11-14
+- **Context**: Founders (13-14 Nov) asked for the new Aarogya Virohan round logo on the right of the letterhead with no "Powered by" label there, "Powered by Aarogya Virohan . AV Suite" only in the footer, no patient name or ID in the footer (the footer itself to stay as it was, centred), and the clinic's full details (address, phone, email, website) on every report, filled from the clinic profile and never hard-coded. A missing optional field must not leave a gap.
+- **Decision**:
+  - `report_letterhead.py` owns the rules for every report: `clinic_details()` returns the clinic's details as labelled pairs in a fixed order (Address, Phone, Email, Website, Reg. No., GSTIN); empty fields are dropped, never shown as an empty label. Address is "line, city, state pincode" without repeating parts already in the line; an invalid pincode is dropped; the website is shown without scheme and trailing slash. `clinic_detail_lines()` gives the same as plain lines.
+  - Letterhead (final, 14 Nov): white, shallow, print-friendly header. Clinic logo, name and document type on the left; the clinic's contacts next, one per row with a small line icon (address, phone, email, website; Reg. No. / GSTIN with a short label); then a thin standing rule and the Aarogya Virohan round mark alone on the far right; one accent rule underneath. A missing field has no row; no contacts means no standing rule. Long names get a smaller font (over 30 and 45 characters) and wrap; nothing is cut. Without a clinic name: Aarogya Virohan mark, name and document type.
+  - Why: earlier drafts put the clinic's details right next to the AV mark (first in a dark band, then in a strip under it) and they read as Aarogya Virohan's; a draft with no AV mark in the header was rejected by Onkar (the mark stays). The standing rule separates the two owners. Medical letterhead practice keeps the header shallow with the provider's name and contacts prominent; a full dark band also costs clinics toner on every printed prescription.
+  - `letterhead_page_top_mm(details)` sizes each report's @page top margin from the contact rows (address wrap estimate capped at 3 lines), so the header never runs into the body; without details it is 29 mm (27 mm before; 2 mm more space under the rule).
+  - Logos: empty margins are trimmed before sizing; an opaque logo on a near-white canvas has that outer background made transparent (flood fill from the corners), so it sits cleanly on the cream prescription page; white inside the artwork is kept; dark backgrounds are left as they are.
+  - Prescriptions show address and contacts only; invoices and receipts also show Reg. No. and GSTIN when filled. The invoice's own clinic block moved into the letterhead; "Billed to" now sits beside the invoice title.
+  - Shared footer (`footer_html`, `footer_css`): exactly the footer used before D-036 (centred, old Aarogya Virohan mark, "POWERED BY AAROGYA VIROHAN . AV SUITE", "Page x of y" centred on the next line), minus the patient name and prescription reference (founders 14 Nov: no patient data in the footer).
+  - Uploaded logos lose their empty margins before sizing (transparent margins by alpha; an opaque background only when all four corners share one colour).
+  - New asset `av_logo_round.png` (the founders' round logo, cut to a transparent circle), used in the header. The footer keeps the old mark. The old wordmark stays in the repo for the posture report until the Posture work adopts this module.
+- **Not in this change**: website field in the clinic profile (the PDFs accept it, nothing stores it yet), display name vs legal name, practitioner degree, authorised-person rules, per-document snapshot of clinic details, the Rx watermark (still the old mark), the posture report (Posture Project).
+- **Verified**: full pytest on Postgres 16 against release/el-nov; new `tests/test_report_letterhead.py` (detail order and labels, missing cells, ids row, page margin, escaping, address, website, name size, footer without patient data on Rx / invoice / receipt, logo trim); PDFs rendered with all details, with phone and website missing, without a clinic, and a multi-page Rx, every page checked.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/prescription_service.py`, `backend/app/services/invoice_pdf.py`, `backend/app/services/posture/brand/av_logo_round.png`, `backend/tests/test_report_letterhead.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_invoice_pdf.py`
+
+---
+
+## [D-037] Shared Brand Module Outside the Posture Package
+
+- **Date**: 2026-11-14
+- **Context**: `report_letterhead.py`, `prescription_pdf.py` and `invoice_pdf.py` took the brand palette, the "powered by" words, `_brand_data_uri` and `_font_faces` from `app/services/posture/pdf_service.py`. The posture report is to adopt `report_letterhead` (Posture work, U1); with the old imports that would be a circular import (posture -> letterhead -> posture).
+- **Decision**:
+  - New `backend/app/services/brand.py` holds the palette (MIDNIGHT to ZEBRA), `POWERED_BY_COMPANY` / `POWERED_BY_PRODUCT`, `BRAND_DIR`, `brand_data_uri()` and `font_faces()`. Moved, not copied; values and code unchanged.
+  - `posture/pdf_service.py` re-exports every moved name under its old name (`_brand_data_uri`, `_font_faces` included), so existing importers and posture tests work unchanged.
+  - The three shared PDF modules import from `app.services.brand` and no longer load the posture package at all.
+  - The image and font files stay in `app/services/posture/brand/` for now; `BRAND_DIR` points there. Moving the files is a separate step, planned with the Posture work so it does not conflict with its open branch.
+- **Verified**: Rx, invoice, receipt and posture report (with and without clinic branding) rendered before and after: generated HTML byte-identical, PDF pages pixel-identical. Full pytest on Postgres 16 on this branch and on release/el-nov: same failure set (the known failures only). New `tests/test_brand.py`: re-exports are the same objects, assets resolve, and the shared PDF modules import without the posture package (checked in a fresh interpreter).
+- **Affected Files**: `backend/app/services/brand.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/invoice_pdf.py`, `backend/tests/test_brand.py`
+
+---
+
+## [D-038] Document Number in the Report Footer; New Round Mark as the Prescription Watermark
+
+- **Date**: 2026-11-14
+- **Context**: D-036 took the patient name and ID out of the footer. On a prescription of two or more pages, page 2 onwards then carried nothing that says which document it belongs to. The prescription watermark was still the old Aarogya Virohan hands mark while the letterhead uses the new round mark.
+- **Decision** (Onkar, 14 Nov):
+  - The shared footer shows the document number before the page count: "Rx RX-7B825459 . Page 2 of 3", "Invoice INV-0042 . Page 1 of 1", "Receipt INV-0042 . Page 1 of 1". Numbers only, never the patient's name or phone. `footer_html(reference)` escapes the text; an empty reference gives the page count alone, as before.
+  - Prescription watermark: the new round mark (`av_logo_round.png`) faded to 6%. WeasyPrint has no opacity for @page backgrounds, so `brand.watermark_data_uri()` bakes the fade into the image and drops the mark's white background disc (otherwise a pale patch shows on the cream page). One switch: `WATERMARK_FILE = ""` in `app/services/brand.py` removes the watermark; `WATERMARK_OPACITY` sets the strength.
+  - Pending founders' view (Round 3: R3-2 footer number, R3-3 watermark). The posture report keeps its own footer and the old watermark until the Posture work adopts the shared letterhead.
+- **Verified**: full pytest on Postgres 16 on this branch and on release/el-nov (same known failures); Rx (multi-page), invoice and receipt rendered and every page looked at, footer zoomed; watermark checked on a near-empty page; posture report HTML unchanged.
+- **Affected Files**: `backend/app/services/brand.py`, `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/invoice_pdf.py`, `backend/tests/test_brand.py`, `backend/tests/test_report_letterhead.py`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -559,5 +629,8 @@ Each entry follows this structure:
 | L-44 | The clinic switcher is in the sidebar clinic card, which shows only when the sidebar is expanded. With the sidebar collapsed on desktop, a multi-clinic user must expand it to switch | Open; acceptable for now (D-030) | Frontend |
 | L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
 | L-46 | WeasyPrint 70 warns that a future version will need the HarfBuzz subset library, which the backend Docker image does not install. PDFs are made correctly today | Open; add the library to the Docker image and check a deploy before the next WeasyPrint major upgrade (D-032) | Backend |
+| L-47 | `GET /api/v1/auth/me` with a malformed Bearer token returns 500 instead of 401 (found in the 11 Nov prod-schema rehearsal) | Open, next CRM round | Backend |
+| L-48 | Invoice / receipt with an empty clinic name printed "Thank you for visiting ." | Fixed 2026-11-14 in D-036 (plain "Thank you." without a name) | Backend |
+| L-49 | The backend Docker image installs only `fonts-liberation`, which has no Devanagari; a clinic or patient name in Hindi would print as boxes on Railway (renders locally only because other fonts are installed). Needs a Devanagari font package in the Dockerfile, tested on a real image build | Open | Backend / deploy |
 
-*Last updated: 2026-11-10 (D-032 follow-up: uv.lock) | Branch: fix/backend-uv-lock*
+*Last updated: 2026-11-14 (D-036 report identity) | Branch: feat/report-identity*
