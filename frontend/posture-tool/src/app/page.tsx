@@ -20,10 +20,10 @@ import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@
 type Step = "upload" | "review" | "report"
 
 // App bar, brand direction B (13 October 2026): the Midnight band of the AV
-// Suite CRM with the white logo and the three steps of an assessment. On
-// the report step the report's own letterhead carries the logo, so the bar
-// shows only the product name; two logos one above the other read as a
-// mistake.
+// Suite CRM with the white logo and the three steps of an assessment. The
+// logo shows on every step since 17 November 2026: the report's letterhead
+// now carries the clinic's logo, not Aarogya Virohan's, so step 3 no longer
+// fell back to the name as text.
 const STEP_ORDER: { key: Step; label: string }[] = [
   { key: "upload", label: "Patient & photos" },
   { key: "review", label: "Landmark check" },
@@ -40,12 +40,8 @@ function Header({ step }: { step: Step }) {
   return (
     <header className="bg-[linear-gradient(115deg,#0B1238_0%,#121F4A_60%,#1B4A54_100%)] text-white">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
-        {step !== "report" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src="/brand/av_logo_wordmark_white.png" alt="Aarogya Virohan" className="h-6 w-auto" />
-        ) : (
-          <span className="font-display text-[15px] font-bold">Aarogya Virohan</span>
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/av_logo_wordmark_white.png" alt="Aarogya Virohan" className="h-6 w-auto" />
         <span className="rounded-full bg-[#C1FF72] px-2.5 py-0.5 text-[11.5px] font-bold text-[#0B1238]">
           Posture Tool
         </span>

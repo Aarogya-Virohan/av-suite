@@ -578,6 +578,23 @@ Each entry follows this structure:
 
 ---
 
+## [D-039] Posture Report on the Shared Letterhead, Signed-in Clinic, IST Date
+
+- **Date**: 2026-11-17
+- **Context**: The posture report kept its own dark letterhead and footer after D-036. In production (17 Nov, 01:44 IST) a report made while signed in to "AV Suite Clinic 2" printed the placeholder clinic "AV Clinic", the footer carried the patient's name, and the assessed-on date and report ID showed 16 Nov because the route took the server's UTC date. Step 3 of the posture tool showed "Aarogya Virohan" as text instead of the logo.
+- **Decision** (coordinator, 17 Nov; Posture branding round, part 1):
+  - The posture PDF uses `report_letterhead.py` unchanged: `letterhead_html`, `letterhead_css`, `letterhead_page_top_mm`, `footer_html`, `footer_css`, `clinic_details`, `resolve_clinic_logo`. Address and contacts only, no Reg. No. or GSTIN (same as the prescription).
+  - The clinic is the signed-in clinic: `/api/v1/posture/report/pdf` reads the clinics row of the request (`perm_ctx.clinic`) on every export; `report["branding"]` sent by the client is ignored. `/api/v1/posture/report` adds the same clinic as plain text in `report["branding"]` for the web report, after the report file is saved (the saved copy carries no logo). New `app/services/posture/clinic_letterhead.py`. The "AV Clinic" placeholder is removed from backend and posture-tool; the patient box always shows "Assessed by".
+  - Footer: "Report PT-... . Page x of y", no patient name (D-036, D-038).
+  - Assessed-on date and the date in the report ID are the IST date (`datetime.now(IST)`), same rule as D-017. The saved file's name keeps its UTC timestamp (not printed).
+  - The shared header and footer assume paragraph margins are zero; the posture page keeps browser margins in its body, so they are zeroed for `.letterhead p` and `.running-footer p` only. No colour or other design change; the posture watermark stays as it was.
+  - posture-tool: the app bar shows the Aarogya Virohan logo on every step (the report letterhead now carries the clinic's logo, so the reason for hiding it on step 3 is gone).
+- **Not in this change**: reference ranges, camera-only capture and the "posture test upload" capability (next parts of the round); web report header design (it keeps its own band, now filled with the signed-in clinic).
+- **Verified**: full pytest (SQLite) on this branch and on dev f02118a, twice: same 24 known failures, no new ones. New `tests/services/posture/test_pdf_letterhead_17nov.py`, `tests/services/posture/test_assessment_date_ist.py` (01:44 IST gives 17 Nov and PT-20261117-), `tests/test_posture_pdf_clinic.py` (HTTP: signed-in clinic printed, posted branding ignored, patient name once). posture-tool tsc, lint, build. PDFs rendered with a long clinic name and logo, with a short name and no logo, and with no clinic; every page looked at, header zoomed.
+- **Affected Files**: `backend/app/api/v1/posture.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/services/posture/clinic_letterhead.py`, `backend/tests/services/posture/test_pdf_letterhead_17nov.py` (replaces `test_pdf_letterhead_13oct.py`), `backend/tests/services/posture/test_assessment_date_ist.py`, `backend/tests/test_posture_pdf_clinic.py`, `frontend/posture-tool/src/app/page.tsx`, `frontend/posture-tool/src/components/report/ReportHeader.tsx`, `frontend/posture-tool/src/lib/branding.ts`, `frontend/posture-tool/src/types/posture.ts`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 

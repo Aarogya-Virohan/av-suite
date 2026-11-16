@@ -63,9 +63,10 @@ export interface PostureReport {
     heightCm?: number
   }
 
-  // Clinic letterhead, to come from the marketplace (AV Suite core). Absent
-  // today, so every report shows the Aarogya Virohan fallback. Same fields
-  // as report["branding"] in pdf_service.py.
+  // Clinic letterhead: the signed-in clinic, added by the backend's /report
+  // route from the clinics row since 17 November 2026 (clinic_letterhead.py).
+  // Absent only when the clinic has no name; the Aarogya Virohan letterhead
+  // is shown then.
   branding?: ClinicBranding
 
   views: {

@@ -25,13 +25,19 @@ details come from the marketplace, and a patient box with every intake field.
 from __future__ import annotations
 
 import html
-import re
 from datetime import date
 from typing import Any
 
 from weasyprint import HTML
 
 from app.services.posture.classifier import SEVERITY_LABELS
+from app.services.report_letterhead import (
+    footer_css,
+    footer_html,
+    letterhead_css,
+    letterhead_html,
+    letterhead_page_top_mm,
+)
 from app.services.posture.signature_svg import render_signature_svg
 
 # Palette, "powered by" words and brand assets moved to app/services/brand.py
@@ -61,118 +67,35 @@ from app.services.brand import (  # noqa: F401
 CLINIC_NAME = "Aarogya Virohan"
 REPORT_TITLE = "Posture Assessment Report"
 
-# Letterhead fallback, 13 October 2026. Clinic details will come from the
-# marketplace (AV Suite core) once clinics join; until then every report
-# carries these. Values as given by Onkar on 13 October, who called them
-# placeholders: "AV Clinic" stands in for a clinic name.
-AV_FALLBACK = {
-    "clinicName": "AV Clinic",
-    "phone": "+91 88680 00760",
-    "email": "aarogyavirohan@gmail.com",
-}
+# Letterhead, 17 November 2026: the shared report letterhead
+# (app/services/report_letterhead.py, D-036), the same header the exercise
+# prescription and invoice carry. The clinic is the signed-in clinic, read
+# from the clinics row by the route, never from the report body the client
+# posts, and never a placeholder name. Without a clinic name the shared
+# header falls back to Aarogya Virohan only.
+LETTERHEAD_SUBTITLE = REPORT_TITLE
 
 
-# A clinic logo arrives inside the report body the client posts, so only an
-# inline PNG or JPEG is accepted. Anything else (a remote URL, SVG, a file
-# path) is ignored and the clinic's initials are shown instead, so a report
-# can never make the server fetch or read something.
-_LOGO_DATA_URI = re.compile(r"^data:image/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$")
-_LOGO_MAX_CHARS = 3_000_000
+def _clinic_parts(clinic: dict | None) -> tuple[str, str, list]:
+    """(escaped name, logo data URI, details) from the route's clinic dict."""
+    clinic = clinic if isinstance(clinic, dict) else {}
+    name = str(clinic.get("name") or "").strip()
+    if not name:
+        return "", "", []
+    logo = clinic.get("logoSrc") or ""
+    logo = logo if isinstance(logo, str) and logo.startswith("data:image/png;base64,") else ""
+    details = clinic.get("details") or []
+    return _esc(name), logo, list(details)
 
 
-def _safe_logo(value: Any) -> str:
-    if not isinstance(value, str) or len(value) > _LOGO_MAX_CHARS:
-        return ""
-    return value if _LOGO_DATA_URI.match(value) else ""
+def _letterhead(clinic: dict | None) -> str:
+    name, logo, details = _clinic_parts(clinic)
+    return letterhead_html(_esc(LETTERHEAD_SUBTITLE), name, logo, details)
 
 
-def _initials(name: str) -> str:
-    words = [w for w in re.split(r"[^A-Za-z0-9]+", name) if w]
-    return "".join(w[0] for w in words[:2]).upper()
-
-
-def _letterhead(report: dict) -> str:
-    """
-    The dark band at the top of every page. With clinic details (report
-    ["branding"], to come from the marketplace) it is the clinic's own
-    letterhead: logo and name on the left, the head doctor in the middle,
-    contact on the right. Without them it is Aarogya Virohan's, with the
-    assessing physiotherapist from the intake form on the right.
-    Empty fields are left out, never printed as blank labels.
-    """
-
-    branding = report.get("branding")
-    branding = branding if isinstance(branding, dict) else {}
-    patient = report.get("patient") or {}
-
-    def col(lines: list[str]) -> str:
-        lines = [line for line in lines if line]
-        return f'<td class="lh-col">{"".join(lines)}</td>' if lines else ""
-
-    sep = '<td class="lh-sep"></td>'
-
-    if _present(branding.get("clinicName")):
-        name = str(branding["clinicName"]).strip()
-        logo = _safe_logo(branding.get("logo"))
-        tile = (
-            f'<img src="{logo}" alt="" />'
-            if logo
-            else f'<span class="initials">{_esc(_initials(name))}</span>'
-        )
-        clinic = (
-            f'<td class="lh-clinic"><table class="lh-id"><tr>'
-            f'<td class="tile">{tile}</td>'
-            f'<td><p class="clinic-name">{_esc(name)}</p>'
-            + (
-                f'<p class="lh-sub">{_esc(branding.get("addressLine"))}</p>'
-                if _present(branding.get("addressLine"))
-                else ""
-            )
-            + "</td></tr></table></td>"
-        )
-        doctor = col([
-            f'<p class="doc-name">{_esc(branding.get("doctorName"))}</p>'
-            if _present(branding.get("doctorName")) else "",
-            f'<p class="doc-degree">{_esc(branding.get("doctorDegree"))}</p>'
-            if _present(branding.get("doctorDegree")) and _present(branding.get("doctorName")) else "",
-            f'<p class="lh-sub">Reg. No. {_esc(branding.get("doctorRegNo"))}</p>'
-            if _present(branding.get("doctorRegNo")) and _present(branding.get("doctorName")) else "",
-        ])
-        contact = col([
-            f'<p class="lh-strong">{_esc(branding.get(k))}</p>' if k == "phone"
-            else f'<p class="lh-sub">{_esc(branding.get(k))}</p>'
-            for k in ("phone", "email", "website")
-            if _present(branding.get(k))
-        ])
-        cells = [clinic] + [c for c in (doctor, contact) if c]
-    else:
-        wordmark = _brand_data_uri("av_logo_wordmark_white.png")
-        mark = (
-            f'<img class="av-wordmark" src="{wordmark}" alt="{CLINIC_NAME}" />'
-            if wordmark
-            else f'<p class="clinic-name">{CLINIC_NAME}</p>'
-        )
-        contact_line = " &nbsp;&middot;&nbsp; ".join(
-            _esc(AV_FALLBACK[k]) for k in ("phone", "email") if AV_FALLBACK.get(k)
-        )
-        clinic = (
-            f'<td class="lh-clinic">{mark}'
-            + (f'<p class="lh-sub av-contact">{contact_line}</p>' if contact_line else "")
-            + "</td>"
-        )
-        assessor = col([
-            '<p class="lh-label">Assessing physiotherapist</p>'
-            if _present(patient.get("clinician")) else "",
-            f'<p class="doc-name">{_esc(patient.get("clinician"))}</p>'
-            if _present(patient.get("clinician")) else "",
-        ])
-        cells = [clinic] + ([assessor] if assessor else [])
-
-    return (
-        '<div class="letterhead"><table class="lh"><tr>'
-        + sep.join(cells)
-        + "</tr></table></div>"
-    )
+def footer_reference(report_id: str) -> str:
+    """Document number before the page count (D-036, D-038). No patient data."""
+    return f"Report {report_id}" if report_id else ""
 
 
 # Severity -> (text colour, background). Deliberately sober: this is printed
@@ -529,8 +452,6 @@ def _patient_box(report: dict) -> str:
 
     patient = report.get("patient") or {}
     report_id = report.get("reportId") or ""
-    branding = report.get("branding")
-    has_clinic = isinstance(branding, dict) and _present(branding.get("clinicName"))
 
     age = patient.get("age")
     age_text = f"{_esc(age)} Y" if _present(age) else ""
@@ -551,12 +472,9 @@ def _patient_box(report: dict) -> str:
     right = [
         ("Report ID", f'<span class="nowrap">{_esc(report_id)}</span>' if report_id else ""),
         ("Assessed on", _display_date(patient.get("assessmentDate"))),
-        # With a clinic letterhead the head doctor is in the band and the
-        # assessing physiotherapist is here. In the Aarogya Virohan fallback
-        # the assessing physiotherapist is already in the band, so this row
-        # names the clinic instead (13 October 2026, Onkar).
-        ("Assessed by", _esc(patient.get("clinician"))) if has_clinic
-        else ("Clinic", _esc(AV_FALLBACK.get("clinicName"))),
+        # The clinic is in the letterhead; the assessing physiotherapist is
+        # here (17 November 2026, shared letterhead).
+        ("Assessed by", _esc(patient.get("clinician"))),
     ]
 
     def half(rows: list[tuple[str, str]]) -> str:
@@ -581,10 +499,12 @@ def _patient_box(report: dict) -> str:
     """
 
 
-def build_report_html(report: dict) -> str:
-    """Assemble the full clinical report document."""
+def build_report_html(report: dict, clinic: dict | None = None) -> str:
+    """
+    Assemble the full clinical report document. `clinic` is the signed-in
+    clinic as built by the route: {"name", "logoSrc", "details"}.
+    """
 
-    patient = report.get("patient") or {}
     views = report.get("views") or {}
     report_id = report.get("reportId") or ""
 
@@ -599,19 +519,9 @@ def build_report_html(report: dict) -> str:
     # stays in scoring.py with nothing calling it. Its replacement is the
     # Biomechanical Signature below.
 
-    # In the footer of every page, so a loose second page still says whose
-    # report it is (the letterhead names the clinic, not the patient).
-    footer_who = " &nbsp;&middot;&nbsp; ".join(
-        v for v in (_esc(patient.get("name")), _esc(report_id)) if _present(v)
-    )
-    footer_who_html = (
-        f'<span class="who">{footer_who}</span>&nbsp;&nbsp;&middot;&nbsp;&nbsp;'
-        if footer_who
-        else ""
-    )
-
-    mark = _brand_data_uri("av_mark.png")
-    footer_mark = f'<img class="mark" src="{mark}" alt="" />' if mark else ""
+    # Footer (D-036): document number and page only, no patient name.
+    _, _, details = _clinic_parts(clinic)
+    page_top = letterhead_page_top_mm(details)
 
     # The logo mark, already faded in the file itself, centred behind every
     # page. WeasyPrint has no background opacity, so the fading is baked
@@ -651,7 +561,7 @@ def build_report_html(report: dict) -> str:
        carries the 14 mm side margins instead. */
     @page {{
         size: A4;
-        margin: 31mm 0 20mm 0;
+        margin: {page_top}mm 0 20mm 0;
         background-color: {PAGE};
         {watermark_css}
 
@@ -676,160 +586,14 @@ def build_report_html(report: dict) -> str:
         font-size: 9.3pt;
     }}
 
-    /* Letterhead, repeated on every page. */
-    .letterhead {{
-        position: running(letterhead);
-        width: 100%;
-        background: linear-gradient(115deg, {MIDNIGHT} 0%, {MIDNIGHT_2} 55%, {DEEP_TEAL} 100%);
-        padding: 5mm 14mm 4.6mm 14mm;
-        color: #ffffff;
-    }}
-    .lh {{
-        width: 100%;
-        border-collapse: collapse;
-    }}
-    .lh td {{
-        vertical-align: middle;
-        padding: 0;
-    }}
-    .lh p {{
+    {letterhead_css()}
+    {footer_css()}
+    /* The shared letterhead and footer are written for pages that zero every
+       paragraph margin (prescription, invoice). This page keeps browser
+       paragraph margins in the body, so they are zeroed here for the two
+       running elements only. */
+    .letterhead p, .running-footer p {{
         margin: 0;
-    }}
-    .lh-clinic {{
-        width: 46%;
-        padding-right: 5mm !important;
-    }}
-    .lh-col {{
-        padding: 0 4mm !important;
-    }}
-    .lh-sep {{
-        width: 0.3mm;
-        background: rgba(255, 255, 255, 0.22);
-    }}
-    .lh-id {{
-        border-collapse: collapse;
-    }}
-    .lh-id td {{
-        vertical-align: middle;
-    }}
-    .lh-id .tile {{
-        width: 13mm;
-        height: 13mm;
-        background: #ffffff;
-        border-radius: 3.2mm;
-        text-align: center;
-        padding: 0 !important;
-    }}
-    .lh-id .tile img {{
-        max-width: 11mm;
-        max-height: 11mm;
-        vertical-align: middle;
-    }}
-    .lh-id .tile .initials {{
-        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 13pt;
-        color: {GROVE};
-    }}
-    .lh-id td + td {{
-        padding-left: 3.5mm !important;
-    }}
-    .clinic-name {{
-        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 12.5pt;
-        line-height: 1.2;
-        color: #ffffff;
-    }}
-    .av-wordmark {{
-        height: 8.5mm;
-        width: auto;
-        display: block;
-    }}
-    .av-contact {{
-        margin-top: 2mm !important;
-    }}
-    .lh-sub {{
-        font-size: 7.6pt;
-        color: {ON_DARK};
-        line-height: 1.5;
-        margin-top: 0.6mm !important;
-    }}
-    .lh-strong {{
-        font-size: 7.8pt;
-        font-weight: 600;
-        color: #ffffff;
-    }}
-    .lh-label {{
-        font-size: 6.4pt;
-        font-weight: 700;
-        letter-spacing: 1.1px;
-        text-transform: uppercase;
-        color: {ON_DARK};
-        margin-bottom: 1mm !important;
-    }}
-    .doc-name {{
-        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-        font-weight: 700;
-        font-size: 10pt;
-        color: #ffffff;
-    }}
-    .doc-degree {{
-        font-size: 7.8pt;
-        font-weight: 600;
-        color: {LIME};
-        margin-top: 0.4mm !important;
-    }}
-
-    /* Footer, repeated on every page: "powered by", then whose report and
-       the page count. */
-    .running-footer {{
-        position: running(runningFooter);
-        width: 100%;
-        padding: 0 14mm;
-        text-align: center;
-    }}
-    .running-footer .inner {{
-        border-top: 1px solid {RULE};
-        padding-top: 2.4mm;
-    }}
-    .running-footer p {{
-        margin: 0;
-    }}
-    .running-footer .powered {{
-        font-size: 7pt;
-        letter-spacing: 0.9px;
-        color: {MUTED};
-    }}
-    .running-footer .powered .by {{
-        font-weight: 700;
-        color: {MUTED};
-    }}
-    .running-footer .powered .company {{
-        font-weight: 700;
-        color: {MIDNIGHT};
-    }}
-    .running-footer .powered .dot {{
-        color: {GROVE};
-        margin: 0 3px;
-    }}
-    .running-footer .powered .product {{
-        font-weight: 700;
-        color: {GROVE};
-    }}
-    .running-footer .powered .mark {{
-        height: 3.6mm;
-        width: auto;
-        vertical-align: -0.9mm;
-        margin-right: 1.6mm;
-    }}
-    .running-footer .meta {{
-        margin-top: 1.2mm;
-        font-size: 6.8pt;
-        color: {MUTED};
-    }}
-    .running-footer .meta .page::after {{
-        content: "Page " counter(page) " of " counter(pages);
     }}
 
     /* Patient box. */
@@ -1277,17 +1041,8 @@ def build_report_html(report: dict) -> str:
 </head>
 <body>
 
-{_letterhead(report)}
-
-<div class="running-footer">
-    <div class="inner">
-        <p class="powered">
-            {footer_mark}<span class="by">POWERED BY</span>
-            <span class="company">{POWERED_BY_COMPANY}</span><span class="dot">&bull;</span><span class="product">{POWERED_BY_PRODUCT}</span>
-        </p>
-        <p class="meta">{footer_who_html}<span class="page"></span></p>
-    </div>
-</div>
+{_letterhead(clinic)}
+{footer_html(footer_reference(report_id))}
 
 {_patient_box(report)}
 
@@ -1324,9 +1079,9 @@ def build_report_html(report: dict) -> str:
 """
 
 
-def generate_posture_pdf(report: dict) -> bytes:
-    """Render the report dict to PDF bytes."""
+def generate_posture_pdf(report: dict, clinic: dict | None = None) -> bytes:
+    """Render the report dict to PDF bytes, under the signed-in clinic's letterhead."""
 
-    html_content = build_report_html(report)
+    html_content = build_report_html(report, clinic)
 
     return HTML(string=html_content).write_pdf()
