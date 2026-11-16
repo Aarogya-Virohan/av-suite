@@ -1603,3 +1603,13 @@ Not yet verified, needed before this is trusted:
 - "Points to check" on the review screen is red (Onkar).
 First real report from the new flow (Sandeep, 27 October): levelled by 0.2,
 0.8 and 0.6 degrees on side, front and back.
+
+## 10 November 2026
+
+### Commit authorship and branch flow
+
+Every commit is authored and committed by OnkarDureja only. No Co-Authored-By lines, no Claude-Session lines, nothing that credits a tool in the commit message or the PR description.
+
+Every change goes on a feature branch, which merges into that round's release branch. Nothing merges straight into dev. Dev only takes a release branch.
+
+This came up because commit 939f761 (PR #52) broke both rules. It has a Claude co-author trailer and it went into dev directly. It stays as it is, since rewriting dev would break everyone's local copy. The rule applies from here on.

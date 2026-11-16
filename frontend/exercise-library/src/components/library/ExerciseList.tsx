@@ -17,6 +17,9 @@ interface ExerciseListProps {
   loadingMore: boolean;
   loadMoreError: string | null;
   onLoadMore: () => void;
+  onEditPhotos?: (exercise: Exercise) => void;
+  /** Shown only for the clinic's own exercises, to users with exercises.edit. */
+  onEditCategories?: (exercise: Exercise) => void;
 }
 
 /**
@@ -35,6 +38,8 @@ export function ExerciseList({
   loadingMore,
   loadMoreError,
   onLoadMore,
+  onEditPhotos,
+  onEditCategories,
 }: ExerciseListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -94,6 +99,8 @@ export function ExerciseList({
           exercise={exercise}
           isAdded={addedIds.includes(exercise.id)}
           onAdd={onAdd}
+          onEditPhotos={onEditPhotos}
+          onEditCategories={onEditCategories}
         />
       ))}
 

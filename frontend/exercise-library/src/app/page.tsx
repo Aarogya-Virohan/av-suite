@@ -6,11 +6,13 @@ import { CloudOff, Loader2 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { SplitLayout } from "@/components/layout/SplitLayout";
 import { SearchBar } from "@/components/library/SearchBar";
-import { BodyPartFilter } from "@/components/library/BodyPartFilter";
+import { CategoryFilter } from "@/components/library/CategoryFilter";
 import { ExerciseList } from "@/components/library/ExerciseList";
+import { PhotoDialog } from "@/components/library/PhotoDialog";
+import { CategoryEditDialog } from "@/components/library/CategoryEditDialog";
 import { PrescriptionBuilder } from "@/components/prescription/PrescriptionBuilder";
-import { Exercise, PrescriptionItem } from "@/types/exercise";
-import { fetchBodyParts, fetchExercises, getToken, type BodyPartCount } from "@/lib/api";
+import { Exercise, ExercisePhoto, PrescriptionItem } from "@/types/exercise";
+import { can, fetchCategories, fetchExercises, fetchMe, getToken, type CategoryGroup } from "@/lib/api";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const PAGE_SIZE = 30;
@@ -21,9 +23,9 @@ export default function Home() {
   const [prescription, setPrescription] = useState<PrescriptionItem[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [selectedParts, setSelectedParts] = useState<string[]>([]);
-  const [bodyParts, setBodyParts] = useState<BodyPartCount[]>([]);
-  const [bodyPartsFailed, setBodyPartsFailed] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
+  const [categoriesFailed, setCategoriesFailed] = useState(false);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -36,6 +38,12 @@ export default function Home() {
   // Bumped on every new search/filter; a page that arrives for an older
   // query is dropped instead of being appended to the new list.
   const queryVersion = useRef(0);
+  // Clinic photos: who may add them, and which exercise is open.
+  const [canEditPhotos, setCanEditPhotos] = useState(false);
+  const [photoExerciseId, setPhotoExerciseId] = useState<string | null>(null);
+  // Categories of the clinic's own exercises (EL-L-10, EL-D-008).
+  const [categoryExerciseId, setCategoryExerciseId] = useState<string | null>(null);
+  const [categoriesKey, setCategoriesKey] = useState(0);
   const moreController = useRef<AbortController | null>(null);
 
   // Route guard.
@@ -43,22 +51,39 @@ export default function Home() {
     if (!getToken()) router.replace("/login");
   }, [router]);
 
+  useEffect(() => {
+    if (!getToken()) return;
+    fetchMe()
+      .then((me) => setCanEditPhotos(can(me, "exercises.edit")))
+      .catch(() => setCanEditPhotos(false));
+  }, []);
+
+  const updatePhotos = useCallback((exerciseId: string, photos: ExercisePhoto[]) => {
+    setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, photos } : e)));
+  }, []);
+  const photoExercise = exercises.find((e) => e.id === photoExerciseId) ?? null;
+  const categoryExercise = exercises.find((e) => e.id === categoryExerciseId) ?? null;
+  const replaceExercise = useCallback((updated: Exercise) => {
+    setExercises((prev) => prev.map((e) => (e.id === updated.id ? { ...updated, photos: e.photos } : e)));
+    setCategoriesKey((k) => k + 1); // counts in the filter panel
+  }, []);
+
   // Debounce typing so a word is one request, not one per letter.
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Body parts for the filter: all of them, head to toe, from the backend.
+  // Category groups for the filter panel, with counts, from the backend.
   useEffect(() => {
     if (!getToken()) return;
-    fetchBodyParts()
+    fetchCategories()
       .then((rows) => {
-        setBodyParts(rows);
-        setBodyPartsFailed(false);
+        setCategoryGroups(rows);
+        setCategoriesFailed(false);
       })
-      .catch(() => setBodyPartsFailed(true));
-  }, [reloadKey]);
+      .catch(() => setCategoriesFailed(true));
+  }, [reloadKey, categoriesKey]);
 
   // First page on search or filter change. Older requests are aborted, so a
   // slow response can never overwrite a newer one, and the current list stays
@@ -72,7 +97,7 @@ export default function Home() {
     if (initial) setIsLoading(true);
     else setIsRefetching(true);
 
-    fetchExercises({ search: search || undefined, bodyParts: selectedParts, page: 1, pageSize: PAGE_SIZE }, controller.signal)
+    fetchExercises({ search: search || undefined, categories: selectedCategories, page: 1, pageSize: PAGE_SIZE }, controller.signal)
       .then(({ items, total: count }) => {
         if (version !== queryVersion.current) return;
         setExercises(items);
@@ -93,7 +118,7 @@ export default function Home() {
       });
 
     return () => controller.abort();
-  }, [search, selectedParts, reloadKey]);
+  }, [search, selectedCategories, reloadKey]);
 
   const hasMore = exercises.length < total;
 
@@ -105,7 +130,7 @@ export default function Home() {
     setLoadingMore(true);
     setLoadMoreError(null);
     fetchExercises(
-      { search: search || undefined, bodyParts: selectedParts, page: page + 1, pageSize: PAGE_SIZE },
+      { search: search || undefined, categories: selectedCategories, page: page + 1, pageSize: PAGE_SIZE },
       controller.signal
     )
       .then(({ items, total: count }) => {
@@ -129,18 +154,18 @@ export default function Home() {
       .finally(() => {
         if (version === queryVersion.current) setLoadingMore(false);
       });
-  }, [loadingMore, hasMore, isRefetching, search, selectedParts, page]);
+  }, [loadingMore, hasMore, isRefetching, search, selectedCategories, page]);
 
-  // Keep picked parts in head-to-toe order, like the list.
-  const setParts = (next: string[]) => {
-    const order = new Map(bodyParts.map((b, i) => [b.body_part, i]));
-    setSelectedParts([...next].sort((a, b) => (order.get(a) ?? 1e9) - (order.get(b) ?? 1e9)));
+  // Keep picked categories in panel order (group, then value).
+  const setCategories = (next: string[]) => {
+    const order = new Map(categoryGroups.flatMap((g) => g.values).map((v, i) => [v.id, i]));
+    setSelectedCategories([...next].sort((a, b) => (order.get(a) ?? 1e9) - (order.get(b) ?? 1e9)));
   };
 
   const resetFilters = () => {
     setSearchInput("");
     setSearch("");
-    setSelectedParts([]);
+    setSelectedCategories([]);
   };
 
   const addedIds = useMemo(() => prescription.map((p) => p.exercise.id), [prescription]);
@@ -211,11 +236,12 @@ export default function Home() {
                   </span>
                 </div>
                 <SearchBar value={searchInput} onChange={setSearchInput} busy={isRefetching} />
-                <BodyPartFilter
-                  parts={bodyParts}
-                  selected={selectedParts}
-                  onChange={setParts}
-                  unavailable={bodyPartsFailed}
+                <CategoryFilter
+                  groups={categoryGroups}
+                  selected={selectedCategories}
+                  onChange={setCategories}
+                  total={total}
+                  unavailable={categoriesFailed}
                 />
                 {loadError && (
                   <p role="alert" className="text-xs font-medium text-danger">
@@ -229,11 +255,13 @@ export default function Home() {
                 onAdd={addExercise}
                 stale={isRefetching}
                 onReset={resetFilters}
-                hasFilters={!!searchInput || selectedParts.length > 0}
+                hasFilters={!!searchInput || selectedCategories.length > 0}
                 hasMore={hasMore}
                 loadingMore={loadingMore}
                 loadMoreError={loadMoreError}
                 onLoadMore={loadMore}
+                onEditPhotos={canEditPhotos ? (e) => setPhotoExerciseId(e.id) : undefined}
+                onEditCategories={canEditPhotos ? (e) => setCategoryExerciseId(e.id) : undefined}
               />
             </>
           }
@@ -245,6 +273,21 @@ export default function Home() {
               onReplace={setPrescription}
             />
           }
+        />
+      )}
+      {categoryExercise && (
+        <CategoryEditDialog
+          exercise={categoryExercise}
+          groups={categoryGroups}
+          onClose={() => setCategoryExerciseId(null)}
+          onSaved={replaceExercise}
+        />
+      )}
+      {photoExercise && (
+        <PhotoDialog
+          exercise={photoExercise}
+          onClose={() => setPhotoExerciseId(null)}
+          onPhotosChange={updatePhotos}
         />
       )}
     </div>

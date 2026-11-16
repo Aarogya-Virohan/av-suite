@@ -71,5 +71,14 @@ class SupabaseStorageClient:
             logger.warning("Supabase storage signed URL request failed")
             raise StorageUnavailableError from exc
 
+    def delete_file(self, path: str) -> None:
+        """Deletes one file from the private bucket (used when an exercise
+        photo is replaced or removed)."""
+        try:
+            self.client.storage.from_(self.bucket_name).remove([path])
+        except (StorageException, httpx.HTTPError, OSError) as exc:
+            logger.warning("Supabase storage delete failed")
+            raise StorageUnavailableError from exc
+
 # Create a global instance
 storage_client = SupabaseStorageClient()

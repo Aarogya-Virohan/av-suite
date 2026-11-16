@@ -8,10 +8,11 @@ from app.models.prescription import Prescription
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
 from app.repositories.prescription import PrescriptionRepository
 from app.utils.whatsapp import build_whatsapp_link
-from app.services import exercise_media
+from app.services import exercise_media, exercise_photos
 from app.services.prescription_pdf import (
     RxDoc,
     RxItem,
+    _shrink_to_data_uri as shrink_to_data_uri,
     ist_date,
     pdf_filename,
     render_prescription_pdf,
@@ -184,12 +185,19 @@ def _rx_doc(rx: Prescription) -> RxDoc:
                 # Only picture links are fetched; demo videos are never
                 # downloaded into the PDF (EL-D-003).
                 image_url=(exercise_media.image_url(ex.video_url) if ex else None),
+                exercise_id=(str(ex.id) if ex else None),
             )
         )
     return RxDoc(
         rx_id=str(rx.id),
         clinic_name=(rx.clinic.name if rx.clinic else ""),
         clinic_logo=(rx.clinic.branding_logo_url if rx.clinic else None),
+        address_line=(rx.clinic.address_line if rx.clinic else None),
+        city=(rx.clinic.city if rx.clinic else None),
+        state=(rx.clinic.state if rx.clinic else None),
+        pincode=(rx.clinic.pincode if rx.clinic else None),
+        phone=(rx.clinic.phone if rx.clinic else None),
+        email=(rx.clinic.email if rx.clinic else None),
         physio_name=physio_name,
         patient_name=(
             f"{patient.first_name} {patient.last_name}".strip() if patient else "Patient"
@@ -200,6 +208,32 @@ def _rx_doc(rx: Prescription) -> RxDoc:
         physio_notes=rx.physio_notes,
         items=items,
     )
+
+
+async def _attach_clinic_photos(db: AsyncSession, clinic_id: uuid.UUID, doc: RxDoc) -> None:
+    """The clinic's own exercise photos (front, side) for the PDF, EL-D-004.
+    A photo that cannot be loaded is left out; the library picture is used."""
+    ids = {uuid.UUID(it.exercise_id) for it in doc.items if it.exercise_id}
+    if not ids:
+        return
+    by_exercise = await exercise_photos.photos_for(db, clinic_id, list(ids))
+    cache: dict[uuid.UUID, str] = {}
+    for it in doc.items:
+        rows = by_exercise.get(uuid.UUID(it.exercise_id)) if it.exercise_id else None
+        srcs = []
+        for row in rows or []:
+            if row.id not in cache:
+                raw = await exercise_photos.load_photo_bytes(row)
+                try:
+                    cache[row.id] = (
+                        await asyncio.to_thread(shrink_to_data_uri, raw) if raw else ""
+                    )
+                except Exception as exc:
+                    logger.warning("Clinic photo skipped in PDF: %s", type(exc).__name__)
+                    cache[row.id] = ""
+            if cache[row.id]:
+                srcs.append(cache[row.id])
+        it.photo_srcs = srcs
 
 
 def prescription_pdf_filename(rx: Prescription) -> str:
@@ -226,7 +260,9 @@ async def generate_prescription_pdf(
     if not rx:
         raise ValueError("Prescription not found")
 
-    pdf_bytes = await render_prescription_pdf(_rx_doc(rx))
+    doc = _rx_doc(rx)
+    await _attach_clinic_photos(db, rx.clinic_id, doc)
+    pdf_bytes = await render_prescription_pdf(doc)
     pdf_key = await _store_pdf(rx, pdf_bytes)
 
     repo = PrescriptionRepository(db)
