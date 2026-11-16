@@ -80,6 +80,9 @@ export default function ViewSection({ viewName, data }: Props) {
                   <li key={m.paramId} className="rounded-lg px-3 py-3 even:bg-[#F3EEE2]">
                     <p className="text-[15px] leading-snug text-[#141A33]">{m.label}</p>
                     {showSide && <p className="mt-0.5 text-[12.5px] text-[#5D6380]">{m.sideLabel}</p>}
+                    {m.screeningRange && (
+                      <p className="mt-0.5 text-[12px] text-[#5D6380]">AV screening range: {m.screeningRange}</p>
+                    )}
                     <div className="mt-1.5 flex items-center justify-between gap-3">
                       <span className="font-display text-[17px] font-bold tabular-nums text-[#0B1238]">
                         {formatValue(m.value, m.unit)}
@@ -100,6 +103,7 @@ export default function ViewSection({ viewName, data }: Props) {
                 <tr className="text-[10.5px] uppercase tracking-[0.1em] text-[#5D6380]">
                   <th className="px-3 pb-2 text-left font-bold">Parameter</th>
                   <th className="px-3 pb-2 text-right font-bold sm:px-4">Value</th>
+                  <th className="px-3 pb-2 text-left font-bold">AV screening range</th>
                   <th className="px-3 pb-2 text-left font-bold">Finding</th>
                 </tr>
               </thead>
@@ -118,6 +122,7 @@ export default function ViewSection({ viewName, data }: Props) {
                       <td className="whitespace-nowrap px-3 py-3 text-right font-display text-[15px] font-bold tabular-nums text-[#0B1238] sm:px-4">
                         {formatValue(m.value, m.unit)}
                       </td>
+                      <td className="px-3 py-3 text-[12.5px] text-[#5D6380]">{m.screeningRange ?? ""}</td>
                       <td className="w-px whitespace-nowrap rounded-r-lg px-3 py-3">
                         <SeverityBadge severity={m.severity} label={m.severityLabel} />
                       </td>

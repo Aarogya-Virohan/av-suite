@@ -595,6 +595,23 @@ Each entry follows this structure:
 
 ---
 
+## [D-040] AV Screening Range on Every Posture Row; Head Position Is Not CVA
+
+- **Date**: 2026-11-17
+- **Context**: Founders' main feedback on the posture report: a range next to each value, like a blood report. Research (17 Nov) found published adult norms comparable with our photograph and landmarks for almost none of the measures: CVA norms are C7 to tragus (about 49 degrees), trunk and shoulder norms are back-surface scans of other landmarks, the HKA norms are radiographs. Only pelvic obliquity has a usable published range (Moharrami et al. 2023, radiographs).
+- **Decision** (Onkar, 17 Nov):
+  - Every row shows value, "AV screening range" and the existing grade. The AV screening range is the band the grade already treats as Normal, read at render time from `classifier.THRESHOLDS` (`app/services/posture/reference_ranges.py`), so the printed range cannot drift from the grading. No band changes. No Below / Within / Above.
+  - Sources footnote on the last page, per measure: the published basis named in the classifier comments where there is one, otherwise "AV clinical team, Oct 2026". Pelvic obliquity also carries "Published reference 0 to 5.6 degrees (Moharrami et al. 2023, standing pelvic radiographs); not directly comparable". The PDF reads ranges and sources from the server, never from the posted report.
+  - PT-L01 is shown as "Head Position (ear-shoulder angle)", with the footnote "Ear to shoulder point, not the C7-based craniovertebral angle". `calc_cva` measures MediaPipe ear to shoulder point against the horizontal; it is not the standard CVA. PT-L01 and `calc_cva` keep their names (saved reports, synthesis mapping).
+  - Web report: same range column (a line under the value on phones) and the same footnote, from `measurement.screeningRange` and `report.screeningSources`.
+  - The footnote is set in three columns at 6.1 pt so the report stays three pages; page 3 is now nearly full (see open item).
+- **For the founders (not decided here)**: the head position band (Normal at 50 degrees or more) was taken from CVA literature. On our ear-shoulder angle five test subjects read 68 to 78 degrees, so every patient grades Normal and the row screens nothing. A band for this angle is a clinical decision.
+- **Open**: page 3 has little room left; a longer clinical synthesis or more measures could push the closing block to a fourth page.
+- **Verified**: full pytest (SQLite) on this branch and dev f02118a, same 24 known failures; new `tests/services/posture/test_reference_ranges_17nov.py` (ranges equal THRESHOLDS and follow a band change, grade edges match the printed range, PDF column and footnote, posted ranges ignored, no CVA wording, Moharrami only in the footnote). posture-tool tsc, lint, build. PDFs rendered with po-3 photos (real detection), with and without a clinic: three pages each, every page looked at, footnote zoomed.
+- **Affected Files**: `backend/app/services/posture/reference_ranges.py`, `backend/app/services/posture/report_builder.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/api/v1/posture.py`, `backend/tests/services/posture/test_reference_ranges_17nov.py`, `frontend/posture-tool/src/components/report/ViewSection.tsx`, `frontend/posture-tool/src/components/report/ReportCard.tsx`, `frontend/posture-tool/src/types/posture.ts`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 

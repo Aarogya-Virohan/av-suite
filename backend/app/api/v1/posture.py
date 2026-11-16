@@ -47,6 +47,7 @@ from app.services.posture.exceptions import (
 )
 from app.services.posture.pdf_service import generate_posture_pdf
 from app.services.posture.clinic_letterhead import clinic_letterhead, web_branding
+from app.services.posture.reference_ranges import LABELS as REF_LABELS
 from app.services.posture.level import (
     rotate_display_image,
     rotate_landmarks,
@@ -336,7 +337,7 @@ def _report_from_points(
         side_measurements.append(
             measurement(
                 "PT-L01",
-                "Forward Head (CVA)",
+                REF_LABELS["PT-L01"],
                 cva,
                 "\u00b0",
                 severity,
@@ -346,7 +347,7 @@ def _report_from_points(
 
     except InsufficientVisibilityError:
         side_measurements.append(
-            measurement("PT-L01", "Forward Head (CVA)", None, "\u00b0", "insufficient_data")
+            measurement("PT-L01", REF_LABELS["PT-L01"], None, "\u00b0", "insufficient_data")
         )
 
     # PT-L05 — Forward Trunk Lean

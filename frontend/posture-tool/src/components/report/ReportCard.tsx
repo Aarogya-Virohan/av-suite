@@ -90,6 +90,19 @@ export default function ReportCard({
                 Analysis version {data.analysisVersion}. Values and grades are only comparable with reports carrying the same version.
               </p>
             )}
+            {/* AV screening ranges and their sources, 17 November 2026.
+                Same text as the PDF footnote (reference_ranges.py). */}
+            {data.screeningSources && data.screeningSources.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#1C7A54]">AV screening ranges and sources</p>
+                {data.screeningNote && <p className="mt-1 text-[12px] text-[#5D6380]">{data.screeningNote}</p>}
+                {data.screeningSources.map((s) => (
+                  <p key={s.name} className="mt-1 text-[12px] text-[#5D6380]">
+                    <span className="font-semibold text-[#141A33]">{s.name}:</span> {s.text}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
 
           <PoweredBy />

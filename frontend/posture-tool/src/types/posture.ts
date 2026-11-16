@@ -24,6 +24,10 @@ export interface Measurement {
   // component's job, not the payload's.
   side: "left" | "right" | null
   sideLabel: string | null
+  // The band this row's grade treats as Normal ("AV screening range"),
+  // from backend reference_ranges.py since 17 November 2026. Optional:
+  // earlier reports do not carry it.
+  screeningRange?: string
 }
 
 export interface ViewData {
@@ -95,6 +99,10 @@ export interface PostureReport {
   // Founders' Q5 replacement, the regional profile, since 11 October 2026.
   // Optional because earlier reports do not carry it.
   signature?: BiomechanicalSignature
+
+  // Footnote for the AV screening ranges, since 17 November 2026.
+  screeningNote?: string
+  screeningSources?: { name: string; text: string }[]
 }
 
 export interface ClinicBranding {

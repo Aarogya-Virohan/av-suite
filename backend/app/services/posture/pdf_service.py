@@ -25,6 +25,7 @@ details come from the marketplace, and a patient box with every intake field.
 from __future__ import annotations
 
 import html
+import re
 from datetime import date
 from typing import Any
 
@@ -38,6 +39,7 @@ from app.services.report_letterhead import (
     letterhead_html,
     letterhead_page_top_mm,
 )
+from app.services.posture.reference_ranges import SCREENING_NOTE, screening_range, source_lines
 from app.services.posture.signature_svg import render_signature_svg
 
 # Palette, "powered by" words and brand assets moved to app/services/brand.py
@@ -192,7 +194,7 @@ def _measurement_rows(measurements: list[dict]) -> str:
 
     if not measurements:
         return (
-            '<tr><td colspan="3" class="empty">No measurements available '
+            '<tr><td colspan="4" class="empty">No measurements available '
             "for this view.</td></tr>"
         )
 
@@ -233,6 +235,7 @@ def _measurement_rows(measurements: list[dict]) -> str:
             <tr>
                 <td class="param">{param_cell}</td>
                 <td class="value">{value_text}</td>
+                <td class="range">{_esc(screening_range(str(m.get("paramId") or "")))}</td>
                 <td class="severity">
                     <span style="color:{colour};background:{background};">
                         {_esc(m.get('severityLabel'))}
@@ -338,6 +341,7 @@ def _view_section(title: str, view: dict, key: str = "") -> str:
                             <tr>
                                 <th>Parameter</th>
                                 <th class="num">Value</th>
+                                <th>AV screening range</th>
                                 <th>Finding</th>
                             </tr>
                         </thead>
@@ -497,6 +501,40 @@ def _patient_box(report: dict) -> str:
         <p class="t">{REPORT_TITLE.upper()}</p>
     </div>
     """
+
+
+def _balanced_columns(items: list[str], n: int) -> list[list[str]]:
+    """Split items, in order, into n columns of about equal text length."""
+    lengths = [len(re.sub(r"<[^>]+>", "", i)) + 40 for i in items]  # 40: line-end slack
+    best, best_cost = [items], float("inf")
+    k = len(items)
+    for a in range(1, k):
+        for b in range(a + 1, k):
+            cuts = [(0, a), (a, b), (b, k)] if n == 3 else [(0, k)]
+            cost = max(sum(lengths[i:j]) for i, j in cuts)
+            if cost < best_cost:
+                best, best_cost = [items[i:j] for i, j in cuts], cost
+    return best
+
+
+def _sources_footnote() -> str:
+    """
+    Sources of the AV screening ranges, on the last page (17 November 2026).
+    From reference_ranges.py on the server, never from the posted report.
+    """
+    entries = [
+        f'<p class="src"><strong class="src-name">{_esc(name)}:</strong> {_esc(text)}</p>'
+        for name, text in source_lines()
+    ]
+    # Three columns, so the footnote fits the last page with the sign-off
+    # (the report stays three pages, founders 19 October 2026).
+    cols = _balanced_columns(entries, 3)
+    cells = '<td class="gap"></td>'.join(f'<td>{"".join(col)}</td>' for col in cols)
+    return (
+        '<p class="disclaimer-tag sources-tag">AV screening ranges and sources'
+        f'<span class="lead">{_esc(SCREENING_NOTE)}</span></p>'
+        f'<table class="sources"><tr>{cells}</tr></table>'
+    )
 
 
 def build_report_html(report: dict, clinic: dict | None = None) -> str:
@@ -779,7 +817,14 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     }}
     .measurements .param {{
         color: {INK};
-        width: 52%;
+        width: 40%;
+    }}
+    /* AV screening range, 17 November 2026: the band the grade treats as
+       Normal. Same text style as the row labels' secondary line. */
+    .measurements .range {{
+        color: {MUTED};
+        font-size: 7.6pt;
+        width: 17%;
     }}
     .measurements .value {{
         font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
@@ -1032,6 +1077,41 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
         color: {MUTED};
         margin: 5px 0 0 0;
     }}
+    .notes .sources-tag {{
+        margin-top: 4px;
+        margin-bottom: 1px;
+    }}
+    .notes .sources-tag .lead {{
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 400;
+        font-size: 6.1pt;
+        color: {MUTED};
+        margin-left: 2mm;
+    }}
+    .notes .sources {{
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 2px;
+    }}
+    .notes .sources td {{
+        vertical-align: top;
+        width: 31%;
+        padding: 0;
+    }}
+    .notes .sources td.gap {{
+        width: 3.5%;
+    }}
+    .notes .src {{
+        font-size: 6.1pt;
+        color: {MUTED};
+        line-height: 1.28;
+        margin: 1px 0 0 0;
+    }}
+    .notes .src .src-name {{
+        font-weight: 600;
+        color: {INK};
+    }}
     .analysis-version {{
         margin: 6px 0 0 0;
         font-size: 6.5pt;
@@ -1070,6 +1150,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     <p class="side-note">{SIDE_NOTE}</p>
     {upload_note}
     {version_line}
+    {_sources_footnote()}
 </div>
 </div>
 </div>
