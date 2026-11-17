@@ -1,14 +1,14 @@
 """Add clinic-scoped patient display numbers and backfill existing patients.
 
 Revision ID: c7d9e1a4b602
-Revises: f2b6c8d0a134
+Revises: 81ebc274f369
 """
 from alembic import op
 import sqlalchemy as sa
 
 
 revision = "c7d9e1a4b602"
-down_revision = "f2b6c8d0a134"
+down_revision = "81ebc274f369"
 branch_labels = None
 depends_on = None
 
