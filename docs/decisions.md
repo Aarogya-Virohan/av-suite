@@ -1603,3 +1603,45 @@ Not yet verified, needed before this is trusted:
 - "Points to check" on the review screen is red (Onkar).
 First real report from the new flow (Sandeep, 27 October): levelled by 0.2,
 0.8 and 0.6 degrees on side, front and back.
+
+## 10 November 2026
+
+### Commit authorship and branch flow
+
+Every commit is authored and committed by OnkarDureja only. No Co-Authored-By lines, no Claude-Session lines, nothing that credits a tool in the commit message or the PR description.
+
+Every change goes on a feature branch, which merges into that round's release branch. Nothing merges straight into dev. Dev only takes a release branch.
+
+This came up because commit 939f761 (PR #52) broke both rules. It has a Claude co-author trailer and it went into dev directly. It stays as it is, since rewriting dev would break everyone's local copy. The rule applies from here on.
+
+## 14 November 2026
+
+Posture tool, branch `feat/posture-auth` (U1). Taken by Onkar.
+
+### Posture API behind login, posture.create and the posture-tool product
+- The posture endpoints move from `/posture/*` (no authentication) to
+  `/api/v1/posture/*`. Each needs a valid token, the posture-tool product
+  enabled for the workspace and `posture.create`. The old path is removed,
+  not kept for compatibility: an open path would keep the hole, and gating
+  it would break an old frontend the same way. Backend and posture-tool
+  deploy together; a few minutes between the two deploys is accepted.
+- No migration. `posture.view` and `posture.create` were already in the
+  capability registry and the CRM permissions editor; the product is
+  already seeded and enabled for all three production clinics (checked
+  14 November).
+- Role templates unchanged: therapist and front desk stay deny-all, so they
+  need "Run Posture Analysis" granted. Whether therapists should get it by
+  default is a founders' question (asked to Shivank, 14 November).
+- posture-tool signs in with the AV Suite account (same flow as the
+  Exercise Library, clinic picker included). A session that ends during an
+  assessment opens a password dialog and sends the failed request again,
+  so photos and checked points are kept. /analyze serves the same page,
+  because the CRM patient page links there and it was a 404.
+- No vitest or Playwright added to the repo; the UI was tested with an
+  outside Playwright run at 1440 and 390 px.
+
+### Gender optional on /posture/report
+The intake offers "Not given" for gender (13 October), but the report route
+required it, so every report without a gender failed at the last step with
+"gender: Field required". Found in the U1 photo run. Now optional, the same
+fix as case_ref on 27 October.

@@ -8,6 +8,7 @@ file name, and clinic and OWN scope checks on the download endpoint.
 
 from __future__ import annotations
 
+import base64
 import io
 import os
 import uuid
@@ -323,9 +324,12 @@ async def test_letterhead_wording_and_no_signature() -> None:
     assert "signature" not in out.lower()
     assert '<div class="caption">Date</div>' not in out
     assert "Treating therapist" in out and "Asha Rao" in out
-    # AV logo top-left, clinic on the right.
-    assert 'class="av-wordmark"' in out
-    assert out.index('class="lh-av"') < out.index('class="lh-clinic"')
+    # D-036 (14 Nov): Aarogya Virohan mark on the far right of the header;
+    # "Powered by" only in the footer.
+    head = out[out.index('<div class="letterhead">') : out.index('<div class="running-footer">')]
+    assert "av-round" in head and "Powered by" not in head and "POWERED BY" not in head
+    foot = out[out.index('<div class="running-footer">') :]
+    assert "POWERED BY" in foot and "AAROGYA VIROHAN" in foot
     assert "Grove &lt;Physio&gt;" in out
     # No logo stored: clinic name only, no logo cell.
     assert 'class="lh-logo"' not in out
@@ -337,8 +341,10 @@ async def test_letterhead_av_only_without_clinic_and_no_empty_therapist() -> Non
     out = build_prescription_html(_doc(clinic_name="", physio_name=""))
     assert 'class="lh-clinic"' not in out and 'class="lh-logo"' not in out
     assert ">Clinic<" not in out
+    # Aarogya Virohan only: round logo and name on the left, nothing on the right.
+    assert 'class="av-only"' in out and 'class="av-round"' in out
+    assert 'class="lh-contact' not in out
     assert "Treating therapist" not in out
-    assert 'class="av-wordmark"' in out
 
 
 async def test_clinic_logo_is_used_when_valid() -> None:
@@ -351,7 +357,10 @@ async def test_clinic_logo_is_used_when_valid() -> None:
     with Image.open(io.BytesIO(base64.b64decode(src.split(",", 1)[1]))) as img:
         assert max(img.size) <= 400  # shrunk
     out = build_prescription_html(_doc(clinic_logo_src=src))
-    assert f'<td class="lh-logo"><div class="tile"><img src="{src}"' in out
+    assert '<td class="lh-logo"><div class="tile" style="width: ' in out
+    assert f'<img src="{src}"' in out[out.index('class="lh-logo"') :]
+    # Logo, then clinic name, then Aarogya Virohan on the right.
+    assert out.index('class="lh-logo"') < out.index('class="lh-clinic"')
 
 
 @pytest.mark.parametrize(
@@ -455,7 +464,8 @@ async def test_generated_pdf_uses_clinic_logo_from_db(
     assert gen.status_code == 200, gen.text
     assert len(seen) == 1
     html_out = seen[0]
-    assert '<td class="lh-logo"><div class="tile"><img src="data:image/png;base64,' in html_out
+    tile = html_out[html_out.index('<td class="lh-logo"><div class="tile" style="width: ') :]
+    assert tile.split("</td>")[0].count('<img src="data:image/png;base64,') == 1
     assert clinic.name in html_out
     assert "Treating therapist" in html_out and "Asha Rao" in html_out
     assert storage.files[f"prescriptions/{clinic.id}/{rx_id}.pdf"][:5] == b"%PDF-"
@@ -473,3 +483,57 @@ async def test_exercise_picture_is_large_and_above_the_dose() -> None:
     assert card.index('<div class="ex-img"><img') < card.index('<table class="dose">')
     assert "max-height: 60mm" in out
     assert pdf.IMAGE_MAX_PX >= 1200
+
+
+@pytest.mark.parametrize(
+    "raw, shown",
+    [
+        ("CHIN TUCKS", "Chin tucks"),
+        ("Shoulder abduction active ROM", "Shoulder abduction active ROM"),
+        ("LATERAL FLEXION  ISOMETRIC  – Right Side", "Lateral flexion isometric – right side"),
+        ("bridging", "Bridging"),
+        ("Prone Y raise (seated)", "Prone Y raise (seated)"),
+        ("  Wall   angels ", "Wall angels"),
+        ("", ""),
+    ],
+)
+def test_display_title(raw: str, shown: str) -> None:
+    """Titles show as written; only titles mostly in capitals change (EL-D-008)."""
+    from app.services.prescription_pdf import display_title
+
+    assert display_title(raw) == shown
+
+
+def _png_uri(w: int, h: int) -> str:
+    buf = io.BytesIO()
+    Image.new("RGBA", (w, h), (0, 0, 0, 0)).save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+@pytest.mark.parametrize(
+    ("w", "h", "expected"),
+    [
+        (300, 300, (11.0, 11.0, 13.0)),  # square: same as before
+        (300, 100, (33.0, 11.0, 35.0)),  # wide wordmark grows sideways
+        (800, 100, (40.0, 5.0, 42.0)),  # very wide: capped at 40 mm
+        (150, 300, (5.5, 11.0, 13.0)),  # tall: fits the square
+    ],
+)
+def test_logo_box_keeps_ratio(w, h, expected):
+    from app.services.report_letterhead import _logo_box_mm
+
+    assert _logo_box_mm(_png_uri(w, h)) == expected
+
+
+def test_logo_box_unreadable_falls_back_to_square():
+    from app.services.report_letterhead import _logo_box_mm
+
+    assert _logo_box_mm("data:image/png;base64,AAAA") == (11.0, 11.0, 13.0)
+    assert _logo_box_mm("data:image/jpeg;base64,AAAA") == (11.0, 11.0, 13.0)
+
+
+def test_wide_logo_tile_in_letterhead():
+    src = _png_uri(300, 100)
+    out = build_prescription_html(_doc(clinic_logo_src=src))
+    assert '<div class="tile" style="width: 35.0mm">' in out
+    assert 'style="width: 33.0mm; height: 11.0mm"' in out

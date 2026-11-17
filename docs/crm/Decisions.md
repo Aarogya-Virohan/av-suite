@@ -443,6 +443,178 @@ Each entry follows this structure:
 
 ---
 
+## [D-030] Clinic Logo Left, AV Suite Right; Clinic Switcher in the Sidebar; Tax Hidden on New Invoices
+
+- **Date**: 2026-11-08
+- **Context**: Branding rule from Onkar (2 Nov): the client's logo on the left and the AV Suite logo on the right of the CRM header. The header had a clinic name chip on the right, and the sidebar showed the clinic logo in place of the AV mark. On a 390 px phone every page was 461 px wide, because the header search bar and the clinic chip did not fit. Founders were told in Round 2 (7 Nov) that the invoice tax field would be hidden while GST is open (R2-2).
+- **Decision**:
+  - Header: clinic logo (`branding_logo_url`) on the left, after the menu button. When the clinic has no logo, or the saved logo does not load, the clinic name is shown instead. AV Suite wordmark on the right; below 640 px only the AV mark. The clinic chip is removed from the header.
+  - On phones (below 640 px) search is an icon button that opens the same command bar; from 640 px it is the full search bar as before. Pages are now 390 px wide at 390 px (checked on all nine sidebar pages).
+  - Sidebar top always shows the AV Suite mark.
+  - Clinic switcher moves into the clinic card at the foot of the sidebar, next to logout. The card opens the clinic list only when `GET /me` returns more than one workspace; with one clinic it is plain text. Switching works as before: `POST /auth/switch-workspace`, new token, full reload.
+  - Create Invoice: the tax field is hidden and `tax_amount` is sent as 0. The API, types and invoice preview are unchanged, so invoices that already have tax still show it, and tax can return by flipping `SHOW_TAX` in `CreateInvoiceSlideOver.tsx` once the founders decide.
+  - AV wordmark copied from the Posture tool brand folder and resized to 560 x 88 (`public/brand/av-logo-wordmark.png`).
+- **Not changed**: backend, API, invoice PDF and Exercise Library PDF letterhead (to be aligned separately).
+- **Affected Files**: `frontend/crm/src/components/layout/{AppShell,ClinicBrand,SidebarNavigation,WorkspaceSwitcher}.tsx`, `frontend/crm/src/features/billing/components/CreateInvoiceSlideOver.tsx`, `frontend/crm/public/brand/av-logo-wordmark.png`
+
+---
+
+## [D-031] CRM Production Dependencies Upgraded for Security Advisories; CI Actions on Node 24
+
+- **Date**: 2026-11-08
+- **Context**: The CI security audit (report only) found 7 advisories in the CRM production dependencies: 1 critical in `next` 16.3.2 (remote code execution in the image optimizer and `use cache`, SSRF, cache poisoning), 5 high (`axios`, `follow-redirects`, `sharp`, `source-map-js`, `zod`) and 1 moderate (`baseline-browser-mapping`). The CRM runs on Vercel in production. The same run warned that `actions/checkout@v4`, `actions/setup-node@v4` and `actions/setup-python@v5` target the deprecated Node 20 runtime.
+- **Decision**:
+  - `npm audit fix` in `frontend/crm`, inside the existing version ranges (no `package.json` change): `next` 16.4.5 (with its own `sharp` 0.35.5), `axios` 1.21.0, `zod` 4.6.7, `follow-redirects` 1.16.3, `source-map-js` 1.2.2, `baseline-browser-mapping` 2.11.35. `npm audit --omit=dev` now reports 0.
+  - CI uses `actions/checkout@v5`, `actions/setup-node@v5` and `actions/setup-python@v6` (all Node 24; same inputs).
+  - Only the CRM app in this change. Exercise Library and Posture tool have the same `next` advisories and are upgraded in their own rounds. Backend advisories (python-jose without a fix, weasyprint, Pillow, protobuf) are a separate change.
+- **Verified**: tsc, vitest 49 pass, `next build` on Next.js 16.4.5; Playwright on the production build against a local backend at 390 and 1440 px on nine pages, single and multi clinic users: page width equals the viewport, no page errors, no failed calls except the expected Rx 403 (L-30) and the first step of the multi-clinic login; clinic switch, invoice creation (tax 0) and the old taxed invoice preview still work; CSP and security headers unchanged; image optimizer returns 200.
+- **Affected Files**: `frontend/crm/package-lock.json`, `.github/workflows/ci.yml`
+
+---
+
+## [D-032] Backend JWT on PyJWT Instead of python-jose; WeasyPrint 70
+
+- **Date**: 2026-11-09
+- **Context**: The CI security audit (pip-audit) reports `python-jose` 3.5.0 (no fixed release exists), its dependency `ecdsa` 0.19.2, and two advisories in `weasyprint` 69.0. python-jose signs and checks every login token (`app/core/security.py`, `app/middleware/clinic_gate.py`) and the posture detection token (`app/services/posture/review.py`, shared Posture code). Tokens already given out by production must keep working through the deploy.
+- **Decision**:
+  - Tokens are signed and checked with PyJWT 2.15.1 (`requirements.txt`; `pyproject.toml` no longer lists python-jose). PyJWT 2.15.1 was already installed in production as a dependency of `supabase-auth`, so no new package is added; `python-jose` and `ecdsa` are removed.
+  - Same algorithm (`JWT_ALGORITHM`, HS256), same secret (`JWT_SECRET_KEY`), same claims (`sub`, `clinic_id`, `role`, `exp`, `iat`; posture: `purpose`, `views`, `exp`, `iat`), same expiry setting. Code catches `PyJWTError`; the middleware raises `InvalidTokenError` for a token without `sub` or `clinic_id`. No alias keeps the old `JWTError` name.
+  - PyJWT checks are kept at their defaults. One check is stricter than python-jose: a token whose `iat` is in the future is rejected. Our server issues and verifies its own tokens with one clock, so this does not affect real users; it was kept instead of switching the check off.
+  - `weasyprint` 69.0 to 70.0. The only visible change is the angled gradient in the PDF letterhead band (colour values differ by up to 12 of 255 inside the band); text, fonts, layout and page count are the same.
+  - Posture shares `app/services/posture/review.py` and the letterhead; the Posture report PDF uses the same gradient. The Tool 03 branch has the same five python-jose files and needs this change after it merges.
+- **Verified**:
+  - Tokens made by the old code (python-jose) verify with the new code, and tokens made by the new code verify with the old code; header and claims are identical. Expired, signature-tampered and claim-tampered tokens are rejected by both; `alg: none` is rejected. Posture detection token works both ways.
+  - Running API on PyJWT: register, login, `/auth/me`, patients, appointments, leads, invoices return 200; a token made by python-jose for the same user returns 200; expired python-jose token, tampered token and no token return 401 with the same error body. Live invoice PDF download 200.
+  - Invoice, receipt and prescription PDFs rendered with 69.0 and 70.0 from the same data and compared page by page (see above).
+  - Full pytest on a fresh Postgres 16 on this branch and on its base: 435 passed, 10 failed on both, and the failures are exactly `tests/known_failures.txt`.
+  - CRM production build, Playwright login and Dashboard, Patients, Billing and Appointments at 1440 and 390 px: no page errors, no failed API calls, page width equals the viewport.
+  - pip-audit on `requirements.txt`: python-jose, ecdsa and weasyprint no longer reported. Pillow, pillow-heif and protobuf remain (Posture dependencies, separate change).
+  - Not tested: the Docker image build (Docker Hub not reachable from the test machine); the first CI run and the Railway deploy are the check.
+- **Follow-up (2026-11-10)**: `backend/uv.lock` still locked python-jose, ecdsa, rsa and pyasn1 after this change (the first search covered only .py, .txt and .toml files). Regenerated with `uv lock`: those four removed, PyJWT 2.14.0 to 2.15.1, nothing else changed; `uv lock --check` passes. Docker and CI install from `requirements.txt` and never read `uv.lock`, so production was not affected. `backend/SETUP_GUIDE.md` now names PyJWT.
+- **Affected Files**: `backend/requirements.txt`, `backend/pyproject.toml`, `backend/app/core/security.py`, `backend/app/middleware/clinic_gate.py`, `backend/app/services/posture/review.py`, `backend/tests/test_appointments_and_requests_api.py`, `backend/tests/test_recycle_bin_soft_delete.py`
+
+---
+
+## [D-033] User Permissions Editor Stays Locked Until the Saved Permissions Load
+
+- **Date**: 2026-11-10
+- **Context**: `PUT /users/{id}/permissions` replaces every saved override of that user: keys missing from the request are deleted. The Edit Permissions slide-over (Settings, User Management) builds its request from the overrides it loaded with `GET /users/{id}/permissions`, so keys the form does not list (for example Tool 03 `screening.*` keys) are sent back unchanged. When that GET failed, the slide-over still opened the form with role defaults and Save enabled; one Save then reset the user to role defaults and deleted every other saved override. A response without a `data` list was treated as "no overrides" in the same way. This slide-over is the only caller of the PUT in the frontends.
+- **Decision**:
+  - The permissions query throws when the response has no `data` list, so a wrong shape is an error, never an empty list.
+  - Until the saved overrides are loaded, the slide-over shows a loading state or an error with **Try again** and **Close**. No scope selects and no Save button are shown, and `handleSave` returns early, so no PUT can be sent without the saved list.
+  - The role-default branch for a user without loaded data is removed. Defaults still fill canonical keys that have no saved row, as before.
+- **Verified**: tsc; vitest 53 pass (new tests: loading state, GET failure with retry and no PUT, wrong response shape, save keeps a key the form does not list); `next build`; Playwright on the production build against a local backend at 1440 and 390 px: with the GET forced to fail the error shows, no select and no Save; after Try again a save with no edits sends `screening.view` back and the database row `screening.view = own` is still there after the save; page width equals the viewport, no page errors, no failed calls.
+- **Affected Files**: `frontend/crm/src/features/users/api.ts`, `frontend/crm/src/features/users/components/UserPermissionsSlideOver.tsx`, `frontend/crm/src/features/users/user-permissions-slideover.test.tsx`
+
+---
+
+## [D-034] Report Letterhead: Clinic Left, Aarogya Virohan Right
+
+- **Date**: 2026-11-12
+- **Context**: The shared report letterhead (`report_letterhead.py`, used by the exercise prescription PDF and the invoice / receipt PDF) put the Aarogya Virohan wordmark on the left and the clinic on the right, following the founders' Exercise Library feedback of 23 Oct (items 6 and 7). The CRM header already shows the clinic on the left and Aarogya Virohan on the right (D-030). On 12 Nov Shivank sir set one rule for every patient-facing document and the CRM: "the clinic is the hero, Aarogya Virohan is the backend partner", clinic logo left, Aarogya Virohan right and smaller. This replaces the 23 Oct items 6 and 7.
+- **Decision**:
+  - With a clinic name: clinic logo (when usable) and clinic name with the document subtitle ("Invoice", "Payment Receipt", "Exercise Prescription Tool") on the left; on the right a smaller Aarogya Virohan wordmark under a "Powered by" label. Same letterhead for invoice and receipt (one rule; founders can ask for a footer-only invoice later).
+  - Without a clinic name: Aarogya Virohan only, wordmark and subtitle on the left, as before.
+  - `letterhead_html()` keeps its signature and class names, so the callers do not change. The posture report has its own letterhead in the posture module and is aligned in the Posture work, not here.
+- **Verified**: full pytest on Postgres 16, same 10 known failures as dev 6ca4499 (dev 435 passed, this change 438: three new invoice / receipt letterhead tests); prescription letterhead tests assert the new order; PDFs rendered for prescription, invoice and receipt with a logo, with a name only and without a clinic, every page checked as an image.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_invoice_pdf.py`
+
+---
+
+## [D-035] Letterhead Logo Keeps the Clinic Logo's Shape
+
+- **Date**: 2026-11-13
+- **Context**: The letterhead (D-034) put every clinic logo inside a 13 mm square tile. Most clinic logos are wide wordmarks; the first real one (a 3:1 logo with a tagline) shrank to about 11 x 4 mm and its tagline could not be read.
+- **Decision**: The logo keeps its own ratio. Square and tall logos stay as before (11 mm inside a 13 mm tile). A wide logo keeps the 11 mm height and grows sideways up to 40 mm (tile = logo + 2 mm); a wider logo is capped at 40 mm and gets shorter. Size comes from the PNG header of the normalised logo (`resolve_clinic_logo` always returns PNG); anything unreadable falls back to the square box. The clinic name stays next to the logo.
+- **Verified**: full pytest on Postgres 16 against release/el-nov (only the known failures); new tests for square, wide, very wide, tall and unreadable logos and for the tile markup; PDFs rendered with square, 3:1, 8:1 and 1:2 logos and with a real clinic logo, every page checked.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/tests/test_prescription_pdf.py`
+
+---
+
+## [D-036] Report Identity: One Set of Rules for Letterhead and Footer
+
+- **Date**: 2026-11-14
+- **Context**: Founders (13-14 Nov) asked for the new Aarogya Virohan round logo on the right of the letterhead with no "Powered by" label there, "Powered by Aarogya Virohan . AV Suite" only in the footer, no patient name or ID in the footer (the footer itself to stay as it was, centred), and the clinic's full details (address, phone, email, website) on every report, filled from the clinic profile and never hard-coded. A missing optional field must not leave a gap.
+- **Decision**:
+  - `report_letterhead.py` owns the rules for every report: `clinic_details()` returns the clinic's details as labelled pairs in a fixed order (Address, Phone, Email, Website, Reg. No., GSTIN); empty fields are dropped, never shown as an empty label. Address is "line, city, state pincode" without repeating parts already in the line; an invalid pincode is dropped; the website is shown without scheme and trailing slash. `clinic_detail_lines()` gives the same as plain lines.
+  - Letterhead (final, 14 Nov): white, shallow, print-friendly header. Clinic logo, name and document type on the left; the clinic's contacts next, one per row with a small line icon (address, phone, email, website; Reg. No. / GSTIN with a short label); then a thin standing rule and the Aarogya Virohan round mark alone on the far right; one accent rule underneath. A missing field has no row; no contacts means no standing rule. Long names get a smaller font (over 30 and 45 characters) and wrap; nothing is cut. Without a clinic name: Aarogya Virohan mark, name and document type.
+  - Why: earlier drafts put the clinic's details right next to the AV mark (first in a dark band, then in a strip under it) and they read as Aarogya Virohan's; a draft with no AV mark in the header was rejected by Onkar (the mark stays). The standing rule separates the two owners. Medical letterhead practice keeps the header shallow with the provider's name and contacts prominent; a full dark band also costs clinics toner on every printed prescription.
+  - `letterhead_page_top_mm(details)` sizes each report's @page top margin from the contact rows (address wrap estimate capped at 3 lines), so the header never runs into the body; without details it is 29 mm (27 mm before; 2 mm more space under the rule).
+  - Logos: empty margins are trimmed before sizing; an opaque logo on a near-white canvas has that outer background made transparent (flood fill from the corners), so it sits cleanly on the cream prescription page; white inside the artwork is kept; dark backgrounds are left as they are.
+  - Prescriptions show address and contacts only; invoices and receipts also show Reg. No. and GSTIN when filled. The invoice's own clinic block moved into the letterhead; "Billed to" now sits beside the invoice title.
+  - Shared footer (`footer_html`, `footer_css`): exactly the footer used before D-036 (centred, old Aarogya Virohan mark, "POWERED BY AAROGYA VIROHAN . AV SUITE", "Page x of y" centred on the next line), minus the patient name and prescription reference (founders 14 Nov: no patient data in the footer).
+  - Uploaded logos lose their empty margins before sizing (transparent margins by alpha; an opaque background only when all four corners share one colour).
+  - New asset `av_logo_round.png` (the founders' round logo, cut to a transparent circle), used in the header. The footer keeps the old mark. The old wordmark stays in the repo for the posture report until the Posture work adopts this module.
+- **Not in this change**: website field in the clinic profile (the PDFs accept it, nothing stores it yet), display name vs legal name, practitioner degree, authorised-person rules, per-document snapshot of clinic details, the Rx watermark (still the old mark), the posture report (Posture Project).
+- **Verified**: full pytest on Postgres 16 against release/el-nov; new `tests/test_report_letterhead.py` (detail order and labels, missing cells, ids row, page margin, escaping, address, website, name size, footer without patient data on Rx / invoice / receipt, logo trim); PDFs rendered with all details, with phone and website missing, without a clinic, and a multi-page Rx, every page checked.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/prescription_service.py`, `backend/app/services/invoice_pdf.py`, `backend/app/services/posture/brand/av_logo_round.png`, `backend/tests/test_report_letterhead.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_invoice_pdf.py`
+
+---
+
+## [D-037] Shared Brand Module Outside the Posture Package
+
+- **Date**: 2026-11-14
+- **Context**: `report_letterhead.py`, `prescription_pdf.py` and `invoice_pdf.py` took the brand palette, the "powered by" words, `_brand_data_uri` and `_font_faces` from `app/services/posture/pdf_service.py`. The posture report is to adopt `report_letterhead` (Posture work, U1); with the old imports that would be a circular import (posture -> letterhead -> posture).
+- **Decision**:
+  - New `backend/app/services/brand.py` holds the palette (MIDNIGHT to ZEBRA), `POWERED_BY_COMPANY` / `POWERED_BY_PRODUCT`, `BRAND_DIR`, `brand_data_uri()` and `font_faces()`. Moved, not copied; values and code unchanged.
+  - `posture/pdf_service.py` re-exports every moved name under its old name (`_brand_data_uri`, `_font_faces` included), so existing importers and posture tests work unchanged.
+  - The three shared PDF modules import from `app.services.brand` and no longer load the posture package at all.
+  - The image and font files stay in `app/services/posture/brand/` for now; `BRAND_DIR` points there. Moving the files is a separate step, planned with the Posture work so it does not conflict with its open branch.
+- **Verified**: Rx, invoice, receipt and posture report (with and without clinic branding) rendered before and after: generated HTML byte-identical, PDF pages pixel-identical. Full pytest on Postgres 16 on this branch and on release/el-nov: same failure set (the known failures only). New `tests/test_brand.py`: re-exports are the same objects, assets resolve, and the shared PDF modules import without the posture package (checked in a fresh interpreter).
+- **Affected Files**: `backend/app/services/brand.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/invoice_pdf.py`, `backend/tests/test_brand.py`
+
+---
+
+## [D-038] Document Number in the Report Footer; New Round Mark as the Prescription Watermark
+
+- **Date**: 2026-11-14
+- **Context**: D-036 took the patient name and ID out of the footer. On a prescription of two or more pages, page 2 onwards then carried nothing that says which document it belongs to. The prescription watermark was still the old Aarogya Virohan hands mark while the letterhead uses the new round mark.
+- **Decision** (Onkar, 14 Nov):
+  - The shared footer shows the document number before the page count: "Rx RX-7B825459 . Page 2 of 3", "Invoice INV-0042 . Page 1 of 1", "Receipt INV-0042 . Page 1 of 1". Numbers only, never the patient's name or phone. `footer_html(reference)` escapes the text; an empty reference gives the page count alone, as before.
+  - Prescription watermark: the new round mark (`av_logo_round.png`) faded to 6%. WeasyPrint has no opacity for @page backgrounds, so `brand.watermark_data_uri()` bakes the fade into the image and drops the mark's white background disc (otherwise a pale patch shows on the cream page). One switch: `WATERMARK_FILE = ""` in `app/services/brand.py` removes the watermark; `WATERMARK_OPACITY` sets the strength.
+  - Pending founders' view (Round 3: R3-2 footer number, R3-3 watermark). The posture report keeps its own footer and the old watermark until the Posture work adopts the shared letterhead.
+- **Verified**: full pytest on Postgres 16 on this branch and on release/el-nov (same known failures); Rx (multi-page), invoice and receipt rendered and every page looked at, footer zoomed; watermark checked on a near-empty page; posture report HTML unchanged.
+- **Affected Files**: `backend/app/services/brand.py`, `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/invoice_pdf.py`, `backend/tests/test_brand.py`, `backend/tests/test_report_letterhead.py`
+
+---
+
+## [D-039] Posture Report on the Shared Letterhead, Signed-in Clinic, IST Date
+
+- **Date**: 2026-11-17
+- **Context**: The posture report kept its own dark letterhead and footer after D-036. In production (17 Nov, 01:44 IST) a report made while signed in to "AV Suite Clinic 2" printed the placeholder clinic "AV Clinic", the footer carried the patient's name, and the assessed-on date and report ID showed 16 Nov because the route took the server's UTC date. Step 3 of the posture tool showed "Aarogya Virohan" as text instead of the logo.
+- **Decision** (coordinator, 17 Nov; Posture branding round, part 1):
+  - The posture PDF uses `report_letterhead.py` unchanged: `letterhead_html`, `letterhead_css`, `letterhead_page_top_mm`, `footer_html`, `footer_css`, `clinic_details`, `resolve_clinic_logo`. Address and contacts only, no Reg. No. or GSTIN (same as the prescription).
+  - The clinic is the signed-in clinic: `/api/v1/posture/report/pdf` reads the clinics row of the request (`perm_ctx.clinic`) on every export; `report["branding"]` sent by the client is ignored. `/api/v1/posture/report` adds the same clinic as plain text in `report["branding"]` for the web report, after the report file is saved (the saved copy carries no logo). New `app/services/posture/clinic_letterhead.py`. The "AV Clinic" placeholder is removed from backend and posture-tool; the patient box always shows "Assessed by".
+  - Footer: "Report PT-... . Page x of y", no patient name (D-036, D-038).
+  - Assessed-on date and the date in the report ID are the IST date (`datetime.now(IST)`), same rule as D-017. The saved file's name keeps its UTC timestamp (not printed).
+  - The shared header and footer assume paragraph margins are zero; the posture page keeps browser margins in its body, so they are zeroed for `.letterhead p` and `.running-footer p` only. No colour or other design change; the posture watermark stays as it was.
+  - posture-tool: the app bar shows the Aarogya Virohan logo on every step (the report letterhead now carries the clinic's logo, so the reason for hiding it on step 3 is gone).
+- **Not in this change**: reference ranges, camera-only capture and the "posture test upload" capability (next parts of the round); web report header design (it keeps its own band, now filled with the signed-in clinic).
+- **Verified**: full pytest (SQLite) on this branch and on dev f02118a, twice: same 24 known failures, no new ones. New `tests/services/posture/test_pdf_letterhead_17nov.py`, `tests/services/posture/test_assessment_date_ist.py` (01:44 IST gives 17 Nov and PT-20261117-), `tests/test_posture_pdf_clinic.py` (HTTP: signed-in clinic printed, posted branding ignored, patient name once). posture-tool tsc, lint, build. PDFs rendered with a long clinic name and logo, with a short name and no logo, and with no clinic; every page looked at, header zoomed.
+- **Affected Files**: `backend/app/api/v1/posture.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/services/posture/clinic_letterhead.py`, `backend/tests/services/posture/test_pdf_letterhead_17nov.py` (replaces `test_pdf_letterhead_13oct.py`), `backend/tests/services/posture/test_assessment_date_ist.py`, `backend/tests/test_posture_pdf_clinic.py`, `frontend/posture-tool/src/app/page.tsx`, `frontend/posture-tool/src/components/report/ReportHeader.tsx`, `frontend/posture-tool/src/lib/branding.ts`, `frontend/posture-tool/src/types/posture.ts`
+
+---
+
+## [D-040] AV Screening Range on Every Posture Row; Head Position Is Not CVA
+
+- **Date**: 2026-11-17
+- **Context**: Founders' main feedback on the posture report: a range next to each value, like a blood report. Research (17 Nov) found published adult norms comparable with our photograph and landmarks for almost none of the measures: CVA norms are C7 to tragus (about 49 degrees), trunk and shoulder norms are back-surface scans of other landmarks, the HKA norms are radiographs. Only pelvic obliquity has a usable published range (Moharrami et al. 2023, radiographs).
+- **Decision** (Onkar, 17 Nov):
+  - Every row shows value, "AV screening range" and the existing grade. The AV screening range is the band the grade already treats as Normal, read at render time from `classifier.THRESHOLDS` (`app/services/posture/reference_ranges.py`), so the printed range cannot drift from the grading. No band changes. No Below / Within / Above.
+  - Sources footnote on the last page, per measure: the published basis named in the classifier comments where there is one, otherwise "AV clinical team, Oct 2026". Pelvic obliquity also carries "Published reference 0 to 5.6 degrees (Moharrami et al. 2023, standing pelvic radiographs); not directly comparable". The PDF reads ranges and sources from the server, never from the posted report.
+  - PT-L01 is shown as "Head Position (ear-shoulder angle)", with the footnote "Ear to shoulder point, not the C7-based craniovertebral angle". `calc_cva` measures MediaPipe ear to shoulder point against the horizontal; it is not the standard CVA. PT-L01 and `calc_cva` keep their names (saved reports, synthesis mapping).
+  - Web report: same range column (a line under the value on phones) and the same footnote, from `measurement.screeningRange` and `report.screeningSources`.
+  - The footnote is set in three columns at 6.1 pt so the report stays three pages; page 3 is now nearly full (see open item).
+- **For the founders (not decided here)**: the head position band (Normal at 50 degrees or more) was taken from CVA literature. On our ear-shoulder angle five test subjects read 68 to 78 degrees, so every patient grades Normal and the row screens nothing. A band for this angle is a clinical decision.
+- **Open**: page 3 has little room left; a longer clinical synthesis or more measures could push the closing block to a fourth page.
+- **Verified**: full pytest (SQLite) on this branch and dev f02118a, same 24 known failures; new `tests/services/posture/test_reference_ranges_17nov.py` (ranges equal THRESHOLDS and follow a band change, grade edges match the printed range, PDF column and footnote, posted ranges ignored, no CVA wording, Moharrami only in the footnote). posture-tool tsc, lint, build. PDFs rendered with po-3 photos (real detection), with and without a clinic: three pages each, every page looked at, footnote zoomed.
+- **Affected Files**: `backend/app/services/posture/reference_ranges.py`, `backend/app/services/posture/report_builder.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/api/v1/posture.py`, `backend/tests/services/posture/test_reference_ranges_17nov.py`, `frontend/posture-tool/src/components/report/ViewSection.tsx`, `frontend/posture-tool/src/components/report/ReportCard.tsx`, `frontend/posture-tool/src/types/posture.ts`
+
+- **Review fixes, 17 Nov (Onkar, same decision)**: column and all mentions renamed "Normal range"; one format from THRESHOLDS ("\u2265 50\u00b0", "\u00b1 4\u00b0", "\u2264 5\u00b0", "\u2264 10 mm"), set like the parameter name; one fixed column grid on all three plane tables (photo cell 57 mm, data cell 120 mm, columns 41 / 19 / 26 / 34 mm) so Parameter, Value, Normal range and Finding start at the same x on every page, headers on one line; radar chart axes use the table labels in sentence case (`reference_ranges.chart_label`, long names on two lines); "Normal ranges: basis and sources" is its own section above the sign-off and disclaimer, one line per measure at 8 pt. The embedded Inter subset has no \u2264 / \u2265 glyphs, so those symbols alone are set in Liberation Sans / Arial. Consequence: the report is now four pages (sign-off and disclaimer move to page 4); founders' three-page layout of 19 Oct no longer holds.
+- **Three pages again, 17 Nov (Onkar's second review)**: radar chart 128 mm to 102 mm (same design); axis names 13 to 15 and ring names 10 to 13 SVG units, so on paper they stay 8.3 pt and 7.2 pt (no text made smaller than before; ring names were 7.0 pt). Spacing tightened between sources, sign-off (signature space 9 to 7 mm) and disclaimer; sources lines stay 8 pt. Finding column 41 mm so "MODERATE DEVIATION" fits inside the row (Parameter 37, Value 17, Normal range 25 mm). The report is three pages; page 3 still has little spare room.
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
@@ -491,5 +663,11 @@ Each entry follows this structure:
 | L-41 | Backend invoice PDF was a placeholder (five lines of text with a `%PDF-1.4` header) and its download URL pointed at `/api/v1/billing/invoices/...` | Fixed 2026-10-31: real server PDF for invoice and receipt, URL fixed, CRM "Download PDF" (D-027) | - |
 | L-42 | The invoice PDF download needs a signed-in clinic user, so the `download_url` and WhatsApp link from `POST /invoices/{id}/pdf` cannot be opened by a patient. The CRM WhatsApp button only opens a chat; the PDF is attached by hand | Open; a signed, expiring patient link or email with the PDF attached (C-20) | Backend + frontend |
 | L-43 | Clinic profile update accepted any length for city, state, phone, registration number and authorised person, so longer values returned 500 from the database | Fixed 2026-11-02: length limits in the API, 422 (D-029) | - |
+| L-44 | The clinic switcher is in the sidebar clinic card, which shows only when the sidebar is expanded. With the sidebar collapsed on desktop, a multi-clinic user must expand it to switch | Open; acceptable for now (D-030) | Frontend |
+| L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
+| L-46 | WeasyPrint 70 warns that a future version will need the HarfBuzz subset library, which the backend Docker image does not install. PDFs are made correctly today | Open; add the library to the Docker image and check a deploy before the next WeasyPrint major upgrade (D-032) | Backend |
+| L-47 | `GET /api/v1/auth/me` with a malformed Bearer token returns 500 instead of 401 (found in the 11 Nov prod-schema rehearsal) | Open, next CRM round | Backend |
+| L-48 | Invoice / receipt with an empty clinic name printed "Thank you for visiting ." | Fixed 2026-11-14 in D-036 (plain "Thank you." without a name) | Backend |
+| L-49 | The backend Docker image installs only `fonts-liberation`, which has no Devanagari; a clinic or patient name in Hindi would print as boxes on Railway (renders locally only because other fonts are installed). Needs a Devanagari font package in the Dockerfile, tested on a real image build | Open | Backend / deploy |
 
-*Last updated: 2026-11-02 (D-029; L-43 added and closed) | Branch: fix/staff-booking-and-limits*
+*Last updated: 2026-11-14 (D-036 report identity) | Branch: feat/report-identity*

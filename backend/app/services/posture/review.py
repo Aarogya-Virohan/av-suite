@@ -17,7 +17,8 @@ import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 
 from app.core.config import settings
 
@@ -146,7 +147,7 @@ def read_detection_token(token: str) -> dict[str, Any]:
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
-    except JWTError as e:
+    except PyJWTError as e:
         raise InvalidDetectionToken(str(e)) from e
 
     if payload.get("purpose") != TOKEN_PURPOSE:

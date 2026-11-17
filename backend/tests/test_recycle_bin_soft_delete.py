@@ -1,4 +1,4 @@
-from jose import jwt
+import jwt
 import pytest
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -21,7 +21,7 @@ async def test_patient_delete_attribution_recycle_bin_and_restore(client, auth_h
     assert created.status_code in (200, 201), created.text
     patient_id = created.json()["data"]["id"]
     token = auth_headers["Authorization"].split(" ", 1)[1]
-    user_id = jwt.decode(token, key="", options={"verify_signature": False})["sub"]
+    user_id = jwt.decode(token, options={"verify_signature": False})["sub"]
 
     deleted = await client.delete(
         f"{settings.API_V1_PREFIX}/patients/{patient_id}", headers=auth_headers
@@ -79,7 +79,7 @@ async def test_other_soft_delete_flows_record_authenticated_user(
     client, auth_headers, db_session
 ):
     token = auth_headers["Authorization"].split(" ", 1)[1]
-    claims = jwt.decode(token, key="", options={"verify_signature": False})
+    claims = jwt.decode(token, options={"verify_signature": False})
     user_id = UUID(claims["sub"])
     clinic_id = UUID(claims["clinic_id"])
 

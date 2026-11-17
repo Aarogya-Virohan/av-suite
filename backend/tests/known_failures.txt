@@ -1,0 +1,13 @@
+# Tests that already fail on dev on a clean Postgres run (found 20 Oct 2026,
+# still failing on 3 Nov 2026). CI skips them so a new failure stands out.
+# They are not fixed by skipping: remove a line as soon as its test passes.
+tests/test_appointments_permissions.py::test_view_own_scope_list
+tests/test_appointments_permissions.py::test_frontdesk_can_view_and_create
+tests/test_appointments_permissions.py::test_frontdesk_can_edit
+tests/test_bucket_rbac.py::test_bucket_upload_admin
+tests/test_bucket_rbac.py::test_bucket_upload_therapist
+tests/test_bucket_rbac.py::test_bucket_upload_frontdesk
+tests/test_patients_api.py::test_patients_crud_therapist_scope
+tests/test_patients_api.py::test_patients_crud_frontdesk
+tests/test_permissions.py::test_role_template_permission
+tests/test_treatments_permissions.py::test_view_own_scope

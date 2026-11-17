@@ -3,7 +3,7 @@
 import React from 'react';
 import { SidebarNavigation } from './SidebarNavigation';
 import { CommandBar } from './CommandBar';
-import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { AvBrand, ClinicBrand } from './ClinicBrand';
 import { HeaderCalendar } from './HeaderCalendar';
 import { AuthGuard } from '../auth/AuthGuard';
 import { useUiStore, useAuthStore } from '../../store';
@@ -60,7 +60,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
         >
           {/* Top Header */}
-          <header className="sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur md:z-20 md:gap-4 md:px-8 dark:border-slate-800 dark:bg-slate-900">
+          {/* Top Header (D-030): clinic logo or name on the left, AV Suite on the right.
+              The clinic switcher lives in the sidebar footer card. */}
+          <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur md:z-20 md:gap-4 md:px-8 dark:border-slate-800 dark:bg-slate-900">
             <button
               type="button"
               aria-label="Open menu"
@@ -69,21 +71,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Menu className="h-5 w-5" />
             </button>
+            <ClinicBrand logoUrl={effectiveClinic?.branding_logo_url} name={effectiveClinic?.name} />
             <button
+              type="button"
+              aria-label="Search patients or run commands"
               onClick={() => {
                 const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
                 window.dispatchEvent(event);
               }}
-              className="flex h-10 w-full max-w-[420px] cursor-pointer items-center gap-2.5 rounded-[10px] border border-line bg-card px-3 text-sm text-slate-400 transition-colors hover:border-teal-300 dark:border-slate-700 dark:bg-slate-800"
+              className="ml-auto flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center gap-2.5 rounded-[10px] border border-line bg-card text-sm text-slate-400 transition-colors hover:border-teal-300 sm:ml-0 sm:w-full sm:max-w-[420px] sm:shrink sm:justify-start sm:px-3 dark:border-slate-700 dark:bg-slate-800"
             >
-              <Search className="h-4 w-4" />
-              <span className="truncate">Search patients or run commands…</span>
+              <Search className="h-4 w-4 shrink-0" />
+              <span className="hidden truncate sm:inline">Search patients or run commands…</span>
               <kbd className="ml-auto hidden sm:inline rounded-md border border-line bg-canvas px-1.5 py-0.5 font-sans text-[11px] font-semibold text-muted dark:bg-slate-700">
                 ⌘K
               </kbd>
             </button>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex shrink-0 items-center gap-2.5 sm:ml-auto">
               {today && canAccessModule('appointments') && <HeaderCalendar label={today} />}
               {today && !canAccessModule('appointments') && (
                 <span className="hidden h-10 items-center gap-2 rounded-[10px] border border-line bg-card px-3 text-sm font-medium text-ink-2 md:flex">
@@ -91,7 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {today}
                 </span>
               )}
-              <WorkspaceSwitcher fallbackName={effectiveClinic?.name} />
+              <AvBrand />
             </div>
           </header>
 

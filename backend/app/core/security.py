@@ -18,7 +18,8 @@ Security Considerations:
 
 import bcrypt
 from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
+import jwt
+from jwt import PyJWTError
 from typing import Any, Union
 from app.core.config import settings
 import logging
@@ -235,7 +236,7 @@ def decode_token(token: str) -> dict:
     
     Error:
     - ExpiredSignatureError: Token expired ho gaya
-    - JWTError: Token invalid ya tampered hai
+    - PyJWTError: Token invalid ya tampered hai
     - Invalid SECRET_KEY ya algorithm mismatch
     
     Usage:
@@ -243,7 +244,7 @@ def decode_token(token: str) -> dict:
         payload = decode_token(token)
         user_id = payload.get("sub")
         clinic_id = payload.get("clinic_id")
-    except JWTError:
+    except PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     """
     
@@ -262,7 +263,7 @@ def decode_token(token: str) -> dict:
         logger.warning(f"Token expired")
         raise
         
-    except JWTError as e:
+    except PyJWTError as e:
         # Token invalid, tampered, ya corrupted hai
         logger.warning(f"Token validation failed: {str(e)}")
         raise

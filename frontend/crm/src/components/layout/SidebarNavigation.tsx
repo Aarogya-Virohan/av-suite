@@ -21,6 +21,7 @@ import { useAuthStore, useUiStore } from '../../store';
 import { canAccessModule, hasCapability, ModuleVisibility, usePermissionSubscription } from '../../config/permissions';
 import { useClinicSettings } from '../../features/settings/api';
 import { cn } from '../../lib/cn';
+import { WorkspaceCard } from './WorkspaceSwitcher';
 
 interface NavItem {
   label: string;
@@ -97,20 +98,11 @@ export function SidebarNavigation() {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_55%_at_0%_100%,rgba(27,74,84,0.9)_0%,rgba(27,74,84,0)_60%)]"
       />
 
-      {/* Header / Logo */}
+      {/* Header / Logo: always the AV Suite mark; the clinic logo sits in the top bar (D-030). */}
       <div className={cn('relative flex h-[72px] items-center gap-3', isSidebarOpen ? 'px-4' : 'justify-center px-2')}>
         <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-white p-1 shadow-[0_0_0_2px_rgba(78,136,143,0.5),0_4px_14px_rgba(0,0,0,0.25)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={effectiveClinic?.branding_logo_url || '/brand/av-logo-mark.png'}
-            alt={effectiveClinic?.branding_logo_url ? 'Clinic logo' : 'AV Suite'}
-            className="h-full w-full object-contain"
-            onError={(e) => {
-              // A saved logo URL that no longer loads falls back to the AV Suite mark.
-              const img = e.currentTarget;
-              if (!img.src.endsWith('/brand/av-logo-mark.png')) img.src = '/brand/av-logo-mark.png';
-            }}
-          />
+          <img src="/brand/av-logo-mark.png" alt="AV Suite" className="h-full w-full object-contain" />
         </span>
         {isSidebarOpen && (
           <div className="min-w-0 flex-1">
@@ -183,31 +175,7 @@ export function SidebarNavigation() {
       {/* Workspace + Logout */}
       <div className={cn('relative border-t border-white/10', isSidebarOpen ? 'p-3' : 'p-2')}>
         {isSidebarOpen ? (
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.06] p-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lime to-fresh text-[11px] font-bold text-midnight">
-              {clinicName
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((w: string) => w[0])
-                .join('')
-                .toUpperCase()}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold">{clinicName}</p>
-              <p className="text-[11px] text-[#aab2d6]">{roleLabel(role)}</p>
-            </div>
-            <button
-              onClick={() => {
-                logout();
-                window.location.replace('/login');
-              }}
-              className="cursor-pointer rounded-md p-1.5 text-[#aab2d6] transition-colors hover:bg-white/10 hover:text-[#ffb4a8]"
-              aria-label="Logout"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+          <WorkspaceCard clinicName={clinicName} roleText={roleLabel(role)} />
         ) : (
           <button
             onClick={() => {

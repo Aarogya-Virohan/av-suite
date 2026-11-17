@@ -37,6 +37,9 @@ const paise = (n: number) => Math.round(n * 100) / 100;
 const rupees = (n: number) => formatMoney(paise(n).toFixed(2));
 type AdjustMode = 'amount' | 'percent';
 
+/** Tax field on new invoices. Off until the founders decide on GST (D-030). */
+const SHOW_TAX = false;
+
 /** Small ₹ / % switch for discount and tax (C-16). */
 function ModeSwitch({ mode, onChange, label }: { mode: AdjustMode; onChange: (m: AdjustMode) => void; label: string }) {
   return (
@@ -325,7 +328,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
             <span className="text-muted">Subtotal</span>
             <span className="font-semibold tabular-nums text-ink">{rupees(subtotal)}</span>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className={cn('grid gap-4', SHOW_TAX ? 'grid-cols-2' : 'grid-cols-1 sm:max-w-[50%]')}>
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <label htmlFor={discountMode === 'percent' ? 'inv-discount-pct' : 'inv-discount'} className="text-[11px] font-medium text-muted">
@@ -356,20 +359,24 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
               )}
               {discountMode === 'percent' && <p className="mt-1 text-[11px] tabular-nums text-muted">= {rupees(discountAmount)}</p>}
             </div>
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <label htmlFor={taxMode === 'percent' ? 'inv-tax-pct' : 'inv-tax'} className="text-[11px] font-medium text-muted">
-                  Tax ({taxMode === 'percent' ? '%' : '₹'})
-                </label>
-                <ModeSwitch mode={taxMode} onChange={setTaxMode} label="Tax" />
+            {/* Tax is hidden on new invoices until the founders decide on GST (D-030, R2-2).
+                tax_amount stays 0; the API still accepts tax and old taxed invoices still show it. */}
+            {SHOW_TAX && (
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <label htmlFor={taxMode === 'percent' ? 'inv-tax-pct' : 'inv-tax'} className="text-[11px] font-medium text-muted">
+                    Tax ({taxMode === 'percent' ? '%' : '₹'})
+                  </label>
+                  <ModeSwitch mode={taxMode} onChange={setTaxMode} label="Tax" />
+                </div>
+                {taxMode === 'percent' ? (
+                  <input id="inv-tax-pct" value={taxPct} onChange={(e) => setTaxPct(e.target.value)} type="number" min={0} max={100} step="0.01" className={smallInput} />
+                ) : (
+                  <input id="inv-tax" {...register('tax_amount', { setValueAs: (v) => num(v) })} type="number" min={0} step="0.01" className={smallInput} />
+                )}
+                {taxMode === 'percent' && <p className="mt-1 text-[11px] tabular-nums text-muted">= {rupees(taxAmount)} (on amount after discount)</p>}
               </div>
-              {taxMode === 'percent' ? (
-                <input id="inv-tax-pct" value={taxPct} onChange={(e) => setTaxPct(e.target.value)} type="number" min={0} max={100} step="0.01" className={smallInput} />
-              ) : (
-                <input id="inv-tax" {...register('tax_amount', { setValueAs: (v) => num(v) })} type="number" min={0} step="0.01" className={smallInput} />
-              )}
-              {taxMode === 'percent' && <p className="mt-1 text-[11px] tabular-nums text-muted">= {rupees(taxAmount)} (on amount after discount)</p>}
-            </div>
+            )}
           </div>
           {errors.discount_amount && <p className={errorText}>{errors.discount_amount.message}</p>}
           <div className="flex items-center justify-between border-t border-line pt-3 font-bold">

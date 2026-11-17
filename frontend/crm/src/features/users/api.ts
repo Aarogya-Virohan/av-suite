@@ -50,7 +50,13 @@ export function useUserPermissions(userId: string) {
     queryFn: async () => {
       if (!userId) return [];
       const res = await apiClient.get(`/users/${userId}/permissions`);
-      return res.data?.data || [];
+      const data = res.data?.data;
+      // The editor sends back the full list on save (PUT replaces every override),
+      // so an unexpected shape must be an error, never an empty list.
+      if (!Array.isArray(data)) {
+        throw new Error('Unexpected response while loading permissions');
+      }
+      return data;
     },
     enabled: !!userId,
   });
