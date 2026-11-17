@@ -68,6 +68,8 @@ export type InvoiceCreatePayload = Omit<InvoiceFormValues, 'discount_amount' | '
   tax_amount?: number;
   discount_percent?: string;
   tax_percent?: string;
+  /** Required by the server when the discount is above 20% (PR B). */
+  discount_reason?: string;
 };
 
 export function useCreateInvoice() {

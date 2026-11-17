@@ -5,7 +5,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import text, func
+from sqlalchemy import text, func, select
 
 from app.services.invoice_pdf import (
     InvoiceDoc,
@@ -14,7 +14,7 @@ from app.services.invoice_pdf import (
     pdf_filename,
     render_invoice_pdf,
 )
-from app.enums.billing import InvoiceStatus
+from app.enums.billing import InvoiceStatus, PaymentStatus
 from app.enums.package import PackageStatus
 from app.models.billing import Invoice, Package, PatientPackage, Payment, InvoiceCounter
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -48,10 +48,38 @@ class BillingPayloadValidationError(BillingValidationError):
 
 
 AMOUNT_ROUNDING_TOLERANCE = Decimal("0.005")
+DISCOUNT_REASON_THRESHOLD = 20
 
 
 class BillingNotFoundError(Exception):
     """Raised when a billing resource is not found."""
+
+
+class BillingConflictError(Exception):
+    """Raised when a billing action conflicts with the resource's current state."""
+
+
+def _validated_discount_reason(
+    subtotal: Decimal,
+    discount_amount: Decimal,
+    discount_percent: Decimal | None,
+    reason: str | None,
+) -> str | None:
+    normalized = reason.strip() if reason is not None else None
+    # A percent discount is judged by its percent: the rupee amount is rounded
+    # to paise and can sit a fraction above 20% of the subtotal (20% of 333.33
+    # is 66.67), which must not ask for a reason at exactly 20%.
+    if discount_percent is not None:
+        reason_required = discount_percent > DISCOUNT_REASON_THRESHOLD
+    else:
+        reason_required = (
+            discount_amount > subtotal * Decimal(DISCOUNT_REASON_THRESHOLD) / Decimal("100")
+        )
+    if reason_required and not normalized:
+        raise BillingPayloadValidationError(
+            "discount_reason is required for discounts greater than 20%."
+        )
+    return normalized or None
 
 
 class BillingService:
@@ -331,10 +359,18 @@ class BillingService:
         if total_amount < Decimal("0.00"):
             raise BillingValidationError("Total invoice amount cannot be negative.")
 
+        discount_reason = _validated_discount_reason(
+            subtotal, discount_amount, payload.discount_percent, payload.discount_reason
+        )
+
         invoice_data = payload.model_dump(
             exclude={"items", "line_items", "invoice_number"}
         )
-        invoice_data.update(discount_amount=discount_amount, tax_amount=tax_amount)
+        invoice_data.update(
+            discount_amount=discount_amount,
+            tax_amount=tax_amount,
+            discount_reason=discount_reason,
+        )
         invoice_data.update(
             {
                 "clinic_id": clinic_id,
@@ -455,6 +491,19 @@ class BillingService:
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
         update_data = payload.model_dump(exclude_unset=True)
+        # Keys the caller actually sent. update_data gains derived keys below
+        # (discount_amount from a stored percent), so decisions about what the
+        # caller changed must use this set.
+        sent = set(update_data)
+        if (
+            update_data.get("status") == InvoiceStatus.DRAFT
+            and invoice.status != InvoiceStatus.DRAFT
+        ):
+            # Only drafts can be deleted; moving an issued invoice back to
+            # draft would reopen that path for paid or cancelled invoices.
+            raise BillingConflictError("An issued invoice cannot be moved back to draft.")
+        if "cancel_reason" in update_data and update_data["cancel_reason"] is not None:
+            update_data["cancel_reason"] = update_data["cancel_reason"].strip() or None
 
         discount_percent = update_data.get("discount_percent", invoice.discount_percent)
         tax_percent = update_data.get("tax_percent", invoice.tax_percent)
@@ -472,6 +521,16 @@ class BillingService:
                 raise BillingPayloadValidationError("tax_amount does not match tax_percent.")
             tax_amount = expected
             update_data["tax_amount"] = expected
+        # The reason rule applies when this request sets or changes the
+        # discount. Invoices issued before the rule existed may carry a large
+        # discount with no reason; editing notes or cancelling them must work.
+        if sent & {"discount_amount", "discount_percent", "discount_reason"}:
+            update_data["discount_reason"] = _validated_discount_reason(
+                invoice.subtotal,
+                discount_amount,
+                discount_percent,
+                update_data.get("discount_reason", invoice.discount_reason),
+            )
         if any(k in update_data for k in ("discount_amount", "tax_amount", "discount_percent", "tax_percent")):
             update_data["total_amount"] = invoice.subtotal - discount_amount + tax_amount
 
@@ -489,7 +548,10 @@ class BillingService:
 
         updated = await self.invoice_repository.update(invoice, update_data)
         await self.invoice_repository.session.commit()
-        return updated
+        # Re-load the eager response relationships after commit. The repository
+        # update returns the changed ORM row with unloaded relationships, which
+        # cannot be serialized safely from an async endpoint.
+        return await self.get_invoice(clinic_id, updated.id)
 
     async def delete_invoice(
         self, clinic_id: UUID, invoice_id: UUID, deleted_by: UUID | None = None
@@ -497,6 +559,8 @@ class BillingService:
         """Delete or cancel an invoice for the clinic."""
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
+        if invoice.status != InvoiceStatus.DRAFT:
+            raise BillingConflictError("Only draft invoices can be deleted.")
         await self.invoice_repository.delete(invoice, deleted_by=deleted_by)
         await self.invoice_repository.session.commit()
 
@@ -611,12 +675,74 @@ class BillingService:
             limit=limit,
         )
 
-    async def delete_payment(self, clinic_id: UUID, payment_id: UUID) -> None:
-        """Delete a payment record for the clinic."""
+    async def void_payment(
+        self, clinic_id: UUID, payment_id: UUID, reason: str, voided_by: UUID
+    ) -> tuple[Payment, Invoice, Decimal, Decimal]:
+        """Void a payment and recalculate its invoice in one transaction."""
 
-        payment = await self.get_payment(clinic_id, payment_id)
-        await self.payment_repository.delete(payment)
+        normalized_reason = reason.strip()
+        if len(normalized_reason) < 5:
+            raise BillingPayloadValidationError(
+                "reason must contain at least 5 non-whitespace characters."
+            )
+        payment_statement = (
+            select(Payment)
+            .where(Payment.id == payment_id, Payment.clinic_id == clinic_id)
+            .with_for_update()
+        )
+        payment = await self.payment_repository.session.scalar(payment_statement)
+        if payment is None:
+            raise BillingNotFoundError(
+                f"Payment '{payment_id}' not found for clinic '{clinic_id}'."
+            )
+        invoice = await self.invoice_repository.get_by_id_with_items(
+            payment.invoice_id, clinic_id=clinic_id, for_update=True
+        )
+        if invoice is None:
+            raise BillingNotFoundError(
+                f"Invoice '{payment.invoice_id}' not found for clinic '{clinic_id}'."
+            )
+        if payment.status == PaymentStatus.VOIDED:
+            raise BillingConflictError("Payment has already been voided.")
+
+        previous_paid = invoice.paid_amount
+        payment.status = PaymentStatus.VOIDED
+        payment.void_reason = normalized_reason
+        payment.voided_by = voided_by
+        await self.payment_repository.session.flush()
+        recalculated_paid = await self.payment_repository.session.scalar(
+            select(func.coalesce(func.sum(Payment.amount), 0)).where(
+                Payment.invoice_id == invoice.id,
+                Payment.clinic_id == clinic_id,
+                Payment.status != PaymentStatus.VOIDED,
+            )
+        )
+        recalculated_paid = Decimal(recalculated_paid or 0)
+        if invoice.status == InvoiceStatus.CANCELLED:
+            updated_invoice = await self.invoice_repository.update(
+                invoice, {"paid_amount": recalculated_paid}
+            )
+        else:
+            recalculated_status = (
+                InvoiceStatus.PAID
+                if recalculated_paid >= invoice.total_amount and invoice.total_amount > 0
+                else InvoiceStatus.PARTIAL
+                if recalculated_paid > 0
+                else InvoiceStatus.UNPAID
+            )
+            updated_invoice = await self.invoice_repository.update(
+                invoice,
+                {"paid_amount": recalculated_paid, "status": recalculated_status},
+            )
+        loaded_payment = await self.payment_repository.get_by_id_with_patient(
+            payment.id, clinic_id=clinic_id
+        )
+        if loaded_payment is None:
+            raise BillingNotFoundError(
+                f"Voided payment '{payment_id}' could not be reloaded."
+            )
         await self.payment_repository.session.commit()
+        return loaded_payment, updated_invoice, previous_paid, recalculated_paid
 
     async def build_invoice_document(
         self, clinic_id: UUID, invoice_id: UUID, kind: str = "invoice"

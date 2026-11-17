@@ -19,6 +19,7 @@ import pytest
 from httpx import AsyncClient
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from app.core.config import settings
 from app.core.security import create_access_token
@@ -26,6 +27,7 @@ from app.enums.permission import CapabilityScope
 from app.enums.product import EntitlementStatus
 from app.enums.user import UserRole
 from app.models.clinic import Clinic
+from app.models.audit import AuditLog
 from app.models.exercise import Exercise
 from app.models.membership import Membership
 from app.models.patient import Patient
@@ -242,6 +244,20 @@ async def test_pdf_goes_to_storage_and_downloads_with_filename(
     assert dl.headers["content-type"] == "application/pdf"
     assert f'filename="{body["filename"]}"' in dl.headers["content-disposition"]
     assert dl.headers["content-disposition"].startswith("attachment")
+    download_count = await db_session.scalar(
+        select(func.count()).select_from(AuditLog).where(
+            AuditLog.action == "download", AuditLog.entity_type == "prescription",
+            AuditLog.entity_id == uuid.UUID(rx_id),
+        )
+    )
+    assert download_count == 1
+    audit_event = await db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "download", AuditLog.entity_type == "prescription",
+            AuditLog.entity_id == uuid.UUID(rx_id),
+        )
+    )
+    assert audit_event.details == {}
 
     # File lost from storage: download regenerates instead of 404.
     storage.files.clear()

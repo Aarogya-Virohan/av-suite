@@ -27,7 +27,7 @@ from app.schemas.lead import (
     LeadResponse,
     LeadUpdate,
 )
-from app.services.audit import log_event_safely
+from app.services.audit import changed_fields, log_event_safely, serialize_audit_value
 
 from app.services.lead import LeadNotFoundError, LeadPayloadValidationError, LeadService, LeadValidationError
 
@@ -142,10 +142,17 @@ async def update_lead(
 
     try:
         previous = await service.get_lead(clinic.id, id)
+        lead_fields = (
+            "name", "phone", "email", "source", "stage", "assigned_to",
+            "notes", "lost_reason", "lost_remark",
+        )
+        before = {key: getattr(previous, key) for key in lead_fields}
         old_stage = previous.stage
         lead = await service.update_lead(clinic.id, id, payload)
+        after = {key: getattr(lead, key) for key in before}
         details = {
-            "lost_reason": lead.lost_reason,
+            "lost_reason": serialize_audit_value(lead.lost_reason),
+            "changes": changed_fields(before, after),
         }
 
         if old_stage != lead.stage:

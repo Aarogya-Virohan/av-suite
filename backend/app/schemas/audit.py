@@ -4,7 +4,24 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class AuditExportRequest(BaseModel):
+    """Minimal context recorded when a client-side export completes."""
+
+    entity_type: str = Field(min_length=1, max_length=100)
+    row_count: int = Field(ge=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("entity_type")
+    @classmethod
+    def validate_entity_type(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("entity_type cannot be blank.")
+        return value
 
 
 class AuditLogCreate(BaseModel):

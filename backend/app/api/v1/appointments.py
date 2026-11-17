@@ -35,7 +35,7 @@ from app.services.appointment import (
     AppointmentService,
     AppointmentValidationError,
 )
-from app.services.audit import log_event_safely
+from app.services.audit import changed_fields, log_event_safely
 
 router = APIRouter()
 
@@ -221,8 +221,17 @@ async def update_appointment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You cannot reassign an appointment to another therapist.",
             )
+        before = {
+            key: getattr(appointment, key)
+            for key in payload.model_dump(exclude_unset=True)
+        }
         appointment = await service.update_appointment(clinic.id, id, payload)
-        await log_event_safely(service.appointment_repository.session, clinic.id, user.id, "update", "appointment", id)
+        after = {key: getattr(appointment, key) for key in before}
+        await log_event_safely(
+            service.appointment_repository.session, clinic.id, user.id,
+            "update", "appointment", id,
+            {"changes": changed_fields(before, after)},
+        )
         return AppointmentResponse.model_validate(appointment)
     except AppointmentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

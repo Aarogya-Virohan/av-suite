@@ -17,6 +17,7 @@ import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
 import { formatMoney } from '../../../lib/money';
 import { localToday } from '../../../lib/datetime';
 import { cn } from '../../../lib/cn';
+import { DISCOUNT_REASON_THRESHOLD, needsDiscountReason } from '../discountReason';
 
 interface CreateInvoiceSlideOverProps {
   isOpen: boolean;
@@ -87,6 +88,10 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   const [taxMode, setTaxMode] = React.useState<AdjustMode>('amount');
   const [discountPct, setDiscountPct] = React.useState('');
   const [taxPct, setTaxPct] = React.useState('');
+  // A discount above 20% needs a written reason; the server rejects it
+  // otherwise and keeps the reason in the audit log (PR B).
+  const [discountReason, setDiscountReason] = React.useState('');
+  const [discountReasonError, setDiscountReasonError] = React.useState('');
 
   const freshValues = (): InvoiceFormValues => ({
     patient_id: '',
@@ -120,6 +125,8 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
       setTaxMode('amount');
       setDiscountPct('');
       setTaxPct('');
+      setDiscountReason('');
+      setDiscountReasonError('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, reset]);
@@ -151,6 +158,12 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
     else append(line);
   };
   const totalAmount = paise(Math.max(0, subtotal - discountAmount + taxAmount));
+  const reasonNeeded = needsDiscountReason({
+    mode: discountMode,
+    percent: num(discountPct),
+    amount: discountAmount,
+    subtotal,
+  });
 
   const onSubmit = async (values: InvoiceFormValues) => {
     if (discountAmount > subtotal) {
@@ -167,6 +180,12 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
       setError('due_date', { message: 'Due date cannot be before the issue date' });
       return;
     }
+    const reason = discountReason.trim();
+    if (reasonNeeded && !reason) {
+      setDiscountReasonError(`Add a reason for a discount above ${DISCOUNT_REASON_THRESHOLD}%`);
+      document.getElementById('inv-discount-reason')?.focus();
+      return;
+    }
     try {
       const { discount_amount: _d, tax_amount: _t, ...rest } = values;
       const pct = (raw: string) => (Math.round(num(raw) * 100) / 100).toFixed(2);
@@ -175,6 +194,9 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
         // In percent mode only the percent is sent; the server computes the amount.
         ...(discountMode === 'percent' ? { discount_percent: pct(discountPct) } : { discount_amount: paise(discountAmount) }),
         ...(taxMode === 'percent' ? { tax_percent: pct(taxPct) } : { tax_amount: paise(taxAmount) }),
+        // Sent only when required, so a reason typed for a larger discount
+        // and then left behind after lowering it is not stored.
+        ...(reasonNeeded ? { discount_reason: reason } : {}),
         subtotal,
         total_amount: totalAmount,
         items: values.items.map((i) => ({
@@ -379,6 +401,34 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
             )}
           </div>
           {errors.discount_amount && <p className={errorText}>{errors.discount_amount.message}</p>}
+          {reasonNeeded && (
+            <div>
+              <label htmlFor="inv-discount-reason" className="mb-1 block text-[11px] font-medium text-muted">
+                Reason for discount above {DISCOUNT_REASON_THRESHOLD}% *
+              </label>
+              <textarea
+                id="inv-discount-reason"
+                value={discountReason}
+                onChange={(e) => {
+                  setDiscountReason(e.target.value);
+                  if (discountReasonError) setDiscountReasonError('');
+                }}
+                rows={2}
+                maxLength={500}
+                placeholder="e.g. Staff family, hardship approved by owner"
+                aria-invalid={Boolean(discountReasonError)}
+                aria-describedby="inv-discount-reason-help"
+                className={cn(
+                  smallInput,
+                  'h-auto resize-none py-2',
+                  discountReasonError && 'border-danger focus:border-danger focus:ring-danger/15',
+                )}
+              />
+              <p id="inv-discount-reason-help" className={discountReasonError ? errorText : 'mt-1 text-[11px] text-muted'}>
+                {discountReasonError || 'Saved with the invoice in the audit log.'}
+              </p>
+            </div>
+          )}
           <div className="flex items-center justify-between border-t border-line pt-3 font-bold">
             <span className="text-ink">Total Payable</span>
             <span className="tabular-nums text-grove">{rupees(totalAmount)}</span>

@@ -128,7 +128,7 @@ async def test_other_soft_delete_flows_record_authenticated_user(
         issue_date=datetime.now(timezone.utc),
         subtotal=Decimal("10.00"),
         total_amount=Decimal("10.00"),
-        status=InvoiceStatus.ISSUED,
+        status=InvoiceStatus.DRAFT,
     )
     document = PatientDocument(
         clinic_id=clinic_id,

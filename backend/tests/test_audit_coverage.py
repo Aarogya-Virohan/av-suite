@@ -65,7 +65,7 @@ async def test_audit_helper_persists_safe_event_fields():
         ("billing.py", "delete_invoice", "delete", "invoice"),
         ("billing.py", "record_payment", "create", "payment"),
         ("billing.py", "record_payment_for_invoice", "create", "payment"),
-        ("billing.py", "delete_payment", "delete", "payment"),
+        ("billing.py", "void_payment", "void", "payment"),
         ("users.py", "create_user", "create", "user"),
     ],
 )
