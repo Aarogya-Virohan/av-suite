@@ -1,6 +1,13 @@
 import pytest
+import uuid
 
 from app.core.config import settings
+from app.core.security import create_access_token
+from app.enums.user import UserRole
+from app.models.clinic import Clinic
+from app.models.membership import Membership
+from app.models.user import User
+from app.services.product_entitlements import ensure_crm_entitlement
 
 
 @pytest.mark.asyncio
@@ -67,7 +74,27 @@ async def test_transition_into_lost_requires_reason_and_persists_reason(client, 
 
 
 @pytest.mark.asyncio
-async def test_converting_lost_lead_clears_lost_fields(client, auth_headers):
+async def test_converting_lost_lead_clears_lost_fields(client, db_session):
+    clinic = Clinic(name="Lost lead conversion clinic")
+    user = User(
+        id=uuid.uuid4(),
+        clinic_id=None,
+        email=f"lost-conversion-{uuid.uuid4()}@example.com",
+        password_hash="unused",
+        role=UserRole.ADMIN,
+        first_name="Conversion",
+        last_name="Admin",
+        is_active=True,
+    )
+    db_session.add_all([clinic, user])
+    await db_session.flush()
+    user.clinic_id = clinic.id
+    db_session.add(Membership(user_id=user.id, clinic_id=clinic.id, role=UserRole.ADMIN))
+    await ensure_crm_entitlement(db_session, clinic.id)
+    await db_session.commit()
+    headers = {
+        "Authorization": f"Bearer {create_access_token(subject=user.id, clinic_id=clinic.id, role=UserRole.ADMIN.value)}"
+    }
     created = await client.post(
         f"{settings.API_V1_PREFIX}/leads",
         json={
@@ -76,12 +103,12 @@ async def test_converting_lost_lead_clears_lost_fields(client, auth_headers):
             "stage": "lost",
             "lost_reason": "denied",
         },
-        headers=auth_headers,
+        headers=headers,
     )
     assert created.status_code == 201
     converted = await client.post(
         f"{settings.API_V1_PREFIX}/leads/{created.json()['id']}/convert",
-        headers=auth_headers,
+        headers=headers,
     )
     assert converted.status_code == 200, converted.text
     lead = converted.json().get("data", converted.json()).get("lead", {})
