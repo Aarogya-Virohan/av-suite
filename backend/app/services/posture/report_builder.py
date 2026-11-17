@@ -221,7 +221,7 @@ def build_report_response(
         # Footnote for the AV screening ranges (17 November 2026).
         "screeningNote": SCREENING_NOTE,
         "screeningSources": [
-            {"name": name, "text": text} for name, text in source_lines()
+            {"name": name, "text": text} for name, text in source_lines(views)
         ],
     }
 

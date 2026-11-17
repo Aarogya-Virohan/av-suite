@@ -13,13 +13,16 @@ its own full-width block on the last PDF page. The rings sit on faint bands
 in the severity colours and carry their names along the top, so the chart
 reads on its own without the key. Labels are 13 units: about 9 pt on the
 PDF (drawn 128 mm wide) and 8.5 px on a 340 px phone screen.
+
+17 November 2026 (coordinator review of v4): each axis carries its table
+row's label word for word, wrapped to fit, and the ring names moved off the
+vertical centre line, where the "Normal" pill covered two points, into the
+gap between two axes that is clear of every point and the outline.
 """
 
 import math
 from html import escape
 from typing import Any
-
-from app.services.posture.reference_ranges import chart_label
 
 # Same colours as the PDF badges (pdf_service.SEVERITY_STYLES). The outline
 # is the brand teal since 11 October 2026.
@@ -46,32 +49,90 @@ def _tint(hex_colour: str, amount: float) -> str:
     m = [round(p + (q - p) * amount) for p, q in zip(_PAPER, c)]
     return "#" + "".join(f"{v:02x}" for v in m)
 
-# Axis names, 17 November 2026 (Onkar's review): the same names as the
-# report tables, from the row's own label (reference_ranges.chart_label),
-# so the chart can never call a measure something the table does not.
+# Axis names, 17 November 2026 (coordinator review): the row's own label,
+# the exact text the report table prints, so the chart can never call a
+# measure something the table does not. Long names wrap; the words do not
+# change.
 
 FONT = "Inter, Helvetica, Arial, sans-serif"
 LABEL_SIZE = 15  # 13 until 17 Nov 2026; raised with the smaller PDF chart so axis names stay at 8 pt or more
 RING_LABEL_SIZE = 13  # 10 until 17 Nov 2026, same reason
 
-DEFAULT_WIDTH = 520
+# 540 since 17 Nov 2026 (520 before) so the full table labels fit beside
+# the chart: 15 units on the 102 mm PDF chart is still 8.0 pt.
+DEFAULT_WIDTH = 540
 DEFAULT_HEIGHT = 400
 
 
-WRAP_AT = 14
+# Width of one character, as a share of the font size, used only to decide
+# where a name wraps. Measured on the rendered PDF: Inter runs about 0.50 em
+# a character in these labels.
+CHAR_W = 0.52
+# The ring-name pills keep the width formula they had before.
+PILL_CHAR_W = 0.6
+SIDE_MARGIN = 4
 
 
-def _wrap(name: str) -> list[str]:
-    """Two lines for a long axis name, split at the space nearest the middle."""
-    if len(name) <= WRAP_AT or " " not in name:
-        return [name]
-    spaces = [i for i, c in enumerate(name) if c == " "]
-    cut = min(spaces, key=lambda i: abs(i - len(name) / 2))
-    return [name[:cut], name[cut + 1 :]]
+def _text_w(text: str, size: float) -> float:
+    return len(text) * size * CHAR_W
 
 
-def _short(p: dict[str, Any]) -> str:
-    return chart_label(p.get("label") or "")
+def _wrap(name: str, room: float) -> list[str]:
+    """
+    The label in as few lines as fit `room` units, broken at spaces, and
+    after a hyphen only when one word is wider than the room on its own.
+    The words and their case stay exactly as the table prints them.
+    """
+    words: list[str] = []
+    for word in name.split():
+        if _text_w(word, LABEL_SIZE) <= room or "-" not in word:
+            words.append(word)
+            continue
+        piece = ""
+        for part in word.split("-")[:-1]:
+            if piece and _text_w(piece + part + "-", LABEL_SIZE) > room:
+                words.append(piece)
+                piece = ""
+            piece += part + "-"
+        last = word.split("-")[-1]
+        if piece and _text_w(piece + last, LABEL_SIZE) > room:
+            words.append(piece)
+            piece = ""
+        words.append(piece + last)
+    lines: list[str] = []
+    for word in words:
+        joined = f"{lines[-1]} {word}" if lines and not lines[-1].endswith("-") else (
+            f"{lines[-1]}{word}" if lines else word
+        )
+        if lines and _text_w(joined, LABEL_SIZE) <= room:
+            lines[-1] = joined
+        else:
+            lines.append(word)
+    return lines or [name]
+
+
+def _seg_hits_rect(x1, y1, x2, y2, rx0, ry0, rx1, ry1) -> bool:
+    """Whether the segment touches the rectangle (Liang-Barsky clip)."""
+    dx, dy = x2 - x1, y2 - y1
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x1 - rx0), (dx, rx1 - x1), (-dy, y1 - ry0), (dy, ry1 - y1)):
+        if p == 0:
+            if q < 0:
+                return False
+            continue
+        t = q / p
+        if p < 0:
+            t0 = max(t0, t)
+        else:
+            t1 = min(t1, t)
+        if t0 > t1:
+            return False
+    return True
+
+
+def _circle_hits_rect(x, y, r, rx0, ry0, rx1, ry1) -> bool:
+    nx, ny = min(max(x, rx0), rx1), min(max(y, ry0), ry1)
+    return (x - nx) ** 2 + (y - ny) ** 2 < r * r
 
 
 def render_signature_svg(
@@ -104,10 +165,12 @@ def render_signature_svg(
         return "".join(parts)
 
     points: list[tuple[float, float, dict[str, Any]]] = []
+    angles: list[float] = []
     for i, p in enumerate(params):
         # Half a step off vertical, so no axis runs up the chart's vertical
         # centre line, where the ring names are printed.
         a = math.radians(-90 + 360 * (i + 0.5) / n)
+        angles.append(a)
         ex, ey = cx + outer * math.cos(a), cy + outer * math.sin(a)
         parts.append(
             f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{ex:.1f}" y2="{ey:.1f}" '
@@ -117,7 +180,13 @@ def render_signature_svg(
         lx, ly = cx + (outer + gap) * math.cos(a), cy + (outer + gap) * math.sin(a)
         anchor = "middle" if abs(math.cos(a)) < 0.3 else ("start" if math.cos(a) > 0 else "end")
         measured = p.get("tier") is not None
-        name_lines = _wrap(_short(p))
+        if anchor == "start":
+            room = width - lx - SIDE_MARGIN
+        elif anchor == "end":
+            room = lx - SIDE_MARGIN
+        else:
+            room = 2 * min(lx, width - lx) - 2 * SIDE_MARGIN
+        name_lines = _wrap(p.get("label") or "", room)
         lines = len(name_lines) + (0 if measured else 1)
         # Labels below the chart hang down from the ring, labels above sit
         # on it, side labels are centred on the axis.
@@ -128,19 +197,18 @@ def render_signature_svg(
             y0 = ly - (lines - 1) * LABEL_SIZE * 1.05 - 2
         else:
             y0 = ly + LABEL_SIZE * 0.35 - (lines - 1) * LABEL_SIZE * 0.5
-        label = escape(name_lines[0]) + "".join(
-            f'<tspan x="{lx:.1f}" dy="{LABEL_SIZE * 1.05:.1f}">{escape(line)}</tspan>'
-            for line in name_lines[1:]
-        )
-        second = "" if measured else (
-            f'<tspan x="{lx:.1f}" dy="{LABEL_SIZE * 1.05:.1f}" '
-            f'font-size="{LABEL_SIZE - 2}">not measured</tspan>'
-        )
-        parts.append(
-            f'<text x="{lx:.1f}" y="{y0:.1f}" font-size="{LABEL_SIZE}" text-anchor="{anchor}" '
-            f'fill="{"#1f2a44" if measured else GREY}" '
-            f'font-family="{FONT}">{label}{second}</text>'
-        )
+        # One <text> per line: WeasyPrint anchors a shorter first line of a
+        # multi-tspan text="end" label against the widest line, so a three
+        # line name printed ragged (seen 17 Nov 2026).
+        rows = [(line, LABEL_SIZE) for line in name_lines]
+        if not measured:
+            rows.append(("not measured", LABEL_SIZE - 2))
+        for k, (line, size) in enumerate(rows):
+            parts.append(
+                f'<text x="{lx:.1f}" y="{y0 + k * LABEL_SIZE * 1.05:.1f}" font-size="{size}" '
+                f'text-anchor="{anchor}" fill="{"#1f2a44" if measured else GREY}" '
+                f'font-family="{FONT}">{escape(line)}</text>'
+            )
         if measured:
             r = ring(p["tier"])
             points.append((cx + r * math.cos(a), cy + r * math.sin(a), p))
@@ -159,20 +227,81 @@ def render_signature_svg(
             f'fill="{COLOUR[p["severity"]]}" stroke="#ffffff" stroke-width="1.5"/>'
         )
 
-    # Ring names up the vertical centre line, above the outline and points,
-    # each on a small paper coloured pill so a line or the outline never cuts
-    # through the text. (A text halo through paint-order is not supported by
-    # WeasyPrint: it painted the stroke over the letters.)
-    for t, name in enumerate(RING_LABELS):
-        y = cy - ring(t) + RING_LABEL_SIZE + 2
-        w = len(name) * RING_LABEL_SIZE * 0.6 + 8
+    # Ring names, 17 November 2026 (coordinator review of v4). Until then
+    # they ran up the vertical centre line and the "Normal" pill covered
+    # the two points either side of it. Now "Normal" sits on the centre,
+    # where no point can ever be (a point sits on a ring line, the
+    # innermost at ring(0), and the outline stays outside that ring when
+    # every axis is measured), as the key says: normal at the centre.
+    # Mild, Moderate and Severe sit in their own bands along the bisector
+    # of one gap between two axes: the gap where none of them touches a
+    # point or the outline, nearest the top when several are clear. Each
+    # starts mid-band and may move up to ten units along the bisector,
+    # inside its band, to clear the outline. When no one gap clears all
+    # three (an outline that zigzags across the bands), a name that would
+    # touch goes to the nearest gap where it is clear. (With an unmeasured
+    # axis the outline skips it and can pass behind the centre pill; no
+    # point can.) Same pills as before: a small
+    # paper coloured pill so a grid line never cuts through the text. (A
+    # text halo through paint-order is not supported by WeasyPrint: it
+    # painted the stroke over the letters.)
+    clear = 4.0
+    dot_r = 5.5 + 1.5 + clear
+    edges = [
+        (*measured_pts[k], *measured_pts[(k + 1) % len(measured_pts)])
+        for k in range(len(measured_pts))
+    ] if len(measured_pts) >= 2 else []
+
+    def pill(t: int, gap: float, shift: float = 0.0) -> tuple[float, float, float, float]:
+        w = len(RING_LABELS[t]) * RING_LABEL_SIZE * PILL_CHAR_W + 8
         h = RING_LABEL_SIZE + 4
+        r_mid = 0.0 if t == 0 else (ring(t - 1) + ring(t)) / 2 + shift
+        px, py = cx + r_mid * math.cos(gap), cy + r_mid * math.sin(gap)
+        return px - w / 2, py - h / 2, px + w / 2, py + h / 2
+
+    shifts = [0.0, -2.0, 2.0, -4.0, 4.0, -6.0, 6.0, -8.0, 8.0, -10.0, 10.0]
+
+    def hits(t: int, gap: float, shift: float) -> int:
+        x0, y0, x1, y1 = pill(t, gap, shift)
+        box = (x0 - clear, y0 - clear, x1 + clear, y1 + clear)
+        count = sum(_circle_hits_rect(x, y, dot_r, x0, y0, x1, y1) for x, y, _ in points)
+        count += sum(_seg_hits_rect(*e, *box) for e in edges)
+        return count
+
+    def place(t: int, gap: float) -> tuple[int, float]:
+        """(touches, shift) of the clearest spot for ring name t in this gap."""
+        return min((hits(t, gap, d), abs(d), d) for d in shifts)[0::2]
+
+    def cost(gap: float) -> float:
+        total = sum(place(t, gap)[0] for t in range(1, len(RING_LABELS)))
+        # Nearest the top as the tie-break, where the names used to be.
+        return 1000 * total + (1 - math.cos(gap + math.pi / 2))
+
+    gaps = [math.radians(-90 + 360 * i / n) for i in range(n)]
+    best = min(gaps, key=cost)
+
+    def own_spot(t: int) -> tuple[float, float]:
+        if t == 0:
+            return best, 0.0
+        touches, shift = place(t, best)
+        if touches:
+            near = sorted(gaps, key=lambda g: (1 - math.cos(g - best)))
+            for g in near:
+                k, d = place(t, g)
+                if k == 0:
+                    return g, d
+        return best, shift
+
+    for t, name in enumerate(RING_LABELS):
+        x0, y0, x1, y1 = pill(t, *own_spot(t))
+        h = y1 - y0
         parts.append(
-            f'<rect x="{cx - w / 2:.1f}" y="{y - RING_LABEL_SIZE - 0.5:.1f}" width="{w:.1f}" '
+            f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{x1 - x0:.1f}" '
             f'height="{h:.1f}" rx="{h / 2:.1f}" fill="#fffdf7" fill-opacity="0.92"/>'
         )
         parts.append(
-            f'<text x="{cx:.1f}" y="{y:.1f}" font-size="{RING_LABEL_SIZE}" text-anchor="middle" '
+            f'<text x="{(x0 + x1) / 2:.1f}" y="{y1 - 3.5:.1f}" '
+            f'font-size="{RING_LABEL_SIZE}" text-anchor="middle" '
             f'fill="{COLOUR[_RING_KEYS[t]]}" font-weight="600" font-family="{FONT}">'
             f"{name}</text>"
         )

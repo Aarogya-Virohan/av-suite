@@ -523,16 +523,18 @@ def _patient_box(report: dict) -> str:
     """
 
 
-def _sources_section() -> str:
+def _sources_section(views: dict | None) -> str:
     """
     Normal ranges: basis and sources, its own short section on page 3 above
     the sign-off and disclaimer (Onkar's review, 17 November 2026), one line
-    per measure. From reference_ranges.py on the server, never from the
-    posted report.
+    per measure. The basis text comes from reference_ranges.py on the
+    server, never from the posted report; the name in front of it is the
+    row's own label, the same text the table prints (escaped here as it is
+    there), so a measure has one name on every page.
     """
     rows = "".join(
         f'<p class="src"><strong>{_esc(name)}:</strong> {_esc(text)}</p>'
-        for name, text in source_lines()
+        for name, text in source_lines(views)
     )
     return (
         '<div class="sources-section">'
@@ -1144,7 +1146,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
 
 {_synthesis_section(report.get("synthesis") or {})}
 
-{_sources_section()}
+{_sources_section(views)}
 
 <div class="closing">
 <table class="sign-off">

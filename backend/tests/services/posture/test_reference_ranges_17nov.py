@@ -113,7 +113,8 @@ def test_sources_section_sits_above_the_disclaimer_one_line_per_measure():
     closing = html.index('<div class="closing">')
     assert start < closing < html.index(">Disclaimer<")
     section = html[start:closing]
-    assert section.count('<p class="src">') == len(rr.SOURCES)
+    # One line per measure that has a row in this report (three here).
+    assert section.count('<p class="src">') == 3
     assert "font-size: 8pt" in html
 
 
@@ -123,21 +124,106 @@ def test_every_table_uses_the_same_fixed_columns():
     assert "table-layout: fixed" in html
 
 
-def test_chart_names_match_the_table_labels():
+def _full_report():
+    rows = {
+        "side": [
+            ("PT-L01", rr.LABELS["PT-L01"], "none"),
+            ("PT-L05", "Backward Trunk Lean", "none"),
+            ("PT-L06", "Knee Flexion", "none"),
+        ],
+        "front": [
+            ("PT-A01", "Head Lateral Tilt", "none"),
+            ("PT-A04", "Pelvic Obliquity", "none"),
+            ("PT-A06", "Left Knee Alignment (Hip-Knee-Ankle)", "none"),
+            ("PT-A06", "Right Knee Alignment (Hip-Knee-Ankle)", "none"),
+        ],
+        "back": [
+            ("PT-P01", "Trunk Lateral Deviation (Posterior)", "moderate"),
+            ("PT-P02", "Shoulder Level Asymmetry", "mild"),
+        ],
+    }
+    views = {
+        v: {"measurements": [measurement(p, label, 1.0, rr.UNITS[p], sev) for p, label, sev in ms]}
+        for v, ms in rows.items()
+    }
+    return {"patient": {"name": "Sample Patient"}, "views": views}
+
+
+def _svg_text(svg: str) -> str:
+    lines = re.findall(r"<text[^>]*>([^<]*)</text>", svg)
+    return re.sub(r"- ", "-", " ".join(lines))
+
+
+def test_one_name_everywhere_chart_sources_and_table():
+    """
+    Coordinator review of v4 (17 Nov 2026): the radar axis and the sources
+    line carry the table row's own label, same text and case.
+    """
+    from html import unescape
+
     from app.services.posture.signature import build_signature
     from app.services.posture.signature_svg import render_signature_svg
 
-    svg = render_signature_svg(build_signature(_report()["views"]))
-    assert "Head position" in svg
-    assert "Left knee" in rr.chart_label("Left Knee Alignment (Hip-Knee-Ankle)")
-    assert "Forward head" not in svg
-    assert rr.chart_label("Left Knee Alignment (Hip-Knee-Ankle)") == "Left knee alignment"
-    assert rr.chart_label("Trunk Lateral Deviation (Posterior)") == "Trunk lateral deviation"
+    report = _full_report()
+    labels = [m["label"] for v in report["views"].values() for m in v["measurements"]]
+    chart = unescape(_svg_text(render_signature_svg(build_signature(report["views"]))))
+    for label in labels:
+        assert label in chart, label
+    for old in ("Head position", "Knee flexion", "Forward head"):
+        assert old not in chart
+
+    names = [name for name, _ in rr.source_lines(report["views"])]
+    assert names == [
+        rr.LABELS["PT-L01"],
+        "Backward Trunk Lean",
+        "Knee Flexion",
+        "Head Lateral Tilt",
+        "Pelvic Obliquity",
+        "Left Knee Alignment (Hip-Knee-Ankle), Right Knee Alignment (Hip-Knee-Ankle)",
+        "Trunk Lateral Deviation (Posterior)",
+        "Shoulder Level Asymmetry",
+    ]
+    html = build_report_html(report)
+    section = html[html.index('<div class="sources-section">'):html.index('<div class="closing">')]
+    for name in names:
+        assert f"<strong>{name}:</strong>" in section.replace("&#x27;", "'")
+
+
+def test_sources_name_follows_the_sign_of_the_row():
+    report = _full_report()
+    report["views"]["side"]["measurements"][1]["label"] = "Forward Trunk Lean"
+    report["views"]["side"]["measurements"][2]["label"] = "Knee Hyperextension"
+    names = [name for name, _ in rr.source_lines(report["views"])]
+    assert "Forward Trunk Lean" in names and "Knee Hyperextension" in names
+    assert "Trunk Lean" not in names and "Knee Flexion / Hyperextension" not in names
+
+
+def test_ring_names_cover_no_point_and_no_outline():
+    from app.services.posture.signature import build_signature
+    from app.services.posture.signature_svg import _circle_hits_rect, _seg_hits_rect, render_signature_svg
+
+    svg = render_signature_svg(build_signature(_full_report()["views"]))
+    pills = [tuple(map(float, m)) for m in re.findall(
+        r'<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)" height="([\d.]+)"', svg)]
+    dots = [tuple(map(float, m)) for m in re.findall(r'<circle cx="([-\d.]+)" cy="([-\d.]+)" r="5.5"', svg)]
+    outline = [tuple(map(float, p.split(","))) for p in re.search(r'<polygon points="([^"]+)"', svg).group(1).split()]
+    assert len(pills) == 4 and len(dots) == 9
+    for x, y, w, h in pills:
+        box = (x, y, x + w, y + h)
+        assert not any(_circle_hits_rect(a, b, 7, *box) for a, b in dots)
+        assert not any(
+            _seg_hits_rect(*outline[k], *outline[(k + 1) % len(outline)], *box) for k in range(len(outline))
+        )
+    # Not on the vertical centre line above the centre any more, where
+    # "Normal" used to cover the two top points.
+    normal = pills[0]
+    assert abs(normal[1] + normal[3] / 2 - 200) < 1
 
 
 def test_report_response_carries_the_sources_for_the_web():
-    r = build_report_response({}, {"measurements": []}, {"measurements": []}, {"measurements": []}, {})
+    report = _full_report()
+    r = build_report_response({}, report["views"]["side"], report["views"]["front"], report["views"]["back"], {})
     names = [s["name"] for s in r["screeningSources"]]
     assert names[0] == rr.LABELS["PT-L01"]
-    assert "Pelvic Obliquity" in names
+    assert "Backward Trunk Lean" in names
     assert r["screeningNote"] == rr.SCREENING_NOTE

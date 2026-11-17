@@ -22,7 +22,7 @@ saved reports and the synthesis mapping are unchanged.
 
 from __future__ import annotations
 
-import re
+from typing import Any
 
 from app.services.posture.classifier import THRESHOLDS
 
@@ -105,19 +105,6 @@ SOURCES: list[dict[str, str]] = [
     },
 ]
 
-# Footnote names, so a footnote line reads the same as the row it explains.
-SOURCE_NAMES: dict[str, str] = {
-    "PT-L01": LABELS["PT-L01"],
-    "PT-L05": "Trunk Lean",
-    "PT-L06": "Knee Flexion / Hyperextension",
-    "PT-A01": "Head Lateral Tilt",
-    "PT-A04": "Pelvic Obliquity",
-    "PT-A05": "Knee Alignment (Hip-Knee-Ankle)",
-    "PT-P01": "Trunk Lateral Deviation",
-    "PT-P02": "Shoulder Level Asymmetry",
-}
-
-
 def _num(value: float) -> str:
     return f"{value:g}"
 
@@ -149,23 +136,50 @@ def screening_range(param_id: str) -> str:
     return ""
 
 
-def source_lines() -> list[tuple[str, str]]:
-    """(row name, basis) for the sources section, one line per measure."""
+# Row order of the report, so the sources read in the order of the tables.
+VIEW_ORDER = ("side", "front", "back")
+
+
+def row_labels(views: dict[str, Any] | None) -> dict[str, list[str]]:
+    """
+    The label each report row carries, by paramId, in report order. This is
+    the one place a measure's printed name comes from (the label the route
+    put on the row, api/v1/posture.py), so the sources section and the radar
+    chart name a measure exactly as its table row does, including the knee
+    and trunk rows whose names follow the sign (Onkar's review, 17 Nov 2026).
+    """
+    names: dict[str, list[str]] = {}
+    for view_name in VIEW_ORDER:
+        view = (views or {}).get(view_name) or {}
+        for m in view.get("measurements") or []:
+            label = m.get("label")
+            pid = m.get("paramId")
+            if not label or not pid:
+                continue
+            seen = names.setdefault(pid, [])
+            if label not in seen:
+                seen.append(label)
+    return names
+
+
+def source_lines(views: dict[str, Any] | None) -> list[tuple[str, str]]:
+    """
+    (row name, basis) for the sources section, one line per measure, named
+    with the report's own row labels. A measure with no row in this report
+    gets no line: there is nothing in the tables for it to explain.
+    """
+    labels = row_labels(views)
     lines = []
     for entry in SOURCES:
+        names: list[str] = []
+        for pid in entry["params"].split(","):
+            for label in labels.get(pid, []):
+                if label not in names:
+                    names.append(label)
+        if not names:
+            continue
         text = entry["basis"].rstrip(".") + "."
         if entry["note"]:
             text += " " + entry["note"]
-        name = SOURCE_NAMES[entry["params"].split(",")[0]]
-        lines.append((name, text))
+        lines.append((", ".join(names), text))
     return lines
-
-
-def chart_label(row_label: str) -> str:
-    """
-    The radar chart name for a report row: the table's own label in sentence
-    case, without the bracketed detail, so the chart and the tables name a
-    measure the same way ("Head position", not "Forward head").
-    """
-    base = re.sub(r"\s*\(.*\)\s*$", "", row_label or "").strip()
-    return base[:1].upper() + base[1:].lower() if base else ""
