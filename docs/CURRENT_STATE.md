@@ -1,7 +1,18 @@
 # Posture Tool, current state
 
-Written 2 October 2026, updated 3, 10, 11, 12, 13 and 15 October, by
-reading and running, not from memory.
+Written 2 October 2026, updated 3, 10, 11, 12, 13 and 15 October and
+17 November, by reading and running, not from memory.
+
+17 November in one paragraph: the posture tool is in production behind
+the AV Suite login (PR #67, release/posture-nov, checked live on 17 Nov
+at 01:44 IST). The report now uses the shared clinic letterhead with the
+signed-in clinic and an IST date (D-039), and every row carries a Normal
+range read from the grading bands, with a basis and sources section on
+page 3 (D-040). The branding round (PR #68, feat/posture-branding) is
+merged into dev; its production live check is still owed. D-039 and
+D-040 live in docs/crm/Decisions.md, not in docs/decisions.md. Sections
+4i to 4m below say what changed after 15 October; section 5 is the open
+list as of 17 November.
 
 This file replaces posture_tool_FULL_STORY_17Sep2026.md and
 posture_tool_handoff_01Oct2026.md as the thing to read first. Both are
@@ -11,6 +22,11 @@ something else contradicts this file, this one is newer.
 ---
 
 ## 0. There are two clones of this repo on the laptop. Read this first.
+
+(Written 2 October. Not re-checked on 17 November; the Desktop clone may
+be gone. Since November, rounds are also worked in worktrees such as
+~/wt-branding, whose upstream can be origin/dev: never plain `git push`
+from one, always `git push origin <branch>`.)
 
     /Users/onkardureja/av-suite            <- the real one. Work here.
     /Users/onkardureja/Desktop/av-suite    <- an old clone, was stuck at 17 Sept.
@@ -36,33 +52,44 @@ starting.
 
 ## 1. Where the code is
 
-Branch dev. Do not trust a commit hash written in this file, including
-in the list below: this file is itself committed, so any hash it names is
-one commit behind the moment it is written. That is how the previous
-version of this section came to name a HEAD three commits stale. Run
-`git log --oneline -5` instead.
+Branch dev. Do not trust a commit hash written in this file: this file is
+itself committed, so any hash it names is one commit behind the moment it
+is written. Run `git log --oneline -5` instead.
 
-dev is pushed and origin is in step as of 13 October (eade86f was the last
-push; checked with git log against origin/dev on 15 October).
+Branch flow since 10 November (docs/decisions.md): every change goes on a
+feature branch, which merges into that round's release branch; dev only
+takes a release branch. Commits are authored and committed by OnkarDureja
+only, with no tool credit in messages or PR descriptions. Work reaches
+Onkar as an mbox, checked by `git am` on a fresh clone of origin/dev with
+an identical tree; nothing goes to dev without him.
 
-work/capture-flow-03Oct is the branch the 3 October work was done on and
-is merged into dev by fast-forward. fix/posture-gsi-and-labels still
-exists at 097595b and is behind dev. Neither needs anything doing.
+Posture work on dev since 15 October, in order (git log for the hashes):
+bigger photos and chart, three pages (19 Oct); tilt correction instead of
+the level lock, then the phone-test fixes (27 Oct); next 16.4.6 for the
+CI audit (10 Nov); login, posture.create and the posture-tool product on
+the API, sign-in in the app (14 Nov); optional gender (14 Nov); release
+posture-nov to production (PR #67, 17 Nov); the branding round (PR #68,
+17 Nov).
 
-Full suite: 146 passed on 13 October after commit 45f2fa8, run on the
-Mac in the real clone (posture tests plus tests/test_clinic_isolation.py). In the Mac's
-Linux VM that one CRM test errors on SQLite; the Mac run is the one to
-trust.
-
-Run `git log --oneline -15` for recent commits. The list that used to
-sit here stopped at 2 October and is removed.
+Tests on 17 November, dev 47bf710, in a Linux VM (Python 3.11,
+SQLite, DATABASE_URL unset): full suite 575 passed, 2 skipped, 24 failed.
+The 24 failures are CRM tests and the same set as dev f02118a
+(appointments_permissions 3, billing_payment_invoice_guards 4,
+bucket_rbac 3, exercise_templates 1, invoice_pdf 4, invoice_percentages
+2, patients_api 2, permissions 1, review_regressions 3,
+treatments_permissions 1). Not investigated; they are not posture tests.
+Posture tests (tests/services/posture, tests/test_posture_auth.py,
+tests/test_posture_pdf_clinic.py): 200 passed.
 
 ---
 
 ## 2. The three documents that matter
 
 - docs/decisions.md, decisions actually taken, with the reason.
-  Dated sections from 18 September to 13 October. The "Not decided,
+  Dated sections from 18 September to 14 November. From 17 November the
+  posture decisions that touch shared report code are numbered entries
+  in docs/crm/Decisions.md (D-039, D-040), because the letterhead and
+  brand modules are shared with the prescription and invoice PDFs. The "Not decided,
   still blocked" list sits between 10 and 11 October and every item on
   it is now settled; each says where.
 - docs/open_questions_research.md, new on 2 October. Four entries:
@@ -100,6 +127,16 @@ Every graded parameter on the report now has founder-approved bands.
   direction word), relayed by Onkar as a screenshot. Built, section 4f.
   The other questions of the 12 October batch were not answered as of
   15 October (section 5).
+
+- 27 October: the 1.5 degree level lock (10 October guideline) and the
+  tripod requirement (11 October answer 4a) are replaced by tilt
+  correction on the capture screen, on founders' feedback and Onkar's
+  own tests (section 4j).
+- 12 and 17 November: Shivank sir's rule for every patient-facing
+  document, "the clinic is the hero, Aarogya Virohan is the backend
+  partner" (D-034, D-036); the posture report follows it since D-039.
+  Founders asked for a range next to every value, like a blood report;
+  built as the Normal range column (D-040).
 
 Open from the third reply:
 - Lawyer's view on consent and how long to keep data (their answer 6a).
@@ -301,76 +338,152 @@ AAROGYA VIROHAN . AV SUITE". Email fixed to aarogyavirohan@gmail.com.
 - Tested by Onkar in the laptop browser on 13 October (reports for himself
   and Ayush Gupta, both two pages, layout correct).
 
-## 5. Not started
+## 4i. Done on 19 October, bigger photographs and chart
 
-- Back-view millimetre calibration without the nose. Measured 11 October:
-  the guessed nose makes back-view millimetres read about 3 percent small,
-  at worst 5.7. Deferred on purpose, since point placement errors are
-  around thirty times larger (known_limitations.md).
-- Founder batch, 13 questions drafted 12 October: Q1 allow uploads at all
-  (recommend camera only), Q2 keep the "likely hypertonic / inhibited"
-  columns (recommend remove), Q3 patient name in saved files (recommend case
-  reference only), Q4 decimals, Q5 minus sign beside a direction label, Q6
-  footer tagline ("exercise prescription" on a report that prescribes
-  none), Q7 registered company name, Q8 the upload note (ours, moot if Q1 is
-  camera only), Q9 report colours, Q10 lawyer on consent and retention, Q11
-  inter-rater test (needs two physios), Q12 where the tool runs, Q13 clinic
-  logo after the marketplace. Answered 13 October: Q4 b and Q5 b, built
-  (section 4f). Q6 settled by Onkar on 13 October (tagline removed). Q9:
-  Onkar chose brand direction B and it is built; founders' sign-off still
-  owed. The rest had no answer as of 15 October. Earlier
-  drafts of this file called the muscle columns Q3 and the patient name Q4;
-  that numbering is retired.
-- Clinic letterhead data: report["branding"] is built and tested but
-  nothing sends it. It should come from the marketplace (AV Suite core)
-  once clinics join. Ask clinics for a square logo (PNG/SVG, transparent,
-  512 px or more, up to 2 MB), a wide one optional, clinic name as text.
-- AV fallback values are Onkar's placeholders: "AV Clinic", +91 88680
-  00760, aarogyavirohan@gmail.com (pdf_service.AV_FALLBACK and
-  frontend lib/branding.ts, change both together).
-- Proposed 13 October, not answered by Onkar: treat "NA", "N/A", "Nil",
-  "None", "-" in optional fields as empty on the report (both of the
-  13 October phone reports printed "Assessing physiotherapist: Na/NA").
-- Form says "Gender", report says "Age / Sex". Not aligned; Onkar's call.
-- Logo teal with white button text is about 4.1:1, under AA 4.5:1 for
-  normal text. Kept on Onkar's word; #3B6A70 would pass.
-- Not screenshotted by Claude: the landmark review and camera screens
-  (colour changes only); Onkar's own screenshots on 13 October looked right.
-- Phone checks owed by Onkar: tilt in landscape (side tilt near 90), and a
-  real capture on a tripod.
+Founders asked for larger photographs and a larger signature chart. The
+report went from two pages to three: side plane alone on page 1, front
+and back on page 2, signature, synthesis and closing on page 3. Details in
+decisions.md, 19 October. The sizes changed again on 17 November (4m).
+
+## 4j. Done on 27 October, tilt correction
+
+The capture button no longer waits for 1.5 degrees of level. It needs the
+phone steady and within 10 degrees of upright; the side tilt at capture is
+sent with the photo and the backend turns the reviewed points back by it
+before measuring (services/posture/level.py). Optional one-time
+calibration per phone and browser. The report says "levelled by x
+degrees" or "tilt not measured". ANALYSIS_VERSION is 2026-10-27.1 and is
+still that on 17 November. Phone-test fixes the same day: steadiness
+threshold, camera screen closing, calibration guard, case reference
+optional, "NA", "N/A", "Nil", "None", "-" treated as empty
+(`_PLACEHOLDERS` in api/v1/posture.py), red "points to check". Still
+owed from that day: the door-frame sign check on a real Android phone and
+on an iPhone (decisions.md, 27 October, "Not yet verified").
+
+## 4k. Done on 10 and 14 November, security and login (U1)
+
+- posture-tool on next 16.4.6 for the CI security audit (10 Nov).
+- The posture API moved from /posture (no authentication) to
+  /api/v1/posture. Every call needs a valid token, the posture-tool
+  product enabled for the workspace and posture.create. Role templates
+  are unchanged, so therapists and front desk need "Run Posture
+  Analysis" granted (founders' question, see section 5).
+- posture-tool signs in with the AV Suite account, with the clinic picker
+  for accounts in more than one clinic. A session that ends mid-assessment
+  asks for the password and resends, so photos and checked points are
+  kept. /analyze serves the same page (the CRM links there).
+- Gender is optional on the report route, like case_ref.
+
+## 4l. Done on 17 November, production (PR #67)
+
+release/posture-nov merged into dev and deployed. Live check on
+17 November at 01:44 IST passed: sign-in, clinic header, a three-view
+run, the three-page PDF. That check is what found the problems D-039
+fixes (placeholder clinic name, patient name in the footer, UTC date).
+posture-tool has a vercel.json; backend settings such as
+JWT_EXPIRE_MINUTES are on Railway.
+
+## 4m. Done on 16 and 17 November, branding round (PR #68)
+
+feat/posture-branding, five commits, merged into dev. Production live
+check still owed. Details in docs/crm/Decisions.md, D-039 and D-040,
+with two review notes under D-040.
+
+- Shared letterhead (D-039): the PDF uses report_letterhead.py unchanged.
+  The clinic is the signed-in clinic, read from the clinics row on every
+  export (app/services/posture/clinic_letterhead.py); report["branding"]
+  sent by the client is ignored. The web report gets the same clinic as
+  text. Footer "Report PT-... . Page x of y", no patient name. Assessed-on
+  date and report ID date are IST. The "AV Clinic" placeholder is gone;
+  frontend lib/branding.ts keeps AV_FALLBACK only for the AV phone and
+  email when there is no clinic. The app bar shows the logo on every step.
+- Normal range (D-040): every row shows value, Normal range and grade.
+  The range is the band the grade already treats as Normal, read from
+  classifier.THRESHOLDS by app/services/posture/reference_ranges.py, so it
+  cannot drift from the grading. No band changed. Format: >= 50 deg,
+  +- 4 deg, <= 5 deg, <= 10 mm (real symbols on the report; the embedded
+  Inter subset lacks them, so they are set in Liberation Sans / Arial).
+- PT-L01 is shown as "Head Position (ear-shoulder angle)": calc_cva
+  measures ear to shoulder point, not the C7 to tragus CVA. PT-L01 and
+  calc_cva keep their names.
+- "Normal ranges: basis and sources" on page 3, above the sign-off, one
+  line per measure at 8 pt: the published basis where the classifier
+  comments name one, otherwise "AV clinical team, Oct 2026". Pelvic
+  obliquity also carries Moharrami et al. 2023 (0 to 5.6 deg,
+  radiographs, not directly comparable).
+- One name per measure (coordinator review of v4): the radar axes and the
+  sources lines print the row's own label, same text and case as the
+  table, including the knee and trunk names that follow the sign.
+  reference_ranges.row_labels() reads them off the report rows; there is
+  no second list of names. The region list names regions only.
+- Layout: one fixed column grid on all three plane tables; radar chart
+  102 mm wide (was 128), SVG 540 x 400, axis names 8.0 pt and ring names
+  7.2 pt on paper. Ring names: Normal on the centre, Mild, Moderate and
+  Severe in their own bands in the gap between two axes that keeps them
+  off every point and the outline. Still three pages; page 3 has little
+  room left.
+
+## 5. Open on 17 November
+
+Checked against dev 47bf710 on 17 November unless it says otherwise.
+
+Release
+- Production live check of PR #68 (branding round). Owed.
+
+Founders (Shivank sir; one message going out, no action here until he
+answers)
+- Head Position band. Normal is 50 degrees or more, taken from CVA
+  literature, but our ear-shoulder angle read 68 to 78 degrees on five
+  subjects (po-1 78.2, po-2 73.2, po-3 68.0, po-4 68.0, po-5 74.4), so
+  every patient grades Normal and the row screens nothing.
+- Therapist access: whether therapists get posture.create and posture.view
+  (own or all) by default. A grant script is ready and has not been run.
+- Shoulder Level Asymmetry band (0 to 5 mm) has no recorded basis.
+- From the 12 October batch, no answer recorded after 15 October: Q2
+  "likely hypertonic / inhibited" columns (still on the report), Q3
+  patient name in saved files, Q7 registered company name, Q9 colours
+  sign-off, Q10 lawyer on consent and retention, Q11 inter-rater test.
+  Settled since: Q6 (tagline removed), Q12 (it runs in production), Q13
+  (clinic logo via the signed-in clinic, D-039). Q1 and Q8: see uploads.
+
+Engineering, planned and not built
+- Uploads: camera only for clinics, upload behind a new capability
+  "posture test upload", default off, granted to Onkar's AV test
+  account. Named in D-039 as the next part of the round. Nothing for it
+  is on dev yet. Until then the upload path still has no check of any
+  kind.
+- Security advisories (pip-audit, 12 November), still on dev: Pillow
+  10.4.0 (fix 13.0.0), pillow-heif 0.18.0 (fix 1.3.0), protobuf 4.25.9
+  (fix 5.29.6 or 6.33.5).
+- JWT_EXPIRE_MINUTES on Railway: value to come from Onkar.
+- MediaPipe: detector.py is at model_complexity=1. Complexity 2 places
+  points better but marks more of them not visible; not re-checked with
+  the review step (open_questions_research.md). No mediapipe upgrade
+  without an old vs new landmark comparison and Onkar's OK.
+- Back-view millimetre calibration without the nose. Deferred on purpose
+  (known_limitations.md).
+- Page 3 is nearly full; a longer synthesis or more measures could push
+  the closing block to a fourth page.
+
+Small, Onkar's call (unchanged since 13 October)
+- Intake says "Gender", the report says "Age / Sex".
+- Logo teal #4E888F buttons with white text are about 4.1:1, under AA
+  4.5:1; #3B6A70 (already the hover colour) would pass.
+
+People, not code
 - Lawyer's view on consent and data retention (founders' answer 6a).
 - Inter-rater test: two physios placing points on the same photographs.
-  Needs people, not code.
-- Clean-up owed by Onkar: backend/data/reports (79 files on 15 October,
-  older ones still hold photos, test leftovers like x.json) and
-  Downloads/Posture-test/_render (Claude's renders, plus
-  posture-tool-src.tgz from 13 October). .env.local is back at
-  http://localhost:8000 since 13 October.
-- Deployment. The tool runs from the laptop over quick tunnels; no plan
-  for hosting it or joining it to AV Suite has been written down.
-- One "Should be reviewed against real photographs" note is still live, in
-  calc_elbow_carrying_angle around line 568. It is moot, since PT-A08 was
-  withdrawn on 2 October. Left in place deliberately. The facing-direction
-  note at line 373 was closed on 3 October.
-- The upload path has no check of any kind. A clinician can choose any
-  file, including a screenshot or a photo of a screen, and it is measured
-  as if it were a guided capture. The report names the source on every
-  view. On 11 October we concluded that checks cannot catch what matters
-  (tilt, distance, camera height), so the real question is whether uploads
-  are allowed at all: founder Q1, above.
-- detector.py runs MediaPipe at model_complexity=1. Measured on
-  2 October: complexity 2 costs 0.11 seconds more per assessment and
-  places landmarks better, but it also reports honest visibility on
-  occluded points, so 33 landmarks across the seven subjects stop
-  passing the 0.65 guard and whole posterior lower bodies go to not
-  measured. The model choice is clear; the consequence was held for
-  question 1 of the 2 October founder document (severity tiers; not Q1
-  of the 11 October batch, which is about uploads). That question was
-  answered on 10 October (tiers kept), so the stated reason for holding
-  is gone. Not yet re-checked: how complexity 2 behaves now that the
-  landmark review step lets the clinician place or mark points. Written
-  up in open_questions_research.md; needs a fresh look before the
-  founders are asked anything.
+- Tilt correction on real phones: door-frame sign check on Android and on
+  an iPhone (4j).
+
+Housekeeping (Onkar, laptop; not re-checked on 17 November)
+- backend/data/reports: older files still hold photographs.
+- Downloads/Posture-test/_render: old renders.
+
+Closed since 15 October, for the record: "NA" placeholders (27 Oct),
+the clinic letterhead data (D-039), the "AV Clinic" placeholder (D-039),
+the moot elbow note in calc_elbow_carrying_angle (no longer in the code),
+the dead .env.local tunnel note (production now).
 
 ---
 
@@ -417,8 +530,10 @@ mixup.
   resize moved a knee deviation from 0.356 to 1.358 degrees and flipped
   its direction from neutral to varus. Use PNG for any repeatability
   test.
-- Every real decision goes into docs/decisions.md.
-- CRM is out of scope. Do not touch.
+- Every real decision goes into docs/decisions.md, or into
+  docs/crm/Decisions.md when it changes shared report code (D-039, D-040).
+- CRM is out of scope. Do not touch. The posture report uses the shared
+  report_letterhead.py and brand.py unchanged (D-039).
 
 ---
 
