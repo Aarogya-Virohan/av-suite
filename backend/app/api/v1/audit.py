@@ -9,12 +9,14 @@ from app.core.dependencies import require_capability
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_async_session, get_current_clinic
+from app.core.dependencies import get_async_session, get_current_clinic, require_admin
 from app.models.clinic import Clinic
 from app.repositories.audit import AuditLogRepository
-from app.schemas.audit import AuditLogResponse
+from app.schemas.audit import AuditExportRequest, AuditLogResponse
 from app.services.audit import AuditLogService
 from app.schemas.envelope import ResponseEnvelope
+from app.services.audit import log_event_safely
+from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(require_capability("audit.view"))])
 
@@ -29,6 +31,7 @@ async def get_audit_log_service(
 
 AuditLogServiceDep = Annotated[AuditLogService, Depends(get_audit_log_service)]
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
+AdminUserDep = Annotated[User, Depends(require_admin)]
 
 
 @router.get("/audit-logs", response_model=ResponseEnvelope[list[AuditLogResponse]])
@@ -113,3 +116,23 @@ async def get_audit(
         )
 
     return ResponseEnvelope(data=AuditLogResponse.model_validate(log))
+
+
+@router.post("/audit/export", response_model=ResponseEnvelope[dict[str, bool]])
+async def log_audit_export(
+    payload: AuditExportRequest,
+    clinic: CurrentClinicDep,
+    user: AdminUserDep,
+    service: AuditLogServiceDep,
+) -> ResponseEnvelope[dict[str, bool]]:
+    """Record metadata for a completed client-side export."""
+
+    await log_event_safely(
+        service.audit_repository.session,
+        clinic.id,
+        user.id,
+        "export",
+        payload.entity_type,
+        details={"entity_type": payload.entity_type, "row_count": payload.row_count},
+    )
+    return ResponseEnvelope(data={"logged": True})

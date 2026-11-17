@@ -5,9 +5,9 @@ from decimal import Decimal
 from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.enums.billing import InvoiceStatus, PaymentMethod
+from app.enums.billing import InvoiceStatus, PaymentMethod, PaymentStatus
 from app.enums.package import PackageStatus
 
 
@@ -154,6 +154,7 @@ class InvoiceBase(BaseModel):
     discount_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"), max_digits=5, decimal_places=2)
     tax_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"), max_digits=5, decimal_places=2)
     notes: str | None = None
+    discount_reason: str | None = None
 
 
 class InvoiceCreate(InvoiceBase):
@@ -177,6 +178,14 @@ class InvoiceUpdate(BaseModel):
     tax_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"), max_digits=5, decimal_places=2)
     status: InvoiceStatus | None = None
     notes: str | None = None
+    cancel_reason: str | None = None
+    discount_reason: str | None = None
+
+    @model_validator(mode="after")
+    def validate_cancel_reason(self):
+        if self.status == InvoiceStatus.CANCELLED and not (self.cancel_reason or "").strip():
+            raise ValueError("cancel_reason is required when cancelling an invoice.")
+        return self
 
 
 class InvoiceResponse(InvoiceBase):
@@ -191,6 +200,7 @@ class InvoiceResponse(InvoiceBase):
     total_amount: Decimal
     paid_amount: Decimal
     status: InvoiceStatus
+    cancel_reason: str | None = None
     line_items: list[dict[str, Any]] = Field(default_factory=list)
     items: list[InvoiceItemResponse] = Field(default_factory=list)
     created_at: datetime
@@ -236,6 +246,21 @@ class PaymentResponse(PaymentBase):
     clinic_id: UUID
     created_at: datetime
     updated_at: datetime
+    status: PaymentStatus
+    void_reason: str | None = None
+    voided_by: UUID | None = None
+
+
+class PaymentVoidRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 5:
+            raise ValueError("reason must contain at least 5 non-whitespace characters.")
+        return value
 
 
 class PaymentListResponse(BaseModel):

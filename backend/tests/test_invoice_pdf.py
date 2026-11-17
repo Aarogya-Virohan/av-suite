@@ -3,11 +3,14 @@
 import io
 import re
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from pypdf import PdfReader
+from sqlalchemy import select, func
 
 from app.core.config import settings
+from app.models.audit import AuditLog
 from app.services.invoice_pdf import (
     InvoiceDoc,
     build_invoice_html,
@@ -75,13 +78,27 @@ async def _setup(client, auth_headers):
 
 
 @pytest.mark.asyncio
-async def test_invoice_pdf_is_real_and_has_the_printed_content(client, auth_headers):
+async def test_invoice_pdf_is_real_and_has_the_printed_content(client, auth_headers, db_session):
     _, inv = await _setup(client, auth_headers)
     res = await client.get(f"{API}/invoices/{inv['id']}/pdf/download", headers=auth_headers)
     assert res.status_code == 200, res.text
     assert res.headers["content-type"] == "application/pdf"
     assert f'filename="Invoice-{inv["invoice_number"]}.pdf"' in res.headers["content-disposition"]
     assert res.content.startswith(b"%PDF-")
+    download_events = await db_session.scalar(
+        select(func.count()).select_from(AuditLog).where(
+            AuditLog.action == "download", AuditLog.entity_type == "invoice",
+            AuditLog.entity_id == UUID(inv["id"]),
+        )
+    )
+    assert download_events == 1
+    audit_event = await db_session.scalar(
+        select(AuditLog).where(
+            AuditLog.action == "download", AuditLog.entity_type == "invoice",
+            AuditLog.entity_id == UUID(inv["id"]),
+        )
+    )
+    assert audit_event.details == {"kind": "invoice"}
     text = _text(res.content)
     for expected in (
         "Kavya Nair",

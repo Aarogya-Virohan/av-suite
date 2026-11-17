@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
 from typing import Any
 from uuid import UUID
 
@@ -10,6 +12,58 @@ from app.repositories.audit import AuditLogRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+_SENSITIVE_AUDIT_FIELDS = {
+    "password", "password_hash", "token", "access_token", "refresh_token",
+    "secret", "secret_key", "client_secret", "credential", "credentials",
+    "api_key", "private_key",
+}
+
+
+def serialize_audit_value(value: Any) -> Any:
+    """Convert model values into stable, JSON-safe audit values."""
+
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, (Decimal, UUID)):
+        return str(value)
+    if isinstance(value, dict):
+        return {
+            str(key): serialize_audit_value(item)
+            for key, item in value.items()
+            if not any(secret in str(key).lower() for secret in _SENSITIVE_AUDIT_FIELDS)
+        }
+    if isinstance(value, (list, tuple)):
+        return [serialize_audit_value(item) for item in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if hasattr(value, "model_dump"):
+        return serialize_audit_value(value.model_dump())
+    return str(value)
+
+
+def changed_fields(before: dict[str, Any], after: dict[str, Any]) -> dict[str, list[Any]]:
+    """Build safe [old, new] pairs for fields that actually changed."""
+
+    changes: dict[str, list[Any]] = {}
+    for field, old_value in before.items():
+        lowered = field.lower()
+        if any(secret in lowered for secret in _SENSITIVE_AUDIT_FIELDS):
+            continue
+        if field not in after:
+            continue
+        try:
+            if old_value == after[field]:
+                continue
+        except (TypeError, ValueError):
+            pass
+        old_serialized = serialize_audit_value(old_value)
+        new_serialized = serialize_audit_value(after[field])
+        if old_serialized != new_serialized:
+            changes[field] = [old_serialized, new_serialized]
+    return changes
 
 
 async def log_event_safely(session: AsyncSession, clinic_id: UUID, user_id: UUID | None,

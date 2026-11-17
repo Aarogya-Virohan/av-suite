@@ -18,6 +18,7 @@ from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
 from app.services import prescription_service
+from app.services.audit import log_event_safely
 from fastapi.responses import Response
 
 logger = logging.getLogger(__name__)
@@ -300,6 +301,9 @@ async def download_pdf(
         )
     except ValueError:
         raise HTTPException(status_code=404, detail="PDF file not found on server")
+    await log_event_safely(
+        db, uuid.UUID(str(clinic_id)), user.id, "download", "prescription", rx.id
+    )
     filename = prescription_service.prescription_pdf_filename(rx)
     return Response(
         content=pdf_bytes,
