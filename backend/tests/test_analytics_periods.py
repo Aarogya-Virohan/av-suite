@@ -92,11 +92,11 @@ async def _create_context(session: AsyncSession):
     await session.flush()
 
     patients = [
-        Patient(clinic_id=clinic.id, first_name=f"Patient{i}", last_name="Test")
+        Patient(clinic_id=clinic.id, display_number=i + 1, first_name=f"Patient{i}", last_name="Test")
         for i in range(6)
     ]
     outside_patient = Patient(
-        clinic_id=other_clinic.id, first_name="Outside", last_name="Test"
+        clinic_id=other_clinic.id, display_number=1, first_name="Outside", last_name="Test"
     )
     session.add_all([*patients, outside_patient])
     await session.flush()
@@ -959,6 +959,7 @@ async def test_analytics_api_period_contract_and_scoping(
     patients = [
         Patient(
             clinic_id=clinic.id,
+            display_number=i + 1,
             first_name=f"API{i}",
             last_name="Patient",
             created_at=event_date,
@@ -967,6 +968,7 @@ async def test_analytics_api_period_contract_and_scoping(
     ]
     outside_patient = Patient(
         clinic_id=other_clinic.id,
+        display_number=1,
         first_name="Outside",
         last_name="Patient",
         created_at=event_dates[3],

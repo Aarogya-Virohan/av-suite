@@ -93,6 +93,7 @@ async def seeded_patient(db_session: AsyncSession) -> Patient:
         pat = Patient(
             id=uuid4(),
             clinic_id=clinic.id,
+            display_number=uuid4().int % 9_000_000_000 + 1,
             first_name="ApptTest",
             last_name="Patient",
             phone="9000000001",

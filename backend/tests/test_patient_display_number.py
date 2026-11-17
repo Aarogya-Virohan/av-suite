@@ -12,8 +12,20 @@ from sqlalchemy.engine import make_url
 from app.core.config import settings
 from app.models.clinic import Clinic
 from app.models.patient import Patient, PatientCounter
+from app.models.booking import AppointmentRequest
+from app.models.lead import Lead
+from app.models.user import User
+from app.repositories.appointment import AppointmentRepository
+from app.repositories.booking import AppointmentRequestRepository
+from app.repositories.clinic import ClinicRepository
+from app.repositories.lead import LeadRepository
+from app.repositories.patient import PatientRepository
+from app.repositories.user import UserRepository
+from app.schemas.booking import AppointmentRequestApprovePayload
 from app.schemas.common import PaginationParams
 from app.schemas.patient import PatientCreate
+from app.services.booking import BookingService
+from app.services.lead import LeadService
 from app.services.patient_service import create_patient, search_patients
 
 
@@ -62,6 +74,56 @@ async def test_display_number_sequences_are_clinic_scoped(db_session):
     second = await create_patient(db_session, str(clinics[0].id), PatientCreate(first_name="A", last_name="Two"))
     other = await create_patient(db_session, str(clinics[1].id), PatientCreate(first_name="B", last_name="One"))
     assert (first.display_number, second.display_number, other.display_number) == (1, 2, 1)
+
+
+@pytest.mark.asyncio
+async def test_lead_conversion_uses_next_clinic_display_number(db_session):
+    clinic = Clinic(name=f"Lead conversion {uuid.uuid4()}")
+    db_session.add(clinic)
+    await db_session.flush()
+    for index in range(3):
+        await create_patient(
+            db_session, str(clinic.id),
+            PatientCreate(first_name="Existing", last_name=str(index)),
+        )
+    lead = Lead(clinic_id=clinic.id, name="Converted", phone=f"{uuid.uuid4().int % 10**10:010d}")
+    db_session.add(lead)
+    await db_session.commit()
+
+    patients = PatientRepository(db_session)
+    service = LeadService(LeadRepository(db_session), patients, UserRepository(db_session))
+    _, created_patient = await service.convert_lead_to_patient(clinic.id, lead.id)
+    assert created_patient.display_number == 4
+
+
+@pytest.mark.asyncio
+async def test_booking_approval_uses_next_clinic_display_number(db_session):
+    clinic = Clinic(name=f"Booking approval {uuid.uuid4()}")
+    db_session.add(clinic)
+    await db_session.flush()
+    therapist = (await db_session.execute(select(User).where(User.role == "therapist").limit(1))).scalar_one()
+    for index in range(2):
+        await create_patient(
+            db_session, str(clinic.id),
+            PatientCreate(first_name="Existing", last_name=str(index)),
+        )
+    request = AppointmentRequest(
+        clinic_id=clinic.id, name="Booking patient",
+        phone=f"{uuid.uuid4().int % 10**10:010d}",
+    )
+    db_session.add(request)
+    await db_session.commit()
+
+    service = BookingService(
+        AppointmentRequestRepository(db_session), AppointmentRepository(db_session),
+        PatientRepository(db_session), ClinicRepository(db_session),
+    )
+    result = await service.approve_request(
+        clinic.id, request.id, AppointmentRequestApprovePayload(therapist_id=therapist.id),
+    )
+    created_patient = await db_session.get(Patient, uuid.UUID(result["patient_id"]))
+    assert created_patient is not None
+    assert created_patient.display_number == 3
 
 
 @pytest.mark.asyncio

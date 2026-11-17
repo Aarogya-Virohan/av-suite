@@ -18,9 +18,8 @@ Features:
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from app.models.patient import Patient, PatientCounter
+from app.models.patient import Patient
+from app.services.patient_number import allocate_patient_display_number
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.common import PaginationParams
 from typing import Optional, List, Tuple
@@ -208,14 +207,7 @@ async def create_patient(
         # Patient object create karte hain
         # model_dump(): Pydantic schema se dict extract karte hain
         clinic_uuid = uuid.UUID(clinic_id)
-        insert_counter = sqlite_insert if db.bind.dialect.name == "sqlite" else pg_insert
-        counter_stmt = insert_counter(PatientCounter).values(
-            clinic_id=clinic_uuid, last_number=1
-        ).on_conflict_do_update(
-            index_elements=[PatientCounter.clinic_id],
-            set_={"last_number": PatientCounter.last_number + 1},
-        ).returning(PatientCounter.last_number)
-        display_number = (await db.execute(counter_stmt)).scalar_one()
+        display_number = await allocate_patient_display_number(db, clinic_uuid)
         patient = Patient(
             clinic_id=clinic_uuid,
             display_number=display_number,
