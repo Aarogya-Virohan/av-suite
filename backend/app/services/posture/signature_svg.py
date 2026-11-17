@@ -51,8 +51,8 @@ def _tint(hex_colour: str, amount: float) -> str:
 # so the chart can never call a measure something the table does not.
 
 FONT = "Inter, Helvetica, Arial, sans-serif"
-LABEL_SIZE = 13
-RING_LABEL_SIZE = 10
+LABEL_SIZE = 15  # 13 until 17 Nov 2026; raised with the smaller PDF chart so axis names stay at 8 pt or more
+RING_LABEL_SIZE = 13  # 10 until 17 Nov 2026, same reason
 
 DEFAULT_WIDTH = 520
 DEFAULT_HEIGHT = 400

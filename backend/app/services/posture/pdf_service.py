@@ -810,10 +810,12 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
         border-collapse: collapse;
         table-layout: fixed;
     }}
-    .measurements col.c-param {{ width: 41mm; }}
-    .measurements col.c-value {{ width: 19mm; }}
-    .measurements col.c-range {{ width: 26mm; }}
-    .measurements col.c-finding {{ width: 34mm; }}
+    /* Finding is sized for the longest pill, "MODERATE DEVIATION" (about
+       37 mm with the cell padding), 17 November 2026. */
+    .measurements col.c-param {{ width: 37mm; }}
+    .measurements col.c-value {{ width: 17mm; }}
+    .measurements col.c-range {{ width: 25mm; }}
+    .measurements col.c-finding {{ width: 41mm; }}
     .measurements th {{
         white-space: nowrap;
     }}
@@ -928,7 +930,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
        long summaries and a full synthesis on three pages. Labels print at
        about 9 pt. */
     .sig-chart svg {{
-        width: 128mm;
+        width: 102mm; /* 128 mm until 17 Nov 2026: about 20% smaller so the report stays three pages */
         height: auto;
     }}
     .sig-regions {{
@@ -1032,7 +1034,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
         page-break-inside: avoid;
     }}
     .sign-off {{
-        margin-top: 16px;
+        margin-top: 8px;
         width: 100%;
         border-collapse: collapse;
         page-break-inside: avoid;
@@ -1046,7 +1048,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
         width: 12%;
     }}
     .sign-off .space {{
-        height: 9mm;
+        height: 7mm;
         border-bottom: 1px solid #b9b1a0;
     }}
     .sign-off .caption {{
@@ -1064,7 +1066,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     }}
 
     .notes {{
-        margin-top: 10px;
+        margin-top: 6px;
         border: 1px solid {RULE};
         background: {PAPER};
         border-radius: 2.5mm;
@@ -1097,7 +1099,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     }}
     /* Normal ranges: basis and sources (17 November 2026). Minimum 8 pt. */
     .sources-section {{
-        margin-top: 4mm;
+        margin-top: 3mm;
     }}
     .sources-section .sources-tag {{
         font-size: 6.4pt;
@@ -1109,9 +1111,9 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     }}
     .sources-section .src {{
         font-size: 8pt;
-        line-height: 1.35;
+        line-height: 1.3;
         color: {INK};
-        margin: 0 0 0.8mm 0;
+        margin: 0 0 0.4mm 0;
     }}
     .sources-section .src.lead {{
         color: {MUTED};
