@@ -143,7 +143,7 @@ async def test_pdf_never_downloads_video_links(
 
     monkeypatch.setattr(prescription_pdf, "embed_images", fake_embed)
     clinic, headers = await _clinic(db_session)
-    patient = Patient(clinic_id=clinic.id, first_name="Priya", last_name="Sharma", phone="9876543210")
+    patient = Patient(clinic_id=clinic.id, display_number=uuid.uuid4().int % 9_000_000_000 + 1, first_name="Priya", last_name="Sharma", phone="9876543210")
     pic = Exercise(clinic_id=clinic.id, title="Pic", body_part="Neck", is_free=True, video_url=BLOGGER)
     vid = Exercise(clinic_id=clinic.id, title="Vid", body_part="Hip", is_free=True, video_url=VIDEO)
     db_session.add_all([patient, pic, vid])

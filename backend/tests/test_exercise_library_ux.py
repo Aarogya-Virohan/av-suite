@@ -159,8 +159,8 @@ async def test_note_suggestions_scope_and_isolation(client: AsyncClient, db_sess
     db_session.add(Membership(user_id=therapist.id, clinic_id=clinic.id, role=UserRole.THERAPIST))
     db_session.add(UserPermission(user_id=therapist.id, clinic_id=clinic.id,
                                   capability_key="prescriptions.view", scope=CapabilityScope.OWN))
-    patient = Patient(clinic_id=clinic.id, first_name="P", last_name="One")
-    other_patient = Patient(clinic_id=other_clinic.id, first_name="P", last_name="Two")
+    patient = Patient(clinic_id=clinic.id, display_number=uuid.uuid4().int % 9_000_000_000 + 1, first_name="P", last_name="One")
+    other_patient = Patient(clinic_id=other_clinic.id, display_number=uuid.uuid4().int % 9_000_000_000 + 1, first_name="P", last_name="Two")
     ex = Exercise(clinic_id=None, title=f"g {uuid.uuid4().hex[:4]}", body_part="Neck", is_free=True)
     db_session.add_all([patient, other_patient, ex])
     await db_session.flush()

@@ -39,6 +39,7 @@ pytestmark = pytest.mark.asyncio
 async def _patient(db: AsyncSession, clinic_id, name: str, *, status="active", deleted=False):
     patient = Patient(
         clinic_id=clinic_id,
+        display_number=uuid.uuid4().int % 9_000_000_000 + 1,
         first_name=name,
         last_name="Regression",
         phone=f"{uuid.uuid4().int % 10**10:010d}",

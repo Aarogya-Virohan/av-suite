@@ -18,7 +18,7 @@ async def _context(db_session):
     clinic = (await db_session.scalars(select(Clinic).where(Clinic.name == "Aarogya Seeded Test Clinic"))).one()
     therapist = (await db_session.scalars(select(User).where(User.email == "therapist@avtest.com"))).one()
     patient = Patient(
-        id=uuid4(), clinic_id=clinic.id, first_name="Date", last_name="Range",
+        id=uuid4(), clinic_id=clinic.id, display_number=uuid4().int % 9_000_000_000 + 1, first_name="Date", last_name="Range",
         phone=f"9{uuid4().int % 10**9:09d}", gender="male",
         date_of_birth=date(1990, 1, 1),
     )

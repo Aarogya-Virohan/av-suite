@@ -173,7 +173,7 @@ async def _setup(db: AsyncSession, role: UserRole = UserRole.ADMIN):
     db.add(Membership(user_id=user.id, clinic_id=clinic.id, role=role))
     db.add(WorkspaceProduct(clinic_id=clinic.id, product_id="exercise-prescription",
                             status=EntitlementStatus.ENABLED))
-    patient = Patient(clinic_id=clinic.id, first_name="Priya", last_name="Sharma", phone="9876543210")
+    patient = Patient(clinic_id=clinic.id, display_number=uuid.uuid4().int % 9_000_000_000 + 1, first_name="Priya", last_name="Sharma", phone="9876543210")
     exercise = Exercise(clinic_id=clinic.id, title="Bridge", body_part="Hip", is_free=True)
     db.add_all([patient, exercise])
     await db.commit()

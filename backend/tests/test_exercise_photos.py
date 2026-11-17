@@ -326,7 +326,7 @@ async def test_pdf_uses_clinic_photos(
     monkeypatch.setattr(prescription_pdf, "_render", lambda h: (seen.append(h), real_render(h))[1])
 
     clinic, _u, headers = await _clinic(db_session)
-    patient = Patient(clinic_id=clinic.id, first_name="Priya", last_name="Sharma", phone="9876543210")
+    patient = Patient(clinic_id=clinic.id, display_number=1, first_name="Priya", last_name="Sharma", phone="9876543210")
     with_photos = Exercise(clinic_id=None, title="Has photos", body_part="Neck", is_free=True,
                            video_url="https://blogger.googleusercontent.com/img/a")
     without = Exercise(clinic_id=None, title="No photos", body_part="Hip", is_free=True,

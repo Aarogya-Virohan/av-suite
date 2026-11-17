@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.enums.patient import PatientStatus
 from app.models.patient import Patient
 from app.repositories.base import BaseRepository
+from app.services.patient_number import allocate_patient_display_number
+from collections.abc import Mapping
 
 
 class PatientRepository(BaseRepository[Patient]):
@@ -17,6 +19,23 @@ class PatientRepository(BaseRepository[Patient]):
         """Create a patient repository bound to the active session."""
 
         super().__init__(session, Patient)
+
+    async def create(self, obj_in: Mapping[str, object]) -> Patient:
+        """Create a patient, allocating a clinic number when none was supplied."""
+
+        data = dict(obj_in)
+        number = data.get("display_number")
+        if number is None:
+            clinic_id = data.get("clinic_id")
+            if clinic_id is None:
+                raise ValueError("clinic_id is required to allocate a patient display number.")
+            data["display_number"] = await allocate_patient_display_number(
+                self.session, UUID(str(clinic_id))
+            )
+        elif isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+            raise ValueError("display_number must be a positive integer.")
+
+        return await super().create(data)
 
     async def get_by_patient_id(self, id: UUID, *, clinic_id: UUID | None = None) -> Patient | None:
         """Return a single patient by primary key ID and clinic scope."""

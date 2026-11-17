@@ -150,6 +150,7 @@ async def test_invoice_numbers_are_backend_generated_and_clinic_unique(
     await db_session.flush()
     other_patient = Patient(
         clinic_id=other_clinic.id,
+        display_number=1,
         first_name="Other",
         last_name="Patient",
         phone="9876500102",

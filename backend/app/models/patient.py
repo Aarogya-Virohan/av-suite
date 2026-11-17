@@ -2,7 +2,7 @@ import uuid
 import enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy import String, Date, ForeignKey, Text, Enum, DateTime
+from sqlalchemy import String, Date, ForeignKey, Text, Enum, DateTime, BigInteger, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 from datetime import date, datetime
 from typing import Optional
@@ -18,9 +18,11 @@ class PatientStatus(str, enum.Enum):
 
 class Patient(Base, TimestampMixin):
     __tablename__ = "patients"
+    __table_args__ = (UniqueConstraint("clinic_id", "display_number", name="uq_patients_clinic_display_number"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     clinic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinics.id", ondelete="CASCADE"))
+    display_number: Mapped[int] = mapped_column(BigInteger, nullable=False)
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -64,3 +66,12 @@ class Patient(Base, TimestampMixin):
     def _full_name_expression(cls):
         from sqlalchemy import func
         return func.concat(cls.first_name, ' ', cls.last_name)
+
+
+class PatientCounter(Base):
+    __tablename__ = "patient_counters"
+
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("clinics.id", ondelete="CASCADE"), primary_key=True
+    )
+    last_number: Mapped[int] = mapped_column(BigInteger, nullable=False)

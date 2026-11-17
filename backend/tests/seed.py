@@ -15,7 +15,7 @@ from app.enums.shared import Gender
 from app.enums.lead import LeadStage, LeadSource
 from app.models.clinic import Clinic, ClinicPlanTier
 from app.models.user import User
-from app.models.patient import Patient
+from app.models.patient import Patient, PatientCounter
 from app.models.treatment import TreatmentSession
 from app.models.exercise import Exercise
 from app.models.lead import Lead
@@ -169,6 +169,7 @@ async def seed():
             patient = Patient(
                 id=uuid.uuid4(),
                 clinic_id=clinic.id,
+                display_number=1,
                 first_name=f"Patient{idx}",
                 last_name="Sample",
                 date_of_birth=date(1992, 5, 15),
@@ -180,6 +181,7 @@ async def seed():
                 status="active",
             )
             session.add(patient)
+            session.add(PatientCounter(clinic_id=clinic.id, last_number=1))
             await session.flush()
 
             # Treatments
