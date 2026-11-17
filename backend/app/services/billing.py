@@ -66,10 +66,15 @@ def _validated_discount_reason(
     reason: str | None,
 ) -> str | None:
     normalized = reason.strip() if reason is not None else None
-    reason_required = (
-        (discount_percent is not None and discount_percent > DISCOUNT_REASON_THRESHOLD)
-        or discount_amount > subtotal * Decimal(DISCOUNT_REASON_THRESHOLD) / Decimal("100")
-    )
+    # A percent discount is judged by its percent: the rupee amount is rounded
+    # to paise and can sit a fraction above 20% of the subtotal (20% of 333.33
+    # is 66.67), which must not ask for a reason at exactly 20%.
+    if discount_percent is not None:
+        reason_required = discount_percent > DISCOUNT_REASON_THRESHOLD
+    else:
+        reason_required = (
+            discount_amount > subtotal * Decimal(DISCOUNT_REASON_THRESHOLD) / Decimal("100")
+        )
     if reason_required and not normalized:
         raise BillingPayloadValidationError(
             "discount_reason is required for discounts greater than 20%."
@@ -486,6 +491,17 @@ class BillingService:
 
         invoice = await self.get_invoice(clinic_id, invoice_id)
         update_data = payload.model_dump(exclude_unset=True)
+        # Keys the caller actually sent. update_data gains derived keys below
+        # (discount_amount from a stored percent), so decisions about what the
+        # caller changed must use this set.
+        sent = set(update_data)
+        if (
+            update_data.get("status") == InvoiceStatus.DRAFT
+            and invoice.status != InvoiceStatus.DRAFT
+        ):
+            # Only drafts can be deleted; moving an issued invoice back to
+            # draft would reopen that path for paid or cancelled invoices.
+            raise BillingConflictError("An issued invoice cannot be moved back to draft.")
         if "cancel_reason" in update_data and update_data["cancel_reason"] is not None:
             update_data["cancel_reason"] = update_data["cancel_reason"].strip() or None
 
@@ -505,16 +521,16 @@ class BillingService:
                 raise BillingPayloadValidationError("tax_amount does not match tax_percent.")
             tax_amount = expected
             update_data["tax_amount"] = expected
-        discount_reason = _validated_discount_reason(
-            invoice.subtotal,
-            discount_amount,
-            discount_percent,
-            update_data.get("discount_reason", invoice.discount_reason),
-        )
-        if "discount_reason" in update_data or any(
-            key in update_data for key in ("discount_amount", "discount_percent")
-        ):
-            update_data["discount_reason"] = discount_reason
+        # The reason rule applies when this request sets or changes the
+        # discount. Invoices issued before the rule existed may carry a large
+        # discount with no reason; editing notes or cancelling them must work.
+        if sent & {"discount_amount", "discount_percent", "discount_reason"}:
+            update_data["discount_reason"] = _validated_discount_reason(
+                invoice.subtotal,
+                discount_amount,
+                discount_percent,
+                update_data.get("discount_reason", invoice.discount_reason),
+            )
         if any(k in update_data for k in ("discount_amount", "tax_amount", "discount_percent", "tax_percent")):
             update_data["total_amount"] = invoice.subtotal - discount_amount + tax_amount
 

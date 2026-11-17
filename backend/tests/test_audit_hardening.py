@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select, func, update
 
 from app.core.config import settings
-from app.enums.billing import PaymentStatus
+from app.enums.billing import InvoiceStatus, PaymentStatus
 from app.models.audit import AuditLog
 from app.models.billing import Invoice, Payment
 from app.models.document import PatientDocument
@@ -300,15 +300,67 @@ async def test_invoice_cancellation_reason_and_draft_only_deletion(client, auth_
     conflict = await client.delete(f"{API}/invoices/{invoice['id']}", headers=auth_headers)
     assert conflict.status_code == 409
 
+    issued = (await _invoice(client, auth_headers, patient_id, items=[
+        {"description": "Care", "quantity": 1, "unit_price": "100.00"}
+    ])).json()
+    paid = await _payment(client, auth_headers, issued, patient_id, "100.00")
+    assert paid.status_code == 201, paid.text
+    # An issued (here paid) invoice must not be turned back into a draft,
+    # or "only drafts can be deleted" could be bypassed in two calls.
+    back_to_draft = await client.patch(
+        f"{API}/invoices/{issued['id']}", json={"status": "draft"}, headers=auth_headers
+    )
+    assert back_to_draft.status_code == 409, back_to_draft.text
+    assert (await client.delete(f"{API}/invoices/{issued['id']}", headers=auth_headers)).status_code == 409
+
     draft = (await _invoice(client, auth_headers, patient_id, items=[
         {"description": "Care", "quantity": 1, "unit_price": "100.00"}
     ])).json()
-    marked_draft = await client.patch(
-        f"{API}/invoices/{draft['id']}", json={"status": "draft"}, headers=auth_headers
+    await db_session.execute(
+        update(Invoice).where(Invoice.id == UUID(draft["id"])).values(status=InvoiceStatus.DRAFT)
     )
-    assert marked_draft.status_code == 200, marked_draft.text
+    await db_session.commit()
     deleted = await client.delete(f"{API}/invoices/{draft['id']}", headers=auth_headers)
     assert deleted.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_invoice_without_reason_from_before_the_rule_can_still_be_edited(
+    client, auth_headers, db_session
+):
+    """Invoices issued before the 20% rule may have a large discount and no reason."""
+    patient_id = await _patient(client, auth_headers)
+    invoice = (await _invoice(
+        client, auth_headers, patient_id, discount_percent="25", discount_reason="Seed reason"
+    )).json()
+    await db_session.execute(
+        update(Invoice).where(Invoice.id == UUID(invoice["id"])).values(discount_reason=None)
+    )
+    await db_session.commit()
+
+    notes = await client.patch(
+        f"{API}/invoices/{invoice['id']}", json={"notes": "Called patient"}, headers=auth_headers
+    )
+    assert notes.status_code == 200, notes.text
+    cancelled = await client.patch(
+        f"{API}/invoices/{invoice['id']}",
+        json={"status": "cancelled", "cancel_reason": "Billed twice"},
+        headers=auth_headers,
+    )
+    assert cancelled.status_code == 200, cancelled.text
+
+    # Changing the discount itself still needs the reason.
+    other = (await _invoice(
+        client, auth_headers, patient_id, discount_percent="25", discount_reason="Seed reason"
+    )).json()
+    await db_session.execute(
+        update(Invoice).where(Invoice.id == UUID(other["id"])).values(discount_reason=None)
+    )
+    await db_session.commit()
+    changed = await client.patch(
+        f"{API}/invoices/{other['id']}", json={"discount_percent": "30"}, headers=auth_headers
+    )
+    assert changed.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -324,6 +376,12 @@ async def test_discount_reason_threshold_amount_and_audit(client, auth_headers, 
     assert above_amount.status_code == 422
     below_amount = await _invoice(client, auth_headers, patient_id, discount_amount="199.99")
     assert below_amount.status_code == 201, below_amount.text
+    # 20% of 333.33 rounds to 66.67 (a fraction above 20%); exactly 20% needs no reason.
+    rounded_percent = await _invoice(
+        client, auth_headers, patient_id, discount_percent="20",
+        items=[{"description": "Care", "quantity": 1, "unit_price": "333.33"}],
+    )
+    assert rounded_percent.status_code == 201, rounded_percent.text
 
     justified = await _invoice(
         client, auth_headers, patient_id, discount_percent="25", discount_reason="Approved hardship"
