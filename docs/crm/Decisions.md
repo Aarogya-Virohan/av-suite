@@ -578,6 +578,43 @@ Each entry follows this structure:
 
 ---
 
+## [D-039] Posture Report on the Shared Letterhead, Signed-in Clinic, IST Date
+
+- **Date**: 2026-11-17
+- **Context**: The posture report kept its own dark letterhead and footer after D-036. In production (17 Nov, 01:44 IST) a report made while signed in to "AV Suite Clinic 2" printed the placeholder clinic "AV Clinic", the footer carried the patient's name, and the assessed-on date and report ID showed 16 Nov because the route took the server's UTC date. Step 3 of the posture tool showed "Aarogya Virohan" as text instead of the logo.
+- **Decision** (coordinator, 17 Nov; Posture branding round, part 1):
+  - The posture PDF uses `report_letterhead.py` unchanged: `letterhead_html`, `letterhead_css`, `letterhead_page_top_mm`, `footer_html`, `footer_css`, `clinic_details`, `resolve_clinic_logo`. Address and contacts only, no Reg. No. or GSTIN (same as the prescription).
+  - The clinic is the signed-in clinic: `/api/v1/posture/report/pdf` reads the clinics row of the request (`perm_ctx.clinic`) on every export; `report["branding"]` sent by the client is ignored. `/api/v1/posture/report` adds the same clinic as plain text in `report["branding"]` for the web report, after the report file is saved (the saved copy carries no logo). New `app/services/posture/clinic_letterhead.py`. The "AV Clinic" placeholder is removed from backend and posture-tool; the patient box always shows "Assessed by".
+  - Footer: "Report PT-... . Page x of y", no patient name (D-036, D-038).
+  - Assessed-on date and the date in the report ID are the IST date (`datetime.now(IST)`), same rule as D-017. The saved file's name keeps its UTC timestamp (not printed).
+  - The shared header and footer assume paragraph margins are zero; the posture page keeps browser margins in its body, so they are zeroed for `.letterhead p` and `.running-footer p` only. No colour or other design change; the posture watermark stays as it was.
+  - posture-tool: the app bar shows the Aarogya Virohan logo on every step (the report letterhead now carries the clinic's logo, so the reason for hiding it on step 3 is gone).
+- **Not in this change**: reference ranges, camera-only capture and the "posture test upload" capability (next parts of the round); web report header design (it keeps its own band, now filled with the signed-in clinic).
+- **Verified**: full pytest (SQLite) on this branch and on dev f02118a, twice: same 24 known failures, no new ones. New `tests/services/posture/test_pdf_letterhead_17nov.py`, `tests/services/posture/test_assessment_date_ist.py` (01:44 IST gives 17 Nov and PT-20261117-), `tests/test_posture_pdf_clinic.py` (HTTP: signed-in clinic printed, posted branding ignored, patient name once). posture-tool tsc, lint, build. PDFs rendered with a long clinic name and logo, with a short name and no logo, and with no clinic; every page looked at, header zoomed.
+- **Affected Files**: `backend/app/api/v1/posture.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/services/posture/clinic_letterhead.py`, `backend/tests/services/posture/test_pdf_letterhead_17nov.py` (replaces `test_pdf_letterhead_13oct.py`), `backend/tests/services/posture/test_assessment_date_ist.py`, `backend/tests/test_posture_pdf_clinic.py`, `frontend/posture-tool/src/app/page.tsx`, `frontend/posture-tool/src/components/report/ReportHeader.tsx`, `frontend/posture-tool/src/lib/branding.ts`, `frontend/posture-tool/src/types/posture.ts`
+
+---
+
+## [D-040] AV Screening Range on Every Posture Row; Head Position Is Not CVA
+
+- **Date**: 2026-11-17
+- **Context**: Founders' main feedback on the posture report: a range next to each value, like a blood report. Research (17 Nov) found published adult norms comparable with our photograph and landmarks for almost none of the measures: CVA norms are C7 to tragus (about 49 degrees), trunk and shoulder norms are back-surface scans of other landmarks, the HKA norms are radiographs. Only pelvic obliquity has a usable published range (Moharrami et al. 2023, radiographs).
+- **Decision** (Onkar, 17 Nov):
+  - Every row shows value, "AV screening range" and the existing grade. The AV screening range is the band the grade already treats as Normal, read at render time from `classifier.THRESHOLDS` (`app/services/posture/reference_ranges.py`), so the printed range cannot drift from the grading. No band changes. No Below / Within / Above.
+  - Sources footnote on the last page, per measure: the published basis named in the classifier comments where there is one, otherwise "AV clinical team, Oct 2026". Pelvic obliquity also carries "Published reference 0 to 5.6 degrees (Moharrami et al. 2023, standing pelvic radiographs); not directly comparable". The PDF reads ranges and sources from the server, never from the posted report.
+  - PT-L01 is shown as "Head Position (ear-shoulder angle)", with the footnote "Ear to shoulder point, not the C7-based craniovertebral angle". `calc_cva` measures MediaPipe ear to shoulder point against the horizontal; it is not the standard CVA. PT-L01 and `calc_cva` keep their names (saved reports, synthesis mapping).
+  - Web report: same range column (a line under the value on phones) and the same footnote, from `measurement.screeningRange` and `report.screeningSources`.
+  - The footnote is set in three columns at 6.1 pt so the report stays three pages; page 3 is now nearly full (see open item).
+- **For the founders (not decided here)**: the head position band (Normal at 50 degrees or more) was taken from CVA literature. On our ear-shoulder angle five test subjects read 68 to 78 degrees, so every patient grades Normal and the row screens nothing. A band for this angle is a clinical decision.
+- **Open**: page 3 has little room left; a longer clinical synthesis or more measures could push the closing block to a fourth page.
+- **Verified**: full pytest (SQLite) on this branch and dev f02118a, same 24 known failures; new `tests/services/posture/test_reference_ranges_17nov.py` (ranges equal THRESHOLDS and follow a band change, grade edges match the printed range, PDF column and footnote, posted ranges ignored, no CVA wording, Moharrami only in the footnote). posture-tool tsc, lint, build. PDFs rendered with po-3 photos (real detection), with and without a clinic: three pages each, every page looked at, footnote zoomed.
+- **Affected Files**: `backend/app/services/posture/reference_ranges.py`, `backend/app/services/posture/report_builder.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/api/v1/posture.py`, `backend/tests/services/posture/test_reference_ranges_17nov.py`, `frontend/posture-tool/src/components/report/ViewSection.tsx`, `frontend/posture-tool/src/components/report/ReportCard.tsx`, `frontend/posture-tool/src/types/posture.ts`
+
+- **Review fixes, 17 Nov (Onkar, same decision)**: column and all mentions renamed "Normal range"; one format from THRESHOLDS ("\u2265 50\u00b0", "\u00b1 4\u00b0", "\u2264 5\u00b0", "\u2264 10 mm"), set like the parameter name; one fixed column grid on all three plane tables (photo cell 57 mm, data cell 120 mm, columns 41 / 19 / 26 / 34 mm) so Parameter, Value, Normal range and Finding start at the same x on every page, headers on one line; radar chart axes use the table labels in sentence case (`reference_ranges.chart_label`, long names on two lines); "Normal ranges: basis and sources" is its own section above the sign-off and disclaimer, one line per measure at 8 pt. The embedded Inter subset has no \u2264 / \u2265 glyphs, so those symbols alone are set in Liberation Sans / Arial. Consequence: the report is now four pages (sign-off and disclaimer move to page 4); founders' three-page layout of 19 Oct no longer holds.
+- **Three pages again, 17 Nov (Onkar's second review)**: radar chart 128 mm to 102 mm (same design); axis names 13 to 15 and ring names 10 to 13 SVG units, so on paper they stay 8.3 pt and 7.2 pt (no text made smaller than before; ring names were 7.0 pt). Spacing tightened between sources, sign-off (signature space 9 to 7 mm) and disclaimer; sources lines stay 8 pt. Finding column 41 mm so "MODERATE DEVIATION" fits inside the row (Parameter 37, Value 17, Normal range 25 mm). The report is three pages; page 3 still has little spare room.
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 

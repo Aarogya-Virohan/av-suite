@@ -5,6 +5,7 @@ from fastapi import Form
 from fastapi import UploadFile
 from fastapi.responses import Response
 
+import asyncio
 import base64
 import re
 import uuid
@@ -12,13 +13,14 @@ import uuid
 import cv2
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from types import SimpleNamespace
 
 from mediapipe.framework.formats import landmark_pb2
 
-from app.core.dependencies import require_capability
+from app.core.dependencies import PermissionContextDep, require_capability
 from app.services.posture.decoder import decode_image_bytes
 from app.services.posture.schemas import Landmark
 from app.services.posture.review import (
@@ -44,6 +46,8 @@ from app.services.posture.exceptions import (
     InsufficientVisibilityError,
 )
 from app.services.posture.pdf_service import generate_posture_pdf
+from app.services.posture.clinic_letterhead import clinic_letterhead, web_branding
+from app.services.posture.reference_ranges import LABELS as REF_LABELS
 from app.services.posture.level import (
     rotate_display_image,
     rotate_landmarks,
@@ -160,6 +164,7 @@ def _rearfoot_label(value: float, side_label: str) -> str:
 # an analysis or renders its report, so each needs posture.create (which also
 # checks the clinic has the posture-tool product enabled).
 router = APIRouter()
+IST = ZoneInfo("Asia/Kolkata")
 _CAN_RUN = [Depends(require_capability("posture.create"))]
 
 
@@ -332,7 +337,7 @@ def _report_from_points(
         side_measurements.append(
             measurement(
                 "PT-L01",
-                "Forward Head (CVA)",
+                REF_LABELS["PT-L01"],
                 cva,
                 "\u00b0",
                 severity,
@@ -342,7 +347,7 @@ def _report_from_points(
 
     except InsufficientVisibilityError:
         side_measurements.append(
-            measurement("PT-L01", "Forward Head (CVA)", None, "\u00b0", "insufficient_data")
+            measurement("PT-L01", REF_LABELS["PT-L01"], None, "\u00b0", "insufficient_data")
         )
 
     # PT-L05 — Forward Trunk Lean
@@ -752,7 +757,11 @@ def _report_from_points(
         "age": age,
         "gender": gender,
         "caseRef": case_ref,
-        "assessmentDate": date.today().isoformat(),
+        # IST, not the server's date (17 November 2026): Railway runs in UTC,
+        # so a report made between 00:00 and 05:30 IST printed the previous
+        # day, and the report ID below carried the same wrong date. Same rule
+        # as D-017.
+        "assessmentDate": datetime.now(IST).date().isoformat(),
         "clinician": clinician_name,
         # Printed in the patient box since 13 October 2026. It was already
         # required at intake (it sets the millimetre scale) but not kept.
@@ -948,6 +957,7 @@ _ASPECT_TOLERANCE = 0.01
 
 @router.post("/report", dependencies=_CAN_RUN)
 async def report_from_review(
+    perm_ctx: PermissionContextDep,
     detection_token: str = Form(...),
     review: str = Form(...),
     front_display: UploadFile = File(...),
@@ -1105,6 +1115,14 @@ async def report_from_review(
             else {"degrees": round(levels[name], 2), "calibrated": bool(calibrated[name])}
         )
 
+    # The signed-in clinic for the web report's letterhead (17 November
+    # 2026). Added after the report file is saved, so the saved copy does not
+    # carry the logo; the PDF route reads the clinic again itself.
+    clinic = await clinic_letterhead(perm_ctx.clinic)
+    branding = web_branding(perm_ctx.clinic, clinic.get("logoSrc", ""))
+    if branding:
+        report["branding"] = branding
+
     return report
 
 
@@ -1119,7 +1137,7 @@ async def report_from_review(
 
 
 @router.post("/report/pdf", dependencies=_CAN_RUN)
-async def export_posture_pdf(report: dict = Body(...)):
+async def export_posture_pdf(perm_ctx: PermissionContextDep, report: dict = Body(...)):
     """
     Render an already-computed posture report to a clinical PDF.
 
@@ -1127,8 +1145,12 @@ async def export_posture_pdf(report: dict = Body(...)):
     analysis is not re-run just to produce a document.
     """
 
+    # The clinic on the letterhead is the signed-in clinic, read from the
+    # clinics row here; report["branding"] from the client is ignored.
+    clinic = await clinic_letterhead(perm_ctx.clinic)
+
     try:
-        pdf_bytes = generate_posture_pdf(report)
+        pdf_bytes = await asyncio.to_thread(generate_posture_pdf, report, clinic)
     except Exception as e:
         raise HTTPException(
             status_code=500,

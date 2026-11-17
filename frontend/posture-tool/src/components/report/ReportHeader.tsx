@@ -1,8 +1,8 @@
-// Letterhead and patient box, 13 October 2026, the same as the PDF
-// (_letterhead and _patient_box in pdf_service.py). With clinic details
-// (report.branding, to come from the marketplace) the band is the clinic's
-// letterhead: logo and name, the head doctor, contact. Without them it is
-// Aarogya Virohan's, with the assessing physiotherapist on the right.
+// Letterhead and patient box, 13 October 2026. With clinic details
+// (report.branding: the signed-in clinic, from the backend since 17 November
+// 2026) the band is the clinic's letterhead: logo and name, address,
+// contact. Without them it is Aarogya Virohan's, with the assessing
+// physiotherapist on the right. The PDF uses the shared report letterhead.
 // Empty fields are left out, never shown as blank labels.
 
 import type { PostureReport } from "@/types/posture"
@@ -94,8 +94,7 @@ export function Letterhead({ patient, branding }: Props) {
   )
 }
 
-export function PatientBox({ patient, reportId, branding }: Props) {
-  const hasClinic = present(branding?.clinicName)
+export function PatientBox({ patient, reportId }: Props) {
   const ageSex = [present(patient.age) ? `${patient.age} Y` : "", patient.gender ?? ""]
     .filter(present)
     .join(" / ")
@@ -110,13 +109,12 @@ export function PatientBox({ patient, reportId, branding }: Props) {
     ["Height", height],
     ["Case ref.", patient.caseRef],
   ]
-  // With a clinic letterhead the head doctor is in the band and the assessing
-  // physiotherapist is here; in the fallback the assessor is in the band, so
-  // this row names the clinic instead. Same as the PDF.
+  // The assessing physiotherapist, always; the clinic is in the letterhead.
+  // Never a placeholder clinic name (17 November 2026). Same as the PDF.
   const right: [string, string][] = [
     ["Report ID", reportId ?? ""],
     ["Assessed on", formatReportDate(patient.assessmentDate)],
-    hasClinic ? ["Assessed by", patient.clinician] : ["Clinic", AV_FALLBACK.clinicName],
+    ["Assessed by", patient.clinician],
   ]
 
   const column = (rows: [string, string][]) => (

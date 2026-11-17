@@ -1,10 +1,7 @@
-// Letterhead fallback, 13 October 2026. Same values as AV_FALLBACK in
-// backend/app/services/posture/pdf_service.py; change both together.
-// Clinic details will come from the marketplace (AV Suite core); until then
-// every report carries these. Onkar's placeholders: "AV Clinic" stands in for
-// a clinic name.
+// Aarogya Virohan's own contact, on the letterhead only when the report has
+// no clinic (13 October 2026). The "AV Clinic" placeholder name was removed
+// on 17 November 2026: the report names the signed-in clinic, or no clinic.
 export const AV_FALLBACK = {
-  clinicName: "AV Clinic",
   phone: "+91 88680 00760",
   email: "aarogyavirohan@gmail.com",
 }
