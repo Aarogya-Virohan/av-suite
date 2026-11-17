@@ -23,7 +23,13 @@ class LeadBase(BaseModel):
 
     @model_validator(mode="after")
     def validate_lost_reason_remark(self):
-        if self.stage == LeadStage.LOST and self.lost_reason == LeadLostReason.OTHER and not self.lost_remark:
+        if self.stage == LeadStage.LOST and self.lost_reason is None:
+            raise ValueError("lost_reason is required when stage is 'lost'")
+        if (
+            self.stage == LeadStage.LOST
+            and self.lost_reason == LeadLostReason.OTHER
+            and not self.lost_remark
+        ):
             raise ValueError("lost_remark is required when lost_reason is 'other'")
         return self
 
@@ -46,6 +52,16 @@ class LeadUpdate(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
     lost_reason: LeadLostReason | None = None
     lost_remark: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_lost_fields_require_transition(self):
+        if (
+            self.stage is not None
+            and self.stage != LeadStage.LOST
+            and (self.lost_reason is not None or self.lost_remark is not None)
+        ):
+            raise ValueError("lost fields can only be updated while stage is 'lost'")
+        return self
 
 
 class LeadResponse(LeadBase):

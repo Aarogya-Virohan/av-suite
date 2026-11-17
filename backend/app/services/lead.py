@@ -101,7 +101,14 @@ class LeadService:
         target_stage = update_data.get("stage", lead.stage)
         target_reason = update_data.get("lost_reason", lead.lost_reason)
         target_remark = update_data.get("lost_remark", lead.lost_remark)
-        if target_stage == LeadStage.LOST and target_reason is not None and target_reason.value == "other" and not target_remark:
+        if target_stage == LeadStage.LOST and target_reason is None:
+            raise LeadPayloadValidationError("lost_reason is required when stage is 'lost'.")
+        if (
+            target_stage == LeadStage.LOST
+            and target_reason is not None
+            and target_reason.value == "other"
+            and not target_remark
+        ):
             raise LeadPayloadValidationError("lost_remark is required when lost_reason is 'other'.")
         if target_stage != LeadStage.LOST:
             update_data.update(lost_reason=None, lost_remark=None)
@@ -140,6 +147,8 @@ class LeadService:
             {
                 "stage": LeadStage.CONVERTED,
                 "converted_patient_id": patient.id,
+                "lost_reason": None,
+                "lost_remark": None,
             },
         )
         await self.lead_repository.session.commit()

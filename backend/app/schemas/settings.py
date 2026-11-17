@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
 
@@ -14,6 +16,7 @@ class ClinicSettingsResponse(BaseModel):
     id: UUID
     name: str = Field(..., description="Clinic organization name.")
     branding_logo_url: str | None = Field(default=None, description="URL of clinic logo image asset.")
+    client_type: Literal["clinic", "hospital", "home_care"] = "clinic"
     branding_color: str | None = Field(default=None, description="Primary branding color hex code (e.g. #008080).")
     plan_tier: ClinicPlanTier = Field(..., description="Read-only subscription plan tier.")
     is_partner_clinic: bool = Field(..., description="Read-only partner clinic designation flag.")
@@ -38,6 +41,7 @@ class ClinicSettingsUpdate(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=255, description="Updated clinic name.")
     branding_logo_url: str | None = Field(default=None, description="Updated branding logo URL.")
+    client_type: Literal["clinic", "hospital", "home_care"] = "clinic"
     branding_color: str | None = Field(default=None, max_length=32, description="Updated branding color hex string.")
     is_documents_enabled: bool | None = Field(default=None, description="Toggle document storage bucket on/off.")
     # Lengths match the database columns (models/clinic.py); longer values
@@ -66,3 +70,42 @@ class ClinicSettingsUpdate(BaseModel):
         if value is not None and len(value) != 15:
             raise ValueError("gstin must contain exactly 15 characters")
         return value
+
+
+FeeCategory = Literal["consultation", "posture", "exercise_rx", "custom"]
+
+
+class ClinicFeeItemCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    category: FeeCategory
+    default_price: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+    price_editable: bool = True
+    sort_order: int = 0
+
+
+class ClinicFeeItemUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    category: FeeCategory | None = None
+    default_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    price_editable: bool | None = None
+    sort_order: int | None = None
+
+    @field_validator("name", "category", "default_price", "price_editable", "sort_order")
+    @classmethod
+    def updates_cannot_be_null(cls, value):
+        if value is None:
+            raise ValueError("fee item fields cannot be null")
+        return value
+
+
+class ClinicFeeItemResponse(BaseModel):
+    id: UUID
+    clinic_id: UUID
+    name: str
+    category: FeeCategory
+    default_price: Decimal
+    price_editable: bool
+    active: bool
+    sort_order: int
+
+    model_config = ConfigDict(from_attributes=True)

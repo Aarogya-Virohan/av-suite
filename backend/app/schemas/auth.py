@@ -49,6 +49,7 @@ class ClinicInfoResponse(BaseModel):
     name: str
     slug: Optional[str] = None
     branding_logo_url: Optional[str] = None
+    client_type: str = "clinic"
     branding_color: Optional[str] = None
 
 class AuthMeResponse(BaseModel):

@@ -25,6 +25,7 @@ from app.models.treatment import TreatmentSession, SoapAssessment
 from app.models.billing import Package, PatientPackage, Invoice, InvoiceItem, Payment
 from app.models.document import PatientDocument
 from app.models.audit import AuditLog
+from app.models.clinic_fee_item import ClinicFeeItem
 
 __all__ = [
     "Base",
@@ -64,4 +65,5 @@ __all__ = [
     "Payment",
     "PatientDocument",
     "AuditLog",
+    "ClinicFeeItem",
 ]
