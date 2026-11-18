@@ -53,9 +53,10 @@ type Draft = {
   assessment: string;
   plan: string;
   finalized: boolean;
+  is_reassessment: boolean;
 };
 
-const emptyDraft = (): Draft => ({
+const emptyDraft = (isReassessment = false): Draft => ({
   diagnosis: '',
   area: null,
   pain_vas: null,
@@ -64,6 +65,7 @@ const emptyDraft = (): Draft => ({
   assessment: '',
   plan: '',
   finalized: false,
+  is_reassessment: isReassessment,
 });
 
 function toDraft(note: SoapAssessment): Draft {
@@ -78,6 +80,7 @@ function toDraft(note: SoapAssessment): Draft {
     assessment: String(f.assessment || ''),
     plan: String(f.plan || ''),
     finalized: !!note.finalized,
+    is_reassessment: !!note.is_reassessment,
   };
 }
 
@@ -90,7 +93,24 @@ function painTone(v: number) {
   return 'border-danger bg-danger text-white';
 }
 
-export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patientId: string; isReassessmentOnly?: boolean }) {
+type NoteFilter = 'all' | 'initial' | 'reassessment';
+
+const FILTERS: { key: NoteFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'initial', label: 'Initial' },
+  { key: 'reassessment', label: 'Re-assessment' },
+];
+
+const typeLabel = (isReassessment: boolean) => (isReassessment ? 'Re-assessment' : 'Initial');
+
+/*
+ * SOAP notes and re-assessments are rows of the same table (soap_assessments,
+ * flag is_reassessment). They used to be two tabs rendering this component
+ * twice with a filter, which looked like duplicated data (founder feedback
+ * C-06). One tab now shows both, with a filter and a type badge per note.
+ */
+export function SoapNotesTab({ patientId }: { patientId: string }) {
+  const [filter, setFilter] = useState<NoteFilter>('all');
   const { data: assessmentsResponse, isLoading } = useAssessments(patientId);
   const createAssessment = useCreateAssessment();
   const updateAssessment = useUpdateAssessment();
@@ -98,9 +118,9 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
   const notes = useMemo(
     () =>
       ((assessmentsResponse?.data || []) as SoapAssessment[])
-        .filter((a) => !!a.is_reassessment === isReassessmentOnly)
+        .filter((a) => filter === 'all' || !!a.is_reassessment === (filter === 'reassessment'))
         .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))),
-    [assessmentsResponse?.data, isReassessmentOnly],
+    [assessmentsResponse?.data, filter],
   );
 
   const [selectedId, setSelectedId] = useState<string | 'new' | null>(null);
@@ -132,7 +152,8 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
 
   const isFinalized = draft.finalized;
   const busy = createAssessment.isPending || updateAssessment.isPending;
-  const title = isReassessmentOnly ? 'Re-assessment' : 'SOAP Assessment';
+  const title = draft.is_reassessment ? 'Re-assessment' : 'Initial SOAP note';
+  const hasAnyNote = ((assessmentsResponse?.data || []) as SoapAssessment[]).length > 0;
 
   const confirmDiscard = () => !dirty || window.confirm('You have unsaved changes in this note. Discard them?');
 
@@ -146,7 +167,8 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
   const startNew = () => {
     if (!confirmDiscard()) return;
     setSelectedId('new');
-    setDraft(emptyDraft());
+    // A patient's first note is the initial assessment; later ones default to re-assessment.
+    setDraft(emptyDraft(hasAnyNote || filter === 'reassessment'));
     setDirty(false);
   };
 
@@ -171,7 +193,7 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
       therapist_id: useAuthStore.getState().userId || undefined,
       specialty: 'physiotherapy',
       diagnosis: draft.diagnosis.trim() || null,
-      is_reassessment: isReassessmentOnly,
+      is_reassessment: draft.is_reassessment,
       finalized: finalize,
       form_data: {
         subjective: draft.subjective,
@@ -213,7 +235,27 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
         {selectedId === 'new' && (
           <div className="rounded-lg border border-grove/30 bg-grove-wash px-3 py-2 text-xs font-semibold text-grove">New note (not saved yet)</div>
         )}
-        {notes.length === 0 && <p className="px-1 py-2 text-xs text-muted">No {title.toLowerCase()} notes yet.</p>}
+        <div role="group" aria-label="Filter notes" className="flex gap-1 rounded-lg bg-canvas p-1">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              aria-pressed={filter === f.key}
+              onClick={() => setFilter(f.key)}
+              className={cn(
+                'flex-1 cursor-pointer rounded-md px-1.5 py-1 text-[11px] font-semibold transition-colors',
+                filter === f.key ? 'bg-card text-ink shadow-sm' : 'text-muted hover:text-ink',
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        {notes.length === 0 && (
+          <p className="px-1 py-2 text-xs text-muted">
+            {filter === 'all' ? 'No notes yet.' : `No ${typeLabel(filter === 'reassessment').toLowerCase()} notes yet.`}
+          </p>
+        )}
         {notes.map((n) => {
           const area = AREAS.find((a) => a.key === (n.form_data as any)?.area)?.label;
           return (
@@ -230,6 +272,14 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
                 <span className="text-xs font-semibold text-ink">{fmt(n.created_at)}</span>
                 {n.finalized ? <Lock className="h-3.5 w-3.5 text-ok" aria-label="Finalized" /> : <span className="text-[10px] font-bold uppercase text-warn">Draft</span>}
               </div>
+              <span
+                className={cn(
+                  'mt-1 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                  n.is_reassessment ? 'bg-info-wash text-info' : 'bg-grove-wash text-grove',
+                )}
+              >
+                {typeLabel(!!n.is_reassessment)}
+              </span>
               <p className="mt-0.5 truncate text-xs text-muted">{n.diagnosis || area || 'No diagnosis'}</p>
             </button>
           );
@@ -273,6 +323,27 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
         </Card>
 
         <Card className="space-y-5 p-5">
+          {!isFinalized && (
+            <div>
+              <FieldLabel>Note type</FieldLabel>
+              <div role="group" aria-label="Note type" className="flex flex-wrap gap-2">
+                {[false, true].map((isRe) => (
+                  <button
+                    key={String(isRe)}
+                    type="button"
+                    aria-pressed={draft.is_reassessment === isRe}
+                    onClick={() => edit('is_reassessment', isRe)}
+                    className={cn(
+                      'cursor-pointer rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+                      draft.is_reassessment === isRe ? 'border-grove bg-grove text-white' : 'border-line bg-card text-ink-2 hover:border-grove',
+                    )}
+                  >
+                    {typeLabel(isRe)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <FieldLabel>Clinical area</FieldLabel>
             <div className="flex flex-wrap items-center gap-2">
@@ -329,9 +400,9 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
           </div>
 
           <div>
-            <FieldLabel htmlFor={`dx-${isReassessmentOnly}`}>Clinical Diagnosis</FieldLabel>
+            <FieldLabel htmlFor={'soap-dx'}>Clinical Diagnosis</FieldLabel>
             <input
-              id={`dx-${isReassessmentOnly}`}
+              id={'soap-dx'}
               type="text"
               disabled={isFinalized}
               value={draft.diagnosis}
@@ -343,11 +414,11 @@ export function SoapNotesTab({ patientId, isReassessmentOnly = false }: { patien
 
           {SOAP_FIELDS.map((f) => (
             <div key={f.key}>
-              <label htmlFor={`${f.key}-${isReassessmentOnly}`} className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-grove">
+              <label htmlFor={`soap-${f.key}`} className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-grove">
                 {f.label}
               </label>
               <textarea
-                id={`${f.key}-${isReassessmentOnly}`}
+                id={`soap-${f.key}`}
                 rows={3}
                 disabled={isFinalized}
                 value={draft[f.key]}

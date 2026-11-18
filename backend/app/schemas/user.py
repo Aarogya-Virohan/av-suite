@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
+from app.core.security import check_password_byte_length
 from app.enums.user import UserRole, normalize_user_role
 
 
@@ -36,6 +37,11 @@ class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
     last_name: str | None = Field(default=None, min_length=1, max_length=100)
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, value: str) -> str:
+        return check_password_byte_length(value)
 
     @model_validator(mode="after")
     def apply_name_compatibility(self) -> Self:

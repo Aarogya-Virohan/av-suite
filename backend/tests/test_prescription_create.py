@@ -45,7 +45,7 @@ async def test_admin_can_create_prescription(client: AsyncClient, db_session: As
     db_session.add(
         WorkspaceProduct(clinic_id=clinic.id, product_id="exercise-prescription", status=EntitlementStatus.ENABLED)
     )
-    patient = Patient(clinic_id=clinic.id, first_name="Rx", last_name="Patient")
+    patient = Patient(clinic_id=clinic.id, display_number=uuid.uuid4().int % 9_000_000_000 + 1, first_name="Rx", last_name="Patient")
     exercise = Exercise(clinic_id=clinic.id, title="Bridge", is_free=True)
     db_session.add_all([patient, exercise])
     await db_session.commit()

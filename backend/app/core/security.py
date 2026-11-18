@@ -18,7 +18,8 @@ Security Considerations:
 
 import bcrypt
 from datetime import datetime, timedelta, timezone
-from jose import jwt, JWTError
+import jwt
+from jwt import PyJWTError
 from typing import Any, Union
 from app.core.config import settings
 import logging
@@ -70,6 +71,22 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         # Lekin exception ko swallow karte hain security ke liye (no info leak)
         logger.error(f"Password verification error: {str(e)}")
         return False
+
+
+# bcrypt only reads the first 72 bytes of a password, and bcrypt 5 raises
+# ValueError for anything longer, which surfaced as a 500 on register and on
+# user create. Passwords are checked against this limit before hashing.
+MAX_PASSWORD_BYTES = 72
+
+
+def check_password_byte_length(password: str) -> str:
+    """Pydantic validator helper: reject passwords bcrypt cannot hash."""
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise ValueError(
+            f"Password is too long. Use at most {MAX_PASSWORD_BYTES} bytes "
+            "(72 English characters; fewer if it has other scripts or emoji)."
+        )
+    return password
 
 
 def get_password_hash(password: str) -> str:
@@ -219,7 +236,7 @@ def decode_token(token: str) -> dict:
     
     Error:
     - ExpiredSignatureError: Token expired ho gaya
-    - JWTError: Token invalid ya tampered hai
+    - PyJWTError: Token invalid ya tampered hai
     - Invalid SECRET_KEY ya algorithm mismatch
     
     Usage:
@@ -227,7 +244,7 @@ def decode_token(token: str) -> dict:
         payload = decode_token(token)
         user_id = payload.get("sub")
         clinic_id = payload.get("clinic_id")
-    except JWTError:
+    except PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     """
     
@@ -246,7 +263,7 @@ def decode_token(token: str) -> dict:
         logger.warning(f"Token expired")
         raise
         
-    except JWTError as e:
+    except PyJWTError as e:
         # Token invalid, tampered, ya corrupted hai
         logger.warning(f"Token validation failed: {str(e)}")
         raise

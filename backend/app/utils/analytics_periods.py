@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta
 
 from app.enums.analytics import AnalyticsPeriod
+from app.core.timezone import CLINIC_TZ
 
 
 @dataclass(frozen=True)
 class DateRange:
-    """A half-open UTC date/time range: ``start <= value < end``."""
+    """A half-open India-local date/time range: ``start <= value < end``."""
 
     start: datetime
     end: datetime
@@ -16,7 +17,7 @@ class DateRange:
 
 @dataclass(frozen=True)
 class AnalyticsPeriods:
-    """Calendar periods used by analytics, all expressed in UTC."""
+    """Calendar periods used by analytics, expressed in India time."""
 
     today: DateRange
     this_week: DateRange
@@ -24,7 +25,7 @@ class AnalyticsPeriods:
     this_year: DateRange
 
     def for_period(self, period: AnalyticsPeriod) -> DateRange:
-        """Return the shared UTC date range selected by the API period value."""
+        """Return the India calendar range selected by the API period value."""
 
         return {
             AnalyticsPeriod.TODAY: self.today,
@@ -35,22 +36,15 @@ class AnalyticsPeriods:
 
     @classmethod
     def containing(cls, now: datetime) -> AnalyticsPeriods:
-        """Build calendar periods containing ``now`` (naive values are treated as UTC)."""
-
-        utc_now = (
-            now.replace(tzinfo=timezone.utc)
-            if now.tzinfo is None
-            else now.astimezone(timezone.utc)
-        )
-        today_start = datetime(
-            utc_now.year, utc_now.month, utc_now.day, tzinfo=timezone.utc
-        )
+        """Build calendar periods containing ``now`` (naive values are India local)."""
+        local_now = now.replace(tzinfo=CLINIC_TZ) if now.tzinfo is None else now.astimezone(CLINIC_TZ)
+        today_start = datetime.combine(local_now.date(), time.min, tzinfo=CLINIC_TZ)
         week_start = today_start - timedelta(days=today_start.weekday())
-        month_start = datetime(utc_now.year, utc_now.month, 1, tzinfo=timezone.utc)
+        month_start = datetime(local_now.year, local_now.month, 1, tzinfo=CLINIC_TZ)
         next_month_start = (
-            datetime(utc_now.year + 1, 1, 1, tzinfo=timezone.utc)
-            if utc_now.month == 12
-            else datetime(utc_now.year, utc_now.month + 1, 1, tzinfo=timezone.utc)
+            datetime(local_now.year + 1, 1, 1, tzinfo=CLINIC_TZ)
+            if local_now.month == 12
+            else datetime(local_now.year, local_now.month + 1, 1, tzinfo=CLINIC_TZ)
         )
 
         return cls(
@@ -58,7 +52,14 @@ class AnalyticsPeriods:
             this_week=DateRange(week_start, week_start + timedelta(days=7)),
             this_month=DateRange(month_start, next_month_start),
             this_year=DateRange(
-                datetime(utc_now.year, 1, 1, tzinfo=timezone.utc),
-                datetime(utc_now.year + 1, 1, 1, tzinfo=timezone.utc),
+                datetime(local_now.year, 1, 1, tzinfo=CLINIC_TZ),
+                datetime(local_now.year + 1, 1, 1, tzinfo=CLINIC_TZ),
             ),
+        )
+
+    @staticmethod
+    def explicit(start: date, end: date) -> DateRange:
+        return DateRange(
+            datetime.combine(start, time.min, tzinfo=CLINIC_TZ),
+            datetime.combine(end + timedelta(days=1), time.min, tzinfo=CLINIC_TZ),
         )

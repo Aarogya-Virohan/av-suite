@@ -303,37 +303,372 @@ Each entry follows this structure:
 
 ---
 
+## [D-021] Exercise Library Redesigned to the AV Suite Brand; Prescription PDF Rebuilt
+
+- **Date**: 2026-10-20
+- **Context**: The Exercise Library still had the old look (dark serif login, shadcn defaults, no logo; the Geist font never loaded because `--font-sans` pointed at itself). Body part chips needed a second click on "Apply Filters". Login showed "[object Object]" for structured errors and accounts in two clinics could not sign in. The prescription PDF took about 18 s and 2.8 MB live: WeasyPrint downloaded every exercise image one after another at full size, inside the async route, blocking the server. The file sat on Railway's local disk (wiped on every redeploy), and the WhatsApp text carried a login-only relative download path.
+- **Decision** (scope and the four product answers by Onkar, 20 Oct):
+  - Frontend `frontend/exercise-library`: CRM tokens and fonts (copied from `frontend/crm/src/app/globals.css` at 6195026), AV logo, CRM-style login with the workspace picker, header with clinic and user, chips filter on click (multi-select, "All" clears), search debounced with stale requests aborted, image thumbnails on cards, searchable patient picker, previous prescriptions of a patient can be opened and edited, one primary action "Save & download PDF" (direct download, proper file name), toasts instead of `alert()`, phone layout with Library / Prescription tabs. The unused browser print view (`A4PrintView`, never reachable) and unused shadcn components were removed.
+  - Frontend fixes found on the way: the Frequency select had no "Daily" (the default) and showed blank; number fields clamped on every keystroke so a value could not be cleared and retyped.
+  - Backend: new `services/prescription_pdf.py` on the posture report's brand system (helpers imported, posture module untouched). Images fetched in parallel (https and public hosts only, 6 s timeout, 8 MB cap), shrunk with Pillow, cached, embedded as data URIs. Render in a worker thread. Stored in the `documents` bucket under `prescriptions/<clinic_id>/<rx_id>.pdf`; local disk only as fallback; the download regenerates a missing file instead of 404 and sends `Rx_<Patient>_<date>.pdf`. Dates in IST.
+  - WhatsApp text has no link; the physiotherapist attaches the PDF. A public or signed link would put health data on an open URL.
+- **Trade-offs**: API shapes unchanged except an added `filename` in the POST `/pdf` response. A PDF is regenerated on every download click (cheap now). Thumbnails load straight from the image host in the browser.
+- **Verified**: backend suite 309 pass, the same 10 known environment failures as before (302 + 7 new PDF tests). Exercise Library `tsc`, `eslint` (0 problems, 15 before) and `next build` clean. Playwright end to end at 1440 and 390 px against a local backend: picker login, chips, search, add, dosage edits, save, download, edit and save again, reopen from history, add-patient validation, logout; no page errors and no failing API calls. Not verified in the sandbox: exercise images (the image host is blocked there), so live PDF time with images is still to be measured.
+- **Affected Files**: `frontend/exercise-library/**`, `backend/app/services/prescription_pdf.py`, `backend/app/services/prescription_service.py`, `backend/app/api/v1/prescriptions.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_whatsapp_click_to_chat.py`
+
+---
+
+## [D-022] Founder Feedback Phase 0 (23 Oct): CRM Quick Fixes
+
+- **Date**: 2026-10-23
+- **Context**: Shivank's feedback of 23 Oct (list + 8 annotated screenshots). Analysis per item is in the CRM Project doc `feedback-crm-23Oct2026.md` (IDs C-01 to C-27, own findings X-1 to X-3). This batch is the frontend-only part that needed no founder decision.
+- **Decision**:
+  - C-01: the header date opens a month calendar; picking a day opens `/appointments?date=YYYY-MM-DD`, filtered by the local (IST) day on the client because the backend `date` filter uses UTC days. "Book Visit" prefills that day (future days at 10:00). Users without Appointments access keep the plain date.
+  - C-03: hover states only where something is clickable. Read-only table rows and lead kanban cards no longer change on hover.
+  - C-05: referral source is a dropdown (Google search, AI search, Walk-in, Friend or family, Doctor referral, Previous treatment, Practo / Justdial / other app, Social media, Other with free text). The column stays free text; an old value not in the list opens as Other with its text, so nothing saved is lost.
+  - C-06: SOAP Notes and Assessments were the same component on the same table shown twice. They are one tab, "SOAP & Assessments", with an All / Initial / Re-assessment filter, a type badge per note, and a note type choice on unfinalized notes. A patient's first note defaults to Initial, later ones to Re-assessment. Tab name still to be confirmed by founders.
+  - C-09: Leads page title "Patient Leads" (sidebar label unchanged).
+  - C-12: opening an invoice or receipt adds a browser history entry, so Back closes the preview instead of leaving Billing. Next's own history state is copied into the entry, otherwise the App Router reloads the page on popstate. Reproduced before the fix (Back went from the receipt to /leads).
+  - C-13: the preview modal is top-aligned and scrolls, with a sticky toolbar (Print and Close). Before, a centred flex box put the Close button above the screen (y = -195 px at 1366x720) with no way to reach it.
+  - C-17: invoice line label "Sessions / Qty".
+  - C-18: the transaction reference field is hidden and cleared for Cash.
+  - C-27: rows per page (5, 10, 25, 50, 75) on every DataTable; the Patients list sends `page_size` to the API.
+  - X-1: Lost leads have no Convert button.
+  - X-2: Analytics no longer shows developer text ("UTC range ... (end exclusive)", "not persisted by the backend"); it shows the date range in words and says expenses are not recorded yet.
+  - Found on the way: Appointments requested only 10 rows with no paging, so later appointments never showed. It now requests 500, the backend maximum (L-39).
+- **Not in this batch**: C-14 / X-3 (test data cleanup, Onkar), C-19 onwards and everything needing founders or backend.
+- **Verified**: `tsc` clean, vitest 25 pass (2 new for the referral field), `next build` clean; Playwright on the production build against a local backend and Postgres, desktop 1366 px with time zone Asia/Kolkata, checked every item above plus the DB rows for a new re-assessment; no page errors; only failing call is the expected Rx 403 for a clinic without the Rx entitlement. Phone width screenshots taken; the CRM layout itself is not phone-ready (sidebar stays open), unchanged by this batch.
+- **Affected Files**: `frontend/crm/src/components/layout/{AppShell,HeaderCalendar}.tsx`, `components/ui/DataTable.tsx`, `app/(dashboard)/{appointments,billing,leads,analytics,patients}/page.tsx`, `app/(dashboard)/patients/[id]/page.tsx`, `features/patients/components/{SoapNotesTab,PatientFormFields,ReferralSourceField,AddPatientSlideOver,EditPatientSlideOver}.tsx`, `features/patients/referral-source.test.tsx`, `features/billing/components/{InvoicePreviewModal,RecordPaymentSlideOver,CreateInvoiceSlideOver}.tsx`, `features/appointments/components/AddAppointmentSlideOver.tsx`
+
+---
+
+## [D-023] Founder Feedback Phase 1 (frontend only): Leads Report, Packages on Invoices, Percent Discount and Tax, No Signature Line
+
+- **Date**: 2026-10-24
+- **Context**: Second batch from the 23 Oct founder feedback (CRM Project doc `feedback-crm-23Oct2026.md`), only items that need no backend change and no founder decision. Delivered on branch `feat/crm-feedback-phase1-fe`, merged into `dev` only when Onkar decides.
+- **Decision**:
+  - C-11: Leads page has "Export CSV" (the leads currently shown, with search applied; UTF-8 with BOM so Excel opens it; cells starting with = + - @ are quoted with a leading apostrophe to stop spreadsheet formulas) and a "Monthly" table for the last 6 months (new, converted, lost, still open, conversion %), counted by local month of the date added.
+  - C-15: Create Invoice has "+ Add package…" listing the clinic's active packages; picking one adds "<name> (<n> sessions)" at the package price, filling the empty first line if it is blank. A per-clinic service and fee list (consultation fee) still needs the backend.
+  - C-16: Discount and tax can be typed in rupees or percent (switch per field). Tax in percent applies to the amount after discount. Only the rupee amounts are sent and stored; printing "10%" on the invoice needs percent fields in the backend.
+  - C-19: invoice and receipt footer drops "Authorized Signatory" and says the document is computer-generated and needs no signature. The clinic logo was already printed when set in Settings; address, phone and GSTIN still wait for clinic profile fields (L-14).
+  - Found on the way: the leads list sent no `limit`, so the API default of 100 silently cut off later leads; it now asks for 500 (L-40). The leads table rows had a hover state although they are not clickable; removed (C-03 follow-up).
+- **Verified**: `tsc` clean, vitest 27 pass (2 new for CSV escaping and monthly counts), `next build` clean. Playwright on the production build against a local backend and Postgres (1366 px, Asia/Kolkata): CSV download (name, row count, escaping), monthly counts with a lead moved to September in the DB, package line, 10% discount and 18% tax giving 7,434.00 on 7,000.00, invoice saved with discount 700.00 and tax 1,134.00 (checked in Postgres), preview shows both and no signature line; no page errors, no failed API calls.
+- **Affected Files**: `frontend/crm/src/app/(dashboard)/leads/page.tsx`, `features/leads/{api,report}.ts`, `features/leads/report.test.ts`, `features/billing/components/{CreateInvoiceSlideOver,InvoicePreviewModal}.tsx`
+
+---
+
+## [D-024] Passwords Limited to 72 Bytes (bcrypt)
+
+- **Date**: 2026-10-24
+- **Context**: bcrypt 5 raises ValueError for passwords over 72 bytes. `POST /auth/register` had no length limit and `POST /users` allowed 128 characters, so a long password returned 500 (reproduced live). Login was not affected (the error is caught and returns 401).
+- **Decision**: `check_password_byte_length` in `backend/app/core/security.py` (72 bytes, UTF-8) is a field validator on `RegisterRequest` and `UserCreate`; long passwords now get 422 with a plain message. The CRM checks the same limit before submitting Add User and Add Therapist (`src/lib/password.ts`).
+- **Verified**: pytest 313 pass on the branch vs 309 on dev, same 10 environment failures (4 new tests); live 80-character register 422, normal register 201; Add User shows the message and sends no request.
+- **Affected Files**: `backend/app/core/security.py`, `backend/app/schemas/{auth,user}.py`, `backend/tests/test_password_length.py`, `frontend/crm/src/lib/password{,.test}.ts`, `frontend/crm/src/features/users/components/AddUserSlideOver.tsx`, `frontend/crm/src/app/(dashboard)/therapists/page.tsx`
+- **Branch**: `fix/password-length` (its entry is added here, on `feat/crm-ux-oct`, to avoid a conflict with D-023).
+
+---
+
+## [D-025] Invoice Save as PDF and WhatsApp, Phone Layout, Booking Requests Refresh
+
+- **Date**: 2026-10-24
+- **Context**: Founder feedback C-20 (download and send invoices), the phone screenshots (sidebar covered the page at 390 px), and booking requests that only appeared after a page refresh.
+- **Decision**:
+  - C-20: the invoice and receipt preview has "Print / Save PDF" (the page title is set to `Invoice_<number>_<patient>` during printing, so "Save as PDF" suggests that file name) and "WhatsApp" (click-to-chat with the patient: document number, total, paid, balance due, and a note that the PDF is attached). The backend invoice PDF is not used: it is a placeholder (L-41).
+  - Phone layout (below 768 px): the sidebar starts closed and opens as an overlay from a menu button in the header; tapping the backdrop or a page link closes it. Header and page padding shrink on phones. Desktop is unchanged.
+  - Pending booking requests refresh every 60 s while the tab is visible and when the user returns to the tab. A failed refresh keeps the current list instead of clearing it.
+- **Not changed**: email sending (needs an email service), server-side invoice PDF (L-41, after the billing backend batch).
+- **Affected Files**: `frontend/crm/src/features/billing/components/InvoicePreviewModal.tsx`, `src/components/layout/{AppShell,SidebarNavigation}.tsx`, `src/app/(dashboard)/appointments/page.tsx`
+
+---
+
+## [D-026] CRM Uses the October Backend Fields: Lost Reasons, Percent on Invoices, Clinic Profile, Analytics Range, Patient Names
+
+- **Date**: 2026-10-31
+- **Context**: The founders' review backend batch (Sparsh, PR #38 and #41, merged into `release/crm-oct` 31 Oct) added lead lost reasons, invoice discount and tax percent, clinic profile fields (Settings and `/auth/me`), India-time custom analytics ranges and patient names on invoices and payments. This batch makes the CRM use them.
+- **Decision**:
+  - Leads: choosing "Lost" (stage dropdown in list or kanban, or Add Lead with stage Lost) asks for the reason first, from the founders' list in their words (Denied, Better price, Asked for discount, Offer, Call not picked, Other). A remark (500 characters) is optional, required for Other. The stage changes only after a reason is saved; Cancel leaves the lead as it was. Lost leads show the reason under the stage; clicking it edits it. Older lost leads without a reason show "Add reason". Leaving Lost clears the reason on the server. CSV export has "Lost reason" and "Lost remark" columns.
+  - Invoices: a discount or tax typed in percent is sent as `discount_percent` / `tax_percent` (2 decimals) without the rupee amount, and the server computes the amount (C-16 completed). A percent outside 0 to 100 is stopped before sending. The invoice and receipt print "Discount (10%)" and "Tax (18%)" when a percent is stored; older invoices print amounts only.
+  - Clinic profile: Settings > Clinic & Branding has "Clinic details for invoices" (address, city, state, PIN code, phone, email, registration number, GSTIN, authorised person). Same checks as the API (PIN code 6 digits, GSTIN 15 characters, email format), lengths as the database columns; empty fields are saved as null, GSTIN in capitals. The invoice header prints the filled fields under the clinic name (C-19 completed, L-14 closed); the footer prints "Authorised by <name>" when set. After saving, `/auth/me` is read again so invoices use the new details at once.
+  - Analytics: a "Custom" choice next to Today / Week / Month / Year, with From and To dates (both included, India days) and Apply. Same rules as the API (both dates, start not after end, at most 24 months), checked before the request. The "Showing ..." note shows the range the server used.
+  - Patient names: Billing (invoice and payment lists, search, Record Payment, invoice preview) uses `patient_name` from the API. The lookup of the first 100 patients is gone (L-8 closed); the preview reads one patient only for the phone number.
+  - `types/schema.ts` regenerated from the backend OpenAPI of `release/crm-oct` 8d66b44 (L-26 closed); no type errors followed.
+- **Affected Files**: `frontend/crm/src/types/schema.ts`, `src/features/leads/{api,report,lostReasons}.ts`, `src/features/leads/{report,lostReasons}.test.ts`, `src/features/leads/components/{AddLeadSlideOver,LostReasonFields,LostReasonSlideOver}.tsx`, `src/app/(dashboard)/leads/page.tsx`, `src/features/billing/api.ts`, `src/features/billing/components/{CreateInvoiceSlideOver,InvoicePreviewModal,RecordPaymentSlideOver}.tsx`, `src/app/(dashboard)/billing/page.tsx`, `src/features/settings/{api,profile}.ts`, `src/features/settings/profile.test.ts`, `src/app/(dashboard)/settings/page.tsx`, `src/store/index.ts`, `src/features/analytics/api.ts`, `src/features/analytics/range.test.ts`, `src/app/(dashboard)/analytics/page.tsx`
+
+---
+
+## [D-027] Invoice and Receipt PDF Made by the Server
+
+- **Date**: 2026-10-31
+- **Context**: The backend invoice "PDF" was five lines of text (L-41), so the CRM saved invoices through the browser print dialog (D-025). Email (C-20) and any patient link need a real file from the server. The shared letterhead came with `dev` (Exercise Library round), so `dev` was merged into `release/crm-oct` first.
+- **Decision**:
+  - `GET /api/v1/invoices/{id}/pdf/download` returns a real A4 PDF made with WeasyPrint, same look as the exercise prescription PDF (shared letterhead, brand fonts, "powered by" footer). `?kind=receipt` gives the payment receipt. File names `Invoice-<number>.pdf` and `Receipt-<number>.pdf`.
+  - Content is what the CRM preview prints: clinic name, address, phone, email, Reg. No., GSTIN (empty fields left out), document title, reference, date (India time), due date (invoice only), status, patient name and phone, line items, subtotal, discount and tax with their percent, total, paid and balance due, for a receipt the payments (date, mode, reference, amount, with the status when not completed), notes, the computer-generated line, "Authorised by" and the thank-you line. No signature line (C-19). Nothing is invented (D-008, D-018).
+  - Amounts print as "Rs." because the embedded brand fonts have no rupee sign and the server may have no font with it. The CRM screen keeps the rupee sign.
+  - Receipt payments are read with the same query as the CRM receipt (`/payments?invoice_id=`), not the invoice relationship.
+  - `POST /invoices/{id}/pdf` no longer renders a PDF it throws away, and its `download_url` now points at the real route (`/api/v1/invoices/...`, it said `/api/v1/billing/...`).
+  - CRM: the invoice and receipt preview has "Download PDF" (server file, downloaded with the user's session) next to "Print" and "WhatsApp". `types/schema.ts` regenerated.
+- **Verified**: see the CRM Project tracker for this delivery.
+- **Affected Files**: `backend/app/services/{invoice_pdf,billing}.py`, `backend/app/api/v1/billing.py`, `backend/tests/test_invoice_pdf.py`, `backend/requirements.txt` (pypdf for tests), `frontend/crm/src/features/billing/{api.ts,pdf.test.ts,components/InvoicePreviewModal.tsx}`, `frontend/crm/src/types/schema.ts`
+
+---
+
+## [D-028] Appointment Lists Filtered, Ordered and Counted by the Server
+
+- **Date**: 2026-11-01
+- **Context**: The server returns appointments oldest first. Three CRM screens loaded the first N appointments with no date and filtered them in the browser: Appointments (500), the Dashboard card (50) and the double-booking warning in Book Visit (100). Reproduced on 1 Nov with 520 appointments from 2025 and 3 today: Appointments listed only 2025 visits, "?date=today" showed 0 appointments, and the Dashboard card showed 22 to 25 Jan 2025. The backend already filtered by India day (L-24) but the CRM did not use it.
+- **Decision**:
+  - Backend `GET /appointments`: `order=asc|desc` (default asc, as before). `start_date` or `end_date` can now be sent alone (open range: from that day on, or up to and including that day). Until now a single date returned 422 (founders' review backend batch, 30 Oct); `test_appointments_and_requests_api.py` is changed to match. `start_date` after `end_date` is still 422. Dates are India days.
+  - Appointments page: Upcoming (from today, soonest first, default) and Past (up to yesterday, newest first), 50 per page with previous and next, or one day from the date picker or the header calendar (`?date=`). The status filter, including No Show, runs on the server. The count is the server total for the filter. Dates from another year show the year. A failed load says so instead of showing an empty list.
+  - Dashboard card: today in full, the next 7 from tomorrow and the 7 most recent before today, merged as before (upcoming first, then recent past). Today is read whole so its earlier visits cannot fill the list and hide later ones.
+  - Dashboard KPI "Scheduled Appointments" (staff view) counts scheduled visits from today on. It showed the total of every appointment ever made.
+  - Book Visit double-booking warning reads the chosen therapist's appointments from the day before to the day after, and compares time ranges with the new visit's duration. The old check ignored the new visit's duration, so 09:00 for 90 minutes did not warn about a 10:00 visit.
+  - `useAppointments` (first N, no filters) is replaced by `useAppointmentList` with explicit server parameters.
+- **Not changed**: no server-side double-booking check (the warning stays a soft warning). Appointment times still show in the browser time zone (D-017).
+- **Affected Files**: `backend/app/{api/v1/appointments,repositories/appointment,services/appointment}.py`, `backend/tests/{test_appointment_list_order_and_ranges,test_appointments_and_requests_api}.py`, `frontend/crm/src/features/appointments/{api,listing,listing.test}.ts`, `features/appointments/components/AddAppointmentSlideOver.tsx`, `src/app/(dashboard)/{appointments,dashboard}/page.tsx`, `src/types/schema.ts`
+
+---
+
+## [D-029] Staff Can Book Visits; Clinic Profile Lengths; Treatment Totals and India Days
+
+- **Date**: 2026-11-02
+- **Context**: Role check of the D-026 to D-028 screens as front desk and therapist, with the overrides a clinic would grant (front desk: patients, appointments, invoices, payments, booking requests; therapist: own appointments, patients and treatments). Everything worked except booking: Book Visit read therapists from `GET /users`, which needs `users.view`, so the therapist list was empty for both roles and they could not book. The same call failed with 403 four times on every Appointments visit, because the form is always mounted. Also open: L-43, and the treatment list total.
+- **Decision**:
+  - New `GET /appointments/therapists` (needs `appointments.create`): active therapists and admins of the clinic with id, name and role only (no email or phone). With own scope it returns the caller alone, the only person own scope may book for. `users.view` stays closed to staff.
+  - Book Visit uses it, only while the drawer is open, shows an error if it fails, and selects the therapist when there is only one.
+  - Clinic profile update: city and state 120, phone 50, registration number 120, authorised person 255, address 500 characters. Longer values returned 500 from the database; now 422 and nothing is saved (L-43). Same limits as the CRM Settings fields, so the CRM never sent them; only direct API calls did.
+  - `GET /treatments`: `total` counts every matching session (it was the size of the page), and `start_date` / `end_date` are India days, end inclusive (they were UTC days, as appointments were before L-24).
+  - Checked and left alone: the Recycle Bin total is correct, because that list has no paging.
+- **Not changed**: no API deactivates a user; the Treatments tab still loads at most 100 sessions per patient, newest first.
+- **Affected Files**: `backend/app/api/v1/{appointments,treatments}.py`, `backend/app/schemas/{appointment,settings}.py`, `backend/app/repositories/treatment.py`, `backend/tests/test_profile_limits_and_treatment_totals.py`, `frontend/crm/src/features/appointments/{api.ts,components/AddAppointmentSlideOver.tsx}`, `frontend/crm/src/types/schema.ts`
+
+---
+
+## [D-030] Clinic Logo Left, AV Suite Right; Clinic Switcher in the Sidebar; Tax Hidden on New Invoices
+
+- **Date**: 2026-11-08
+- **Context**: Branding rule from Onkar (2 Nov): the client's logo on the left and the AV Suite logo on the right of the CRM header. The header had a clinic name chip on the right, and the sidebar showed the clinic logo in place of the AV mark. On a 390 px phone every page was 461 px wide, because the header search bar and the clinic chip did not fit. Founders were told in Round 2 (7 Nov) that the invoice tax field would be hidden while GST is open (R2-2).
+- **Decision**:
+  - Header: clinic logo (`branding_logo_url`) on the left, after the menu button. When the clinic has no logo, or the saved logo does not load, the clinic name is shown instead. AV Suite wordmark on the right; below 640 px only the AV mark. The clinic chip is removed from the header.
+  - On phones (below 640 px) search is an icon button that opens the same command bar; from 640 px it is the full search bar as before. Pages are now 390 px wide at 390 px (checked on all nine sidebar pages).
+  - Sidebar top always shows the AV Suite mark.
+  - Clinic switcher moves into the clinic card at the foot of the sidebar, next to logout. The card opens the clinic list only when `GET /me` returns more than one workspace; with one clinic it is plain text. Switching works as before: `POST /auth/switch-workspace`, new token, full reload.
+  - Create Invoice: the tax field is hidden and `tax_amount` is sent as 0. The API, types and invoice preview are unchanged, so invoices that already have tax still show it, and tax can return by flipping `SHOW_TAX` in `CreateInvoiceSlideOver.tsx` once the founders decide.
+  - AV wordmark copied from the Posture tool brand folder and resized to 560 x 88 (`public/brand/av-logo-wordmark.png`).
+- **Not changed**: backend, API, invoice PDF and Exercise Library PDF letterhead (to be aligned separately).
+- **Affected Files**: `frontend/crm/src/components/layout/{AppShell,ClinicBrand,SidebarNavigation,WorkspaceSwitcher}.tsx`, `frontend/crm/src/features/billing/components/CreateInvoiceSlideOver.tsx`, `frontend/crm/public/brand/av-logo-wordmark.png`
+
+---
+
+## [D-031] CRM Production Dependencies Upgraded for Security Advisories; CI Actions on Node 24
+
+- **Date**: 2026-11-08
+- **Context**: The CI security audit (report only) found 7 advisories in the CRM production dependencies: 1 critical in `next` 16.3.2 (remote code execution in the image optimizer and `use cache`, SSRF, cache poisoning), 5 high (`axios`, `follow-redirects`, `sharp`, `source-map-js`, `zod`) and 1 moderate (`baseline-browser-mapping`). The CRM runs on Vercel in production. The same run warned that `actions/checkout@v4`, `actions/setup-node@v4` and `actions/setup-python@v5` target the deprecated Node 20 runtime.
+- **Decision**:
+  - `npm audit fix` in `frontend/crm`, inside the existing version ranges (no `package.json` change): `next` 16.4.5 (with its own `sharp` 0.35.5), `axios` 1.21.0, `zod` 4.6.7, `follow-redirects` 1.16.3, `source-map-js` 1.2.2, `baseline-browser-mapping` 2.11.35. `npm audit --omit=dev` now reports 0.
+  - CI uses `actions/checkout@v5`, `actions/setup-node@v5` and `actions/setup-python@v6` (all Node 24; same inputs).
+  - Only the CRM app in this change. Exercise Library and Posture tool have the same `next` advisories and are upgraded in their own rounds. Backend advisories (python-jose without a fix, weasyprint, Pillow, protobuf) are a separate change.
+- **Verified**: tsc, vitest 49 pass, `next build` on Next.js 16.4.5; Playwright on the production build against a local backend at 390 and 1440 px on nine pages, single and multi clinic users: page width equals the viewport, no page errors, no failed calls except the expected Rx 403 (L-30) and the first step of the multi-clinic login; clinic switch, invoice creation (tax 0) and the old taxed invoice preview still work; CSP and security headers unchanged; image optimizer returns 200.
+- **Affected Files**: `frontend/crm/package-lock.json`, `.github/workflows/ci.yml`
+
+---
+
+## [D-032] Backend JWT on PyJWT Instead of python-jose; WeasyPrint 70
+
+- **Date**: 2026-11-09
+- **Context**: The CI security audit (pip-audit) reports `python-jose` 3.5.0 (no fixed release exists), its dependency `ecdsa` 0.19.2, and two advisories in `weasyprint` 69.0. python-jose signs and checks every login token (`app/core/security.py`, `app/middleware/clinic_gate.py`) and the posture detection token (`app/services/posture/review.py`, shared Posture code). Tokens already given out by production must keep working through the deploy.
+- **Decision**:
+  - Tokens are signed and checked with PyJWT 2.15.1 (`requirements.txt`; `pyproject.toml` no longer lists python-jose). PyJWT 2.15.1 was already installed in production as a dependency of `supabase-auth`, so no new package is added; `python-jose` and `ecdsa` are removed.
+  - Same algorithm (`JWT_ALGORITHM`, HS256), same secret (`JWT_SECRET_KEY`), same claims (`sub`, `clinic_id`, `role`, `exp`, `iat`; posture: `purpose`, `views`, `exp`, `iat`), same expiry setting. Code catches `PyJWTError`; the middleware raises `InvalidTokenError` for a token without `sub` or `clinic_id`. No alias keeps the old `JWTError` name.
+  - PyJWT checks are kept at their defaults. One check is stricter than python-jose: a token whose `iat` is in the future is rejected. Our server issues and verifies its own tokens with one clock, so this does not affect real users; it was kept instead of switching the check off.
+  - `weasyprint` 69.0 to 70.0. The only visible change is the angled gradient in the PDF letterhead band (colour values differ by up to 12 of 255 inside the band); text, fonts, layout and page count are the same.
+  - Posture shares `app/services/posture/review.py` and the letterhead; the Posture report PDF uses the same gradient. The Tool 03 branch has the same five python-jose files and needs this change after it merges.
+- **Verified**:
+  - Tokens made by the old code (python-jose) verify with the new code, and tokens made by the new code verify with the old code; header and claims are identical. Expired, signature-tampered and claim-tampered tokens are rejected by both; `alg: none` is rejected. Posture detection token works both ways.
+  - Running API on PyJWT: register, login, `/auth/me`, patients, appointments, leads, invoices return 200; a token made by python-jose for the same user returns 200; expired python-jose token, tampered token and no token return 401 with the same error body. Live invoice PDF download 200.
+  - Invoice, receipt and prescription PDFs rendered with 69.0 and 70.0 from the same data and compared page by page (see above).
+  - Full pytest on a fresh Postgres 16 on this branch and on its base: 435 passed, 10 failed on both, and the failures are exactly `tests/known_failures.txt`.
+  - CRM production build, Playwright login and Dashboard, Patients, Billing and Appointments at 1440 and 390 px: no page errors, no failed API calls, page width equals the viewport.
+  - pip-audit on `requirements.txt`: python-jose, ecdsa and weasyprint no longer reported. Pillow, pillow-heif and protobuf remain (Posture dependencies, separate change).
+  - Not tested: the Docker image build (Docker Hub not reachable from the test machine); the first CI run and the Railway deploy are the check.
+- **Follow-up (2026-11-10)**: `backend/uv.lock` still locked python-jose, ecdsa, rsa and pyasn1 after this change (the first search covered only .py, .txt and .toml files). Regenerated with `uv lock`: those four removed, PyJWT 2.14.0 to 2.15.1, nothing else changed; `uv lock --check` passes. Docker and CI install from `requirements.txt` and never read `uv.lock`, so production was not affected. `backend/SETUP_GUIDE.md` now names PyJWT.
+- **Affected Files**: `backend/requirements.txt`, `backend/pyproject.toml`, `backend/app/core/security.py`, `backend/app/middleware/clinic_gate.py`, `backend/app/services/posture/review.py`, `backend/tests/test_appointments_and_requests_api.py`, `backend/tests/test_recycle_bin_soft_delete.py`
+
+---
+
+## [D-033] User Permissions Editor Stays Locked Until the Saved Permissions Load
+
+- **Date**: 2026-11-10
+- **Context**: `PUT /users/{id}/permissions` replaces every saved override of that user: keys missing from the request are deleted. The Edit Permissions slide-over (Settings, User Management) builds its request from the overrides it loaded with `GET /users/{id}/permissions`, so keys the form does not list (for example Tool 03 `screening.*` keys) are sent back unchanged. When that GET failed, the slide-over still opened the form with role defaults and Save enabled; one Save then reset the user to role defaults and deleted every other saved override. A response without a `data` list was treated as "no overrides" in the same way. This slide-over is the only caller of the PUT in the frontends.
+- **Decision**:
+  - The permissions query throws when the response has no `data` list, so a wrong shape is an error, never an empty list.
+  - Until the saved overrides are loaded, the slide-over shows a loading state or an error with **Try again** and **Close**. No scope selects and no Save button are shown, and `handleSave` returns early, so no PUT can be sent without the saved list.
+  - The role-default branch for a user without loaded data is removed. Defaults still fill canonical keys that have no saved row, as before.
+- **Verified**: tsc; vitest 53 pass (new tests: loading state, GET failure with retry and no PUT, wrong response shape, save keeps a key the form does not list); `next build`; Playwright on the production build against a local backend at 1440 and 390 px: with the GET forced to fail the error shows, no select and no Save; after Try again a save with no edits sends `screening.view` back and the database row `screening.view = own` is still there after the save; page width equals the viewport, no page errors, no failed calls.
+- **Affected Files**: `frontend/crm/src/features/users/api.ts`, `frontend/crm/src/features/users/components/UserPermissionsSlideOver.tsx`, `frontend/crm/src/features/users/user-permissions-slideover.test.tsx`
+
+---
+
+## [D-034] Report Letterhead: Clinic Left, Aarogya Virohan Right
+
+- **Date**: 2026-11-12
+- **Context**: The shared report letterhead (`report_letterhead.py`, used by the exercise prescription PDF and the invoice / receipt PDF) put the Aarogya Virohan wordmark on the left and the clinic on the right, following the founders' Exercise Library feedback of 23 Oct (items 6 and 7). The CRM header already shows the clinic on the left and Aarogya Virohan on the right (D-030). On 12 Nov Shivank sir set one rule for every patient-facing document and the CRM: "the clinic is the hero, Aarogya Virohan is the backend partner", clinic logo left, Aarogya Virohan right and smaller. This replaces the 23 Oct items 6 and 7.
+- **Decision**:
+  - With a clinic name: clinic logo (when usable) and clinic name with the document subtitle ("Invoice", "Payment Receipt", "Exercise Prescription Tool") on the left; on the right a smaller Aarogya Virohan wordmark under a "Powered by" label. Same letterhead for invoice and receipt (one rule; founders can ask for a footer-only invoice later).
+  - Without a clinic name: Aarogya Virohan only, wordmark and subtitle on the left, as before.
+  - `letterhead_html()` keeps its signature and class names, so the callers do not change. The posture report has its own letterhead in the posture module and is aligned in the Posture work, not here.
+- **Verified**: full pytest on Postgres 16, same 10 known failures as dev 6ca4499 (dev 435 passed, this change 438: three new invoice / receipt letterhead tests); prescription letterhead tests assert the new order; PDFs rendered for prescription, invoice and receipt with a logo, with a name only and without a clinic, every page checked as an image.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_invoice_pdf.py`
+
+---
+
+## [D-035] Letterhead Logo Keeps the Clinic Logo's Shape
+
+- **Date**: 2026-11-13
+- **Context**: The letterhead (D-034) put every clinic logo inside a 13 mm square tile. Most clinic logos are wide wordmarks; the first real one (a 3:1 logo with a tagline) shrank to about 11 x 4 mm and its tagline could not be read.
+- **Decision**: The logo keeps its own ratio. Square and tall logos stay as before (11 mm inside a 13 mm tile). A wide logo keeps the 11 mm height and grows sideways up to 40 mm (tile = logo + 2 mm); a wider logo is capped at 40 mm and gets shorter. Size comes from the PNG header of the normalised logo (`resolve_clinic_logo` always returns PNG); anything unreadable falls back to the square box. The clinic name stays next to the logo.
+- **Verified**: full pytest on Postgres 16 against release/el-nov (only the known failures); new tests for square, wide, very wide, tall and unreadable logos and for the tile markup; PDFs rendered with square, 3:1, 8:1 and 1:2 logos and with a real clinic logo, every page checked.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/tests/test_prescription_pdf.py`
+
+---
+
+## [D-036] Report Identity: One Set of Rules for Letterhead and Footer
+
+- **Date**: 2026-11-14
+- **Context**: Founders (13-14 Nov) asked for the new Aarogya Virohan round logo on the right of the letterhead with no "Powered by" label there, "Powered by Aarogya Virohan . AV Suite" only in the footer, no patient name or ID in the footer (the footer itself to stay as it was, centred), and the clinic's full details (address, phone, email, website) on every report, filled from the clinic profile and never hard-coded. A missing optional field must not leave a gap.
+- **Decision**:
+  - `report_letterhead.py` owns the rules for every report: `clinic_details()` returns the clinic's details as labelled pairs in a fixed order (Address, Phone, Email, Website, Reg. No., GSTIN); empty fields are dropped, never shown as an empty label. Address is "line, city, state pincode" without repeating parts already in the line; an invalid pincode is dropped; the website is shown without scheme and trailing slash. `clinic_detail_lines()` gives the same as plain lines.
+  - Letterhead (final, 14 Nov): white, shallow, print-friendly header. Clinic logo, name and document type on the left; the clinic's contacts next, one per row with a small line icon (address, phone, email, website; Reg. No. / GSTIN with a short label); then a thin standing rule and the Aarogya Virohan round mark alone on the far right; one accent rule underneath. A missing field has no row; no contacts means no standing rule. Long names get a smaller font (over 30 and 45 characters) and wrap; nothing is cut. Without a clinic name: Aarogya Virohan mark, name and document type.
+  - Why: earlier drafts put the clinic's details right next to the AV mark (first in a dark band, then in a strip under it) and they read as Aarogya Virohan's; a draft with no AV mark in the header was rejected by Onkar (the mark stays). The standing rule separates the two owners. Medical letterhead practice keeps the header shallow with the provider's name and contacts prominent; a full dark band also costs clinics toner on every printed prescription.
+  - `letterhead_page_top_mm(details)` sizes each report's @page top margin from the contact rows (address wrap estimate capped at 3 lines), so the header never runs into the body; without details it is 29 mm (27 mm before; 2 mm more space under the rule).
+  - Logos: empty margins are trimmed before sizing; an opaque logo on a near-white canvas has that outer background made transparent (flood fill from the corners), so it sits cleanly on the cream prescription page; white inside the artwork is kept; dark backgrounds are left as they are.
+  - Prescriptions show address and contacts only; invoices and receipts also show Reg. No. and GSTIN when filled. The invoice's own clinic block moved into the letterhead; "Billed to" now sits beside the invoice title.
+  - Shared footer (`footer_html`, `footer_css`): exactly the footer used before D-036 (centred, old Aarogya Virohan mark, "POWERED BY AAROGYA VIROHAN . AV SUITE", "Page x of y" centred on the next line), minus the patient name and prescription reference (founders 14 Nov: no patient data in the footer).
+  - Uploaded logos lose their empty margins before sizing (transparent margins by alpha; an opaque background only when all four corners share one colour).
+  - New asset `av_logo_round.png` (the founders' round logo, cut to a transparent circle), used in the header. The footer keeps the old mark. The old wordmark stays in the repo for the posture report until the Posture work adopts this module.
+- **Not in this change**: website field in the clinic profile (the PDFs accept it, nothing stores it yet), display name vs legal name, practitioner degree, authorised-person rules, per-document snapshot of clinic details, the Rx watermark (still the old mark), the posture report (Posture Project).
+- **Verified**: full pytest on Postgres 16 against release/el-nov; new `tests/test_report_letterhead.py` (detail order and labels, missing cells, ids row, page margin, escaping, address, website, name size, footer without patient data on Rx / invoice / receipt, logo trim); PDFs rendered with all details, with phone and website missing, without a clinic, and a multi-page Rx, every page checked.
+- **Affected Files**: `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/prescription_service.py`, `backend/app/services/invoice_pdf.py`, `backend/app/services/posture/brand/av_logo_round.png`, `backend/tests/test_report_letterhead.py`, `backend/tests/test_prescription_pdf.py`, `backend/tests/test_invoice_pdf.py`
+
+---
+
+## [D-037] Shared Brand Module Outside the Posture Package
+
+- **Date**: 2026-11-14
+- **Context**: `report_letterhead.py`, `prescription_pdf.py` and `invoice_pdf.py` took the brand palette, the "powered by" words, `_brand_data_uri` and `_font_faces` from `app/services/posture/pdf_service.py`. The posture report is to adopt `report_letterhead` (Posture work, U1); with the old imports that would be a circular import (posture -> letterhead -> posture).
+- **Decision**:
+  - New `backend/app/services/brand.py` holds the palette (MIDNIGHT to ZEBRA), `POWERED_BY_COMPANY` / `POWERED_BY_PRODUCT`, `BRAND_DIR`, `brand_data_uri()` and `font_faces()`. Moved, not copied; values and code unchanged.
+  - `posture/pdf_service.py` re-exports every moved name under its old name (`_brand_data_uri`, `_font_faces` included), so existing importers and posture tests work unchanged.
+  - The three shared PDF modules import from `app.services.brand` and no longer load the posture package at all.
+  - The image and font files stay in `app/services/posture/brand/` for now; `BRAND_DIR` points there. Moving the files is a separate step, planned with the Posture work so it does not conflict with its open branch.
+- **Verified**: Rx, invoice, receipt and posture report (with and without clinic branding) rendered before and after: generated HTML byte-identical, PDF pages pixel-identical. Full pytest on Postgres 16 on this branch and on release/el-nov: same failure set (the known failures only). New `tests/test_brand.py`: re-exports are the same objects, assets resolve, and the shared PDF modules import without the posture package (checked in a fresh interpreter).
+- **Affected Files**: `backend/app/services/brand.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/invoice_pdf.py`, `backend/tests/test_brand.py`
+
+---
+
+## [D-038] Document Number in the Report Footer; New Round Mark as the Prescription Watermark
+
+- **Date**: 2026-11-14
+- **Context**: D-036 took the patient name and ID out of the footer. On a prescription of two or more pages, page 2 onwards then carried nothing that says which document it belongs to. The prescription watermark was still the old Aarogya Virohan hands mark while the letterhead uses the new round mark.
+- **Decision** (Onkar, 14 Nov):
+  - The shared footer shows the document number before the page count: "Rx RX-7B825459 . Page 2 of 3", "Invoice INV-0042 . Page 1 of 1", "Receipt INV-0042 . Page 1 of 1". Numbers only, never the patient's name or phone. `footer_html(reference)` escapes the text; an empty reference gives the page count alone, as before.
+  - Prescription watermark: the new round mark (`av_logo_round.png`) faded to 6%. WeasyPrint has no opacity for @page backgrounds, so `brand.watermark_data_uri()` bakes the fade into the image and drops the mark's white background disc (otherwise a pale patch shows on the cream page). One switch: `WATERMARK_FILE = ""` in `app/services/brand.py` removes the watermark; `WATERMARK_OPACITY` sets the strength.
+  - Pending founders' view (Round 3: R3-2 footer number, R3-3 watermark). The posture report keeps its own footer and the old watermark until the Posture work adopts the shared letterhead.
+- **Verified**: full pytest on Postgres 16 on this branch and on release/el-nov (same known failures); Rx (multi-page), invoice and receipt rendered and every page looked at, footer zoomed; watermark checked on a near-empty page; posture report HTML unchanged.
+- **Affected Files**: `backend/app/services/brand.py`, `backend/app/services/report_letterhead.py`, `backend/app/services/prescription_pdf.py`, `backend/app/services/invoice_pdf.py`, `backend/tests/test_brand.py`, `backend/tests/test_report_letterhead.py`
+
+---
+
+## [D-039] Posture Report on the Shared Letterhead, Signed-in Clinic, IST Date
+
+- **Date**: 2026-11-17
+- **Context**: The posture report kept its own dark letterhead and footer after D-036. In production (17 Nov, 01:44 IST) a report made while signed in to "AV Suite Clinic 2" printed the placeholder clinic "AV Clinic", the footer carried the patient's name, and the assessed-on date and report ID showed 16 Nov because the route took the server's UTC date. Step 3 of the posture tool showed "Aarogya Virohan" as text instead of the logo.
+- **Decision** (coordinator, 17 Nov; Posture branding round, part 1):
+  - The posture PDF uses `report_letterhead.py` unchanged: `letterhead_html`, `letterhead_css`, `letterhead_page_top_mm`, `footer_html`, `footer_css`, `clinic_details`, `resolve_clinic_logo`. Address and contacts only, no Reg. No. or GSTIN (same as the prescription).
+  - The clinic is the signed-in clinic: `/api/v1/posture/report/pdf` reads the clinics row of the request (`perm_ctx.clinic`) on every export; `report["branding"]` sent by the client is ignored. `/api/v1/posture/report` adds the same clinic as plain text in `report["branding"]` for the web report, after the report file is saved (the saved copy carries no logo). New `app/services/posture/clinic_letterhead.py`. The "AV Clinic" placeholder is removed from backend and posture-tool; the patient box always shows "Assessed by".
+  - Footer: "Report PT-... . Page x of y", no patient name (D-036, D-038).
+  - Assessed-on date and the date in the report ID are the IST date (`datetime.now(IST)`), same rule as D-017. The saved file's name keeps its UTC timestamp (not printed).
+  - The shared header and footer assume paragraph margins are zero; the posture page keeps browser margins in its body, so they are zeroed for `.letterhead p` and `.running-footer p` only. No colour or other design change; the posture watermark stays as it was.
+  - posture-tool: the app bar shows the Aarogya Virohan logo on every step (the report letterhead now carries the clinic's logo, so the reason for hiding it on step 3 is gone).
+- **Not in this change**: reference ranges, camera-only capture and the "posture test upload" capability (next parts of the round); web report header design (it keeps its own band, now filled with the signed-in clinic).
+- **Verified**: full pytest (SQLite) on this branch and on dev f02118a, twice: same 24 known failures, no new ones. New `tests/services/posture/test_pdf_letterhead_17nov.py`, `tests/services/posture/test_assessment_date_ist.py` (01:44 IST gives 17 Nov and PT-20261117-), `tests/test_posture_pdf_clinic.py` (HTTP: signed-in clinic printed, posted branding ignored, patient name once). posture-tool tsc, lint, build. PDFs rendered with a long clinic name and logo, with a short name and no logo, and with no clinic; every page looked at, header zoomed.
+- **Affected Files**: `backend/app/api/v1/posture.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/services/posture/clinic_letterhead.py`, `backend/tests/services/posture/test_pdf_letterhead_17nov.py` (replaces `test_pdf_letterhead_13oct.py`), `backend/tests/services/posture/test_assessment_date_ist.py`, `backend/tests/test_posture_pdf_clinic.py`, `frontend/posture-tool/src/app/page.tsx`, `frontend/posture-tool/src/components/report/ReportHeader.tsx`, `frontend/posture-tool/src/lib/branding.ts`, `frontend/posture-tool/src/types/posture.ts`
+
+---
+
+## [D-040] AV Screening Range on Every Posture Row; Head Position Is Not CVA
+
+- **Date**: 2026-11-17
+- **Context**: Founders' main feedback on the posture report: a range next to each value, like a blood report. Research (17 Nov) found published adult norms comparable with our photograph and landmarks for almost none of the measures: CVA norms are C7 to tragus (about 49 degrees), trunk and shoulder norms are back-surface scans of other landmarks, the HKA norms are radiographs. Only pelvic obliquity has a usable published range (Moharrami et al. 2023, radiographs).
+- **Decision** (Onkar, 17 Nov):
+  - Every row shows value, "AV screening range" and the existing grade. The AV screening range is the band the grade already treats as Normal, read at render time from `classifier.THRESHOLDS` (`app/services/posture/reference_ranges.py`), so the printed range cannot drift from the grading. No band changes. No Below / Within / Above.
+  - Sources footnote on the last page, per measure: the published basis named in the classifier comments where there is one, otherwise "AV clinical team, Oct 2026". Pelvic obliquity also carries "Published reference 0 to 5.6 degrees (Moharrami et al. 2023, standing pelvic radiographs); not directly comparable". The PDF reads ranges and sources from the server, never from the posted report.
+  - PT-L01 is shown as "Head Position (ear-shoulder angle)", with the footnote "Ear to shoulder point, not the C7-based craniovertebral angle". `calc_cva` measures MediaPipe ear to shoulder point against the horizontal; it is not the standard CVA. PT-L01 and `calc_cva` keep their names (saved reports, synthesis mapping).
+  - Web report: same range column (a line under the value on phones) and the same footnote, from `measurement.screeningRange` and `report.screeningSources`.
+  - The footnote is set in three columns at 6.1 pt so the report stays three pages; page 3 is now nearly full (see open item).
+- **For the founders (not decided here)**: the head position band (Normal at 50 degrees or more) was taken from CVA literature. On our ear-shoulder angle five test subjects read 68 to 78 degrees, so every patient grades Normal and the row screens nothing. A band for this angle is a clinical decision.
+- **Open**: page 3 has little room left; a longer clinical synthesis or more measures could push the closing block to a fourth page.
+- **Verified**: full pytest (SQLite) on this branch and dev f02118a, same 24 known failures; new `tests/services/posture/test_reference_ranges_17nov.py` (ranges equal THRESHOLDS and follow a band change, grade edges match the printed range, PDF column and footnote, posted ranges ignored, no CVA wording, Moharrami only in the footnote). posture-tool tsc, lint, build. PDFs rendered with po-3 photos (real detection), with and without a clinic: three pages each, every page looked at, footnote zoomed.
+- **Affected Files**: `backend/app/services/posture/reference_ranges.py`, `backend/app/services/posture/report_builder.py`, `backend/app/services/posture/pdf_service.py`, `backend/app/api/v1/posture.py`, `backend/tests/services/posture/test_reference_ranges_17nov.py`, `frontend/posture-tool/src/components/report/ViewSection.tsx`, `frontend/posture-tool/src/components/report/ReportCard.tsx`, `frontend/posture-tool/src/types/posture.ts`
+
+- **Review fixes, 17 Nov (Onkar, same decision)**: column and all mentions renamed "Normal range"; one format from THRESHOLDS ("\u2265 50\u00b0", "\u00b1 4\u00b0", "\u2264 5\u00b0", "\u2264 10 mm"), set like the parameter name; one fixed column grid on all three plane tables (photo cell 57 mm, data cell 120 mm, columns 41 / 19 / 26 / 34 mm) so Parameter, Value, Normal range and Finding start at the same x on every page, headers on one line; radar chart axes use the table labels in sentence case (`reference_ranges.chart_label`, long names on two lines); "Normal ranges: basis and sources" is its own section above the sign-off and disclaimer, one line per measure at 8 pt. The embedded Inter subset has no \u2264 / \u2265 glyphs, so those symbols alone are set in Liberation Sans / Arial. Consequence: the report is now four pages (sign-off and disclaimer move to page 4); founders' three-page layout of 19 Oct no longer holds.
+- **Three pages again, 17 Nov (Onkar's second review)**: radar chart 128 mm to 102 mm (same design); axis names 13 to 15 and ring names 10 to 13 SVG units, so on paper they stay 8.3 pt and 7.2 pt (no text made smaller than before; ring names were 7.0 pt). Spacing tightened between sources, sign-off (signature space 9 to 7 mm) and disclaimer; sources lines stay 8 pt. Finding column 41 mm so "MODERATE DEVIATION" fits inside the row (Parameter 37, Value 17, Normal range 25 mm). The report is three pages; page 3 still has little spare room.
+
+## [D-041] Audit Hardening (Sparsh PR B) with Merge-Time Fixes; Discount Reason in the CRM
+
+- **Date**: 2026-11-18
+- **Context**: Sparsh PR B (`feat/audit-hardening` 9e811a3, spec of 3 Nov): field-level `changes` {field: [old, new]} on patient, lead, appointment and invoice updates; `POST /payments/{id}/void` (reason at least 5 characters, row kept, invoice paid amount and status recalculated, `DELETE /payments` removed); cancelling an invoice needs `cancel_reason`; `DELETE /invoices` only for drafts (409 otherwise); `discount_reason` above 20%; view / download audit rows; admin-only `POST /audit/export`. Migration `ab91ce42d730` on `c7d9e1a4b602`.
+- **Found on review and fixed at merge (OnkarDureja)**:
+  - PATCH `status: "draft"` on an issued or paid invoice, then DELETE, removed it (204). An issued invoice can no longer go back to draft (409). The API creates invoices as issued, so in practice no invoice can be deleted; mistakes are cancelled with a reason.
+  - Every invoice update ran the 20% rule, so an invoice issued before the rule with a discount above 20% and no reason could not have its notes edited or be cancelled (422). The rule now runs only when the request sets the discount or its reason.
+  - A percent discount was also judged by its rounded rupee amount: exactly 20% of 333.33 is 66.67, a fraction above 20%, and asked for a reason. A percent discount is now judged by its percent only.
+- **CRM**: Create Invoice shows "Reason for discount above 20% *" only when the discount is above 20% (percent mode: percent above 20; rupee mode: amount above 20% of the subtotal, compared in paise; same rule as the server, `features/billing/discountReason.ts`). Blank reason is stopped in the form with focus on the field; the reason is trimmed and sent only while required. No void or cancel UI yet (the CRM never called `DELETE /payments`).
+- **Verified**: pytest (PG 16, CI deselects) dev 591, PR B 601, with fixes 602 passed, 0 failed; the three new tests fail on 9e811a3 and pass with the fixes; upgrade / downgrade / upgrade of `ab91ce42d730`; second round on a fresh GitHub clone. CRM tsc, vitest 56 (3 new), next build; Playwright against a local API at 1440 and 390 px, 26 / 26 checks (20% no field, above 20% field, blank blocked, trimmed reason stored, lowered discount stores no reason, reopen resets, no page errors), screenshots looked at.
+- **Affected Files**: `backend/app/services/billing.py`, `backend/tests/test_audit_hardening.py`, `frontend/crm/src/features/billing/discountReason.ts`, `frontend/crm/src/features/billing/discountReason.test.ts`, `frontend/crm/src/features/billing/components/CreateInvoiceSlideOver.tsx`, `frontend/crm/src/features/billing/api.ts`
+
+## [D-042] Fee List, Client Type and Five New Lost Reasons (Sparsh PR C) with Merge-Time Fixes
+
+- **Date**: 2026-11-18
+- **Context**: Sparsh PR C (`feat/fee-list-client-type` 71c5875, spec of 3 Nov): `clinic_fee_items` (consultation, posture, exercise_rx, custom; `price_editable`; delete = inactive; read with `invoices.create`, writes admin only) at `/settings/fee-items`; `clinics.client_type` clinic / hospital / home_care (default clinic, CHECK constraint; `clinics.type` untouched) in the clinic settings and `/auth/me`; five lost reasons added to the `lead_lost_reason` enum (too_far, timing_mismatch, needs_home_visit, cannot_afford, went_to_competitor); a lost lead now needs a reason; converting a lead clears its lost fields. Migration `cd4e8f2a91b7` on `ab91ce42d730`; downgrade keeps the enum values (PostgreSQL cannot drop them).
+- **Found on review and fixed at merge (OnkarDureja)**:
+  - The "lost needs a reason" rule sat on `LeadBase`, which `LeadResponse` also extends. A lead marked lost before reasons existed (reason NULL) made `GET /leads` and `GET /leads/{id}` raise for the whole clinic. Both rules now live on `LeadCreate`; PATCH checks them only when the request marks the lead lost or sets the reason or remark (editing such a lead's notes returned 422).
+  - `sort_order` above the INTEGER range was a 500; it is now 0 to 10000. A fee item name of only spaces was accepted; names are trimmed and cannot be blank.
+- **CRM**: the reason list shows the five new reasons in Shivank sir's words of 2 Nov ("Location / commute too far", "Timing mismatch", "Requires home visit", "Cannot afford", "Went to competitor"), before "Other". `types/schema.ts` regenerated from the backend OpenAPI (it also picks up the EL and Posture endpoints added since the last regeneration; tsc clean). No fee list or client type screens yet.
+- **Verified**: pytest (PG 16, CI deselects) dev 602, PR C 614, with fixes 617 passed, 0 failed; the new tests fail on 71c5875; migration upgrade / downgrade / upgrade with the enum listing all eleven values. CRM tsc, vitest 57, next build; Playwright against a local API at 1440 and 390 px, 8 / 8 (Leads page loads with an old lost lead that has no reason, the dropdown lists the new reasons with Other last, a lead saved as lost with "too_far", no 5xx or page errors), screenshots looked at.
+- **Affected Files**: `backend/app/schemas/lead.py`, `backend/app/services/lead.py`, `backend/app/schemas/settings.py`, `backend/tests/test_lead_lost_reason.py`, `backend/tests/test_fee_items_and_client_type.py`, `frontend/crm/src/features/leads/lostReasons.ts`, `frontend/crm/src/features/leads/lostReasons.test.ts`, `frontend/crm/src/types/schema.ts`
+
+---
+
 ## Known Limitations and Deferred Questions
 > Keep this list current. Remove an item only when it is resolved, and note where.
 
 | # | Item | Status | Owner |
 |---|---|---|---|
-| L-1 | Treatment list API has no `order_by`; with the default limit of 100, older sessions may be skipped | Open, queued (D-012 Part 2) | Sparsh |
+| L-1 | Treatment list API has no `order_by`; with the default limit of 100, older sessions may be skipped | Fixed 2026-10-31 in `release/crm-oct` (PR #38): sessions by treatment date then created, newest first; assessments newest first | - |
 | L-2 | WA Session Report disabled until the clinical summary endpoint exists | Open (D-012 Part 3) | Frontend |
 | L-3 | Prescriptions return 403 for CRM-only clinics; is Rx part of CRM or a separate tool? | **Deferred**: Onkar to discuss with founders. Onkar leans to "separate tool". | Onkar + founders |
 | L-4 | Patient consent (DPDP) before sending clinical info (pain, treatment) on WhatsApp | **Deferred**: founders to decide, must be settled before launch | Onkar + founders |
 | L-5 | Role templates are deny-all, contradicting the founders' 13 Aug decision | Open, queued after PR B | Sparsh |
 | L-6 | Auth still reads `users.clinic_id`; no workspace switch; membership auth incomplete | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): login uses memberships; more than one membership returns `WORKSPACE_SELECTION_REQUIRED` with the workspace list; `POST /auth/switch-workspace` issues a token for another clinic. Frontend: login shows a workspace picker and the top bar switches workspace (D-020) | - |
 | L-7 | Frontend lint config is broken (pre-existing) | Open | Unassigned |
-| L-8 | Billing resolves patient names from only the first 100 patients; others show a short reference | Open; fix with patient name in the invoice/payment API response | Sparsh (later) |
+| L-8 | Billing resolves patient names from only the first 100 patients; others show a short reference | Fixed 2026-10-31: API sends `patient_name` (PR #38); CRM uses it (D-026) | - |
 | L-9 | "Create Invoice" and "Record Payment" buttons showed for every role | Fixed 2026-10-12: hidden without `invoices.create` / `payments.record` (verified with a front desk user given view-only billing overrides) | Frontend |
 | L-10 | Permission helpers are not reactive (see D-013); long-term, convert to hooks | Open, low priority | Frontend |
 | L-11 | Recycle bin `deleted_by` is always null: the backend does not record who deleted an item | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): patients and leads record `deleted_by`, and the recycle bin shows it | - |
 | L-12 | Payroll / salary is not built (fake column removed, D-014) | Product decision needed before building | Onkar + founders |
 | L-13 | Pages that are only correct when reached via the sidebar: fixed for Leads, Therapists, Recycle Bin, Billing, then Patients, patient workspace, Appointments and the sidebar after a therapist test (D-013). All 9 pages pass a direct-load check as admin and as a therapist with overrides (2026-10-12) | Resolved | - |
-| L-14 | Clinic address, phone, lead doctor and registration no. are not stored (the fake Settings fields were removed). Invoices and prescriptions will need them | Open; add clinic profile fields | Sparsh (later), then frontend |
-| L-15 | Audit log is incomplete. `log_event` covers patient create/update/delete, user permission grant/revoke and delete, clinic settings updates and marketplace actions. Leads, appointments, invoices, payments and user creation are not audited | Open; needed for a healthcare CRM (follow-up PR) | Sparsh |
+| L-14 | Clinic address, phone, lead doctor and registration no. are not stored (the fake Settings fields were removed). Invoices and prescriptions will need them | Fixed 2026-10-31 for invoices: profile fields (PR #41), Settings and invoice header (D-026). The prescription PDF does not print them yet (L-36) | - |
+| L-15 | Audit log is incomplete. `log_event` covers patient create/update/delete, user permission grant/revoke and delete, clinic settings updates and marketplace actions. Leads, appointments, invoices, payments and user creation are not audited | Fixed 2026-10-31 in `release/crm-oct` (PR #38): leads, appointments, invoices, payments and user creation write audit rows (checked in Postgres, no passwords or tokens) | - |
 | L-16 | Booking slug: fuzzy clinic-name lookup and a missing `get_by_slug` (D-016) | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): unique `clinics.slug`, exact lookup (a partial name returns 404), slug in `/auth/me`. Frontend links by slug (D-016 retired) | - |
 | L-17 | Public booking services and time slots are a fixed list, not configured per clinic | Open, product decision | Onkar + founders |
-| L-18 | Prescription PDF falls back to "Aarogya-Virohan Clinic" when the clinic is missing (`prescription_service.py`) | Open, low | Sparsh |
+| L-18 | Prescription PDF fell back to "Aarogya-Virohan Clinic" when the clinic is missing (`prescription_service.py`) | Fixed 2026-10-20 (D-021): the clinic name comes from the prescription's clinic; "AV Clinic" (the posture report's fallback) only if that row is missing | - |
 | L-19 | Appointments have no type column; the drawer's "Appointment Type" was silently dropped and was removed | Open, product decision (add a column if needed) | Onkar + Sparsh |
 | L-20 | No overpayment check in `record_payment`: paid_amount can exceed total | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): a payment above the balance is rejected (600 of 1000 accepted, then 500 rejected, 400 accepted, then 0.01 rejected) | - |
 | L-21 | Backend required a client-sent `invoice_number` with no uniqueness | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): backend numbers invoices per clinic (INV-0001, INV-0002, ...), unique per clinic, safe under concurrent requests, client value ignored. Frontend number field removed; the created number is shown | - |
 | L-22 | `POST /users` created no `memberships` row | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): user creation creates a membership, an existing email gets a membership in the new clinic, and migration a8c4e2f1d903 backfills users without one | - |
 | L-23 | Permissions drawer shows "none" for capabilities without an override (ignores the role template) and saves explicit "none" for all of them (PUT replaces all). Harmless while templates are deny-all; would wipe template access once templates are restored | Fix together with role templates: backend returns effective scopes, drawer sends only real overrides | Sparsh + frontend |
-| L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Open; add clinic time zone (default Asia/Kolkata) | Sparsh (later) |
+| L-24 | "Today" and appointment date filters use UTC day boundaries; between 00:00 and 05:30 IST the dashboard shows the previous day | Fixed: backend uses India days (31 Oct, `release/crm-oct`); CRM Appointments, Dashboard and Book Visit use the server filters (2026-11-01, D-028) | - |
 | L-25 | DB enum `specialty_type` lacked ortho/neuro/cardiopulm/sports/paeds/general, so saving them returned 500 | Backend fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it) (12 enum values, all save). Frontend still stores pain area in `form_data.area`; moving it into `specialty` is open | Frontend |
-| L-26 | `types/schema.ts` is stale (e.g. SoapAssessment lacks `finalized`) | Open; regenerate from the backend OpenAPI | Frontend |
+| L-26 | `types/schema.ts` is stale (e.g. SoapAssessment lacks `finalized`) | Fixed 2026-10-31: regenerated from the `release/crm-oct` OpenAPI (D-026) | - |
 | L-27 | Auto-Rx creates a prescription with empty items and the note "Auto-generated prescription." (invented content on a clinical document), and the button shows even for users without prescription permissions. Not changed because Rx scope is parked with founders | Decide with Rx scope | Onkar + founders |
 | L-28 | Document storage errors reached users as raw text (e.g. "[Errno 111] Connection refused") | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): storage failures return 503 "Document storage is temporarily unavailable." | - |
 | L-29 | For non-admin roles every page called `GET /settings/clinic` and `GET /patients` and got 403 | Frontend part fixed 2026-10-12: settings are read only with `settings.view` (name/logo/colour/booking link come from `/auth/me`), patient lookups only with `patients.view` and only while a search or form is open. Verified: front desk dashboard and billing make no 403 calls | Frontend |
@@ -341,5 +676,21 @@ Each entry follows this structure:
 | L-31 | Recycle Bin returned 500 once a patient was soft-deleted (`patients.deleted_by` did not exist) | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): column added; recycle bin lists deleted patients and restore works | - |
 | L-32 | `patient_service.py` never filtered `deleted_at` | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): deleted patients are hidden from the list and search, and GET and PATCH by id return 404 | - |
 | L-33 | `GET /patients` had no status filter, so the Patients page filtered only the loaded page | Fixed 2026-10-17 in `integration/crm-merge` 8665504 (verified by running it): `?status=` on the API (invalid value returns 422); the Patients page sends it and resets to page 1 | - |
+| L-34 | Exercise Library: an account in several clinics picks the clinic at login, but there is no switcher after that (sign out to change) | Open; comes with the marketplace SSO phase | Frontend |
+| L-35 | Exercise Library loads at most 100 exercises and 100 patients per request (`page_size=100`), and the body part chips come from the first unfiltered load. Fine for today's library (13 exercises), wrong once it grows | Open; add paging or a body part list endpoint before the library passes 100 | Frontend + backend |
+| L-36 | Prescription PDF letterhead shows the clinic name with initials; the clinic logo and contact details are not printed (no clinic profile fields yet, see L-14) | Open | Frontend + Sparsh |
+| L-37 | "Therapist guidance" on a prescription is the fixed default text from the builder; there is no field to write it | Open, product decision | Onkar |
+| L-38 | Exercise images are cached in the server's memory only; the first PDF after a deploy downloads them again (parallel, 6 s cap). An image that fails prints "Image not available" | Accepted for now; move images into our own storage with the exercise image pipeline | Backend |
+| L-39 | Appointments loaded at most 500 appointments (oldest first) with no paging and filtered by day in the browser | Fixed 2026-11-01: server paging (50), Upcoming and Past order, India-day filter, status filter and total (D-028) | - |
+| L-40 | Leads list loads at most 500 leads in one request (backend maximum) and has no rows-per-page or paging (it is not a DataTable). Before 24 Oct it sent no limit and got only the API default of 100. Export CSV and the monthly table use the same 500 | Open; backend paging or a monthly count endpoint once a clinic passes 500 leads | Frontend + backend |
+| L-41 | Backend invoice PDF was a placeholder (five lines of text with a `%PDF-1.4` header) and its download URL pointed at `/api/v1/billing/invoices/...` | Fixed 2026-10-31: real server PDF for invoice and receipt, URL fixed, CRM "Download PDF" (D-027) | - |
+| L-42 | The invoice PDF download needs a signed-in clinic user, so the `download_url` and WhatsApp link from `POST /invoices/{id}/pdf` cannot be opened by a patient. The CRM WhatsApp button only opens a chat; the PDF is attached by hand | Open; a signed, expiring patient link or email with the PDF attached (C-20) | Backend + frontend |
+| L-43 | Clinic profile update accepted any length for city, state, phone, registration number and authorised person, so longer values returned 500 from the database | Fixed 2026-11-02: length limits in the API, 422 (D-029) | - |
+| L-44 | The clinic switcher is in the sidebar clinic card, which shows only when the sidebar is expanded. With the sidebar collapsed on desktop, a multi-clinic user must expand it to switch | Open; acceptable for now (D-030) | Frontend |
+| L-45 | CRM dev-only dependencies still have advisories (26 in a full `npm audit`: vite, vitest mocker, wrangler/miniflare `sharp`, undici, js-yaml and others). They run only on developer machines and CI, not in the deployed app; CI audits production dependencies only | Open; upgrade the test and tooling packages in a later change | Frontend |
+| L-46 | WeasyPrint 70 warns that a future version will need the HarfBuzz subset library, which the backend Docker image does not install. PDFs are made correctly today | Open; add the library to the Docker image and check a deploy before the next WeasyPrint major upgrade (D-032) | Backend |
+| L-47 | `GET /api/v1/auth/me` with a malformed Bearer token returns 500 instead of 401 (found in the 11 Nov prod-schema rehearsal) | Open, next CRM round | Backend |
+| L-48 | Invoice / receipt with an empty clinic name printed "Thank you for visiting ." | Fixed 2026-11-14 in D-036 (plain "Thank you." without a name) | Backend |
+| L-49 | The backend Docker image installs only `fonts-liberation`, which has no Devanagari; a clinic or patient name in Hindi would print as boxes on Railway (renders locally only because other fonts are installed). Needs a Devanagari font package in the Dockerfile, tested on a real image build | Open | Backend / deploy |
 
-*Last updated: 2026-10-12 (L-9, L-29, L-30 fixed; Patients list and command palette restyled) | Branch: feat/crm-ui-theme*
+*Last updated: 2026-11-14 (D-036 report identity) | Branch: feat/report-identity*

@@ -11,7 +11,10 @@ from app.models.product import (
 )
 from app.models.patient import Patient, PatientStatus
 from app.models.exercise import Exercise
+from app.models.exercise_photo import ExercisePhoto
+from app.models.exercise_category import ExerciseCategory, exercise_category_links
 from app.models.prescription import Prescription, PrescriptionItem
+from app.models.exercise_template import ExerciseTemplate, ExerciseTemplateItem
 from app.models.posture_session import PostureSession, PostureMeasurement
 
 # --- CRM models ---
@@ -34,6 +37,7 @@ from app.models.psychosocial import (
     PsychosocialSessionReview,
     PsychosocialSharedReport,
 )
+from app.models.clinic_fee_item import ClinicFeeItem
 
 __all__ = [
     "Base",
@@ -52,8 +56,13 @@ __all__ = [
     "Patient",
     "PatientStatus",
     "Exercise",
+    "ExercisePhoto",
+    "ExerciseCategory",
+    "exercise_category_links",
     "Prescription",
     "PrescriptionItem",
+    "ExerciseTemplate",
+    "ExerciseTemplateItem",
     "PostureSession",
     "PostureMeasurement",
     "Lead",
@@ -78,4 +87,5 @@ __all__ = [
     "PsychosocialSessionReview",
     "PsychosocialConsentRequest",
     "PsychosocialSharedReport",
+    "ClinicFeeItem",
 ]

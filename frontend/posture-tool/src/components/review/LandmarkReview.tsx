@@ -852,9 +852,11 @@ export default function LandmarkReview({ detection, loading, onBack, onConfirm }
             ) : (
               <div className="space-y-2.5">
                 {flaggedLeft > 0 && (
-                  <div className="flex items-center gap-3 rounded-2xl border border-[#F0D9B5] bg-[#FBF3E6] p-3 pl-4">
-                    <span className="h-2.5 w-2.5 flex-none rounded-full border-2 border-[#E8A23A]" />
-                    <p className="flex-1 text-[14px] text-[#6B4A12]">
+                  <div className="flex items-center gap-3 rounded-2xl border border-[#E8B4AF] bg-[#FCEBEA] p-3 pl-4">
+                    {/* Red since 27 October 2026 (Onkar): points still to
+                        check must read as unfinished work, not a soft note. */}
+                    <span className="h-2.5 w-2.5 flex-none rounded-full border-2 border-[#B4231B]" />
+                    <p className="flex-1 text-[14px] font-semibold text-[#8F1D16]">
                       {flaggedLeft === 1
                         ? "1 point to check"
                         : `${flaggedLeft} points to check`}

@@ -113,9 +113,14 @@ async def list_soap_assessments(
     )
 
     items = [SoapAssessmentResponse.model_validate(a) for a in assessments]
+    total = await service.repository.count_assessments(
+        clinic_id=clinic.id, patient_id=patient_id, appointment_id=appointment_id,
+        therapist_id=effective_therapist_id, specialty=specialty,
+        is_reassessment=is_reassessment,
+    )
     return SoapAssessmentListResponse(
         items=items,
-        total=len(items),
+        total=total,
         offset=offset,
         limit=limit,
     )

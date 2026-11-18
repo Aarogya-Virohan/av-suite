@@ -1,59 +1,156 @@
-import React from "react";
+import React, { useState } from "react";
 import { Exercise } from "@/types/exercise";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Check, Lock } from "lucide-react";
+import { Camera, Check, Tags, ImageOff, Lock, Maximize2, Play, Plus } from "lucide-react";
+import { ImageViewer } from "@/components/library/ImageViewer";
+import { cn } from "@/lib/utils";
+import { useExercisePhoto } from "@/lib/exercisePhotos";
+import { displayTitle } from "@/lib/displayTitle";
 
 interface ExerciseCardProps {
   exercise: Exercise;
   isAdded: boolean;
   onAdd: (exercise: Exercise) => void;
+  /** Shown only to users who may add clinic photos (exercises.edit). */
+  onEditPhotos?: (exercise: Exercise) => void;
+  /** Own exercises only; global ones are read-only for clinics (EL-D-008). */
+  onEditCategories?: (exercise: Exercise) => void;
 }
 
-export function ExerciseCard({ exercise, isAdded, onAdd }: ExerciseCardProps) {
+export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos, onEditCategories }: ExerciseCardProps) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const [viewing, setViewing] = useState(false);
+  // The clinic's own front photo comes first, then the library picture.
+  const front = exercise.photos?.find((p) => p.angle === "front") ?? exercise.photos?.[0];
+  const clinicUrl = useExercisePhoto(exercise.id, front);
+  const showClinic = !!front && clinicUrl !== null;
+  const showImage = !showClinic && exercise.imageUrl && !imgFailed;
+  const photoCount = exercise.photos?.length ?? 0;
+  // The full-size viewer shows whichever picture the card shows.
+  const viewerSrc = showClinic ? clinicUrl || null : showImage ? exercise.imageUrl : null;
+
+  const zoomButton = (src: string, onError?: () => void) => (
+    <button
+      type="button"
+      onClick={() => setViewing(true)}
+      aria-label={`View the ${exercise.name} picture full size`}
+      className="group/img relative h-full w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={onError}
+        className="h-full w-full object-contain"
+      />
+      <span className="absolute bottom-1 right-1 grid h-6 w-6 place-items-center rounded-md bg-midnight/60 text-white opacity-80 group-hover/img:opacity-100">
+        <Maximize2 className="h-3.5 w-3.5" aria-hidden />
+      </span>
+    </button>
+  );
+
   return (
-    <Card className="mb-3 overflow-hidden border-border/50 hover:border-primary/30 transition-all hover:shadow-md bg-card/50">
-      <CardContent className="p-4 flex flex-col gap-2 relative">
-        <div className="flex justify-between items-start gap-4">
-          <div className="flex-1">
-            <h3 className="font-semibold text-base leading-tight mb-1">{exercise.name}</h3>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-              <span className="font-medium text-primary/80">{exercise.bodyPart}</span>
-              <span>•</span>
-              <span>{exercise.condition}</span>
+    <article className="group flex gap-3.5 rounded-2xl border border-line bg-card p-3 shadow-card transition-colors hover:border-grove/30">
+      <div className="grid h-[92px] w-[132px] shrink-0 place-items-center overflow-hidden rounded-xl border border-line-soft bg-white sm:h-[104px] sm:w-[148px]">
+        {showClinic ? (
+          clinicUrl ? (
+            zoomButton(clinicUrl)
+          ) : (
+            <span className="h-full w-full animate-pulse bg-grove-wash" aria-hidden />
+          )
+        ) : showImage && exercise.imageUrl ? (
+          zoomButton(exercise.imageUrl, () => setImgFailed(true))
+        ) : exercise.videoUrl ? (
+          <a
+            href={exercise.videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Watch the ${exercise.name} demo video (opens in a new tab)`}
+            className="flex h-full w-full flex-col items-center justify-center gap-1 text-grove transition-colors hover:bg-grove-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+          >
+            <Play className="h-5 w-5" aria-hidden />
+            <span className="text-[11px] font-semibold">Watch video</span>
+          </a>
+        ) : (
+          <ImageOff className="h-5 w-5 text-[#b9b3a4]" aria-hidden />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        {/* The buttons drop under the title when the column is too narrow
+            for both (phones), so a long title is never hidden behind them. */}
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+          <div className="min-w-0 flex-1 basis-32">
+            <h3 className="font-display text-[15px] font-bold leading-snug text-ink">
+              {displayTitle(exercise.name)}
+            </h3>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-md bg-grove-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-grove">
+                {exercise.bodyPart}
+              </span>
+              {photoCount > 0 && (
+                <span className="rounded-md bg-info-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-info">
+                  Clinic photo{photoCount > 1 ? "s" : ""}
+                </span>
+              )}
               {!exercise.isFree && (
-                <>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1 font-semibold text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded text-[10px] uppercase">
-                    <Lock className="h-2.5 w-2.5" />
-                    Paid Library
-                  </span>
-                </>
+                <span className="inline-flex items-center gap-1 rounded-md bg-warn-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warn">
+                  <Lock className="h-2.5 w-2.5" />
+                  Paid
+                </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {exercise.instructions}
-            </p>
           </div>
-          <Button
-            variant={isAdded ? "secondary" : "default"}
-            size="sm"
-            className="shrink-0 transition-all"
+
+          <div className="flex shrink-0 items-center gap-1.5">
+          {onEditCategories && !exercise.isGlobal && (
+            <button
+              type="button"
+              onClick={() => onEditCategories(exercise)}
+              aria-label={`Categories for ${exercise.name}`}
+              title="Categories"
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded-[10px] border border-line text-grove transition-colors hover:bg-grove-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+            >
+              <Tags className="h-4 w-4" />
+            </button>
+          )}
+          {onEditPhotos && (
+            <button
+              type="button"
+              onClick={() => onEditPhotos(exercise)}
+              aria-label={`Clinic photos for ${exercise.name}`}
+              title="Clinic photos"
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded-[10px] border border-line text-grove transition-colors hover:bg-grove-wash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25"
+            >
+              <Camera className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
             disabled={isAdded}
             onClick={() => onAdd(exercise)}
-          >
-            {isAdded ? (
-              <>
-                <Check className="mr-1.5 h-3.5 w-3.5" />
-                Added
-              </>
-            ) : (
-              "+ Add"
+            aria-label={isAdded ? `${exercise.name} added` : `Add ${exercise.name}`}
+            className={cn(
+              "flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-[10px] px-3 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grove/25",
+              isAdded
+                ? "cursor-default bg-ok-wash text-ok"
+                : "bg-grove text-white shadow-primary hover:bg-grove-hover"
             )}
-          </Button>
+          >
+            {isAdded ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {isAdded ? "Added" : "Add"}
+          </button>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+        {exercise.instructions && (
+          <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-ink-2">{exercise.instructions}</p>
+        )}
+      </div>
+      {viewing && viewerSrc && (
+        <ImageViewer src={viewerSrc} title={exercise.name} onClose={() => setViewing(false)} />
+      )}
+    </article>
   );
 }
-

@@ -44,7 +44,7 @@ async def patient(db_session: AsyncSession):
     stmt = select(Patient).where(Patient.first_name == "Test", Patient.last_name == "Pat")
     pat = (await db_session.execute(stmt)).scalars().first()
     if not pat:
-        pat = Patient(id=uuid4(), clinic_id=clinic.id, first_name="Test", last_name="Pat", phone="1234567890", gender="male", date_of_birth=datetime(1990, 1, 1).date())
+        pat = Patient(id=uuid4(), clinic_id=clinic.id, display_number=uuid4().int % 9_000_000_000 + 1, first_name="Test", last_name="Pat", phone="1234567890", gender="male", date_of_birth=datetime(1990, 1, 1).date())
         db_session.add(pat)
         await db_session.commit()
     return pat

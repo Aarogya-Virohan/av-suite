@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.enums.appointment import AppointmentSource, AppointmentStatus
+from app.enums.user import UserRole
 
 
 class AppointmentBase(BaseModel):
@@ -78,3 +79,11 @@ class AppointmentListResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+class AssignableTherapist(BaseModel):
+    """A user an appointment can be booked with (Book Visit, D-029)."""
+
+    id: UUID
+    name: str
+    role: UserRole

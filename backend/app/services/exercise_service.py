@@ -21,7 +21,7 @@ from app.models.exercise import Exercise
 from app.schemas.exercise import ExerciseCreate, ExerciseUpdate
 from app.schemas.common import PaginationParams
 from app.repositories.exercise import ExerciseRepository
-from typing import Optional, List, Tuple
+from typing import Optional, List, Sequence, Tuple
 import uuid
 import logging
 
@@ -34,7 +34,8 @@ async def get_exercises(
     pagination: PaginationParams,
     body_part: Optional[str] = None,
     is_free: Optional[bool] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    category_conditions: Sequence = (),
 ) -> Tuple[List[Exercise], int]:
     """
     Function ka purpose: Clinic aur global exercises ko list karna advanced filters ke saath
@@ -100,7 +101,9 @@ async def get_exercises(
         logger.debug(f"Fetching exercises for clinic {clinic_id}")
         
         repo = ExerciseRepository(db)
-        return await repo.list_exercises(clinic_id, pagination, body_part, is_free, search)
+        return await repo.list_exercises(
+            clinic_id, pagination, body_part, is_free, search, category_conditions
+        )
         
     except ValueError as e:
         logger.error(f"Invalid clinic_id format: {clinic_id}")
@@ -248,21 +251,29 @@ async def get_exercise_by_id(
         raise
 
 
+class GlobalExerciseReadOnly(Exception):
+    """A clinic tried to change or delete a global exercise (EL-D-008)."""
+
+
 async def update_exercise(
     db: AsyncSession,
     clinic_id: str,
     exercise_id: str,
     exercise_in: ExerciseUpdate,
 ) -> Optional[Exercise]:
-    """Update an exercise if it exists in clinic scope (or is global)."""
+    """Update one of the clinic's own exercises. Global exercises are read-only for clinics."""
 
     try:
         repo = ExerciseRepository(db)
         exercise = await repo.get_exercise_by_id(clinic_id, exercise_id)
         if not exercise:
             return None
+        if exercise.clinic_id is None:
+            raise GlobalExerciseReadOnly()
 
         return await repo.update_exercise(exercise, exercise_in)
+    except GlobalExerciseReadOnly:
+        raise
     except Exception as e:
         logger.error(f"Update exercise error: {str(e)}")
         await db.rollback()
@@ -274,16 +285,20 @@ async def delete_exercise(
     clinic_id: str,
     exercise_id: str,
 ) -> bool:
-    """Delete an exercise if it exists in clinic scope (or is global)."""
+    """Delete one of the clinic's own exercises. Global exercises are read-only for clinics."""
 
     try:
         repo = ExerciseRepository(db)
         exercise = await repo.get_exercise_by_id(clinic_id, exercise_id)
         if not exercise:
             return False
+        if exercise.clinic_id is None:
+            raise GlobalExerciseReadOnly()
 
         await repo.delete_exercise(exercise)
         return True
+    except GlobalExerciseReadOnly:
+        raise
     except Exception as e:
         logger.error(f"Delete exercise error: {str(e)}")
         await db.rollback()

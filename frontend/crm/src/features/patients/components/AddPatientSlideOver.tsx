@@ -35,7 +35,8 @@ export function AddPatientSlideOver({ isOpen, onClose }: AddPatientSlideOverProp
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<PatientFormValues>({
+    control,
+} = useForm<PatientFormValues>({
     resolver: zodResolver(patientFormSchema),
     defaultValues: EMPTY,
   });
@@ -58,7 +59,7 @@ export function AddPatientSlideOver({ isOpen, onClose }: AddPatientSlideOverProp
   return (
     <SlideOver isOpen={isOpen} onClose={onClose} title="Add New Patient" subtitle="Create a new patient record">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-        <PatientFormFields register={register} errors={errors} idPrefix="add-patient" />
+        <PatientFormFields register={register} control={control} errors={errors} idPrefix="add-patient" />
         <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel

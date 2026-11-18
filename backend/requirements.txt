@@ -7,14 +7,14 @@ sqlalchemy==2.0.54
 greenlet==3.5.6
 asyncpg==0.31.0
 alembic==1.20.0
-python-jose[cryptography]==3.5.0
+PyJWT==2.15.1
 passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
 email-validator==2.3.0
 python-multipart==0.0.32
 supabase==2.31.0
 httpx==0.28.1
-weasyprint==69.0
+weasyprint==70.0
 mediapipe==0.10.14
 # mediapipe pulls these in; pinned so a rebuild cannot drift (cv2 is shared
 # by opencv-contrib-python and opencv-python-headless, so both use one version).
@@ -28,4 +28,5 @@ Pillow==10.4.0
 pillow-heif==0.18.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
+pypdf==6.21.4
 aiosqlite==0.22.1

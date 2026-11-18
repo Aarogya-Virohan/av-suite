@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -15,6 +15,7 @@ from app.schemas.analytics import (
 )
 from app.repositories.analytics import AnalyticsRepository
 from app.utils.analytics_periods import AnalyticsPeriods
+from app.core.timezone import CLINIC_TZ
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -33,11 +34,14 @@ class AnalyticsService:
         *,
         patient_revenue_sort: PatientRevenueSort = PatientRevenueSort.COLLECTED_AMOUNT,
         patient_revenue_limit: int = 5,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> AnalyticsOverviewEnvelope:
         """Compute all clinic-scoped analytics metrics using efficient SQL aggregations."""
 
-        periods = AnalyticsPeriods.containing(datetime.now(timezone.utc))
-        selected_range = periods.for_period(period)
+        periods = AnalyticsPeriods.containing(datetime.now(CLINIC_TZ))
+        selected_range = AnalyticsPeriods.explicit(start_date, end_date) if start_date and end_date else periods.for_period(period)
+        response_period = AnalyticsPeriod.CUSTOM if start_date and end_date else period
 
         repo = AnalyticsRepository(self.session)
 
@@ -79,7 +83,7 @@ class AnalyticsService:
                 booking=booking_analytics,
             ),
             meta=AnalyticsPeriodMetadata(
-                period=period,
+                period=response_period,
                 start=selected_range.start,
                 end=selected_range.end,
             ),
@@ -90,6 +94,9 @@ class AnalyticsService:
         clinic_id: UUID,
         therapist_id: UUID,
         period: AnalyticsPeriod = AnalyticsPeriod.MONTH,
+        *,
+        start_date: date | None = None,
+        end_date: date | None = None,
     ) -> TherapistPerformanceEnvelope:
         """
         Compute therapist-scoped 'own only' performance metrics.
@@ -99,8 +106,9 @@ class AnalyticsService:
         Only returns data belonging to the requesting therapist.
         """
 
-        periods = AnalyticsPeriods.containing(datetime.now(timezone.utc))
-        selected_range = periods.for_period(period)
+        periods = AnalyticsPeriods.containing(datetime.now(CLINIC_TZ))
+        selected_range = AnalyticsPeriods.explicit(start_date, end_date) if start_date and end_date else periods.for_period(period)
+        response_period = AnalyticsPeriod.CUSTOM if start_date and end_date else period
 
         repo = AnalyticsRepository(self.session)
 
@@ -114,7 +122,7 @@ class AnalyticsService:
         return TherapistPerformanceEnvelope(
             data=performance,
             meta=AnalyticsPeriodMetadata(
-                period=period,
+                period=response_period,
                 start=selected_range.start,
                 end=selected_range.end,
             ),

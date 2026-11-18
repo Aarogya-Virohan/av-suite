@@ -24,6 +24,7 @@ from app.enums.user import UserRole
 from app.repositories.audit import AuditLogRepository
 from app.services.audit import AuditLogService
 from app.screening.access import check_clinical_grant
+from app.services.audit import log_event_safely
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,6 @@ async def list_users(
     List all users/therapists in the clinic.
     """
     clinic_id = auth_context.clinic.id
-
     stmt = (
         select(User, Membership.role)
         .join(Membership, Membership.user_id == User.id)
@@ -81,6 +81,7 @@ async def create_user(
     Create a new user in the clinic.
     """
     clinic_id = auth_context.clinic.id
+    user_was_created = False
     
     # Extract first/last name if only name is provided
     fname = payload.first_name
@@ -108,6 +109,7 @@ async def create_user(
             )
             db.add(new_user)
             await db.flush()
+            user_was_created = True
 
         membership = await db.scalar(
             select(Membership).where(
@@ -161,6 +163,13 @@ async def create_user(
                         status_code=409, detail="Membership creation conflicted"
                     )
         await db.refresh(new_user)
+
+    if user_was_created:
+        await log_event_safely(
+            db, clinic_id, auth_context.user.id, "create", "user", new_user.id,
+            {"role": payload.role.value if hasattr(payload.role, "value") else str(payload.role),
+             "is_active": bool(new_user.is_active)},
+        )
     
     # Add name field for UserRead compatibility
     u_dict = {

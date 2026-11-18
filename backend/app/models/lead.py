@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 from app.models.base import SoftDeleteMixin, TimestampMixin, UUIDMixin
-from app.enums.lead import LeadStage, LeadSource
+from app.enums.lead import LeadStage, LeadSource, LeadLostReason
 from app.models.clinic import Clinic
 from app.models.patient import Patient
 from app.models.user import User
@@ -56,6 +56,12 @@ class Lead(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         default=LeadStage.NEW,
         nullable=False,
     )
+
+    lost_reason: Mapped[LeadLostReason | None] = mapped_column(
+        Enum(LeadLostReason, name="lead_lost_reason", values_callable=lambda x: [e.value for e in x], create_type=False),
+        nullable=True,
+    )
+    lost_remark: Mapped[str | None] = mapped_column(String(length=500), nullable=True)
 
     assigned_to: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),

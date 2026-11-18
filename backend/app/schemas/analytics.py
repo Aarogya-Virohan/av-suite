@@ -11,7 +11,7 @@ from app.schemas.envelope import ResponseEnvelope
 
 
 class AnalyticsPeriodMetadata(BaseModel):
-    """Selected UTC calendar range; ``start`` is inclusive and ``end`` exclusive."""
+    """Selected India calendar range; ``start`` is inclusive and ``end`` exclusive."""
 
     period: AnalyticsPeriod
     start: datetime
@@ -44,13 +44,13 @@ class RevenueAnalytics(BaseModel):
     billed_amount_in_period: Decimal = Field(
         description=(
             "Sum of non-draft, non-cancelled invoice total_amount values whose "
-            "issue_date is within the selected UTC period [start, end)."
+            "issue_date is within the selected India-time period [start, end)."
         )
     )
     collected_amount_in_period: Decimal = Field(
         description=(
             "Sum of completed payment amounts whose payment_date is within the "
-            "selected UTC period [start, end), linked to a non-deleted invoice. "
+            "selected India-time period [start, end), linked to a non-deleted invoice. "
             "The current invoice status does not reverse a completed payment."
         )
     )
@@ -65,7 +65,7 @@ class RevenueAnalytics(BaseModel):
         deprecated=True,
         description=(
             "Deprecated legacy metric: sum Invoice.paid_amount for non-deleted "
-            "invoices whose issue_date is in the current UTC calendar month. "
+            "invoices whose issue_date is in the current India calendar month. "
             "No invoice-status filter is applied. This is not a cash-collected "
             "payment-date metric; prefer collected_amount_in_period."
         ),
@@ -74,7 +74,7 @@ class RevenueAnalytics(BaseModel):
         deprecated=True,
         description=(
             "Deprecated legacy metric: sum Invoice.paid_amount for non-deleted "
-            "invoices whose issue_date is within the selected UTC period "
+            "invoices whose issue_date is within the selected India-time period "
             "[start, end). No invoice-status filter is applied. This is not a "
             "cash-collected payment-date metric."
         ),

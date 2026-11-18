@@ -24,6 +24,10 @@ export interface Measurement {
   // component's job, not the payload's.
   side: "left" | "right" | null
   sideLabel: string | null
+  // The band this row's grade treats as Normal ("Normal range"),
+  // from backend reference_ranges.py since 17 November 2026. Optional:
+  // earlier reports do not carry it.
+  screeningRange?: string
 }
 
 export interface ViewData {
@@ -34,6 +38,9 @@ export interface ViewData {
   // How the photograph was taken. Sent by the backend since 3 October 2026;
   // optional because earlier reports do not carry it.
   captureSource?: "camera" | "upload" | "unknown"
+  // Phone tilt corrected before measuring, since 27 October 2026. null on a
+  // new report when no tilt was known; absent on older reports.
+  levelCorrection?: { degrees: number; calibrated: boolean } | null
 }
 
 export interface SynthesisData {
@@ -60,9 +67,10 @@ export interface PostureReport {
     heightCm?: number
   }
 
-  // Clinic letterhead, to come from the marketplace (AV Suite core). Absent
-  // today, so every report shows the Aarogya Virohan fallback. Same fields
-  // as report["branding"] in pdf_service.py.
+  // Clinic letterhead: the signed-in clinic, added by the backend's /report
+  // route from the clinics row since 17 November 2026 (clinic_letterhead.py).
+  // Absent only when the clinic has no name; the Aarogya Virohan letterhead
+  // is shown then.
   branding?: ClinicBranding
 
   views: {
@@ -91,6 +99,10 @@ export interface PostureReport {
   // Founders' Q5 replacement, the regional profile, since 11 October 2026.
   // Optional because earlier reports do not carry it.
   signature?: BiomechanicalSignature
+
+  // "Normal ranges: basis and sources", since 17 November 2026.
+  screeningNote?: string
+  screeningSources?: { name: string; text: string }[]
 }
 
 export interface ClinicBranding {

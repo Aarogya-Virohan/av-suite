@@ -14,6 +14,8 @@
 import type { ChangeEvent } from "react"
 import { useId, useState } from "react"
 
+import type { CaptureLevel } from "@/lib/tilt"
+
 import CameraCapture, { requestMotionPermission } from "./CameraCapture"
 import type { CaptureView } from "./CameraCapture"
 
@@ -23,6 +25,8 @@ interface UploadZoneProps {
   setImage: (image: string) => void
   setImageFile: (file: File) => void
   setSource: (source: "camera" | "upload") => void
+  // Phone tilt at capture; null for an upload or a device without a sensor.
+  setLevel: (level: CaptureLevel | null) => void
   required?: boolean
   // "Front photo is required", shown after a Continue with this slot empty.
   error?: string | null
@@ -59,6 +63,7 @@ export default function UploadZone({
   setImage,
   setImageFile,
   setSource,
+  setLevel,
   required = false,
   error = null,
 }: UploadZoneProps) {
@@ -77,6 +82,7 @@ export default function UploadZone({
     setImageFile(file)
     setLocalSource("upload")
     setSource("upload")
+    setLevel(null)
     // Lets the same file be chosen again after a retake.
     e.target.value = ""
   }
@@ -142,12 +148,13 @@ export default function UploadZone({
         <CameraCapture
           view={view}
           label={label}
-          onCapture={(file, previewUrl) => {
+          onCapture={(file, previewUrl, level) => {
             setThumb(previewUrl)
             setImage(previewUrl)
             setImageFile(file)
             setLocalSource("camera")
             setSource("camera")
+            setLevel(level)
           }}
           onClose={() => setCameraOpen(false)}
         />

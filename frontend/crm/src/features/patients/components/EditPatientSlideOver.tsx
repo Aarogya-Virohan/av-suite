@@ -42,7 +42,8 @@ export function EditPatientSlideOver({ isOpen, onClose, patient }: EditPatientSl
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<PatientFormValues>({
+    control,
+} = useForm<PatientFormValues>({
     resolver: zodResolver(patientFormSchema),
     defaultValues: fromPatient(patient),
   });
@@ -68,7 +69,7 @@ export function EditPatientSlideOver({ isOpen, onClose, patient }: EditPatientSl
   return (
     <SlideOver isOpen={isOpen} onClose={onClose} title="Edit Patient" subtitle="Update existing patient record">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-        <PatientFormFields register={register} errors={errors} idPrefix="edit-patient" />
+        <PatientFormFields register={register} control={control} errors={errors} idPrefix="edit-patient" />
         <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel

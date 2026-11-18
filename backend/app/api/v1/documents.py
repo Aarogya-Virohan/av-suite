@@ -30,6 +30,7 @@ from app.services.document import (
     DocumentService,
     DocumentValidationError,
 )
+from app.services.audit import log_event_safely
 
 
 def check_documents_enabled(clinic: Clinic = Depends(get_current_clinic)) -> None:
@@ -168,8 +169,11 @@ async def list_patient_documents_by_patient(
         limit=limit,
     )
     items = [PatientDocumentResponse.model_validate(doc) for doc in documents]
+    total = await service.document_repository.count_documents(
+        clinic_id=clinic.id, patient_id=patient_id, treatment_id=treatment_id, category=category
+    )
     return PatientDocumentListResponse(
-        items=items, total=len(items), offset=offset, limit=limit
+        items=items, total=total, offset=offset, limit=limit
     )
 
 
@@ -195,8 +199,11 @@ async def list_documents(
         limit=limit,
     )
     items = [PatientDocumentResponse.model_validate(doc) for doc in documents]
+    total = await service.document_repository.count_documents(
+        clinic_id=clinic.id, patient_id=patient_id, treatment_id=treatment_id, category=category
+    )
     return PatientDocumentListResponse(
-        items=items, total=len(items), offset=offset, limit=limit
+        items=items, total=total, offset=offset, limit=limit
     )
 
 
@@ -222,6 +229,7 @@ async def get_document(
 async def download_document(
     id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: DocumentServiceDep,
     scope: CapabilityScope = Depends(require_capability("documents.view")),
 ) -> Response:
@@ -236,6 +244,10 @@ async def download_document(
         if document.file_url.startswith("http"):
             url = document.file_url
             headers = {"Location": url}
+            await log_event_safely(
+                service.document_repository.session, clinic.id, user.id,
+                "download", "document", document.id,
+            )
             return Response(
                 status_code=status.HTTP_307_TEMPORARY_REDIRECT, headers=headers
             )
@@ -243,6 +255,11 @@ async def download_document(
             from app.core.storage import storage_client
 
             file_bytes = storage_client.download_file(document.file_url)
+
+            await log_event_safely(
+                service.document_repository.session, clinic.id, user.id,
+                "download", "document", document.id,
+            )
 
             headers = {
                 "Content-Disposition": f'attachment; filename="{document.label}"',

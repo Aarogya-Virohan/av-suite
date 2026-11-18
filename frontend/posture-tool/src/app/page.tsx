@@ -1,12 +1,15 @@
 "use client"
 
 import { useState } from "react"
+import type { CaptureLevel } from "@/lib/tilt"
 
 import UploadZone from "@/components/posture/UploadZone"
 
 import ReportCard from "@/components/report/ReportCard"
 
 import LandmarkReview from "@/components/review/LandmarkReview"
+
+import AuthGate, { useSession } from "@/components/auth/AuthGate"
 
 import { detectLandmarks, downloadPostureReportPdf, generateReport } from "@/lib/api"
 
@@ -17,10 +20,10 @@ import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@
 type Step = "upload" | "review" | "report"
 
 // App bar, brand direction B (13 October 2026): the Midnight band of the AV
-// Suite CRM with the white logo and the three steps of an assessment. On
-// the report step the report's own letterhead carries the logo, so the bar
-// shows only the product name; two logos one above the other read as a
-// mistake.
+// Suite CRM with the white logo and the three steps of an assessment. The
+// logo shows on every step since 17 November 2026: the report's letterhead
+// now carries the clinic's logo, not Aarogya Virohan's, so step 3 no longer
+// fell back to the name as text.
 const STEP_ORDER: { key: Step; label: string }[] = [
   { key: "upload", label: "Patient & photos" },
   { key: "review", label: "Landmark check" },
@@ -29,18 +32,27 @@ const STEP_ORDER: { key: Step; label: string }[] = [
 
 function Header({ step }: { step: Step }) {
   const current = STEP_ORDER.findIndex((s) => s.key === step)
+  const { me, signOut } = useSession()
+  const leave = () => {
+    if (step !== "upload" && !window.confirm("Sign out? This assessment will be lost.")) return
+    signOut()
+  }
   return (
     <header className="bg-[linear-gradient(115deg,#0B1238_0%,#121F4A_60%,#1B4A54_100%)] text-white">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
-        {step !== "report" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src="/brand/av_logo_wordmark_white.png" alt="Aarogya Virohan" className="h-6 w-auto" />
-        ) : (
-          <span className="font-display text-[15px] font-bold">Aarogya Virohan</span>
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/av_logo_wordmark_white.png" alt="Aarogya Virohan" className="h-6 w-auto" />
         <span className="rounded-full bg-[#C1FF72] px-2.5 py-0.5 text-[11.5px] font-bold text-[#0B1238]">
           Posture Tool
         </span>
+        <div className="ml-auto flex min-w-0 items-center gap-3 text-[12px] sm:order-last sm:ml-4">
+          <span className="max-w-[160px] truncate text-[#C3C9E6]" title={me.user.email}>
+            {me.clinic?.name ?? me.user.email}
+          </span>
+          <button type="button" onClick={leave} className="font-semibold text-white underline-offset-2 hover:underline">
+            Sign out
+          </button>
+        </div>
         <ol className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto" aria-label="Assessment steps">
           {STEP_ORDER.map((s, i) => {
             const active = i === current
@@ -130,7 +142,7 @@ function HeightHint() {
   )
 }
 
-export default function Page() {
+function Assessment() {
 const [step, setStep] =
 useState<Step>("upload")
 
@@ -153,7 +165,7 @@ const [backFile, setBackFile] =
 useState<File | null>(null)
 
 // Whether each photograph came from the in-app capture screen or from an
-// existing file. An uploaded photo skips the tripod, framing and encoding
+// existing file. An uploaded photo skips the tilt correction, framing and encoding
 // protocol, so a measurement taken from one is not comparable with a
 // guided capture of the same patient. The report records which it was.
 type CaptureSource = "camera" | "upload" | "unknown"
@@ -166,6 +178,17 @@ useState<CaptureSource>("unknown")
 
 const [backSource, setBackSource] =
 useState<CaptureSource>("unknown")
+
+// Phone tilt at capture for each guided photo (lib/tilt.ts), corrected on
+// the server. null for uploads and devices without a tilt sensor.
+const [frontLevel, setFrontLevel] =
+useState<CaptureLevel | null>(null)
+
+const [sideLevel, setSideLevel] =
+useState<CaptureLevel | null>(null)
+
+const [backLevel, setBackLevel] =
+useState<CaptureLevel | null>(null)
 
 const [patientName, setPatientName] =
 useState("")
@@ -335,6 +358,9 @@ const resetAll = () => {
                 setFrontSource("unknown")
                 setSideSource("unknown")
                 setBackSource("unknown")
+                setFrontLevel(null)
+                setSideLevel(null)
+                setBackLevel(null)
 
                 setPatientName("")
                 setAge("")
@@ -375,6 +401,9 @@ try {
     frontSource,
     sideSource,
     backSource,
+    frontLevel,
+    sideLevel,
+    backLevel,
   })
 
   setReport(result)
@@ -449,13 +478,13 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
         <div className="mt-4 rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-5 sm:p-6">
           <h2 className="font-display text-[17px] font-bold text-[#141A33]">Photographs</h2>
           <p className="mt-1 text-[14px] leading-relaxed text-[#5D6380]">
-            The camera only takes the photo when the phone is level. An uploaded photo is measured
-            the same way, but the report marks it as not checked.
+            The camera measures how the phone is tilted and corrects for it. An uploaded photo is
+            measured the same way, but without that correction, and the report marks it.
           </p>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <UploadZone label="Front" view="front" required error={photoError(frontImage, "Front")} setImage={setFrontImage} setImageFile={setFrontFile} setSource={setFrontSource} />
-            <UploadZone label="Side" view="side" required error={photoError(sideImage, "Side")} setImage={setSideImage} setImageFile={setSideFile} setSource={setSideSource} />
-            <UploadZone label="Back" view="back" required error={photoError(backImage, "Back")} setImage={setBackImage} setImageFile={setBackFile} setSource={setBackSource} />
+            <UploadZone label="Front" view="front" required error={photoError(frontImage, "Front")} setImage={setFrontImage} setImageFile={setFrontFile} setSource={setFrontSource} setLevel={setFrontLevel} />
+            <UploadZone label="Side" view="side" required error={photoError(sideImage, "Side")} setImage={setSideImage} setImageFile={setSideFile} setSource={setSideSource} setLevel={setSideLevel} />
+            <UploadZone label="Back" view="back" required error={photoError(backImage, "Back")} setImage={setBackImage} setImageFile={setBackFile} setSource={setBackSource} setLevel={setBackLevel} />
           </div>
           <details className="mt-4 rounded-xl bg-[#F3EEE2] px-4 py-3 text-[13px] leading-relaxed text-[#5D6380]">
             <summary className="cursor-pointer font-medium text-[#141A33]">What makes a good photo?</summary>
@@ -565,4 +594,14 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
 </div>
 
 )
+}
+
+// Signed-in only (U1, 14 November 2026). Also served at /analyze, the
+// address the CRM patient page opens.
+export default function Page() {
+  return (
+    <AuthGate>
+      <Assessment />
+    </AuthGate>
+  )
 }

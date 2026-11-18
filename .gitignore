@@ -58,6 +58,9 @@ record.html
 *.yml
 !render.yaml
 !render.yml
+!frontend/av-marketplace/package.json
+!frontend/av-marketplace/package-lock.json
+!frontend/av-marketplace/tsconfig.json
 
 # Environment Secrets - NEVER commit (templates are allowed)
 .env

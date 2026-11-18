@@ -9,7 +9,6 @@ import { RecordPaymentSlideOver } from '../../../features/billing/components/Rec
 import { InvoicePreviewModal } from '../../../features/billing/components/InvoicePreviewModal';
 import { Invoice, Payment, Package, InvoiceStatus } from '../../../types/api';
 import { Plus, CreditCard, FileText, Package as PackageIcon, Eye, Printer } from 'lucide-react';
-import { usePatients } from '../../../features/patients/api';
 import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { Avatar, Badge, type BadgeTone, Button, PageHeader, SegmentGroup, SegmentTab } from '../../../components/ui/brand';
@@ -79,17 +78,35 @@ export default function BillingPage() {
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
   const [previewMode, setPreviewMode] = useState<'invoice' | 'receipt'>('invoice');
 
+  // The preview is a modal without its own route, so the browser Back button
+  // used to leave Billing (founder feedback C-12). Opening it now adds a
+  // history entry, Back closes the modal, and closing it pops that entry.
+  // Next's own history state is copied, otherwise the App Router reloads the
+  // page on popstate.
+  const openPreview = (inv: Invoice, mode: 'invoice' | 'receipt') => {
+    setPreviewInvoice(inv);
+    setPreviewMode(mode);
+    window.history.pushState({ ...(window.history.state ?? {}), avInvoicePreview: true }, '');
+  };
+  const closePreview = () => {
+    if (window.history.state?.avInvoicePreview) window.history.back();
+    else setPreviewInvoice(null);
+  };
+  React.useEffect(() => {
+    const onPop = () => {
+      if (!window.history.state?.avInvoicePreview) setPreviewInvoice(null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const { data: invoices = [], isLoading: isLoadingInvoices } = useInvoices(canViewInvoices);
   const { data: payments = [], isLoading: isLoadingPayments } = usePayments(canViewPayments);
   const { data: packages = [], isLoading: isLoadingPackages } = usePackages(canViewPackages);
-  const { data: patientsResponse } = usePatients(undefined, 1, 100, isAllowed && hasCapability('patients.view'));
-  const patients = patientsResponse?.data || [];
-
-  const getPatientName = (patientId: string) => {
-    const p = patients.find((patient) => patient.id === patientId);
-    // Only the first 100 patients are loaded here (known limitation L-8).
-    return p ? `${p.first_name} ${p.last_name}` : `Patient #${patientId.slice(0, 8).toUpperCase()}`;
-  };
+  // Names come with each invoice and payment from the API, so every row has
+  // one (this replaced the first-100-patients lookup, Decisions.md L-8).
+  const getPatientName = (row: { patient_id: string; patient_name?: string | null }) =>
+    row.patient_name?.trim() || `Patient #${row.patient_id.slice(0, 8).toUpperCase()}`;
 
   const counts: Record<TabKey, number> = {
     invoices: invoices.length,
@@ -111,7 +128,7 @@ export default function BillingPage() {
       key: 'patient',
       header: 'Patient',
       render: (inv) => {
-        const name = getPatientName(inv.patient_id);
+        const name = getPatientName(inv);
         return (
           <div className="flex items-center gap-2.5">
             <Avatar name={name} size={30} />
@@ -145,10 +162,7 @@ export default function BillingPage() {
       render: (inv) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              setPreviewInvoice(inv);
-              setPreviewMode('invoice');
-            }}
+            onClick={() => openPreview(inv, 'invoice')}
             className={cn(SMALL_ACTION, 'border border-line bg-card text-ink-2 hover:bg-canvas')}
           >
             <Eye className="h-3.5 w-3.5" />
@@ -156,10 +170,7 @@ export default function BillingPage() {
           </button>
           {inv.status === 'paid' && (
             <button
-              onClick={() => {
-                setPreviewInvoice(inv);
-                setPreviewMode('receipt');
-              }}
+              onClick={() => openPreview(inv, 'receipt')}
               className={cn(SMALL_ACTION, 'bg-ok-wash text-ok hover:bg-[#d3eedc]')}
             >
               <Printer className="h-3.5 w-3.5" />
@@ -185,7 +196,7 @@ export default function BillingPage() {
       key: 'patient',
       header: 'Patient',
       render: (p) => {
-        const name = getPatientName(p.patient_id);
+        const name = getPatientName(p);
         return (
           <div className="flex items-center gap-2.5">
             <Avatar name={name} size={30} />
@@ -266,7 +277,7 @@ export default function BillingPage() {
             columns={invoiceColumns}
             data={invoices}
             isLoading={isLoadingInvoices}
-            searchField={(inv) => `${inv.invoice_number} ${getPatientName(inv.patient_id)}`}
+            searchField={(inv) => `${inv.invoice_number} ${getPatientName(inv)}`}
             searchPlaceholder="Search invoices by number or patient name..."
           />
         )}
@@ -276,7 +287,7 @@ export default function BillingPage() {
             columns={paymentColumns}
             data={payments}
             isLoading={isLoadingPayments}
-            searchField={(p) => getPatientName(p.patient_id)}
+            searchField={(p) => getPatientName(p)}
             searchPlaceholder="Search payments by patient name..."
           />
         )}
@@ -296,7 +307,7 @@ export default function BillingPage() {
         <RecordPaymentSlideOver isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />
         <InvoicePreviewModal
           isOpen={!!previewInvoice}
-          onClose={() => setPreviewInvoice(null)}
+          onClose={closePreview}
           invoice={previewInvoice}
           mode={previewMode}
         />

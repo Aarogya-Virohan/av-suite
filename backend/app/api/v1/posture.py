@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Body
 from fastapi import File
 from fastapi import Form
 from fastapi import UploadFile
 from fastapi.responses import Response
 
+import asyncio
 import base64
 import re
 import uuid
@@ -12,12 +13,14 @@ import uuid
 import cv2
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from types import SimpleNamespace
 
 from mediapipe.framework.formats import landmark_pb2
 
+from app.core.dependencies import PermissionContextDep, require_capability
 from app.services.posture.decoder import decode_image_bytes
 from app.services.posture.schemas import Landmark
 from app.services.posture.review import (
@@ -43,6 +46,14 @@ from app.services.posture.exceptions import (
     InsufficientVisibilityError,
 )
 from app.services.posture.pdf_service import generate_posture_pdf
+from app.services.posture.clinic_letterhead import clinic_letterhead, web_branding
+from app.services.posture.reference_ranges import LABELS as REF_LABELS
+from app.services.posture.level import (
+    rotate_display_image,
+    rotate_landmarks,
+    rotate_pixel_pair,
+    validate_correction,
+)
 
 from app.services.posture.calculator import (
     calc_cva,
@@ -149,7 +160,12 @@ def _rearfoot_label(value: float, side_label: str) -> str:
     return f"Rearfoot Alignment ({side_label})"
 
 
-router = APIRouter(prefix="/posture", tags=["posture"])
+# Mounted under /api/v1/posture in app/api/v1/router.py. Every endpoint runs
+# an analysis or renders its report, so each needs posture.create (which also
+# checks the clinic has the posture-tool product enabled).
+router = APIRouter()
+IST = ZoneInfo("Asia/Kolkata")
+_CAN_RUN = [Depends(require_capability("posture.create"))]
 
 
 
@@ -236,6 +252,16 @@ def _annotate_or_blank(
 # The founders ruled that no report is generated until the landmarks are
 # confirmed (Q6); /detect then /report replaces it.
 
+# Typed into an optional field to mean "nothing", these printed on reports as
+# "Assessing physiotherapist: Na" (13 and 27 October 2026). Treated as empty.
+_PLACEHOLDERS = {"na", "n/a", "n.a.", "nil", "none", "-", "--", "null", "not applicable"}
+
+
+def blank_if_placeholder(value: str | None) -> str:
+    v = (value or "").strip()
+    return "" if v.lower() in _PLACEHOLDERS else v
+
+
 def report_filename(case_ref: str, now: datetime, unique: str) -> str:
     """
     File name for a saved report.
@@ -311,7 +337,7 @@ def _report_from_points(
         side_measurements.append(
             measurement(
                 "PT-L01",
-                "Forward Head (CVA)",
+                REF_LABELS["PT-L01"],
                 cva,
                 "\u00b0",
                 severity,
@@ -321,7 +347,7 @@ def _report_from_points(
 
     except InsufficientVisibilityError:
         side_measurements.append(
-            measurement("PT-L01", "Forward Head (CVA)", None, "\u00b0", "insufficient_data")
+            measurement("PT-L01", REF_LABELS["PT-L01"], None, "\u00b0", "insufficient_data")
         )
 
     # PT-L05 — Forward Trunk Lean
@@ -731,7 +757,11 @@ def _report_from_points(
         "age": age,
         "gender": gender,
         "caseRef": case_ref,
-        "assessmentDate": date.today().isoformat(),
+        # IST, not the server's date (17 November 2026): Railway runs in UTC,
+        # so a report made between 00:00 and 05:30 IST printed the previous
+        # day, and the report ID below carried the same wrong date. Same rule
+        # as D-017.
+        "assessmentDate": datetime.now(IST).date().isoformat(),
         "clinician": clinician_name,
         # Printed in the patient box since 13 October 2026. It was already
         # required at intake (it sets the millimetre scale) but not kept.
@@ -866,7 +896,7 @@ def _review_view_payload(view: str, detected: "DetectedView", lateral_side: str 
     return payload
 
 
-@router.post("/detect")
+@router.post("/detect", dependencies=_CAN_RUN)
 async def detect_for_review(
     front_image: UploadFile = File(...),
     side_image: UploadFile = File(...),
@@ -925,8 +955,9 @@ async def detect_for_review(
 _ASPECT_TOLERANCE = 0.01
 
 
-@router.post("/report")
+@router.post("/report", dependencies=_CAN_RUN)
 async def report_from_review(
+    perm_ctx: PermissionContextDep,
     detection_token: str = Form(...),
     review: str = Form(...),
     front_display: UploadFile = File(...),
@@ -934,13 +965,27 @@ async def report_from_review(
     back_display: UploadFile = File(...),
     patient_name: str = Form(...),
     age: int = Form(...),
-    gender: str = Form(...),
-    case_ref: str = Form(...),
+    # Optional, as on the intake screen ("Not given"). Required here failed
+    # every report with no gender at the last step.
+    gender: str = Form(""),
+    # Optional on the intake screen. FastAPI treats an empty form value as
+    # missing, so a required field here failed every report where it was
+    # left blank, only at the very last step (phone test, 27 October 2026).
+    case_ref: str = Form(""),
     patient_height_cm: float = Form(...),
     clinician_name: str = Form(""),
     front_source: str = Form("unknown"),
     side_source: str = Form("unknown"),
     back_source: str = Form("unknown"),
+    # Phone tilt at capture, 27 October 2026 (see services/posture/level.py).
+    # Sent only for guided camera captures that had a tilt reading; ignored
+    # for uploads, whose tilt is not known.
+    front_level_deg: float | None = Form(None),
+    side_level_deg: float | None = Form(None),
+    back_level_deg: float | None = Form(None),
+    front_level_calibrated: bool = Form(False),
+    side_level_calibrated: bool = Form(False),
+    back_level_calibrated: bool = Form(False),
 ):
     if not 50 <= patient_height_cm <= 250:
         raise HTTPException(
@@ -950,6 +995,9 @@ async def report_from_review(
                 f"Received: {patient_height_cm} cm."
             ),
         )
+
+    case_ref = blank_if_placeholder(case_ref)
+    clinician_name = blank_if_placeholder(clinician_name)
 
     try:
         token_views = read_detection_token(detection_token)
@@ -976,6 +1024,23 @@ async def report_from_review(
         "back": await back_display.read(),
     }
 
+    sources = {"front": front_source, "side": side_source, "back": back_source}
+    raw_levels = {"front": front_level_deg, "side": side_level_deg, "back": back_level_deg}
+    calibrated = {
+        "front": front_level_calibrated,
+        "side": side_level_calibrated,
+        "back": back_level_calibrated,
+    }
+    levels: dict[str, float | None] = {}
+    for name in ("side", "front", "back"):
+        if sources[name] != "camera":
+            levels[name] = None
+            continue
+        try:
+            levels[name] = validate_correction(raw_levels[name])
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=f"{name} photograph: {e}")
+
     views: dict[str, DetectedView] = {}
     audit_views: dict[str, dict] = {}
 
@@ -997,11 +1062,23 @@ async def report_from_review(
                 detail=f"{name} display image does not match the analysed photograph.",
             )
 
+        # Phone tilt: the clinician reviewed the points on the photograph
+        # as taken; measurement uses them turned back to true vertical.
+        level = levels[name]
+        display_bytes = displays[name]
+        if level:
+            landmarks = rotate_landmarks(landmarks, tv["width_px"], tv["height_px"], level)
+            iris = rotate_pixel_pair(iris, tv["width_px"], tv["height_px"], level)
+            try:
+                display_bytes = rotate_display_image(display_bytes, level)
+            except Exception:
+                raise HTTPException(status_code=422, detail=f"{name} display image could not be read.")
+
         views[name] = DetectedView(
             landmarks=landmarks,
             width_px=tv["width_px"],
             height_px=tv["height_px"],
-            image_bytes=displays[name],
+            image_bytes=display_bytes,
             iris=iris,
             model_landmarks=rows_to_landmarks(tv["landmarks"]),
             display_scale=disp_h / tv["height_px"],
@@ -1028,6 +1105,24 @@ async def report_from_review(
         },
     )
 
+    # What was corrected, per view, so a later visit can be compared and
+    # the correction can be audited. None when no tilt was known (upload,
+    # or a device without a motion sensor).
+    for name in ("side", "front", "back"):
+        report["views"][name]["levelCorrection"] = (
+            None
+            if levels[name] is None
+            else {"degrees": round(levels[name], 2), "calibrated": bool(calibrated[name])}
+        )
+
+    # The signed-in clinic for the web report's letterhead (17 November
+    # 2026). Added after the report file is saved, so the saved copy does not
+    # carry the logo; the PDF route reads the clinic again itself.
+    clinic = await clinic_letterhead(perm_ctx.clinic)
+    branding = web_branding(perm_ctx.clinic, clinic.get("logoSrc", ""))
+    if branding:
+        report["branding"] = branding
+
     return report
 
 
@@ -1041,8 +1136,8 @@ async def report_from_review(
 # report data as a document designed for paper instead.
 
 
-@router.post("/report/pdf")
-async def export_posture_pdf(report: dict = Body(...)):
+@router.post("/report/pdf", dependencies=_CAN_RUN)
+async def export_posture_pdf(perm_ctx: PermissionContextDep, report: dict = Body(...)):
     """
     Render an already-computed posture report to a clinical PDF.
 
@@ -1050,8 +1145,12 @@ async def export_posture_pdf(report: dict = Body(...)):
     analysis is not re-run just to produce a document.
     """
 
+    # The clinic on the letterhead is the signed-in clinic, read from the
+    # clinics row here; report["branding"] from the client is ignored.
+    clinic = await clinic_letterhead(perm_ctx.clinic)
+
     try:
-        pdf_bytes = generate_posture_pdf(report)
+        pdf_bytes = await asyncio.to_thread(generate_posture_pdf, report, clinic)
     except Exception as e:
         raise HTTPException(
             status_code=500,

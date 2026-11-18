@@ -21,6 +21,7 @@ import { useAuthStore, useUiStore } from '../../store';
 import { canAccessModule, hasCapability, ModuleVisibility, usePermissionSubscription } from '../../config/permissions';
 import { useClinicSettings } from '../../features/settings/api';
 import { cn } from '../../lib/cn';
+import { WorkspaceCard } from './WorkspaceSwitcher';
 
 interface NavItem {
   label: string;
@@ -68,7 +69,11 @@ export function SidebarNavigation() {
   const role = useAuthStore((s) => s.role);
   const clinic = useAuthStore((s) => s.clinic);
   const logout = useAuthStore((s) => s.logout);
-  const { isSidebarOpen, toggleSidebar } = useUiStore();
+  const { isSidebarOpen, toggleSidebar, setSidebarOpen } = useUiStore();
+  // On phones the sidebar is an overlay; picking a page closes it.
+  const closeOnPhone = () => {
+    if (window.matchMedia('(max-width: 767px)').matches) setSidebarOpen(false);
+  };
   const { data: clinicSettings } = useClinicSettings(hasCapability('settings.view')); // L-29
 
   const effectiveClinic = clinic || clinicSettings;
@@ -82,7 +87,8 @@ export function SidebarNavigation() {
     <aside
       className={cn(
         'fixed bottom-0 left-0 top-0 z-30 flex flex-col overflow-hidden bg-[var(--brand-navy)] text-white transition-all duration-200',
-        isSidebarOpen ? 'w-64' : 'w-16',
+        // Phones: hidden when closed, overlay when open. Desktop: 64 / 16 as before.
+        isSidebarOpen ? 'w-64 translate-x-0' : 'w-16 -translate-x-full md:translate-x-0',
       )}
     >
       {/* Brand glow, taken from the website banner. Sits above the clinic's
@@ -92,20 +98,11 @@ export function SidebarNavigation() {
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_55%_at_0%_100%,rgba(27,74,84,0.9)_0%,rgba(27,74,84,0)_60%)]"
       />
 
-      {/* Header / Logo */}
+      {/* Header / Logo: always the AV Suite mark; the clinic logo sits in the top bar (D-030). */}
       <div className={cn('relative flex h-[72px] items-center gap-3', isSidebarOpen ? 'px-4' : 'justify-center px-2')}>
         <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-white p-1 shadow-[0_0_0_2px_rgba(78,136,143,0.5),0_4px_14px_rgba(0,0,0,0.25)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={effectiveClinic?.branding_logo_url || '/brand/av-logo-mark.png'}
-            alt={effectiveClinic?.branding_logo_url ? 'Clinic logo' : 'AV Suite'}
-            className="h-full w-full object-contain"
-            onError={(e) => {
-              // A saved logo URL that no longer loads falls back to the AV Suite mark.
-              const img = e.currentTarget;
-              if (!img.src.endsWith('/brand/av-logo-mark.png')) img.src = '/brand/av-logo-mark.png';
-            }}
-          />
+          <img src="/brand/av-logo-mark.png" alt="AV Suite" className="h-full w-full object-contain" />
         </span>
         {isSidebarOpen && (
           <div className="min-w-0 flex-1">
@@ -146,6 +143,7 @@ export function SidebarNavigation() {
                     key={item.href}
                     href={item.href}
                     aria-current={isActive ? 'page' : undefined}
+                    onClick={closeOnPhone}
                     className={cn(
                       'relative flex items-center gap-3 rounded-[9px] px-3 py-2.5 text-sm font-medium transition-colors',
                       isActive
@@ -177,31 +175,7 @@ export function SidebarNavigation() {
       {/* Workspace + Logout */}
       <div className={cn('relative border-t border-white/10', isSidebarOpen ? 'p-3' : 'p-2')}>
         {isSidebarOpen ? (
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.06] p-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-lime to-fresh text-[11px] font-bold text-midnight">
-              {clinicName
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((w: string) => w[0])
-                .join('')
-                .toUpperCase()}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold">{clinicName}</p>
-              <p className="text-[11px] text-[#aab2d6]">{roleLabel(role)}</p>
-            </div>
-            <button
-              onClick={() => {
-                logout();
-                window.location.replace('/login');
-              }}
-              className="cursor-pointer rounded-md p-1.5 text-[#aab2d6] transition-colors hover:bg-white/10 hover:text-[#ffb4a8]"
-              aria-label="Logout"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+          <WorkspaceCard clinicName={clinicName} roleText={roleLabel(role)} />
         ) : (
           <button
             onClick={() => {

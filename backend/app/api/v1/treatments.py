@@ -113,9 +113,14 @@ async def list_treatment_sessions(
     )
 
     items = [TreatmentSessionResponse.model_validate(s) for s in sessions]
+    # Count of every matching session, not only this page.
+    total = await service.repository.count_sessions(
+        clinic_id=clinic.id, patient_id=patient_id, appointment_id=appointment_id,
+        therapist_id=effective_therapist_id, start_date=start_date, end_date=end_date,
+    )
     return TreatmentSessionListResponse(
         items=items,
-        total=len(items),
+        total=total,
         offset=offset,
         limit=limit,
     )

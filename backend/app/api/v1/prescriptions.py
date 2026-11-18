@@ -18,8 +18,8 @@ from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
 from app.services import prescription_service
-from fastapi.responses import FileResponse
-import os
+from app.services.audit import log_event_safely
+from fastapi.responses import Response
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +99,27 @@ async def list_prescriptions(
     except Exception as e:
         logger.error(f"Error listing prescriptions: {str(e)}")
         raise
+
+
+@router.get("/note-suggestions", tags=["Prescriptions"])
+async def note_suggestions(
+    request: Request,
+    user: CurrentUserDep,
+    db: AsyncSession = Depends(get_db),
+    scope: CapabilityScope = Depends(require_capability("prescriptions.view")),
+):
+    """
+    Quick-pick phrases for exercise notes and patient guidance, taken from
+    what this clinic already wrote (OWN scope: only the user's own).
+    """
+    from app.services.prescription_suggestions import get_note_suggestions
+
+    data = await get_note_suggestions(
+        db,
+        uuid.UUID(request.state.clinic_id),
+        None if scope == CapabilityScope.ALL else user.id,
+    )
+    return ResponseEnvelope(data=data)
 
 
 @router.get(
@@ -274,7 +295,21 @@ async def download_pdf(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only download your own prescription PDF.",
         )
-    file_path = os.path.join("static", "prescriptions", rx.pdf_key)
-    if not os.path.exists(file_path):
+    try:
+        pdf_bytes = await prescription_service.load_prescription_pdf(
+            db, uuid.UUID(clinic_id), rx
+        )
+    except ValueError:
         raise HTTPException(status_code=404, detail="PDF file not found on server")
-    return FileResponse(file_path, media_type="application/pdf", filename=rx.pdf_key)
+    await log_event_safely(
+        db, uuid.UUID(str(clinic_id)), user.id, "download", "prescription", rx.id
+    )
+    filename = prescription_service.prescription_pdf_filename(rx)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+        },
+    )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.lead import LeadStage
@@ -17,6 +17,20 @@ class LeadRepository(BaseRepository[Lead]):
         """Initialize repository bound to session."""
 
         super().__init__(session, Lead)
+
+    async def count_leads(self, *, clinic_id: UUID, stage: LeadStage | None = None,
+                          assigned_to: UUID | None = None, source: str | None = None,
+                          search: str | None = None) -> int:
+        statement = select(func.count()).select_from(Lead)
+        if stage is not None: statement = statement.where(Lead.stage == stage)
+        if assigned_to is not None: statement = statement.where(Lead.assigned_to == assigned_to)
+        if source is not None: statement = statement.where(Lead.source == source)
+        if search:
+            pattern = f"%{search.strip()}%"
+            statement = statement.where(or_(Lead.name.ilike(pattern), Lead.phone.ilike(pattern)))
+        statement = self._apply_soft_delete_filter(statement)
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        return int(await self.session.scalar(statement) or 0)
 
     async def list_leads(
         self,

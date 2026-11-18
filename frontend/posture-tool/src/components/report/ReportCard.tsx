@@ -71,6 +71,21 @@ export default function ReportCard({
 
           <SynthesisPanel data={data.synthesis} />
 
+          {/* Normal ranges: basis and sources, its own section above the
+              disclaimer, one line per measure (17 November 2026). Same text
+              as the PDF (backend reference_ranges.py). */}
+          {data.screeningSources && data.screeningSources.length > 0 && (
+            <div>
+              <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#1C7A54]">Normal ranges: basis and sources</p>
+              {data.screeningNote && <p className="mt-1 text-[13px] text-[#5D6380]">{data.screeningNote}</p>}
+              {data.screeningSources.map((s) => (
+                <p key={s.name} className="mt-1 text-[13px] leading-relaxed text-[#141A33]">
+                  <span className="font-semibold">{s.name}:</span> {s.text}
+                </p>
+              ))}
+            </div>
+          )}
+
           <div className="rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-4 py-3.5">
             <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-[#1C7A54]">Disclaimer</p>
             {/* Founders' wording, verbatim, 10 October 2026. Same text as

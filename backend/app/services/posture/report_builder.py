@@ -1,6 +1,7 @@
 from typing import Any
 
 from app.services.posture.classifier import SEVERITY_LABELS, is_borderline
+from app.services.posture.reference_ranges import SCREENING_NOTE, screening_range, source_lines
 from app.services.posture.signature import build_signature
 from app.services.posture.signature_svg import render_signature_svg
 
@@ -90,6 +91,9 @@ def measurement(
         # display it is a presentation decision and belongs to the surface,
         # not to the report.
         "sideLabel": SIDE_WORDING.get(param_id, {}).get(side or ""),
+        # The band this row's grade treats as Normal, read from THRESHOLDS
+        # (reference_ranges.py, 17 November 2026). Shown, never graded on.
+        "screeningRange": screening_range(param_id),
     }
 
 
@@ -182,7 +186,10 @@ def build_side_view_result(
 # tilt, pelvic obliquity, trunk shift and trunk lean; a bent knee now grades.
 # 2026-10-13.1: founders, Q4 and Q5. Values print with one decimal, and the
 # trunk lean and knee rows print the size without a minus sign. No grade moved.
-ANALYSIS_VERSION = "2026-10-13.1"
+# 2026-10-27.1: phone tilt correction. Guided captures are measured with
+# their points turned back by the phone's roll at capture (level.py), so
+# angles against the image vertical or horizontal can move by the roll.
+ANALYSIS_VERSION = "2026-10-27.1"
 
 
 def build_report_response(
@@ -211,6 +218,11 @@ def build_report_response(
         "views": views,
         "synthesis": synthesis,
         "signature": _signature_with_svg(views),
+        # Footnote for the AV screening ranges (17 November 2026).
+        "screeningNote": SCREENING_NOTE,
+        "screeningSources": [
+            {"name": name, "text": text} for name, text in source_lines(views)
+        ],
     }
 
 

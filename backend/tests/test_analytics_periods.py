@@ -43,19 +43,19 @@ class FrozenDateTime(datetime):
         )
 
 
-def test_analytics_periods_are_utc_calendar_ranges() -> None:
+def test_analytics_periods_are_india_calendar_ranges() -> None:
     periods = AnalyticsPeriods.containing(
         datetime(2024, 1, 1, 0, 30, tzinfo=timezone(timedelta(hours=14)))
     )
 
-    assert periods.today.start == datetime(2023, 12, 31, tzinfo=UTC)
-    assert periods.today.end == datetime(2024, 1, 1, tzinfo=UTC)
-    assert periods.this_week.start == datetime(2023, 12, 25, tzinfo=UTC)
-    assert periods.this_week.end == datetime(2024, 1, 1, tzinfo=UTC)
-    assert periods.this_month.start == datetime(2023, 12, 1, tzinfo=UTC)
-    assert periods.this_month.end == datetime(2024, 1, 1, tzinfo=UTC)
-    assert periods.this_year.start == datetime(2023, 1, 1, tzinfo=UTC)
-    assert periods.this_year.end == datetime(2024, 1, 1, tzinfo=UTC)
+    assert periods.today.start.isoformat() == "2023-12-31T00:00:00+05:30"
+    assert periods.today.end.isoformat() == "2024-01-01T00:00:00+05:30"
+    assert periods.this_week.start.isoformat() == "2023-12-25T00:00:00+05:30"
+    assert periods.this_week.end.isoformat() == "2024-01-01T00:00:00+05:30"
+    assert periods.this_month.start.isoformat() == "2023-12-01T00:00:00+05:30"
+    assert periods.this_month.end.isoformat() == "2024-01-01T00:00:00+05:30"
+    assert periods.this_year.start.isoformat() == "2023-01-01T00:00:00+05:30"
+    assert periods.this_year.end.isoformat() == "2024-01-01T00:00:00+05:30"
 
 
 async def _create_context(session: AsyncSession):
@@ -92,11 +92,11 @@ async def _create_context(session: AsyncSession):
     await session.flush()
 
     patients = [
-        Patient(clinic_id=clinic.id, first_name=f"Patient{i}", last_name="Test")
+        Patient(clinic_id=clinic.id, display_number=i + 1, first_name=f"Patient{i}", last_name="Test")
         for i in range(6)
     ]
     outside_patient = Patient(
-        clinic_id=other_clinic.id, first_name="Outside", last_name="Test"
+        clinic_id=other_clinic.id, display_number=1, first_name="Outside", last_name="Test"
     )
     session.add_all([*patients, outside_patient])
     await session.flush()
@@ -959,6 +959,7 @@ async def test_analytics_api_period_contract_and_scoping(
     patients = [
         Patient(
             clinic_id=clinic.id,
+            display_number=i + 1,
             first_name=f"API{i}",
             last_name="Patient",
             created_at=event_date,
@@ -967,6 +968,7 @@ async def test_analytics_api_period_contract_and_scoping(
     ]
     outside_patient = Patient(
         clinic_id=other_clinic.id,
+        display_number=1,
         first_name="Outside",
         last_name="Patient",
         created_at=event_dates[3],
@@ -1251,5 +1253,6 @@ async def test_analytics_api_period_contract_and_scoping(
         "week",
         "month",
         "year",
+        "custom",
     ]
     assert period_parameter["schema"]["default"] == "month"

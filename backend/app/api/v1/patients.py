@@ -35,6 +35,7 @@ from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
 from app.services import patient_service
 from app.api.v1.audit import AuditLogServiceDep
+from app.services.audit import changed_fields, log_event_safely
 
 logger = logging.getLogger(__name__)
 
@@ -348,6 +349,11 @@ async def get_patient(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found or not in caller's clinic"
             )
+
+        await log_event_safely(
+            db, uuid.UUID(str(clinic_id)), uuid.UUID(str(user_id)) if user_id else None,
+            "view", "patient", patient.id,
+        )
         
         logger.info(f"Patient found: {patient.id}")
         return ResponseEnvelope(data=patient)
@@ -368,7 +374,6 @@ async def update_patient(
     request: Request,
     id: str,
     patient_in: PatientUpdate,
-    audit_service: AuditLogServiceDep,
     db: AsyncSession = Depends(get_db),
     scope: CapabilityScope = Depends(require_capability("patients.edit"))
 ):
@@ -377,15 +382,22 @@ async def update_patient(
         clinic_id = request.state.clinic_id
         user_id = request.state.user_id if hasattr(request.state, "user_id") else None
         
+        previous = await patient_service.get_patient_by_id(
+            db, clinic_id, id, scope=scope, user_id=user_id
+        )
+        if previous is None:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        before = {
+            key: getattr(previous, key)
+            for key in patient_in.model_dump(exclude_unset=True)
+        }
         patient = await patient_service.update_patient(db, clinic_id, id, patient_in, scope=scope, user_id=user_id)
+        after = {key: getattr(patient, key) for key in before}
         
-        await audit_service.log_event(
-            clinic_id=clinic_id,
-            user_id=request.state.user_id if hasattr(request.state, "user_id") else None,
-            action="update",
-            entity_type="patient",
-            entity_id=patient.id,
-            details=patient_in.model_dump(exclude_unset=True, mode='json')
+        await log_event_safely(
+            db, uuid.UUID(str(clinic_id)), uuid.UUID(str(user_id)) if user_id else None,
+            "update", "patient", patient.id,
+            {"changes": changed_fields(before, after)},
         )
         
         return ResponseEnvelope(data=patient)

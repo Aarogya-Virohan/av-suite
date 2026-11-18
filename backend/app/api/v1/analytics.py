@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from datetime import date
+
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -47,9 +49,8 @@ async def get_analytics_overview(
     period: AnalyticsPeriod = Query(
         default=AnalyticsPeriod.MONTH,
         description=(
-            "UTC calendar reporting period: today (current UTC day), week "
-            "(current Monday-based calendar week), month (current UTC calendar "
-            "month), or year (current UTC calendar year). The start is inclusive "
+            "India calendar reporting period: today, week (Monday based), month, or year. "
+            "Optional inclusive start_date and end_date select a custom range. The start is inclusive "
             "and the end is exclusive. Defaults to month."
         ),
     ),
@@ -66,6 +67,8 @@ async def get_analytics_overview(
         le=100,
         description="Maximum patient_revenue results to return (1-100; default 5).",
     ),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
     _scope: CapabilityScope = Depends(
         require_capability("analytics.clinic_financials")
     ),
@@ -75,11 +78,13 @@ async def get_analytics_overview(
     Requires analytics.clinic_financials capability.
     """
 
+    _validate_custom_range(start_date, end_date, period)
     return await service.get_overview(
         clinic.id,
         period,
         patient_revenue_sort=patient_revenue_sort,
         patient_revenue_limit=patient_revenue_limit,
+        start_date=start_date, end_date=end_date,
     )
 
 
@@ -94,12 +99,13 @@ async def get_my_performance(
     period: AnalyticsPeriod = Query(
         default=AnalyticsPeriod.MONTH,
         description=(
-            "UTC calendar reporting period: today (current UTC day), week "
-            "(current Monday-based calendar week), month (current UTC calendar "
-            "month), or year (current UTC calendar year). The start is inclusive "
+            "India calendar reporting period: today, week (Monday based), month, or year. "
+            "Optional inclusive start_date and end_date select a custom range. The start is inclusive "
             "and the end is exclusive. Defaults to month."
         ),
     ),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
     _scope: CapabilityScope = Depends(require_capability("analytics.my_performance")),
 ) -> TherapistPerformanceEnvelope:
     """
@@ -107,4 +113,25 @@ async def get_my_performance(
     Requires analytics.my_performance capability.
     """
 
-    return await service.get_my_performance(clinic.id, current_user.id, period)
+    _validate_custom_range(start_date, end_date, period)
+    return await service.get_my_performance(clinic.id, current_user.id, period, start_date=start_date, end_date=end_date)
+
+
+def _validate_custom_range(start_date: date | None, end_date: date | None, period: AnalyticsPeriod) -> None:
+    if (start_date is None) != (end_date is None):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="start_date and end_date must be supplied together")
+    if start_date is None:
+        if period == AnalyticsPeriod.CUSTOM:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="custom period requires start_date and end_date")
+        return
+    if start_date > end_date:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="start_date must not be after end_date")
+    if end_date == date.max or start_date.year > date.max.year - 2:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="date range is outside the supported calendar")
+    # 24 calendar months, clamped for month ends.
+    from calendar import monthrange
+    year = start_date.year + (start_date.month - 1 + 24) // 12
+    month = (start_date.month - 1 + 24) % 12 + 1
+    limit = date(year, month, min(start_date.day, monthrange(year, month)[1]))
+    if end_date > limit:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="date range must not exceed 24 months")

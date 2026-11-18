@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.document import DocumentCategory
@@ -17,6 +17,16 @@ class PatientDocumentRepository(BaseRepository[PatientDocument]):
         """Initialize repository bound to session."""
 
         super().__init__(session, PatientDocument)
+
+    async def count_documents(self, *, clinic_id: UUID, patient_id: UUID | None = None,
+                              treatment_id: UUID | None = None,
+                              category: DocumentCategory | None = None) -> int:
+        statement = select(func.count()).select_from(PatientDocument)
+        if patient_id is not None: statement = statement.where(PatientDocument.patient_id == patient_id)
+        if treatment_id is not None: statement = statement.where(PatientDocument.treatment_id == treatment_id)
+        if category is not None: statement = statement.where(PatientDocument.category == category)
+        statement = self._apply_clinic_scope(statement, clinic_id)
+        return int(await self.session.scalar(statement) or 0)
 
     async def list_documents(
         self,

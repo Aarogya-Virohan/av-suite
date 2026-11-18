@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import type { FieldErrors, UseFormRegister } from 'react-hook-form';
+import type { Control, FieldErrors, UseFormRegister } from 'react-hook-form';
+import { ReferralSourceField } from './ReferralSourceField';
 import type { PatientFormValues } from '../../../lib/schemas';
 import { FieldLabel, inputClass } from '../../../components/ui/brand';
 import { localToday } from '../../../lib/datetime';
@@ -13,10 +14,12 @@ const sectionTitle = 'border-b border-line pb-1.5 text-xs font-bold uppercase tr
 /** Fields shared by Add Patient and Edit Patient so both behave the same. */
 export function PatientFormFields({
   register,
+  control,
   errors,
   idPrefix,
 }: {
   register: UseFormRegister<PatientFormValues>;
+  control: Control<PatientFormValues>;
   errors: FieldErrors<PatientFormValues>;
   idPrefix: string;
 }) {
@@ -76,8 +79,7 @@ export function PatientFormFields({
             {errors.phone && <p className={errorText}>{errors.phone.message}</p>}
           </div>
           <div>
-            <FieldLabel htmlFor={id('referral')}>Referral Source</FieldLabel>
-            <input id={id('referral')} {...register('referral_source')} type="text" placeholder="e.g. Google, Doctor referral" className={inputClass} />
+            <ReferralSourceField control={control} idPrefix={idPrefix} />
           </div>
         </div>
       </div>
