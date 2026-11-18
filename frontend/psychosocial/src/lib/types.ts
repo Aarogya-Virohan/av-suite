@@ -1,0 +1,456 @@
+// Mirrors backend/app/schemas/psychosocial.py. Keep the two in step.
+
+export type InstrumentId = 'phq9' | 'gad7' | 'dass21';
+export type SessionStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type AssignmentStatus = 'active' | 'expired' | 'completed' | 'cancelled';
+
+export interface Option {
+  value: number;
+  label: string;
+}
+
+export interface Item {
+  id: string;
+  number: number;
+  text: string;
+  scored: boolean;
+  options: Option[] | null;
+}
+
+export interface Instrument {
+  id: InstrumentId;
+  version: string;
+  short_name: string;
+  name: string;
+  instructions: string;
+  options: Option[];
+  items: Item[];
+  licence_note: string;
+}
+
+export interface InstrumentSummary {
+  id: InstrumentId;
+  version: string;
+  short_name: string;
+  name: string;
+  item_count: number;
+  citation: string;
+  /** Clinic-wide default for the Repeat field (SRS 4.3.2). null = just once. */
+  default_repeat_weeks: number | null;
+}
+
+export interface Scale {
+  scale_id: string;
+  label: string;
+  score: number;
+  max_score: number;
+  band_label: string;
+  band_level: number;
+  referral: boolean;
+}
+
+export interface SessionSummary {
+  id: string;
+  assignment_id: string;
+  patient_id: string;
+  instrument_id: InstrumentId;
+  instrument_version: string;
+  short_name: string;
+  position: number;
+  status: SessionStatus;
+  answered_count: number;
+  total_items: number;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  referral_flag: boolean;
+  risk_item_flag: boolean;
+  partial_risk: boolean;
+  scales: Scale[];
+}
+
+export interface Assignment {
+  id: string;
+  patient_id: string;
+  status: 'active' | 'completed' | 'cancelled';
+  effective_status: AssignmentStatus;
+  expires_at: string;
+  created_at: string;
+  assigned_by_name: string | null;
+  sessions: SessionSummary[];
+}
+
+export interface AssignmentCreated {
+  assignment: Assignment;
+  screener_path: string;
+}
+
+export interface WorklistRow {
+  session: SessionSummary;
+  patient_name: string;
+  assignment_effective_status: AssignmentStatus;
+}
+
+export interface ResponseRow {
+  item_id: string;
+  number: number;
+  text: string;
+  scored: boolean;
+  value: number | null;
+  answer_label: string | null;
+}
+
+export interface ReferralAction {
+  id: string;
+  session_id: string;
+  action: ReferralActionKey;
+  note: string | null;
+  recorded_by_name: string | null;
+  recorded_at: string;
+  /** Copied when the action was saved (S-D-029). */
+  contact_name: string | null;
+  contact_role: string | null;
+}
+
+export type ReferralActionKey =
+  | 'referred_gp'
+  | 'referred_psychologist'
+  | 'referred_psychiatrist'
+  | 'already_under_care'
+  | 'patient_declined'
+  | 'monitor_and_rescreen'
+  | 'other';
+
+export interface SessionDetail {
+  session: SessionSummary;
+  patient_name: string;
+  instrument_name: string;
+  citation: string;
+  reasons: string[];
+  responses: ResponseRow[];
+  baseline: { session_id: string; completed_at: string | null; scales: Scale[] } | null;
+  is_baseline: boolean;
+  referral_actions: ReferralAction[];
+}
+
+export interface PatientSummary {
+  patient_id: string;
+  referral_flag: boolean;
+  risk_item_flag: boolean;
+  latest: SessionSummary[];
+}
+
+export interface Patient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  age: number | null;
+  date_of_birth: string | null;
+  gender: string | null;
+  status: string;
+}
+
+export interface Me {
+  user: { id: string; email: string; name: string; role: string };
+  active_workspace: { clinic_id: string; name: string; role: string } | null;
+  active_products: { key: string; status: string }[];
+  capabilities: string[];
+}
+
+export interface ClinicUser {
+  id: string;
+  name: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  role: string;
+  is_active: boolean;
+}
+
+export interface PermissionOverride {
+  capability_key: string;
+  scope: 'none' | 'own' | 'all';
+}
+
+// Public screener
+export interface ScreenerQuestionnaire {
+  instrument: Instrument;
+  status: SessionStatus;
+  answers: Record<string, number>;
+}
+
+export interface ScreenerState {
+  clinic_name: string;
+  expires_at: string;
+  consent: { required: boolean; text_version: string; title: string; paragraphs: string[] };
+  questionnaires: ScreenerQuestionnaire[];
+  current_instrument_id: InstrumentId | null;
+}
+
+export interface SubmitResult {
+  instrument_id: InstrumentId;
+  assignment_complete: boolean;
+  next_instrument_id: InstrumentId | null;
+  show_referral_message: boolean;
+  show_support_contacts: boolean;
+}
+
+// Deletion on request (SRS 3.2). Counts only, never results.
+export interface ScreeningData {
+  patient_id: string;
+  links: number;
+  screeners: number;
+  referral_actions: number;
+  schedules: number;
+  consent_records: number;
+  withdrawal_on_file: boolean;
+}
+
+// Score trend (SRS 4.1.2)
+export interface TrendBand {
+  min_score: number;
+  max_score: number;
+  label: string;
+  level: number;
+}
+
+export interface TrendPoint {
+  session_id: string;
+  completed_at: string;
+  score: number;
+  band_label: string;
+  band_level: number;
+  referral: boolean;
+}
+
+export interface TrendSeries {
+  instrument_id: InstrumentId;
+  short_name: string;
+  scale_id: string;
+  label: string;
+  max_score: number;
+  referral_from: number | null;
+  bands: TrendBand[];
+  points: TrendPoint[];
+}
+
+export interface PatientTrend {
+  patient_id: string;
+  series: TrendSeries[];
+}
+
+// Repeat schedules and the Due list (SRS 4.1.1)
+export type ScheduleState = 'consent_withdrawn' | 'retired' | 'waiting' | 'due' | 'upcoming';
+
+export interface Schedule {
+  id: string;
+  patient_id: string;
+  instrument_id: InstrumentId;
+  short_name: string;
+  interval_days: number;
+  state: ScheduleState;
+  next_due_at: string | null;
+  last_completed_at: string | null;
+  created_at: string;
+  created_by_name: string | null;
+}
+
+export interface DueItem extends Schedule {
+  patient_name: string;
+}
+
+// Priority review (F4 = 4A): risk results nobody has opened yet. Providers only.
+export interface PriorityItem {
+  session_id: string;
+  patient_id: string;
+  patient_name: string;
+  short_name: string;
+  status: 'completed' | 'in_progress' | 'cancelled';
+  activity_at: string;
+}
+
+// Sent links (F3 = enhanced 3A): status only, never clinical data.
+export type SentLinkStatus = 'pending' | 'expired' | 'completed' | 'cancelled';
+
+export interface SentLink {
+  id: string;
+  patient_id: string;
+  patient_name: string;
+  screeners: string[];
+  status: SentLinkStatus;
+  sent_at: string;
+  expires_at: string;
+  sent_by_name: string | null;
+  can_cancel: boolean;
+}
+
+// --- clinic settings (SRS 4.3.2) ------------------------------------------
+export interface BandThreshold {
+  label: string;
+  min_score: number;
+  max_score: number | null;
+  refers: boolean;
+}
+
+export interface ScaleThreshold {
+  scale_id: string;
+  label: string;
+  max_score: number;
+  referral_band: string;
+  referral_min_score: number;
+  bands: BandThreshold[];
+}
+
+export interface RiskRule {
+  item_number: number;
+  min_value: number;
+  min_label: string;
+  description: string;
+}
+
+export interface InstrumentSetting {
+  instrument_id: InstrumentId;
+  instrument_version: string;
+  short_name: string;
+  name: string;
+  default_repeat_weeks: number | null;
+  updated_at: string | null;
+  updated_by_name: string | null;
+  source: string;
+  scales: ScaleThreshold[];
+  risk_rules: RiskRule[];
+}
+
+export interface ClinicSettings {
+  thresholds_editable: boolean;
+  instruments: InstrumentSetting[];
+}
+
+// --- anonymised statistics (SRS 4.3.3) -------------------------------------
+export interface BandCount {
+  label: string;
+  /** null = hidden (small group) */
+  count: number | null;
+  suppressed: boolean;
+}
+
+export interface InstrumentAggregate {
+  instrument_id: InstrumentId;
+  short_name: string;
+  completed: number;
+  too_few: boolean;
+  referral: { count: number | null; rate_percent: number | null; suppressed: boolean };
+  scales: { scale_id: string; label: string; bands: BandCount[] }[];
+}
+
+export interface Aggregates {
+  date_from: string;
+  date_to: string;
+  min_cell: number;
+  instruments: InstrumentAggregate[];
+}
+
+// --- referral contact directory (SRS 4.3.1) --------------------------------
+export interface ReferralContact {
+  id: string;
+  name: string;
+  role: string;
+  phone: string | null;
+  email: string | null;
+  note: string | null;
+  archived: boolean;
+  updated_at: string;
+  updated_by_name: string | null;
+}
+
+export interface ReferralContactInput {
+  name: string;
+  role: string;
+  phone: string | null;
+  email: string | null;
+  note: string | null;
+}
+
+// Re-consent after a withdrawal (Q7 = 7B, S-D-037).
+export type ConsentRequestState = 'pending' | 'granted' | 'declined' | 'cancelled' | 'expired';
+
+export interface ConsentRequest {
+  id: string;
+  state: ConsentRequestState;
+  created_at: string;
+  expires_at: string;
+  answered_at: string | null;
+  requested_by_name: string | null;
+}
+
+export interface ConsentRequestCreated {
+  request: ConsentRequest;
+  consent_path: string;
+}
+
+export interface PatientConsent {
+  status: 'none' | 'granted' | 'withdrawn';
+  recorded_at: string | null;
+  outdated: boolean;
+  request: ConsentRequest | null;
+}
+
+export interface ReconsentState {
+  clinic_name: string;
+  state: ConsentRequestState;
+  expires_at: string;
+  consent: ScreenerState['consent'];
+}
+
+// Provider-shared report (founders' F2 follow-up, S-D-039).
+export interface ShareResource {
+  key: string;
+  title: string;
+  description: string;
+  url: string | null;
+  source: string | null;
+  phones: { label: string; tel: string }[];
+}
+
+export interface ShareOptions {
+  resources: ShareResource[];
+  advice_chips: string[];
+  advice_max: number;
+  custom_links_max: number;
+}
+
+export type ShareState = 'active' | 'expired' | 'revoked' | 'locked';
+
+export interface SharedReport {
+  id: string;
+  assignment_id: string;
+  state: ShareState;
+  created_at: string;
+  expires_at: string;
+  shared_by_name: string | null;
+  birth_year_check: boolean;
+  first_opened_at: string | null;
+  open_count: number;
+  advice: string | null;
+  resource_titles: string[];
+}
+
+export interface SharedReportCreated {
+  share: SharedReport;
+  report_path: string;
+}
+
+export interface ReportGate {
+  clinic_name: string;
+  needs_birth_year: boolean;
+}
+
+export interface PatientReport {
+  clinic_name: string;
+  provider_name: string | null;
+  shared_on: string;
+  advice: string | null;
+  summary: { short_name: string; score: number; max_score: number; phrase: string }[];
+  resources: { title: string; description: string | null; url: string | null; domain: string | null; phones: { label: string; tel: string }[] }[];
+}

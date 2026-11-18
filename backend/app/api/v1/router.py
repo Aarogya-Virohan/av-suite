@@ -24,6 +24,8 @@ from app.api.v1 import (
     users,
     marketplace,
     me,
+    psychosocial,
+    screener,
     posture,
     # memory,
 )
@@ -68,6 +70,8 @@ api_router.include_router(
     marketplace.router, prefix="/marketplace", tags=["Marketplace"]
 )
 api_router.include_router(me.router, tags=["Platform Context"])
+api_router.include_router(psychosocial.router, tags=["Psycho-Social Screening"])
+api_router.include_router(screener.router, tags=["Psycho-Social Screener (public)"])
 # api_router.include_router(memory.router, prefix="/memory", tags=["Memory"])
 
 logger.info("All API v1 routers registered (existing + CRM)")
