@@ -33,7 +33,7 @@ class TokenResponse(BaseModel):
 
 
 from uuid import UUID
-from typing import Optional, Dict
+from typing import Dict, Literal, Optional
 
 class UserInfoResponse(BaseModel):
     id: UUID
@@ -49,6 +49,7 @@ class ClinicInfoResponse(BaseModel):
     name: str
     slug: Optional[str] = None
     branding_logo_url: Optional[str] = None
+    client_type: Literal["clinic", "hospital", "home_care"] = "clinic"
     branding_color: Optional[str] = None
 
 class AuthMeResponse(BaseModel):

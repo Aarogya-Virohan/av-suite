@@ -2,13 +2,14 @@ import uuid
 import re
 import unicodedata
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Enum, Boolean, Text, event
+from sqlalchemy import String, Enum, Boolean, Text, event, CheckConstraint
 from app.enums.clinic import ClinicPlanTier, ClinicType
 from app.models.base import Base, TimestampMixin
 
 
 class Clinic(Base, TimestampMixin):
     __tablename__ = "clinics"
+    __table_args__ = (CheckConstraint("client_type IN ('clinic', 'hospital', 'home_care')", name="ck_clinics_client_type"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -25,6 +26,7 @@ class Clinic(Base, TimestampMixin):
         default=ClinicType.CLINIC,
     )
     branding_logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    client_type: Mapped[str] = mapped_column(String(20), nullable=False, default="clinic")
     branding_color: Mapped[str | None] = mapped_column(String(32), nullable=True)
     address_line: Mapped[str | None] = mapped_column(Text, nullable=True)
     city: Mapped[str | None] = mapped_column(String(120), nullable=True)

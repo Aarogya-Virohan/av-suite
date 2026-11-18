@@ -31,3 +31,8 @@ class LeadLostReason(StrEnum):
     OFFER = "offer"
     CALL_NOT_PICKED = "call_not_picked"
     OTHER = "other"
+    TOO_FAR = "too_far"
+    TIMING_MISMATCH = "timing_mismatch"
+    NEEDS_HOME_VISIT = "needs_home_visit"
+    CANNOT_AFFORD = "cannot_afford"
+    WENT_TO_COMPETITOR = "went_to_competitor"
