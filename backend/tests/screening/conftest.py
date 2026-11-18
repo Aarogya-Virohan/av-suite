@@ -85,6 +85,7 @@ async def make_patient(db: AsyncSession, clinic_id: uuid.UUID, first: str = "Ash
     patient = Patient(
         id=uuid.uuid4(),
         clinic_id=clinic_id,
+        display_number=uuid.uuid4().int % 9_000_000_000 + 1,
         first_name=first,
         last_name=f"{TEST_SURNAME_PREFIX}{uuid.uuid4().hex[:6]}",
     )
