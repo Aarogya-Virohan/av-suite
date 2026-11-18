@@ -115,3 +115,53 @@ async def test_converting_lost_lead_clears_lost_fields(client, db_session):
     assert lead["stage"] == "converted"
     assert lead["lost_reason"] is None
     assert lead["lost_remark"] is None
+
+
+@pytest.mark.asyncio
+async def test_lead_marked_lost_before_reasons_existed_still_lists_and_edits(
+    client, auth_headers, db_session
+):
+    """Leads marked lost before reasons existed have lost_reason NULL in the DB."""
+    from sqlalchemy import update
+
+    from app.enums.lead import LeadStage
+    from app.models.lead import Lead
+
+    api = settings.API_V1_PREFIX
+    created = await client.post(
+        f"{api}/leads", json={"name": "Old lost lead", "phone": "9000000001"}, headers=auth_headers
+    )
+    assert created.status_code == 201, created.text
+    lead_id = created.json()["id"]
+    await db_session.execute(
+        update(Lead)
+        .where(Lead.id == uuid.UUID(lead_id))
+        .values(stage=LeadStage.LOST, lost_reason=None, lost_remark=None)
+    )
+    await db_session.commit()
+
+    listed = await client.get(f"{api}/leads", headers=auth_headers)
+    assert listed.status_code == 200, listed.text
+    fetched = await client.get(f"{api}/leads/{lead_id}", headers=auth_headers)
+    assert fetched.status_code == 200, fetched.text
+    assert fetched.json()["stage"] == "lost" and fetched.json()["lost_reason"] is None
+
+    notes = await client.patch(
+        f"{api}/leads/{lead_id}", json={"notes": "Called again"}, headers=auth_headers
+    )
+    assert notes.status_code == 200, notes.text
+
+    # Setting or changing the reason still follows the rules.
+    blank = await client.patch(
+        f"{api}/leads/{lead_id}", json={"lost_reason": None}, headers=auth_headers
+    )
+    assert blank.status_code == 422
+    other = await client.patch(
+        f"{api}/leads/{lead_id}", json={"lost_reason": "other"}, headers=auth_headers
+    )
+    assert other.status_code == 422
+    reason = await client.patch(
+        f"{api}/leads/{lead_id}", json={"lost_reason": "too_far"}, headers=auth_headers
+    )
+    assert reason.status_code == 200, reason.text
+    assert reason.json()["lost_reason"] == "too_far"

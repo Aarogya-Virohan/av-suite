@@ -73,6 +73,17 @@ class ClinicSettingsUpdate(BaseModel):
 
 
 FeeCategory = Literal["consultation", "posture", "exercise_rx", "custom"]
+SORT_ORDER_MAX = 10_000
+
+
+def _clean_fee_name(value: str | None) -> str | None:
+    """Trim the name; a name of only spaces is empty."""
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        raise ValueError("name cannot be blank")
+    return value
 
 
 class ClinicFeeItemCreate(BaseModel):
@@ -80,7 +91,14 @@ class ClinicFeeItemCreate(BaseModel):
     category: FeeCategory
     default_price: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
     price_editable: bool = True
-    sort_order: int = 0
+    # sort_order is an INTEGER column; bound it so a large number is a 422,
+    # not a database error (500).
+    sort_order: int = Field(default=0, ge=0, le=SORT_ORDER_MAX)
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str) -> str:
+        return _clean_fee_name(value)
 
 
 class ClinicFeeItemUpdate(BaseModel):
@@ -88,7 +106,7 @@ class ClinicFeeItemUpdate(BaseModel):
     category: FeeCategory | None = None
     default_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     price_editable: bool | None = None
-    sort_order: int | None = None
+    sort_order: int | None = Field(default=None, ge=0, le=SORT_ORDER_MAX)
 
     @field_validator("name", "category", "default_price", "price_editable", "sort_order")
     @classmethod
@@ -96,6 +114,11 @@ class ClinicFeeItemUpdate(BaseModel):
         if value is None:
             raise ValueError("fee item fields cannot be null")
         return value
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str) -> str:
+        return _clean_fee_name(value)
 
 
 class ClinicFeeItemResponse(BaseModel):

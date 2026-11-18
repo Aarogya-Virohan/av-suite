@@ -88,3 +88,46 @@ async def test_client_type_profile_and_auth_me(client, auth_headers, db_session,
 async def test_invalid_client_type_rejected(client, auth_headers):
     response = await client.patch(f"{settings.API_V1_PREFIX}/settings/clinic", json={"client_type": "lab"}, headers=auth_headers)
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_fee_item_sort_order_is_bounded(client, auth_headers):
+    api = settings.API_V1_PREFIX
+    body = {"name": "Shockwave", "category": "custom", "default_price": "1500.00"}
+    for value in (-1, 10_001, 3_000_000_000):
+        response = await client.post(
+            f"{api}/settings/fee-items", json={**body, "sort_order": value}, headers=auth_headers
+        )
+        assert response.status_code == 422, (value, response.text)
+    created = await client.post(
+        f"{api}/settings/fee-items", json={**body, "sort_order": 10_000}, headers=auth_headers
+    )
+    assert created.status_code == 201, created.text
+    too_big = await client.patch(
+        f"{api}/settings/fee-items/{created.json()['id']}",
+        json={"sort_order": 3_000_000_000},
+        headers=auth_headers,
+    )
+    assert too_big.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_fee_item_name_is_trimmed_and_not_blank(client, auth_headers):
+    api = settings.API_V1_PREFIX
+    blank = await client.post(
+        f"{api}/settings/fee-items",
+        json={"name": "   ", "category": "custom", "default_price": "10.00"},
+        headers=auth_headers,
+    )
+    assert blank.status_code == 422
+    created = await client.post(
+        f"{api}/settings/fee-items",
+        json={"name": "  Shockwave  ", "category": "custom", "default_price": "10.00"},
+        headers=auth_headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["name"] == "Shockwave"
+    renamed = await client.patch(
+        f"{api}/settings/fee-items/{created.json()['id']}", json={"name": "  "}, headers=auth_headers
+    )
+    assert renamed.status_code == 422

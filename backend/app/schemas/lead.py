@@ -21,6 +21,15 @@ class LeadBase(BaseModel):
     lost_reason: LeadLostReason | None = None
     lost_remark: str | None = Field(default=None, max_length=500)
 
+
+class LeadCreate(LeadBase):
+    """Schema for creating a new lead."""
+
+    assigned_to: UUID | None = Field(default=None, description="Assigned staff member user UUID.")
+
+    # The rules live on the input schema only. LeadResponse also extends
+    # LeadBase, and leads marked lost before reasons existed have none; a
+    # rule there made GET /leads fail for the whole clinic.
     @model_validator(mode="after")
     def validate_lost_reason_remark(self):
         if self.stage == LeadStage.LOST and self.lost_reason is None:
@@ -32,12 +41,6 @@ class LeadBase(BaseModel):
         ):
             raise ValueError("lost_remark is required when lost_reason is 'other'")
         return self
-
-
-class LeadCreate(LeadBase):
-    """Schema for creating a new lead."""
-
-    assigned_to: UUID | None = Field(default=None, description="Assigned staff member user UUID.")
 
 
 class LeadUpdate(BaseModel):

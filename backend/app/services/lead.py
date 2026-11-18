@@ -101,15 +101,19 @@ class LeadService:
         target_stage = update_data.get("stage", lead.stage)
         target_reason = update_data.get("lost_reason", lead.lost_reason)
         target_remark = update_data.get("lost_remark", lead.lost_remark)
-        if target_stage == LeadStage.LOST and target_reason is None:
-            raise LeadPayloadValidationError("lost_reason is required when stage is 'lost'.")
-        if (
-            target_stage == LeadStage.LOST
-            and target_reason is not None
-            and target_reason.value == "other"
-            and not target_remark
-        ):
-            raise LeadPayloadValidationError("lost_remark is required when lost_reason is 'other'.")
+        # Check the reason when this request marks the lead lost or changes
+        # its reason or remark. A lead marked lost before reasons existed has
+        # none; editing its notes or phone must still work.
+        sets_lost = (
+            update_data.get("stage") == LeadStage.LOST and lead.stage != LeadStage.LOST
+        ) or bool({"lost_reason", "lost_remark"} & set(update_data))
+        if sets_lost and target_stage == LeadStage.LOST:
+            if target_reason is None:
+                raise LeadPayloadValidationError("lost_reason is required when stage is 'lost'.")
+            if target_reason.value == "other" and not target_remark:
+                raise LeadPayloadValidationError(
+                    "lost_remark is required when lost_reason is 'other'."
+                )
         if target_stage != LeadStage.LOST:
             update_data.update(lost_reason=None, lost_remark=None)
 
