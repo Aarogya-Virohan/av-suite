@@ -365,6 +365,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/exercises/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Categories
+         * @description Category groups for the library filter panel (EL-D-005), in panel order,
+         *     each with its values and how many exercises the clinic can see (its own
+         *     and global) carry each value. Counts do not change with the filters.
+         */
+        get: operations["list_categories_api_v1_exercises_categories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exercises/body-parts": {
         parameters: {
             query?: never;
@@ -490,6 +512,69 @@ export interface paths {
          * @description Delete an exercise.
          */
         delete: operations["delete_exercise_api_v1_exercises__id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exercises/{id}/photos/{angle}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Exercise Photo
+         * @description The photo itself (JPEG), for the caller's clinic only.
+         */
+        get: operations["get_exercise_photo_api_v1_exercises__id__photos__angle__get"];
+        /**
+         * Upload Exercise Photo
+         * @description Add or replace this clinic's photo of an exercise from one angle.
+         *     Works for global exercises too; only this clinic sees the photo.
+         */
+        put: operations["upload_exercise_photo_api_v1_exercises__id__photos__angle__put"];
+        post?: never;
+        /** Delete Exercise Photo */
+        delete: operations["delete_exercise_photo_api_v1_exercises__id__photos__angle__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exercise-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Templates */
+        get: operations["list_templates_api_v1_exercise_templates_get"];
+        put?: never;
+        /** Create Template */
+        post: operations["create_template_api_v1_exercise_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/exercise-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template */
+        get: operations["get_template_api_v1_exercise_templates__template_id__get"];
+        /** Update Template */
+        put: operations["update_template_api_v1_exercise_templates__template_id__put"];
+        post?: never;
+        /** Delete Template */
+        delete: operations["delete_template_api_v1_exercise_templates__template_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -706,6 +791,63 @@ export interface paths {
         head?: never;
         /** Update Patient */
         patch: operations["update_patient_api_v1_patients__id__patch"];
+        trace?: never;
+    };
+    "/api/v1/posture/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Detect For Review */
+        post: operations["detect_for_review_api_v1_posture_detect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report From Review */
+        post: operations["report_from_review_api_v1_posture_report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/report/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Posture Pdf
+         * @description Render an already-computed posture report to a clinical PDF.
+         *
+         *     Takes the report payload the frontend already holds, so the MediaPipe
+         *     analysis is not re-run just to produce a document.
+         */
+        post: operations["export_posture_pdf_api_v1_posture_report_pdf_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/prescriptions": {
@@ -1420,11 +1562,27 @@ export interface paths {
         get: operations["get_payment_api_v1_payments__id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/{id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
         /**
-         * Delete Payment
-         * @description Delete a payment record.
+         * Void Payment
+         * @description Void a payment while retaining its audit trail and database row.
          */
-        delete: operations["delete_payment_api_v1_payments__id__delete"];
+        post: operations["void_payment_api_v1_payments__id__void_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1730,6 +1888,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log Audit Export
+         * @description Record metadata for a completed client-side export.
+         */
+        post: operations["log_audit_export_api_v1_audit_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/recycle-bin": {
         parameters: {
             query?: never;
@@ -1768,6 +1946,42 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/fee-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Fee Items */
+        get: operations["list_fee_items_api_v1_settings_fee_items_get"];
+        put?: never;
+        /** Create Fee Item */
+        post: operations["create_fee_item_api_v1_settings_fee_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/fee-items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Deactivate Fee Item */
+        delete: operations["deactivate_fee_item_api_v1_settings_fee_items__item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Fee Item */
+        patch: operations["update_fee_item_api_v1_settings_fee_items__item_id__patch"];
         trace?: never;
     };
     "/api/v1/settings/clinic": {
@@ -1949,63 +2163,6 @@ export interface paths {
         get: operations["get_platform_context_api_v1_me_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/posture/detect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Detect For Review */
-        post: operations["detect_for_review_posture_detect_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/posture/report": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Report From Review */
-        post: operations["report_from_review_posture_report_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/posture/report/pdf": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Export Posture Pdf
-         * @description Render an already-computed posture report to a clinical PDF.
-         *
-         *     Takes the report payload the frontend already holds, so the MediaPipe
-         *     analysis is not re-run just to produce a document.
-         */
-        post: operations["export_posture_pdf_posture_report_pdf_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2414,6 +2571,16 @@ export interface components {
             role: components["schemas"]["UserRole"];
         };
         /**
+         * AuditExportRequest
+         * @description Minimal context recorded when a client-side export completes.
+         */
+        AuditExportRequest: {
+            /** Entity Type */
+            entity_type: string;
+            /** Row Count */
+            row_count: number;
+        };
+        /**
          * AuditLogResponse
          * @description Schema representing an audit log entry.
          */
@@ -2446,8 +2613,8 @@ export interface components {
              */
             created_at: string;
         };
-        /** Body_detect_for_review_posture_detect_post */
-        Body_detect_for_review_posture_detect_post: {
+        /** Body_detect_for_review_api_v1_posture_detect_post */
+        Body_detect_for_review_api_v1_posture_detect_post: {
             /** Front Image */
             front_image: string;
             /** Side Image */
@@ -2455,8 +2622,8 @@ export interface components {
             /** Back Image */
             back_image: string;
         };
-        /** Body_report_from_review_posture_report_post */
-        Body_report_from_review_posture_report_post: {
+        /** Body_report_from_review_api_v1_posture_report_post */
+        Body_report_from_review_api_v1_posture_report_post: {
             /** Detection Token */
             detection_token: string;
             /** Review */
@@ -2471,7 +2638,10 @@ export interface components {
             patient_name: string;
             /** Age */
             age: number;
-            /** Gender */
+            /**
+             * Gender
+             * @default
+             */
             gender: string;
             /**
              * Case Ref
@@ -2522,6 +2692,11 @@ export interface components {
              */
             back_level_calibrated: boolean;
         };
+        /** Body_upload_exercise_photo_api_v1_exercises__id__photos__angle__put */
+        Body_upload_exercise_photo_api_v1_exercises__id__photos__angle__put: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_patient_document_api_v1_patients__patient_id__documents_post */
         Body_upload_patient_document_api_v1_patients__patient_id__documents_post: {
             /** Label */
@@ -2561,6 +2736,69 @@ export interface components {
          * @enum {string}
          */
         CapabilityScope: "none" | "own" | "all";
+        /** ClinicFeeItemCreate */
+        ClinicFeeItemCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "consultation" | "posture" | "exercise_rx" | "custom";
+            /** Default Price */
+            default_price: number | string;
+            /**
+             * Price Editable
+             * @default true
+             */
+            price_editable: boolean;
+            /**
+             * Sort Order
+             * @default 0
+             */
+            sort_order: number;
+        };
+        /** ClinicFeeItemResponse */
+        ClinicFeeItemResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Clinic Id
+             * Format: uuid
+             */
+            clinic_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "consultation" | "posture" | "exercise_rx" | "custom";
+            /** Default Price */
+            default_price: string;
+            /** Price Editable */
+            price_editable: boolean;
+            /** Active */
+            active: boolean;
+            /** Sort Order */
+            sort_order: number;
+        };
+        /** ClinicFeeItemUpdate */
+        ClinicFeeItemUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Category */
+            category?: ("consultation" | "posture" | "exercise_rx" | "custom") | null;
+            /** Default Price */
+            default_price?: number | string | null;
+            /** Price Editable */
+            price_editable?: boolean | null;
+            /** Sort Order */
+            sort_order?: number | null;
+        };
         /**
          * ClinicPlanTier
          * @description Subscription tiers available to a clinic.
@@ -2587,6 +2825,12 @@ export interface components {
              * @description URL of clinic logo image asset.
              */
             branding_logo_url?: string | null;
+            /**
+             * Client Type
+             * @default clinic
+             * @enum {string}
+             */
+            client_type: "clinic" | "hospital" | "home_care";
             /**
              * Branding Color
              * @description Primary branding color hex code (e.g. #008080).
@@ -2649,6 +2893,12 @@ export interface components {
              */
             branding_logo_url?: string | null;
             /**
+             * Client Type
+             * @default clinic
+             * @enum {string}
+             */
+            client_type: "clinic" | "hospital" | "home_care";
+            /**
              * Branding Color
              * @description Updated branding color hex string.
              */
@@ -2699,6 +2949,21 @@ export interface components {
          * @enum {string}
          */
         EntitlementStatus: "enabled" | "disabled";
+        /**
+         * ExerciseCategoryRef
+         * @description One category an exercise carries (EL-D-005).
+         */
+        ExerciseCategoryRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Group Key */
+            group_key: string;
+            /** Name */
+            name: string;
+        };
         /** ExerciseCreate */
         ExerciseCreate: {
             /** Title */
@@ -2714,6 +2979,27 @@ export interface components {
             is_free: boolean;
             /** Video Url */
             video_url?: string | null;
+            /** Category Ids */
+            category_ids?: string[] | null;
+        };
+        /**
+         * ExercisePhotoInfo
+         * @description One of the caller's clinic photos for an exercise. The image itself is
+         *     served by GET /exercises/{id}/photos/{angle}; updated_at changes on every
+         *     upload, so clients can use it to refresh a cached copy.
+         */
+        ExercisePhotoInfo: {
+            /** Angle */
+            angle: string;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ExerciseRead */
         ExerciseRead: {
@@ -2747,6 +3033,16 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Photos
+             * @default []
+             */
+            photos: components["schemas"]["ExercisePhotoInfo"][];
+            /**
+             * Categories
+             * @default []
+             */
+            categories: components["schemas"]["ExerciseCategoryRef"][];
             /** Image Url */
             readonly image_url: string | null;
             /** Demo Video Url */
@@ -2764,6 +3060,8 @@ export interface components {
             is_free?: boolean | null;
             /** Video Url */
             video_url?: string | null;
+            /** Category Ids */
+            category_ids?: string[] | null;
         };
         /**
          * Gender
@@ -2825,6 +3123,8 @@ export interface components {
             tax_percent?: number | string | null;
             /** Notes */
             notes?: string | null;
+            /** Discount Reason */
+            discount_reason?: string | null;
             /** Items */
             items?: components["schemas"]["InvoiceItemCreate"][];
             /** Line Items */
@@ -2940,6 +3240,8 @@ export interface components {
             tax_percent?: string | null;
             /** Notes */
             notes?: string | null;
+            /** Discount Reason */
+            discount_reason?: string | null;
             /**
              * Id
              * Format: uuid
@@ -2959,6 +3261,8 @@ export interface components {
             /** Paid Amount */
             paid_amount: string;
             status: components["schemas"]["InvoiceStatus"];
+            /** Cancel Reason */
+            cancel_reason?: string | null;
             /** Line Items */
             line_items?: {
                 [key: string]: unknown;
@@ -3002,6 +3306,10 @@ export interface components {
             status?: components["schemas"]["InvoiceStatus"] | null;
             /** Notes */
             notes?: string | null;
+            /** Cancel Reason */
+            cancel_reason?: string | null;
+            /** Discount Reason */
+            discount_reason?: string | null;
         };
         /**
          * LeadAnalytics
@@ -3088,7 +3396,7 @@ export interface components {
          * LeadLostReason
          * @enum {string}
          */
-        LeadLostReason: "denied" | "better_price" | "asked_for_discount" | "offer" | "call_not_picked" | "other";
+        LeadLostReason: "denied" | "better_price" | "asked_for_discount" | "offer" | "call_not_picked" | "other" | "too_far" | "timing_mismatch" | "needs_home_visit" | "cannot_afford" | "went_to_competitor";
         /**
          * LeadResponse
          * @description Schema representing full details of a lead.
@@ -3615,6 +3923,8 @@ export interface components {
              * Format: uuid
              */
             clinic_id: string;
+            /** Display Number */
+            display_number: number;
             /** User Id */
             user_id: string | null;
             /**
@@ -3784,6 +4094,22 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            status: components["schemas"]["PaymentStatus"];
+            /** Void Reason */
+            void_reason?: string | null;
+            /** Voided By */
+            voided_by?: string | null;
+        };
+        /**
+         * PaymentStatus
+         * @description Lifecycle states for recorded payment transactions.
+         * @enum {string}
+         */
+        PaymentStatus: "pending" | "completed" | "voided" | "refunded";
+        /** PaymentVoidRequest */
+        PaymentVoidRequest: {
+            /** Reason */
+            reason: string;
         };
         /** PlatformContextResponse */
         PlatformContextResponse: {
@@ -4088,6 +4414,14 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ResponseEnvelope[ExercisePhotoInfo] */
+        ResponseEnvelope_ExercisePhotoInfo_: {
+            data?: components["schemas"]["ExercisePhotoInfo"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ResponseEnvelope[ExerciseRead] */
         ResponseEnvelope_ExerciseRead_: {
             data?: components["schemas"]["ExerciseRead"] | null;
@@ -4118,6 +4452,15 @@ export interface components {
         ResponseEnvelope_List_PrescriptionRead__: {
             /** Data */
             data?: components["schemas"]["PrescriptionRead"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[List[TemplateRead]] */
+        ResponseEnvelope_List_TemplateRead__: {
+            /** Data */
+            data?: components["schemas"]["TemplateRead"][] | null;
             /** Meta */
             meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
                 [key: string]: unknown;
@@ -4190,6 +4533,14 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ResponseEnvelope[TemplateRead] */
+        ResponseEnvelope_TemplateRead_: {
+            data?: components["schemas"]["TemplateRead"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ResponseEnvelope[TokenResponse] */
         ResponseEnvelope_TokenResponse_: {
             data?: components["schemas"]["TokenResponse"] | null;
@@ -4211,6 +4562,17 @@ export interface components {
             /** Data */
             data?: {
                 [key: string]: unknown;
+            } | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[dict[str, bool]] */
+        ResponseEnvelope_dict_str__bool__: {
+            /** Data */
+            data?: {
+                [key: string]: boolean;
             } | null;
             /** Meta */
             meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
@@ -4446,6 +4808,102 @@ export interface components {
          * @enum {string}
          */
         Specialty: "physiotherapy" | "chiropractic" | "osteopathy" | "massage" | "acupuncture" | "ortho" | "neuro" | "cardiopulm" | "sports" | "paeds" | "general" | "other";
+        /** TemplateIn */
+        TemplateIn: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Items */
+            items: components["schemas"]["TemplateItemIn"][];
+        };
+        /** TemplateItemIn */
+        TemplateItemIn: {
+            /**
+             * Exercise Id
+             * Format: uuid
+             */
+            exercise_id: string;
+            /**
+             * Sets
+             * @default 1
+             */
+            sets: number;
+            /**
+             * Reps
+             * @default 10
+             */
+            reps: number;
+            /**
+             * Hold
+             * @default 0
+             */
+            hold: number;
+            /**
+             * Frequency
+             * @default Daily
+             */
+            frequency: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** TemplateItemRead */
+        TemplateItemRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Exercise Id
+             * Format: uuid
+             */
+            exercise_id: string;
+            /** Position */
+            position: number;
+            /** Sets */
+            sets: number;
+            /** Reps */
+            reps: number;
+            /** Hold */
+            hold: number;
+            /** Frequency */
+            frequency: string;
+            /** Note */
+            note: string | null;
+            exercise?: components["schemas"]["ExerciseRead"] | null;
+        };
+        /** TemplateRead */
+        TemplateRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Clinic Id */
+            clinic_id: string | null;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Is Global
+             * @default false
+             */
+            is_global: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Items */
+            items: components["schemas"]["TemplateItemRead"][];
+        };
         /**
          * TherapistPerformanceEnvelope
          * @description Therapist performance envelope with selected-period metadata.
@@ -4934,6 +5392,8 @@ export interface operations {
                 is_free?: boolean | null;
                 /** @description Search in exercise title */
                 search?: string | null;
+                /** @description Category ids from GET /exercises/categories (repeat the parameter or separate with commas). Inside one group any value matches; across groups every group must match. */
+                category?: string[] | null;
                 /** @description Page number */
                 page?: number;
                 /** @description Items per page */
@@ -4994,6 +5454,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_categories_api_v1_exercises_categories_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -5122,6 +5602,256 @@ export interface operations {
             header?: never;
             path: {
                 id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_exercise_photo_api_v1_exercises__id__photos__angle__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                angle: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_exercise_photo_api_v1_exercises__id__photos__angle__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                angle: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_exercise_photo_api_v1_exercises__id__photos__angle__put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ExercisePhotoInfo_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_exercise_photo_api_v1_exercises__id__photos__angle__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                angle: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_api_v1_exercise_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_List_TemplateRead__"];
+                };
+            };
+        };
+    };
+    create_template_api_v1_exercise_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_TemplateRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_api_v1_exercise_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_TemplateRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_template_api_v1_exercise_templates__template_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_TemplateRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_api_v1_exercise_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
             };
             cookie?: never;
         };
@@ -5300,6 +6030,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResponseEnvelope_PatientRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detect_for_review_api_v1_posture_detect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_detect_for_review_api_v1_posture_detect_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_from_review_api_v1_posture_report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_report_from_review_api_v1_posture_report_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_posture_pdf_api_v1_posture_report_pdf_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -7123,7 +7954,7 @@ export interface operations {
             };
         };
     };
-    delete_payment_api_v1_payments__id__delete: {
+    void_payment_api_v1_payments__id__void_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -7132,14 +7963,20 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentVoidRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PaymentResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -7789,6 +8626,39 @@ export interface operations {
             };
         };
     };
+    log_audit_export_api_v1_audit_export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_dict_str__bool__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_recycle_bin_items_api_v1_recycle_bin_get: {
         parameters: {
             query?: {
@@ -7839,6 +8709,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecycleBinRestoreResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_fee_items_api_v1_settings_fee_items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClinicFeeItemResponse"][];
+                };
+            };
+        };
+    };
+    create_fee_item_api_v1_settings_fee_items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClinicFeeItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClinicFeeItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_fee_item_api_v1_settings_fee_items__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_fee_item_api_v1_settings_fee_items__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClinicFeeItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClinicFeeItemResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8157,107 +9144,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResponseEnvelope_PlatformContextResponse_"];
-                };
-            };
-        };
-    };
-    detect_for_review_posture_detect_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_detect_for_review_posture_detect_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    report_from_review_posture_report_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_report_from_review_posture_report_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_posture_pdf_posture_report_pdf_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

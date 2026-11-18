@@ -2,13 +2,22 @@ import type { components } from '../../types/schema';
 
 export type LostReason = components['schemas']['LeadLostReason'];
 
-/* The founders' own list and words (Decisions.md D-026). Order as they gave it. */
+/*
+ * The founders' own list and words, in the order they gave them: D-026, then
+ * Shivank sir's five of 2 Nov (D-042). "Other" stays last, as the catch-all
+ * that needs a remark.
+ */
 export const LOST_REASONS: { value: LostReason; label: string }[] = [
   { value: 'denied', label: 'Denied' },
   { value: 'better_price', label: 'Better price' },
   { value: 'asked_for_discount', label: 'Asked for discount' },
   { value: 'offer', label: 'Offer' },
   { value: 'call_not_picked', label: 'Call not picked' },
+  { value: 'too_far', label: 'Location / commute too far' },
+  { value: 'timing_mismatch', label: 'Timing mismatch' },
+  { value: 'needs_home_visit', label: 'Requires home visit' },
+  { value: 'cannot_afford', label: 'Cannot afford' },
+  { value: 'went_to_competitor', label: 'Went to competitor' },
   { value: 'other', label: 'Other' },
 ];
 
