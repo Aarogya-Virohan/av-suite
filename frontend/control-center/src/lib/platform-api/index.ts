@@ -25,7 +25,7 @@ export function platformApi(): PlatformApi {
   if (!instance) {
     instance =
       API_MODE === 'mock'
-        ? createMockPlatformApi(getAccessToken)
+        ? createMockPlatformApi(getAccessToken, { onUnauthorized: handleUnauthorized })
         : createHttpPlatformApi(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000', getAccessToken, handleUnauthorized);
   }
   return instance;

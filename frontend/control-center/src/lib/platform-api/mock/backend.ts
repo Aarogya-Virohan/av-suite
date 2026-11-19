@@ -123,6 +123,22 @@ function hash(text: string): number {
 export interface MockBackendOptions {
   /** Clock, injectable for tests. */
   now?: () => Date;
+  /** State saved by exportState(), to survive a page reload. */
+  state?: MockBackendState | null;
+}
+
+/** Serializable mock state (fictional data only). */
+export interface MockBackendState {
+  version: 1;
+  operators: SeedOperator[];
+  organizations: SeedOrganization[];
+  clinics: SeedClinic[];
+  entitlements: SeedEntitlement[];
+  auditLogs: AuditLog[];
+  challenges: [string, string][];
+  sessions: [string, { operatorId: string; version: number; expiresAt: number }][];
+  tokenVersions: [string, number][];
+  counter: number;
 }
 
 export class MockPlatformBackend {
@@ -142,12 +158,40 @@ export class MockPlatformBackend {
 
   constructor(options: MockBackendOptions = {}) {
     this.now = options.now ?? (() => new Date());
+    const state = options.state;
+    if (state && state.version === 1) {
+      this.operators = state.operators;
+      this.organizations = state.organizations;
+      this.clinics = state.clinics;
+      this.entitlements = state.entitlements;
+      this.auditLogs = state.auditLogs;
+      state.challenges.forEach(([k, v]) => this.challenges.set(k, v));
+      state.sessions.forEach(([k, v]) => this.sessions.set(k, v));
+      state.tokenVersions.forEach(([k, v]) => this.tokenVersions.set(k, v));
+      this.counter = state.counter;
+      return;
+    }
     const seed = buildSeed(this.now());
     this.operators = seed.operators;
     this.organizations = seed.organizations;
     this.clinics = seed.clinics;
     this.entitlements = seed.entitlements;
     this.seedAuditHistory();
+  }
+
+  exportState(): MockBackendState {
+    return {
+      version: 1,
+      operators: this.operators,
+      organizations: this.organizations,
+      clinics: this.clinics,
+      entitlements: this.entitlements,
+      auditLogs: this.auditLogs,
+      challenges: [...this.challenges.entries()],
+      sessions: [...this.sessions.entries()],
+      tokenVersions: [...this.tokenVersions.entries()],
+      counter: this.counter,
+    };
   }
 
   /** Build the PlatformApi bound to a token provider. */

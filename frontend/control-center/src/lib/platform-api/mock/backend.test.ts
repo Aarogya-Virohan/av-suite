@@ -107,3 +107,16 @@ describe('mock platform backend', () => {
     expect(text).not.toMatch(/patient_name|"phone"|diagnosis|first_name/);
   });
 });
+
+describe('mock state persistence', () => {
+  it('restores data and sessions from exportState', async () => {
+    const first = new MockPlatformBackend({ now: () => NOW });
+    const { api } = await signIn(first, 'onkar@av-console.mock');
+    const org = (await api.listOrganizations({ status: 'active', page_size: 1 })).data[0];
+    await api.suspendOrganization(org.id, { reason: 'persist check' });
+    const second = new MockPlatformBackend({ now: () => NOW, state: JSON.parse(JSON.stringify(first.exportState())) });
+    const token = [...(first.exportState().sessions)][0][0];
+    const again = second.api(() => token);
+    expect((await again.getOrganization(org.id)).data.status).toBe('suspended');
+  });
+});
