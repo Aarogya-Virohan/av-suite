@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Terminal, UserCog, UserMinus, UserPlus } from 'lucide-react';
+import { Terminal, UserMinus, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { RequirePermission } from '@/components/auth/RequirePermission';
 import { ReasonActionSlideOver } from '@/components/forms/ReasonActionSlideOver';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { Avatar, Badge, Button, Card, PageHeader } from '@/components/ui/brand';
 import { ErrorCard } from '@/components/ui/ErrorCard';
-import { ChangeRoleSlideOver } from '@/features/operators/ChangeRoleSlideOver';
 import { useOperators, useUpdateOperator } from '@/features/operators/hooks';
 import { formatRelative, OPERATOR_ROLE_LABEL } from '@/lib/format';
 import { errorMessage } from '@/lib/platform-api/errors';
@@ -29,7 +28,18 @@ function Operators() {
   const [pageSize, setPageSize] = useState(UI_PAGE_SIZE);
   const query = useOperators({ page, page_size: pageSize });
   const update = useUpdateOperator();
-  const [roleTarget, setRoleTarget] = useState<Operator | null>(null);
+
+  // Same guards as the backend; the backend answers 409 / 422 / 403 on its own.
+  const activeOwners = (query.data?.data ?? []).filter((o) => o.role === 'owner' && o.is_active).length;
+  const actionBlock = (o: Operator): string | null => {
+    if (o.is_active) {
+      if (o.role === 'owner' && activeOwners <= 1) return 'Last active Owner';
+      if (o.id === me?.id) return 'You cannot deactivate yourself';
+      return null;
+    }
+    if (o.role === 'owner') return 'Owner reactivation via CLI';
+    return null;
+  };
   const [activeTarget, setActiveTarget] = useState<Operator | null>(null);
 
   const columns: Column<Operator>[] = [
@@ -60,31 +70,26 @@ function Operators() {
     {
       key: 'actions',
       header: '',
-      render: (o) =>
-        o.role === 'owner' ? (
-          // P-7: the Owner set changes only through the CLI; the backend answers 403 too.
-          <div className="flex items-center justify-end gap-1.5" title="Owner changes via CLI only">
-            <Button variant="ghost" className="h-8 px-3" disabled aria-label={`Change role of ${o.name} (Owner changes via CLI only)`}>
-              <UserCog className="h-3.5 w-3.5" />
-              <span>Role</span>
-            </Button>
-            <Button variant="ghost" className="h-8 px-3" disabled aria-label={`Deactivate ${o.name} (Owner changes via CLI only)`}>
-              <UserMinus className="h-3.5 w-3.5" />
-              <span>Deactivate</span>
-            </Button>
-          </div>
-        ) : (
-          <div className="flex justify-end gap-1.5">
-            <Button variant="ghost" className="h-8 px-3" onClick={() => setRoleTarget(o)} disabled={!o.is_active}>
-              <UserCog className="h-3.5 w-3.5" />
-              <span>Role</span>
-            </Button>
-            <Button variant="ghost" className="h-8 px-3" onClick={() => setActiveTarget(o)}>
+      render: (o) => {
+        const blocked = actionBlock(o);
+        const label = o.is_active ? 'Deactivate' : 'Reactivate';
+        return (
+          <div className="flex flex-col items-end gap-1">
+            <Button
+              variant="ghost"
+              className="h-8 px-3"
+              disabled={!!blocked}
+              title={blocked ?? undefined}
+              aria-label={blocked ? `${label} ${o.name}: ${blocked}` : `${label} ${o.name}`}
+              onClick={() => setActiveTarget(o)}
+            >
               {o.is_active ? <UserMinus className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
-              <span>{o.is_active ? 'Deactivate' : 'Reactivate'}</span>
+              <span>{label}</span>
             </Button>
+            {blocked ? <span className="text-[11px] text-muted">{blocked}</span> : null}
           </div>
-        ),
+        );
+      },
     },
   ];
 
@@ -99,11 +104,11 @@ function Operators() {
           <Terminal className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </span>
         <div className="text-sm text-ink-2">
-          <p className="font-semibold text-ink">Operators are created via CLI by an Owner</p>
+          <p className="font-semibold text-ink">Operators are created and roles changed via CLI by an Owner. Deactivation is available here for emergencies.</p>
           <p className="mt-1">
             Run <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-ink">python -m app.scripts.create_platform_operator</code>{' '}
-            on the backend. The console never sets passwords; a new operator enrols two-step sign-in on first login. Owner changes
-            (role, deactivation) are CLI only too.
+            on the backend. The console never sets passwords; a new operator enrols two-step sign-in on first login. Reactivating an
+            Owner is CLI only too.
           </p>
         </div>
       </Card>
@@ -124,8 +129,6 @@ function Operators() {
         />
       )}
 
-      <ChangeRoleSlideOver operator={roleTarget} onClose={() => setRoleTarget(null)} />
-
       <ReasonActionSlideOver
         isOpen={activeTarget !== null}
         onClose={() => setActiveTarget(null)}
@@ -134,7 +137,14 @@ function Operators() {
         tone={deactivating ? 'danger' : 'default'}
         description={
           deactivating ? (
-            <>They are signed out of every session on their next request and cannot sign in again until an Owner reactivates them.</>
+            activeTarget?.role === 'owner' ? (
+              <>
+                Emergency stop for an Owner account. They are signed out of every session on their next request. Reactivating an Owner is
+                CLI only.
+              </>
+            ) : (
+              <>They are signed out of every session on their next request and cannot sign in again until an Owner reactivates them.</>
+            )
           ) : (
             <>They can sign in again with their existing password and authenticator app.</>
           )

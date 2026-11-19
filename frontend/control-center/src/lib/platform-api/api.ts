@@ -71,6 +71,11 @@ export interface PlatformApi {
   listOperators(params: PaginationParams): Promise<PageResponse<Operator>>;
   /** decision: S2 (CLI-only today). Not used by the UI. */
   createOperator(body: OperatorCreate): Promise<ItemResponse<Operator>>;
+  /**
+   * Console may only take access away: deactivate any operator (not yourself,
+   * not the last active Owner) and reactivate Support. Role changes and Owner
+   * reactivation are CLI only (403).
+   */
   updateOperator(id: string, body: OperatorUpdate): Promise<ItemResponse<Operator>>;
 }
 

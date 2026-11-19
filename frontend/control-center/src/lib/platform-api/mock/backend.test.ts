@@ -100,13 +100,45 @@ describe('mock platform backend', () => {
     await expectError(support.getOverview(), 401, 'UNAUTHORIZED');
   });
 
-  it('protects Owners: role change and deactivation are CLI only (P-7)', async () => {
-    const owners = (await owner.listOperators({})).data.filter((o) => o.role === 'owner');
-    const daman = owners.find((o) => o.email === 'daman@av-console.mock')!;
-    await expectError(owner.updateOperator(daman.id, { is_active: false, reason: 'x' }), 403, 'FORBIDDEN');
-    await expectError(owner.updateOperator(daman.id, { role: 'support', reason: 'x' }), 403, 'FORBIDDEN');
-    const audits = (await owner.listAuditLogs({ action: 'operator.update' })).meta.total;
-    expect(audits).toBe(0);
+  describe('operator rules: take access away in the console, give access via CLI', () => {
+    const find = async (email: string) => (await owner.listOperators({})).data.find((o) => o.email === email)!;
+
+    it('blocks every role change with 403, both directions', async () => {
+      const daman = await find('daman@av-console.mock');
+      const sup = await find('support@av-console.mock');
+      await expectError(owner.updateOperator(daman.id, { role: 'support', reason: 'x' }), 403, 'FORBIDDEN');
+      await expectError(owner.updateOperator(sup.id, { role: 'owner', reason: 'x' }), 403, 'FORBIDDEN');
+      expect((await owner.listAuditLogs({ action: 'operator.update' })).meta.total).toBe(0);
+    });
+
+    it('lets an Owner deactivate another Owner (kill switch), audited', async () => {
+      const daman = await find('daman@av-console.mock');
+      const res = await owner.updateOperator(daman.id, { is_active: false, reason: 'lost laptop' });
+      expect(res.data.is_active).toBe(false);
+      const row = (await owner.listAuditLogs({ action: 'operator.update', page_size: 1 })).data[0];
+      expect(row).toMatchObject({ reason: 'lost laptop', details: { before: { is_active: true }, after: { is_active: false } } });
+    });
+
+    it('blocks self-deactivation', async () => {
+      const me = await find('onkar@av-console.mock');
+      await expectError(owner.updateOperator(me.id, { is_active: false, reason: 'x' }), 422, 'VALIDATION_ERROR');
+    });
+
+    it('blocks deactivating the last active Owner', async () => {
+      await owner.updateOperator((await find('daman@av-console.mock')).id, { is_active: false, reason: 'x' });
+      await owner.updateOperator((await find('shivank@av-console.mock')).id, { is_active: false, reason: 'x' });
+      // Onkar is now the only active Owner.
+      await expectError(owner.updateOperator((await find('onkar@av-console.mock')).id, { is_active: false, reason: 'x' }), 409, 'CONFLICT');
+    });
+
+    it('allows Support reactivation but not Owner reactivation', async () => {
+      const sup = await find('new.support@av-console.mock');
+      await owner.updateOperator(sup.id, { is_active: false, reason: 'x' });
+      expect((await owner.updateOperator(sup.id, { is_active: true, reason: 'back from leave' })).data.is_active).toBe(true);
+      const daman = await find('daman@av-console.mock');
+      await owner.updateOperator(daman.id, { is_active: false, reason: 'x' });
+      await expectError(owner.updateOperator(daman.id, { is_active: true, reason: 'x' }), 403, 'FORBIDDEN');
+    });
   });
 
   it('writes before and after on every mutation audit row', async () => {

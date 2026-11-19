@@ -420,12 +420,20 @@ export class MockPlatformBackend {
         const op = auth('platform.operators.manage');
         const reason = requireReason(body.reason);
         const target = this.operators.find((o) => o.id === id) ?? fail(404, PLATFORM_ERROR_CODES.NOT_FOUND, 'Operator not found.');
-        // P-7: the Owner set (Shivank, Daman, Onkar) changes only through the CLI.
-        if (target.role === 'owner' && (body.is_active !== undefined || (body.role !== undefined && body.role !== target.role))) {
-          fail(403, PLATFORM_ERROR_CODES.FORBIDDEN, 'Owner changes via CLI only.');
+        // Principle (Onkar 19 Nov): taking access away is allowed in the console,
+        // giving access is CLI only.
+        if (body.role !== undefined && body.role !== target.role) {
+          fail(403, PLATFORM_ERROR_CODES.FORBIDDEN, 'Role changes via CLI only.', 'role');
         }
-        if (target.id === op.id && (body.is_active === false || (body.role && body.role !== target.role))) {
-          fail(422, PLATFORM_ERROR_CODES.VALIDATION_ERROR, 'You cannot deactivate yourself or change your own role.');
+        if (body.is_active === false && target.is_active) {
+          const activeOwners = this.operators.filter((o) => o.role === 'owner' && o.is_active);
+          if (target.role === 'owner' && activeOwners.length <= 1) {
+            fail(409, PLATFORM_ERROR_CODES.CONFLICT, 'Cannot deactivate the last active Owner.');
+          }
+          if (target.id === op.id) fail(422, PLATFORM_ERROR_CODES.VALIDATION_ERROR, 'You cannot deactivate yourself.');
+        }
+        if (body.is_active === true && !target.is_active && target.role === 'owner') {
+          fail(403, PLATFORM_ERROR_CODES.FORBIDDEN, 'Owner reactivation via CLI only.');
         }
         const before = { name: target.name, role: target.role, is_active: target.is_active };
         const next: SeedOperator = {

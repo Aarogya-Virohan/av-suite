@@ -162,6 +162,7 @@ export interface OperatorCreate {
 
 export interface OperatorUpdate {
   name?: string;
+  /** decision: CLI only. Any change answers 403 "Role changes via CLI only". */
   role?: OperatorRole;
   /** Deactivating increments token_version on the backend (6.3). */
   is_active?: boolean;
