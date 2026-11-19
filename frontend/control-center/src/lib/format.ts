@@ -71,6 +71,9 @@ const ACTION_LABEL: Record<string, string> = {
   'operator.update': 'Operator updated',
 };
 
+/** Actions the console writes, for the audit filter. */
+export const AUDIT_ACTIONS = Object.keys(ACTION_LABEL);
+
 export function auditActionLabel(action: string): string {
   return ACTION_LABEL[action] ?? action;
 }

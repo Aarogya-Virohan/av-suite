@@ -56,12 +56,17 @@ function ClinicDetail() {
 
   return (
     <div className="space-y-6">
-      <Link
-        href={`/organizations/${clinic.organization_id}`}
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-grove hover:text-grove-hover"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" /> {clinic.organization_name}
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href={`/organizations/${clinic.organization_id}`}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-grove hover:text-grove-hover"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> {clinic.organization_name}
+        </Link>
+        <Link href={`/audit-logs?clinic_id=${clinic.id}`} className="text-xs font-semibold text-grove hover:text-grove-hover">
+          Audit log for this clinic
+        </Link>
+      </div>
 
       <PageHeader
         title={

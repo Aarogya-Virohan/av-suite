@@ -116,7 +116,14 @@ function OrganizationDetail() {
       ) : null}
 
       <Card className="p-5">
-        <CardHeader title="Account" />
+        <CardHeader
+          title="Account"
+          action={
+            <Link href={`/audit-logs?organization_id=${org.id}`} className="text-xs font-semibold text-grove hover:text-grove-hover">
+              Audit log for this organization
+            </Link>
+          }
+        />
         <dl className="grid gap-x-8 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <Detail label="Type" value={ORGANIZATION_TYPE_LABEL[org.type]} />
           <Detail label="Billing contact email" value={org.contact_email ?? '-'} />
