@@ -25,6 +25,8 @@ interface DataTableProps<T> {
   onPageSizeChange?: (size: number) => void;
   // Server-side search support
   onSearchChange?: (term: string) => void;
+  /** Starting search text, e.g. from the URL. */
+  initialSearch?: string;
 }
 
 const PAGE_SIZES = [5, 10, 25, 50, 75] as const;
@@ -43,8 +45,9 @@ export function DataTable<T extends { id: string }>({
   onPageChange,
   onPageSizeChange,
   onSearchChange,
+  initialSearch = '',
 }: DataTableProps<T>) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [clientPage, setClientPage] = useState(1);
   const [clientPageSize, setClientPageSize] = useState(10);
 

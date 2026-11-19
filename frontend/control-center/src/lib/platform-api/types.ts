@@ -48,6 +48,8 @@ export interface PaginationParams {
 
 export const PAGE_SIZE_DEFAULT = 20;
 export const PAGE_SIZE_MAX = 100;
+/** Console list default; one of the DataTable page-size options. */
+export const UI_PAGE_SIZE = 25;
 
 /* ------------------------------------------------------------------ */
 /* Enums (String + CHECK on the backend, section 0.6)                  */
