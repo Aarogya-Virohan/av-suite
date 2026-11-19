@@ -15,12 +15,18 @@ import type {
 } from '../types';
 
 /**
- * Mirror of the product list in core/products.py that the console offers.
+ * Mirror of CANONICAL_PRODUCTS in backend core/products.py (key = id, same
+ * name, description and category) for the products the console offers.
  * clinical-decision-support is left out on purpose (Onkar, 19 Nov): screens
  * render whatever this list holds, so adding it later is a data change.
  */
 export const SEED_CATALOG: ProductCatalogItem[] = [
-  { key: 'crm', name: 'CRM', description: 'Patients, appointments, leads and billing.', category: 'Practice' },
+  {
+    key: 'crm',
+    name: 'CRM',
+    description: 'Patient management, scheduling and clinic operations.',
+    category: 'Patient Management',
+  },
   {
     key: 'exercise-library',
     name: 'Exercise Library',
@@ -174,6 +180,11 @@ export function buildSeed(now: Date = new Date()): SeedData {
   const nowMs = now.getTime();
   const iso = (ms: number) => new Date(ms).toISOString();
   const pick = <T,>(items: readonly T[]) => items[Math.floor(rnd() * items.length)];
+  /** 00:00 IST of the day `days` from today, the bound the console itself sends. */
+  const istMidnight = (days: number) => {
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+    return new Date(Date.parse(`${day}T00:00:00+05:30`) + days * DAY).toISOString();
+  };
 
   const operators: SeedOperator[] = [
     { name: 'Shivank Khare', email: 'shivank@av-console.mock', role: 'owner', mfa: true },
@@ -248,9 +259,9 @@ export function buildSeed(now: Date = new Date()): SeedData {
         let validFrom: string | null = iso(createdMs);
         let validUntil: string | null = null;
         let status: EntitlementStatus = 'enabled';
-        if (roll > 0.92) validUntil = iso(nowMs - 5 * DAY); // expired
-        else if (roll > 0.86) validFrom = iso(nowMs + 7 * DAY); // starts later
-        else if (roll > 0.7) validUntil = iso(nowMs + 60 * DAY);
+        if (roll > 0.92) validUntil = istMidnight(-5); // expired
+        else if (roll > 0.86) validFrom = istMidnight(7); // starts later
+        else if (roll > 0.7) validUntil = istMidnight(61); // last day with access: today + 60
         if (roll < 0.05 && p > 0) status = 'disabled';
         entitlements.push({
           clinic_id: clinic.id,

@@ -129,8 +129,9 @@ export interface MockBackendOptions {
 
 /** Serializable mock state (fictional data only). */
 export interface MockBackendState {
-  version: 1;
+  version: 2;
   operators: SeedOperator[];
+  usageProfile: Record<string, string[]>;
   organizations: SeedOrganization[];
   clinics: SeedClinic[];
   entitlements: SeedEntitlement[];
@@ -148,6 +149,12 @@ export class MockPlatformBackend {
   private clinics: SeedClinic[];
   private entitlements: SeedEntitlement[];
   private auditLogs: AuditLog[] = [];
+  /**
+   * Which products each clinic has history for. Fixed at seed time: usage
+   * is history, so suspending a clinic or changing a tool later must not
+   * rewrite past counts. New clinics start with none.
+   */
+  private usageProfile: Record<string, string[]> = {};
   private readonly catalog: ProductCatalogItem[] = SEED_CATALOG;
   /** challenge token -> operator id (between login and MFA). */
   private readonly challenges = new Map<string, string>();
@@ -159,8 +166,9 @@ export class MockPlatformBackend {
   constructor(options: MockBackendOptions = {}) {
     this.now = options.now ?? (() => new Date());
     const state = options.state;
-    if (state && state.version === 1) {
+    if (state && state.version === 2) {
       this.operators = state.operators;
+      this.usageProfile = state.usageProfile;
       this.organizations = state.organizations;
       this.clinics = state.clinics;
       this.entitlements = state.entitlements;
@@ -176,13 +184,15 @@ export class MockPlatformBackend {
     this.organizations = seed.organizations;
     this.clinics = seed.clinics;
     this.entitlements = seed.entitlements;
+    this.usageProfile = this.buildUsageProfile();
     this.seedAuditHistory();
   }
 
   exportState(): MockBackendState {
     return {
-      version: 1,
+      version: 2,
       operators: this.operators,
+      usageProfile: this.usageProfile,
       organizations: this.organizations,
       clinics: this.clinics,
       entitlements: this.entitlements,
@@ -247,7 +257,10 @@ export class MockPlatformBackend {
           updated_at: ts,
         };
         this.organizations.push(org);
-        this.audit(op, 'organization.create', 'organization', org.id, { organization_id: org.id }, reason, { name, type });
+        this.audit(op, 'organization.create', 'organization', org.id, { organization_id: org.id }, reason, {
+          before: null,
+          after: { name, slug, type, status: 'active', contact_email: org.contact_email, contact_phone: org.contact_phone },
+        });
         return item(this.toOrganization(org));
       },
       getOrganization: async (id) => {
@@ -264,7 +277,8 @@ export class MockPlatformBackend {
         if (body.contact_email !== undefined) org.contact_email = this.optionalEmail(body.contact_email);
         if (body.contact_phone !== undefined) org.contact_phone = body.contact_phone?.trim() || null;
         org.updated_at = this.now().toISOString();
-        this.audit(op, 'organization.update', 'organization', org.id, { organization_id: org.id }, reason, { before });
+        const after = { name: org.name, type: org.type, contact_email: org.contact_email, contact_phone: org.contact_phone };
+        this.audit(op, 'organization.update', 'organization', org.id, { organization_id: org.id }, reason, { before, after });
         return item(this.toOrganization(org));
       },
       suspendOrganization: async (id, body) => item(this.setOrganizationStatus(auth('platform.organizations.manage'), id, 'suspended', body.reason)),
@@ -288,7 +302,10 @@ export class MockPlatformBackend {
           created_at: this.now().toISOString(),
         };
         this.clinics.push(clinic);
-        this.audit(op, 'clinic.create', 'clinic', clinic.id, { organization_id: org.id, clinic_id: clinic.id }, reason, { name });
+        this.audit(op, 'clinic.create', 'clinic', clinic.id, { organization_id: org.id, clinic_id: clinic.id }, reason, {
+          before: null,
+          after: { name, slug, type, status: 'active', organization_id: org.id },
+        });
         return item(this.toClinicListItem(clinic));
       },
       mergeOrganization: async (id, body) => {
@@ -298,12 +315,15 @@ export class MockPlatformBackend {
         const source = this.findOrganization(body.source_organization_id);
         if (source.id === target.id) fail(422, PLATFORM_ERROR_CODES.VALIDATION_ERROR, 'Cannot merge an organization into itself.', 'source_organization_id');
         const moved = this.clinics.filter((c) => c.organization_id === source.id);
+        const movedIds = moved.map((c) => c.id);
         moved.forEach((c) => {
           c.organization_id = target.id;
         });
         this.audit(op, 'organization.merge', 'organization', target.id, { organization_id: target.id }, reason, {
           source_organization_id: source.id,
-          moved_clinic_ids: moved.map((c) => c.id),
+          moved_clinic_ids: movedIds,
+          before: { organization_id: source.id },
+          after: { organization_id: target.id },
         });
         return item(this.organizationDetail(target));
       },
@@ -390,13 +410,20 @@ export class MockPlatformBackend {
           updated_at: ts,
         };
         this.operators.push(created);
-        this.audit(op, 'operator.create', 'operator', created.id, {}, reason, { email, role });
+        this.audit(op, 'operator.create', 'operator', created.id, {}, reason, {
+          before: null,
+          after: { email, name, role, is_active: true, mfa_enabled: false },
+        });
         return item(this.toOperator(created));
       },
       updateOperator: async (id, body) => {
         const op = auth('platform.operators.manage');
         const reason = requireReason(body.reason);
         const target = this.operators.find((o) => o.id === id) ?? fail(404, PLATFORM_ERROR_CODES.NOT_FOUND, 'Operator not found.');
+        // P-7: the Owner set (Shivank, Daman, Onkar) changes only through the CLI.
+        if (target.role === 'owner' && (body.is_active !== undefined || (body.role !== undefined && body.role !== target.role))) {
+          fail(403, PLATFORM_ERROR_CODES.FORBIDDEN, 'Owner changes via CLI only.');
+        }
         if (target.id === op.id && (body.is_active === false || (body.role && body.role !== target.role))) {
           fail(422, PLATFORM_ERROR_CODES.VALIDATION_ERROR, 'You cannot deactivate yourself or change your own role.');
         }
@@ -413,7 +440,10 @@ export class MockPlatformBackend {
           this.tokenVersions.set(target.id, (this.tokenVersions.get(target.id) ?? 0) + 1);
         }
         this.operators = this.operators.map((o) => (o.id === id ? next : o));
-        this.audit(op, 'operator.update', 'operator', target.id, {}, reason, { before });
+        this.audit(op, 'operator.update', 'operator', target.id, {}, reason, {
+          before,
+          after: { name: next.name, role: next.role, is_active: next.is_active },
+        });
         return item(this.toOperator(next));
       },
     };
@@ -541,18 +571,30 @@ export class MockPlatformBackend {
    * Daily usage rows, deterministic per clinic, product, event and day.
    * Only active clinics with an effective entitlement record product events.
    */
+  private buildUsageProfile(): Record<string, string[]> {
+    const profile: Record<string, string[]> = {};
+    this.clinics.forEach((c) => {
+      profile[c.id] = this.entitlements.filter((e) => e.clinic_id === c.id && this.isEffective(e)).map((e) => e.product_key);
+    });
+    return profile;
+  }
+
   private usageRows(clinicId?: string, productKey?: string, dateFrom?: string, dateTo?: string): UsageRow[] {
     const today = new Date(this.now().toISOString().slice(0, 10)).getTime();
     const fromMs = parseOptionalDate(dateFrom, 'date_from') ?? today - 29 * DAY;
     const toMs = parseOptionalDate(dateTo, 'date_to') ?? today;
     if (toMs < fromMs) fail(422, PLATFORM_ERROR_CODES.VALIDATION_ERROR, 'date_to must be on or after date_from.', 'date_to');
     if (toMs - fromMs > 366 * DAY) fail(422, PLATFORM_ERROR_CODES.VALIDATION_ERROR, 'Date range is limited to one year.', 'date_to');
-    const clinics = this.clinics.filter((c) => (!clinicId || c.id === clinicId) && c.status === 'active');
+    // Every clinic, whatever its status today: suspension blocks new events, it does not erase old ones.
+    const clinics = this.clinics.filter((c) => !clinicId || c.id === clinicId);
     const rows: UsageRow[] = [];
     for (let day = toMs; day >= fromMs; day -= DAY) {
       const date = new Date(day).toISOString().slice(0, 10);
       for (const clinic of clinics) {
-        const products = ['platform', ...this.entitlements.filter((e) => e.clinic_id === clinic.id && this.isEffective(e)).map((e) => e.product_key)];
+        if (date < clinic.created_at.slice(0, 10)) continue;
+        const history = this.usageProfile[clinic.id];
+        if (!history) continue; // created in the console after seeding: no events yet
+        const products = ['platform', ...history];
         for (const product of products) {
           if (productKey && product !== productKey) continue;
           for (const eventType of EVENTS_BY_PRODUCT[product] ?? []) {
@@ -599,9 +641,13 @@ export class MockPlatformBackend {
     const reason = requireReason(rawReason);
     const org = this.findOrganization(id);
     if (org.status === status) fail(409, PLATFORM_ERROR_CODES.CONFLICT, `Organization is already ${status}.`);
+    const before = { status: org.status };
     org.status = status;
     org.updated_at = this.now().toISOString();
-    this.audit(op, status === 'suspended' ? 'organization.suspend' : 'organization.activate', 'organization', org.id, { organization_id: org.id }, reason);
+    this.audit(op, status === 'suspended' ? 'organization.suspend' : 'organization.activate', 'organization', org.id, { organization_id: org.id }, reason, {
+      before,
+      after: { status },
+    });
     return this.toOrganization(org);
   }
 
@@ -609,11 +655,12 @@ export class MockPlatformBackend {
     const reason = requireReason(rawReason);
     const clinic = this.findClinic(id);
     if (clinic.status === status) fail(409, PLATFORM_ERROR_CODES.CONFLICT, `Clinic is already ${status}.`);
+    const before = { status: clinic.status };
     clinic.status = status;
     this.audit(op, status === 'suspended' ? 'clinic.suspend' : 'clinic.activate', 'clinic', clinic.id, {
       organization_id: clinic.organization_id,
       clinic_id: clinic.id,
-    }, reason);
+    }, reason, { before, after: { status } });
     return this.toClinicListItem(clinic);
   }
 
@@ -648,6 +695,7 @@ export class MockPlatformBackend {
       action,
       target_type: targetType,
       target_id: targetId,
+      target_name: this.targetName(targetType, targetId, scope.clinic_id),
       organization_id: scope.organization_id ?? null,
       clinic_id: scope.clinic_id ?? null,
       reason,
@@ -658,6 +706,17 @@ export class MockPlatformBackend {
     });
   }
 
+  /** Name of the audit target at the time of the change. */
+  private targetName(targetType: AuditTargetType, targetId: string, clinicId?: string): string | null {
+    if (targetType === 'organization') return this.organizations.find((o) => o.id === targetId)?.name ?? null;
+    if (targetType === 'clinic' || targetType === 'entitlement') {
+      const id = targetType === 'clinic' ? targetId : clinicId;
+      return this.clinics.find((c) => c.id === id)?.name ?? null;
+    }
+    if (targetType === 'operator') return this.operators.find((o) => o.id === targetId)?.name ?? null;
+    return null;
+  }
+
   /** A short, believable history so the audit screen is not empty on first open. */
   private seedAuditHistory() {
     const rnd = createRng(7);
@@ -666,19 +725,23 @@ export class MockPlatformBackend {
     this.organizations
       .filter((o) => o.status === 'suspended')
       .forEach((o, i) => {
-        this.audit(owners[i % owners.length], 'organization.suspend', 'organization', o.id, { organization_id: o.id }, 'Payment overdue, contract on hold', {}, new Date(nowMs - (3 + i) * DAY).toISOString());
+        this.audit(owners[i % owners.length], 'organization.suspend', 'organization', o.id, { organization_id: o.id }, 'Payment overdue, contract on hold', { before: { status: 'active' }, after: { status: 'suspended' } }, new Date(nowMs - (3 + i) * DAY).toISOString());
       });
     this.clinics
       .filter((c) => c.status === 'suspended')
       .forEach((c, i) => {
-        this.audit(owners[(i + 1) % owners.length], 'clinic.suspend', 'clinic', c.id, { organization_id: c.organization_id, clinic_id: c.id }, 'Branch closed for renovation', {}, new Date(nowMs - (2 + i) * DAY).toISOString());
+        this.audit(owners[(i + 1) % owners.length], 'clinic.suspend', 'clinic', c.id, { organization_id: c.organization_id, clinic_id: c.id }, 'Branch closed for renovation', { before: { status: 'active' }, after: { status: 'suspended' } }, new Date(nowMs - (2 + i) * DAY).toISOString());
       });
     this.entitlements.slice(0, 12).forEach((e, i) => {
       const clinic = this.clinics.find((c) => c.id === e.clinic_id)!;
       this.audit(owners[i % owners.length], 'entitlement.update', 'entitlement', `${e.clinic_id}:${e.product_key}`, {
         organization_id: clinic.organization_id,
         clinic_id: clinic.id,
-      }, 'Onboarding: tools as per signed order form', { product_key: e.product_key }, new Date(nowMs - Math.floor(5 + rnd() * 20) * DAY).toISOString());
+      }, 'Onboarding: tools as per signed order form', {
+        product_key: e.product_key,
+        before: null,
+        after: { status: e.status, valid_from: e.valid_from, valid_until: e.valid_until },
+      }, new Date(nowMs - Math.floor(5 + rnd() * 20) * DAY).toISOString());
     });
   }
 

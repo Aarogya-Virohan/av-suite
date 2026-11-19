@@ -7,6 +7,7 @@ import { RequirePermission } from '@/components/auth/RequirePermission';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { FieldLabel, inputClass, PageHeader } from '@/components/ui/brand';
+import { DateField } from '@/components/forms/DateField';
 import { ErrorCard } from '@/components/ui/ErrorCard';
 import { useAuditLogs } from '@/features/audit/hooks';
 import { productLabel, useProductCatalog } from '@/features/catalog/hooks';
@@ -27,7 +28,7 @@ export default function AuditLogsPage() {
   );
 }
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+import { ISO_DAY as DATE_PATTERN } from '@/lib/dates';
 
 function positiveInt(value: string | null, fallback: number, max = Number.MAX_SAFE_INTEGER): number {
   const n = Number(value);
@@ -150,22 +151,25 @@ function AuditLogs() {
         ) : null}
         <div>
           <FieldLabel htmlFor="audit-from">From</FieldLabel>
-          <input
+          <DateField
             id="audit-from"
-            type="date"
             value={dateFrom}
-            onChange={(e) => setParams({ date_from: e.target.value, page: undefined })}
-            className={cn(inputClass, 'w-auto')}
+            onChange={(v) => {
+              if (v === '' || DATE_PATTERN.test(v)) setParams({ date_from: v, page: undefined });
+            }}
+            className="w-44"
           />
         </div>
         <div>
           <FieldLabel htmlFor="audit-to">To</FieldLabel>
-          <input
+          <DateField
             id="audit-to"
-            type="date"
             value={dateTo}
-            onChange={(e) => setParams({ date_to: e.target.value, page: undefined })}
-            className={cn(inputClass, 'w-auto', dateError && 'border-danger')}
+            onChange={(v) => {
+              if (v === '' || DATE_PATTERN.test(v)) setParams({ date_to: v, page: undefined });
+            }}
+            invalid={!!dateError}
+            className="w-44"
           />
         </div>
         {action || operatorId || dateFrom || dateTo || scoped ? (
@@ -219,26 +223,35 @@ function AuditLogs() {
   );
 }
 
+const TARGET_KIND: Record<string, string> = {
+  organization: 'Organization',
+  clinic: 'Clinic',
+  entitlement: 'Tool access',
+  operator: 'Operator',
+};
+
+/** Target name with a link to its page; operators have no page, so plain text. */
 function TargetLink({ log }: { log: AuditLog }) {
-  if (log.clinic_id) {
-    return (
-      <Link href={`/clinics/${log.clinic_id}`} onClick={(e) => e.stopPropagation()} className="font-medium text-grove hover:text-grove-hover">
-        Open clinic
-      </Link>
-    );
-  }
-  if (log.organization_id) {
-    return (
-      <Link
-        href={`/organizations/${log.organization_id}`}
-        onClick={(e) => e.stopPropagation()}
-        className="font-medium text-grove hover:text-grove-hover"
-      >
-        Open organization
-      </Link>
-    );
-  }
-  return <span className="capitalize text-ink-2">{log.target_type}</span>;
+  const kind = TARGET_KIND[log.target_type] ?? log.target_type;
+  const name = log.target_name ?? kind;
+  const href =
+    log.target_type === 'organization' && log.organization_id
+      ? `/organizations/${log.organization_id}`
+      : (log.target_type === 'clinic' || log.target_type === 'entitlement') && log.clinic_id
+        ? `/clinics/${log.clinic_id}`
+        : null;
+  return (
+    <div className="min-w-0">
+      {href ? (
+        <Link href={href} onClick={(e) => e.stopPropagation()} className="font-medium text-grove hover:text-grove-hover">
+          {name}
+        </Link>
+      ) : (
+        <span className="font-medium text-ink">{name}</span>
+      )}
+      <p className="text-xs text-muted">{kind}</p>
+    </div>
+  );
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {

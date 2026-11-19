@@ -175,7 +175,13 @@ function OrganizationDetail() {
         }
       />
 
-      <AddBranchSlideOver organizationId={org.id} organizationName={org.name} isOpen={branchOpen} onClose={() => setBranchOpen(false)} />
+      <AddBranchSlideOver
+        organizationId={org.id}
+        organizationName={org.name}
+        organizationSuspended={suspended}
+        isOpen={branchOpen}
+        onClose={() => setBranchOpen(false)}
+      />
     </div>
   );
 }

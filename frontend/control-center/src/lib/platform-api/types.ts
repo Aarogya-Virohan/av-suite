@@ -354,6 +354,8 @@ export interface AuditLog {
   action: string;
   target_type: AuditTargetType | string;
   target_id: string | null;
+  /** confirm in S3: display name of the target, joined (organization, clinic or operator name). */
+  target_name: string | null;
   organization_id: string | null;
   clinic_id: string | null;
   reason: string | null;

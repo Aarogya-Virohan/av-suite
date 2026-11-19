@@ -1,34 +1,44 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SlideOver } from '@/components/ui/SlideOver';
-import { Badge, Button, FieldLabel, inputClass } from '@/components/ui/brand';
+import { Badge, Button, FieldLabel } from '@/components/ui/brand';
+import { DateField } from '@/components/forms/DateField';
 import { reasonField, REASON_MAX } from '@/components/forms/reason';
 import { textareaClass } from '@/components/forms/ReasonActionSlideOver';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import { errorMessage, isPlatformApiError } from '@/lib/platform-api/errors';
 import { ENTITLEMENT_STATUSES, type Entitlement, type ProductCatalogItem } from '@/lib/platform-api/types';
-import { ACCESS_LABEL, ACCESS_TONE, accessState, dateInputToIso, ENTITLEMENT_STATUS_LABEL, isoToDateInput } from './entitlement';
+import { ISO_DAY } from '@/lib/dates';
+import {
+  ACCESS_LABEL,
+  ACCESS_TONE,
+  accessState,
+  ENTITLEMENT_STATUS_LABEL,
+  fromDateToIso,
+  isoToFromDate,
+  isoToUntilDate,
+  untilDateToIso,
+} from './entitlement';
 import { useSetEntitlement } from './hooks';
-
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const schema = z
   .object({
     status: z.enum(ENTITLEMENT_STATUSES),
-    valid_from: z.string().refine((v) => v === '' || DATE_PATTERN.test(v), 'Pick a valid date'),
-    valid_until: z.string().refine((v) => v === '' || DATE_PATTERN.test(v), 'Pick a valid date'),
+    valid_from: z.string().refine((v) => v === '' || ISO_DAY.test(v), 'Enter a valid date as dd/mm/yyyy'),
+    valid_until: z.string().refine((v) => v === '' || ISO_DAY.test(v), 'Enter a valid date as dd/mm/yyyy'),
     reason: reasonField,
   })
-  .refine((v) => !v.valid_from || !v.valid_until || v.valid_until > v.valid_from, {
+  // The end date is inclusive, so a one-day grant (same start and end) is allowed.
+  .refine((v) => !ISO_DAY.test(v.valid_from) || !ISO_DAY.test(v.valid_until) || v.valid_until >= v.valid_from, {
     path: ['valid_until'],
-    message: 'The end date must be after the start date',
+    message: 'The end date cannot be before the start date',
   });
 type FormValues = z.infer<typeof schema>;
 
@@ -68,8 +78,8 @@ export function EntitlementEditor({
     if (!isOpen) return;
     reset({
       status: current?.status ?? 'enabled',
-      valid_from: isoToDateInput(current?.valid_from ?? null),
-      valid_until: isoToDateInput(current?.valid_until ?? null),
+      valid_from: isoToFromDate(current?.valid_from ?? null),
+      valid_until: isoToUntilDate(current?.valid_until ?? null),
       reason: '',
     });
     save.reset();
@@ -80,8 +90,8 @@ export function EntitlementEditor({
   const [status, validFrom, validUntil] = useWatch({ control, name: ['status', 'valid_from', 'valid_until'] });
   const preview = accessState({
     status: status ?? 'enabled',
-    valid_from: validFrom && DATE_PATTERN.test(validFrom) ? dateInputToIso(validFrom) : null,
-    valid_until: validUntil && DATE_PATTERN.test(validUntil) ? dateInputToIso(validUntil) : null,
+    valid_from: validFrom && ISO_DAY.test(validFrom) ? fromDateToIso(validFrom) : null,
+    valid_until: validUntil && ISO_DAY.test(validUntil) ? untilDateToIso(validUntil) : null,
   });
 
   const onSubmit = (values: FormValues) => {
@@ -91,8 +101,8 @@ export function EntitlementEditor({
         productKey: product.key,
         body: {
           status: values.status,
-          valid_from: dateInputToIso(values.valid_from),
-          valid_until: dateInputToIso(values.valid_until),
+          valid_from: fromDateToIso(values.valid_from),
+          valid_until: untilDateToIso(values.valid_until),
           reason: values.reason,
         },
       },
@@ -146,24 +156,36 @@ export function EntitlementEditor({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <FieldLabel htmlFor="valid-from">Valid from (optional)</FieldLabel>
-            <input id="valid-from" type="date" {...register('valid_from')} aria-invalid={!!errors.valid_from} className={cn(inputClass, errors.valid_from && 'border-danger')} />
+            <Controller
+              control={control}
+              name="valid_from"
+              render={({ field }) => (
+                <DateField id="valid-from" value={field.value} onChange={field.onChange} onBlur={field.onBlur} invalid={!!errors.valid_from} />
+              )}
+            />
             {errors.valid_from && <p className="mt-1.5 text-xs font-medium text-danger">{errors.valid_from.message}</p>}
           </div>
           <div>
             <FieldLabel htmlFor="valid-until">Valid until (optional)</FieldLabel>
-            <input id="valid-until" type="date" {...register('valid_until')} aria-invalid={!!errors.valid_until} className={cn(inputClass, errors.valid_until && 'border-danger')} />
+            <Controller
+              control={control}
+              name="valid_until"
+              render={({ field }) => (
+                <DateField id="valid-until" value={field.value} onChange={field.onChange} onBlur={field.onBlur} invalid={!!errors.valid_until} />
+              )}
+            />
             {errors.valid_until && <p className="mt-1.5 text-xs font-medium text-danger">{errors.valid_until.message}</p>}
           </div>
         </div>
         <p className="-mt-2 text-xs text-muted">
-          Dates are India time. Access starts at 00:00 on the start date and ends at 00:00 on the end date. Empty means no limit.
+          Access starts at 00:00 on the start date and lasts through the end date (India time). Empty = no limit.
         </p>
 
         <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card p-4 text-sm shadow-card">
           <span className="text-ink-2">After saving</span>
           <span className="flex items-center gap-2">
             <Badge tone={ACCESS_TONE[preview]}>{ACCESS_LABEL[preview]}</Badge>
-            {preview === 'scheduled' && validFrom ? <span className="text-xs text-muted">from {formatDate(dateInputToIso(validFrom))}</span> : null}
+            {preview === 'scheduled' && ISO_DAY.test(validFrom ?? '') ? <span className="text-xs text-muted">from {formatDate(fromDateToIso(validFrom))}</span> : null}
           </span>
         </div>
 

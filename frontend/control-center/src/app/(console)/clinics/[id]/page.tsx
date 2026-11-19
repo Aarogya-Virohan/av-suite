@@ -11,7 +11,7 @@ import { Badge, Button, Card, CardHeader, KpiCard, PageHeader } from '@/componen
 import { ErrorCard } from '@/components/ui/ErrorCard';
 import { productLabel, useProductCatalog } from '@/features/catalog/hooks';
 import { EntitlementEditor } from '@/features/clinics/EntitlementEditor';
-import { ACCESS_LABEL, ACCESS_TONE, accessState } from '@/features/clinics/entitlement';
+import { ACCESS_LABEL, ACCESS_TONE, accessState, isoToUntilDate } from '@/features/clinics/entitlement';
 import { useClinic, useSetClinicStatus } from '@/features/clinics/hooks';
 import { formatDate, formatNumber, formatRelative, STATUS_LABEL, STATUS_TONE } from '@/lib/format';
 import { errorMessage } from '@/lib/platform-api/errors';
@@ -51,7 +51,8 @@ function ClinicDetail() {
   const suspended = clinic.status === 'suspended';
   const orgSuspended = clinic.organization_status === 'suspended';
   const entitlementByKey = new Map<string, Entitlement>(clinic.products.map((e) => [e.product_key, e]));
-  const effectiveCount = catalog.products.filter((p) => accessState(entitlementByKey.get(p.key)) === 'active').length;
+  const blocked = suspended || orgSuspended;
+  const effectiveCount = blocked ? 0 : catalog.products.filter((p) => accessState(entitlementByKey.get(p.key)) === 'active').length;
   const maxUsage = Math.max(1, ...clinic.usage.by_product.map((u) => u.events));
 
   return (
@@ -144,10 +145,20 @@ function ClinicDetail() {
                         <p className="text-xs text-muted">{product.category}</p>
                       </td>
                       <td className="px-5 py-3.5">
-                        <Badge tone={ACCESS_TONE[state]}>{ACCESS_LABEL[state]}</Badge>
+                        {/* A granted tool is still unusable while the clinic or its organization is suspended. */}
+                        {state === 'active' && orgSuspended ? (
+                          <Badge tone="neutral">Blocked by organization</Badge>
+                        ) : state === 'active' && suspended ? (
+                          <Badge tone="neutral">Blocked by clinic</Badge>
+                        ) : (
+                          <Badge tone={ACCESS_TONE[state]}>{ACCESS_LABEL[state]}</Badge>
+                        )}
                       </td>
                       <td className="px-5 py-3.5 text-ink-2">{e ? (e.valid_from ? formatDate(e.valid_from) : 'No limit') : '-'}</td>
-                      <td className="px-5 py-3.5 text-ink-2">{e ? (e.valid_until ? formatDate(e.valid_until) : 'No limit') : '-'}</td>
+                      <td className="px-5 py-3.5 text-ink-2">
+                        {/* Stored bound is exclusive; show the last day with access. */}
+                        {e ? (e.valid_until ? formatDate(`${isoToUntilDate(e.valid_until)}T12:00:00+05:30`) : 'No limit') : '-'}
+                      </td>
                       <td className="px-5 py-3.5 text-ink-2">{e ? formatRelative(e.updated_at) : '-'}</td>
                       <td className="px-5 py-3.5 text-right">
                         {canGrant ? (

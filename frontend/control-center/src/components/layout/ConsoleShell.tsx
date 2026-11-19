@@ -190,7 +190,15 @@ function ShellFrame({ children }: { children: React.ReactNode }) {
         <div aria-hidden="true" onClick={() => setOpen(false)} className="fixed inset-0 z-20 bg-midnight/50 backdrop-blur-xs md:hidden" />
       )}
 
-      <div className={cn('flex min-w-0 flex-1 flex-col transition-all duration-200', open ? 'md:pl-64' : 'md:pl-16')}>
+      {/* Navy column behind the fixed sidebar. As a flex child it stretches to the
+          full page height, so a long page never shows the sidebar ending mid-way;
+          the sidebar itself stays pinned to the viewport while scrolling. */}
+      <div
+        aria-hidden="true"
+        className={cn('hidden shrink-0 bg-[var(--brand-navy)] transition-all duration-200 md:block', open ? 'w-64' : 'w-16')}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-line bg-canvas/85 px-4 backdrop-blur md:px-8">
           <button
             type="button"

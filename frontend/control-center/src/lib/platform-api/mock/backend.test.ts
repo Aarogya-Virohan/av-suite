@@ -95,9 +95,73 @@ describe('mock platform backend', () => {
   });
 
   it('invalidates a deactivated operator token (acceptance 4)', async () => {
-    const { api: daman, operator } = await signIn(backend, 'daman@av-console.mock');
+    const { operator } = await signIn(backend, 'support@av-console.mock');
     await owner.updateOperator(operator.id, { is_active: false, reason: 'left the company' });
-    await expectError(daman.getOverview(), 401, 'UNAUTHORIZED');
+    await expectError(support.getOverview(), 401, 'UNAUTHORIZED');
+  });
+
+  it('protects Owners: role change and deactivation are CLI only (P-7)', async () => {
+    const owners = (await owner.listOperators({})).data.filter((o) => o.role === 'owner');
+    const daman = owners.find((o) => o.email === 'daman@av-console.mock')!;
+    await expectError(owner.updateOperator(daman.id, { is_active: false, reason: 'x' }), 403, 'FORBIDDEN');
+    await expectError(owner.updateOperator(daman.id, { role: 'support', reason: 'x' }), 403, 'FORBIDDEN');
+    const audits = (await owner.listAuditLogs({ action: 'operator.update' })).meta.total;
+    expect(audits).toBe(0);
+  });
+
+  it('writes before and after on every mutation audit row', async () => {
+    const org = (await owner.listOrganizations({ status: 'active', page_size: 2 })).data;
+    const detail = (await owner.getOrganization(org[0].id)).data;
+    const supportOp = (await owner.listOperators({})).data.find((o) => o.role === 'support' && o.is_active)!;
+    const created = (await owner.createOrganization({ name: 'Audit Test Org', slug: 'audit-test-org', type: 'clinic', reason: 'r' })).data;
+    await owner.updateOrganization(created.id, { name: 'Audit Test Org 2', reason: 'r' });
+    await owner.suspendOrganization(created.id, { reason: 'r' });
+    await owner.activateOrganization(created.id, { reason: 'r' });
+    const branch = (await owner.createClinic(created.id, { name: 'Audit Branch', slug: 'audit-branch', type: 'clinic', reason: 'r' })).data;
+    await owner.suspendClinic(branch.id, { reason: 'r' });
+    await owner.activateClinic(branch.id, { reason: 'r' });
+    await owner.setClinicProduct(branch.id, 'crm', { status: 'enabled', valid_from: null, valid_until: null, reason: 'r' });
+    await owner.mergeOrganization(created.id, { source_organization_id: org[1].id, reason: 'r' });
+    await owner.updateOperator(supportOp.id, { name: 'Renamed Support', reason: 'r' });
+    void detail;
+    const rows = (await owner.listAuditLogs({ page_size: 10 })).data;
+    expect(rows.map((r) => r.action).sort()).toEqual(
+      [
+        'organization.create', 'organization.update', 'organization.suspend', 'organization.activate', 'clinic.create',
+        'clinic.suspend', 'clinic.activate', 'entitlement.update', 'organization.merge', 'operator.update',
+      ].sort(),
+    );
+    for (const row of rows) {
+      expect(row.details, row.action).toHaveProperty('before');
+      expect(row.details, row.action).toHaveProperty('after');
+      expect(row.details.after, row.action).not.toBeNull();
+      expect(row.target_name, row.action).toBeTruthy();
+    }
+    const opRow = rows.find((r) => r.action === 'operator.update')!;
+    expect(opRow.details).toMatchObject({ before: { name: supportOp.name }, after: { name: 'Renamed Support' } });
+  });
+
+  it('keeps usage history when a clinic or organization is suspended or a tool changes', async () => {
+    const org = (await owner.listOrganizations({ type: 'chain', status: 'active', page_size: 1 })).data[0];
+    const clinic = (await owner.getOrganization(org.id)).data.clinics[0];
+    const before = (await owner.getClinic(clinic.id)).data.usage.total_events;
+    const overviewBefore = (await owner.getOverview()).data.usage_last_30_days;
+    expect(before).toBeGreaterThan(0);
+    await owner.suspendClinic(clinic.id, { reason: 'r' });
+    await owner.suspendOrganization(org.id, { reason: 'r' });
+    await owner.setClinicProduct(clinic.id, 'crm', { status: 'disabled', valid_from: null, valid_until: null, reason: 'r' });
+    expect((await owner.getClinic(clinic.id)).data.usage.total_events).toBe(before);
+    expect((await owner.getOverview()).data.usage_last_30_days).toBe(overviewBefore);
+  });
+
+  it('treats an end date as inclusive through the end of that IST day', async () => {
+    const org = (await owner.listOrganizations({ page_size: 1 })).data[0];
+    const clinic = (await owner.getOrganization(org.id)).data.clinics[0];
+    // NOW = 19 Nov 15:30 IST; end date 19 Nov -> stored bound 20 Nov 00:00 IST.
+    const res = await owner.setClinicProduct(clinic.id, 'posture-tool', {
+      status: 'enabled', valid_from: null, valid_until: '2026-11-19T18:30:00.000Z', reason: 'last day today',
+    });
+    expect(res.data.is_effective).toBe(true);
   });
 
   it('never exposes patient fields', async () => {

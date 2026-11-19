@@ -61,8 +61,18 @@ function Operators() {
       key: 'actions',
       header: '',
       render: (o) =>
-        o.id === me?.id ? (
-          <span className="text-xs text-muted">Another Owner can change your account</span>
+        o.role === 'owner' ? (
+          // P-7: the Owner set changes only through the CLI; the backend answers 403 too.
+          <div className="flex items-center justify-end gap-1.5" title="Owner changes via CLI only">
+            <Button variant="ghost" className="h-8 px-3" disabled aria-label={`Change role of ${o.name} (Owner changes via CLI only)`}>
+              <UserCog className="h-3.5 w-3.5" />
+              <span>Role</span>
+            </Button>
+            <Button variant="ghost" className="h-8 px-3" disabled aria-label={`Deactivate ${o.name} (Owner changes via CLI only)`}>
+              <UserMinus className="h-3.5 w-3.5" />
+              <span>Deactivate</span>
+            </Button>
+          </div>
         ) : (
           <div className="flex justify-end gap-1.5">
             <Button variant="ghost" className="h-8 px-3" onClick={() => setRoleTarget(o)} disabled={!o.is_active}>
@@ -92,7 +102,8 @@ function Operators() {
           <p className="font-semibold text-ink">Operators are created via CLI by an Owner</p>
           <p className="mt-1">
             Run <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-ink">python -m app.scripts.create_platform_operator</code>{' '}
-            on the backend. The console never sets passwords; a new operator enrols two-step sign-in on first login.
+            on the backend. The console never sets passwords; a new operator enrols two-step sign-in on first login. Owner changes
+            (role, deactivation) are CLI only too.
           </p>
         </div>
       </Card>

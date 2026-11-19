@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SlideOverProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export function SlideOver({ isOpen, onClose, title, subtitle, children }: SlideO
       if (e.key === 'Escape') onClose();
     };
     if (isOpen) {
+      // An old toast would sit on top of the panel header.
+      toast.dismiss();
       window.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
     }

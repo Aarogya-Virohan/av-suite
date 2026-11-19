@@ -41,11 +41,13 @@ function toSlug(value: string): string {
 export function AddBranchSlideOver({
   organizationId,
   organizationName,
+  organizationSuspended,
   isOpen,
   onClose,
 }: {
   organizationId: string;
   organizationName: string;
+  organizationSuspended: boolean;
   isOpen: boolean;
   onClose: () => void;
 }) {
@@ -90,6 +92,11 @@ export function AddBranchSlideOver({
   return (
     <SlideOver isOpen={isOpen} onClose={create.isPending ? () => undefined : onClose} title="Add branch" subtitle={organizationName}>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+        {organizationSuspended ? (
+          <p className="rounded-xl border border-danger/20 bg-danger-wash p-4 text-sm font-medium text-danger">
+            New branch will also be blocked while the organization is suspended.
+          </p>
+        ) : null}
         <p className="rounded-xl border border-line bg-canvas p-4 text-sm text-ink-2">
           The new clinic starts active with no staff and no tools. Grant tools from the clinic page. Staff are added by the clinic admin.
         </p>
