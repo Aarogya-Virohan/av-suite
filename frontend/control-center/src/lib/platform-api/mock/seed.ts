@@ -235,7 +235,7 @@ export function buildSeed(now: Date = new Date()): SeedData {
         type: type === 'individual' ? (rnd() > 0.5 ? 'solo' : 'personal') : 'clinic',
         status: clinicStatus,
         staff_count: type === 'individual' ? 1 : 2 + Math.floor(rnd() * 14),
-        last_activity_at: rnd() > 0.08 ? iso(nowMs - Math.floor(rnd() * 9 * DAY)) : null,
+        last_activity_at: iso(nowMs - Math.floor(rnd() * 9 * DAY)),
         created_at: iso(createdMs + b * 3 * DAY),
       };
       clinics.push(clinic);
