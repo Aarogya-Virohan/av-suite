@@ -12,6 +12,7 @@ from app.repositories.appointment import AppointmentRepository
 from app.repositories.booking import AppointmentRequestRepository
 from app.repositories.clinic import ClinicRepository
 from app.repositories.patient import PatientRepository
+from app.services.clinic_status import is_clinic_active
 from app.schemas.booking import (
     AppointmentRequestApprovePayload,
     AppointmentRequestCreate,
@@ -60,6 +61,8 @@ class BookingService:
         clinic = await self.clinic_repository.get_by_slug_or_id(clinic_slug_or_id)
         if clinic is None:
             raise BookingNotFoundError(f"Clinic '{clinic_slug_or_id}' not found.")
+        if not await is_clinic_active(self.clinic_repository.session, clinic):
+            raise BookingNotFoundError(f"Clinic '{clinic_slug_or_id}' not found.")
 
         return PublicClinicBrandingResponse(
             clinic_id=clinic.id,
@@ -76,6 +79,8 @@ class BookingService:
 
         clinic = await self.clinic_repository.get_by_id(clinic_id)
         if clinic is None:
+            raise BookingNotFoundError(f"Clinic '{clinic_id}' does not exist.")
+        if not await is_clinic_active(self.clinic_repository.session, clinic):
             raise BookingNotFoundError(f"Clinic '{clinic_id}' does not exist.")
 
         req_data = payload.model_dump(exclude={"turnstile_token"})
@@ -96,6 +101,8 @@ class BookingService:
 
         clinic = await self.clinic_repository.get_by_slug_or_id(clinic_slug)
         if clinic is None:
+            raise BookingNotFoundError(f"Clinic with slug '{clinic_slug}' not found.")
+        if not await is_clinic_active(self.clinic_repository.session, clinic):
             raise BookingNotFoundError(f"Clinic with slug '{clinic_slug}' not found.")
 
         return await self.create_request(clinic.id, payload)

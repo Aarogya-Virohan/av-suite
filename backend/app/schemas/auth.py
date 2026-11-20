@@ -1,16 +1,23 @@
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.core.security import check_password_byte_length
 
 
 class RegisterRequest(BaseModel):
-    clinic_name: str
+    clinic_name: str = Field(min_length=1, max_length=255)
     email: EmailStr
     password: str
     first_name: str
     last_name: str
+
+    @field_validator("clinic_name", mode="before")
+    @classmethod
+    def normalize_clinic_name(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
 
     @field_validator("password")
     @classmethod

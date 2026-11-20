@@ -38,6 +38,11 @@ class User(Base, TimestampMixin):
         foreign_keys="Membership.user_id",
         cascade="all, delete-orphan",
     )
+    organization_memberships = relationship(
+        "OrganizationMembership",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     patient_profile = relationship("Patient", back_populates="user", uselist=False)
     prescriptions_given = relationship("Prescription", back_populates="physio")
     permission_overrides = relationship(
