@@ -80,6 +80,13 @@ let setupSeenThisVisit = false
 // "Later" on the calibration prompt holds for the rest of the page visit.
 let calibrationDeferredThisVisit = false
 
+// POS-1 (21 Nov 2026), founders' 23 Oct item 6 "taking too much time":
+// how long the last capture took, from tap to saved file, split into the
+// wait for a steady phone and the PNG encode. Shown with ?debug=1 on the
+// next camera screen (this one closes on capture) and in the console, so
+// the slow part can be measured on a real phone before anything changes.
+let lastCaptureTiming: { waitMs: number; encodeMs: number; mb: number } | null = null
+
 export function requestMotionPermission(): Promise<boolean> {
   type MotionPermission = { requestPermission?: () => Promise<"granted" | "denied"> }
   if (typeof window === "undefined" || !("DeviceMotionEvent" in window)) {
@@ -155,6 +162,9 @@ export default function CameraCapture({
 
   const [calDeferred, setCalDeferred] = useState(() => calibrationDeferredThisVisit)
   const [capturing, setCapturing] = useState(false)
+  // True from the frame grab until the file is saved: the phone can move.
+  const [saving, setSaving] = useState(false)
+  const tapAtRef = useRef<number | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
@@ -395,7 +405,9 @@ export default function CameraCapture({
       const ctx = canvas.getContext("2d")
       if (!ctx) return
 
+      const grabAt = performance.now()
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      setSaving(true)
 
       // PNG, not JPEG, because JPEG is lossy at any quality setting and the
       // loss is large enough to move a grade. Measured 3 October 2026 on the
@@ -405,7 +417,15 @@ export default function CameraCapture({
       // PNG changed nothing at all. About 8.7 MB a photo against 1.4.
       canvas.toBlob(
         (blob) => {
+          const tapAt = tapAtRef.current ?? grabAt
+          lastCaptureTiming = {
+            waitMs: Math.round(grabAt - tapAt),
+            encodeMs: Math.round(performance.now() - grabAt),
+            mb: blob ? Math.round((blob.size / 1048576) * 10) / 10 : 0,
+          }
+          console.info("[posture] capture", view, lastCaptureTiming)
           if (!blob) {
+            setSaving(false)
             setCapturing(false)
             setNotice("The photo could not be saved. Tap again.")
             return
@@ -430,6 +450,7 @@ export default function CameraCapture({
   const capture = useCallback(() => {
     if (capturing) return
     setNotice(null)
+    tapAtRef.current = performance.now()
 
     // No tilt reading on this device: take the photo as it is.
     if (levelStatus === "unavailable" || levelStatus === "denied") {
@@ -538,7 +559,8 @@ export default function CameraCapture({
   const guidesOn = layers.lines || layers.grid
 
   let hint: string
-  if (capturing) hint = "Hold still..."
+  if (saving) hint = "Photo taken. Saving..."
+  else if (capturing) hint = "Hold still..."
   else if (levelStatus === "unavailable") hint = "Tilt not measured on this device. Tap to capture"
   else if (levelStatus === "denied") hint = "Tilt not measured. Tap to capture"
   else if (!tiltKnown) hint = "Hold the phone upright"
@@ -554,17 +576,17 @@ export default function CameraCapture({
         <button
           type="button"
           onClick={closeCamera}
-          className="h-10 rounded-full bg-white/10 px-4 text-[14px] font-medium backdrop-blur-md"
+          className="h-11 rounded-full bg-white/10 px-4 text-[15px] font-medium backdrop-blur-md"
         >
           Cancel
         </button>
-        <span className="text-[15px] font-semibold">{label} view</span>
+        <span className="text-[17px] font-semibold">{label} view</span>
         <div className="flex gap-1.5">
           <button
             type="button"
             onClick={() => setLayers({ lines: !guidesOn, grid: !guidesOn })}
             aria-pressed={guidesOn}
-            className={`h-10 rounded-full px-3 text-[13px] font-medium backdrop-blur-md ${
+            className={`h-11 rounded-full px-3.5 text-[15px] font-medium backdrop-blur-md ${
               guidesOn ? "bg-white text-[#141A33]" : "bg-white/10 text-white"
             }`}
           >
@@ -574,7 +596,7 @@ export default function CameraCapture({
             type="button"
             onClick={() => setShowSetup(true)}
             aria-label="Capture setup"
-            className="h-10 w-10 rounded-full bg-white/10 text-[15px] font-semibold backdrop-blur-md"
+            className="h-11 w-11 rounded-full bg-white/10 text-[17px] font-semibold backdrop-blur-md"
           >
             ?
           </button>
@@ -602,6 +624,12 @@ export default function CameraCapture({
             <div>pitch {view_ ? view_.pitch.toFixed(2) : "-"}</div>
             <div>rate {view_?.rate != null ? view_.rate.toFixed(1) : "n/a"} deg/s</div>
             <div>steady {view_ ? String(view_.steady) : "-"}</div>
+            <div>
+              last capture{" "}
+              {lastCaptureTiming
+                ? `wait ${lastCaptureTiming.waitMs} ms, save ${lastCaptureTiming.encodeMs} ms, ${lastCaptureTiming.mb} MB`
+                : "-"}
+            </div>
           </div>
         )}
 
@@ -754,7 +782,7 @@ export default function CameraCapture({
 
       {/* Bottom panel */}
       <div className="space-y-3 bg-black px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">
-        <p className="text-center text-[13px] leading-snug text-white/60">{GUIDANCE[view]}</p>
+        <p className="text-center text-[15px] leading-snug text-white/80">{GUIDANCE[view]}</p>
 
         {levelStatus === "denied" && (
           <div className="text-center">
@@ -772,7 +800,7 @@ export default function CameraCapture({
           {tiltKnown ? (
             <Bubble roll={correctedRoll} pitch={view_!.pitch} ok={withinRange && view_!.steady} />
           ) : (
-            <div className="h-14 w-14" />
+            <div className="h-[72px] w-[72px]" />
           )}
 
           <button
@@ -780,22 +808,22 @@ export default function CameraCapture({
             onClick={capture}
             disabled={!canCapture}
             aria-label="Capture"
-            className={`flex h-[76px] w-[76px] items-center justify-center rounded-full border-4 transition ${
+            className={`flex h-[84px] w-[84px] items-center justify-center rounded-full border-4 transition ${
               canCapture ? "border-[#3FB68B]" : "border-white/25"
             }`}
           >
             <span
-              className={`h-[60px] w-[60px] rounded-full transition ${
+              className={`h-[66px] w-[66px] rounded-full transition ${
                 canCapture ? "bg-white" : "bg-white/20"
               }`}
             />
           </button>
 
-          <div className="h-14 w-14" />
+          <div className="h-[72px] w-[72px]" />
         </div>
 
         <p
-          className={`text-center text-[13px] font-medium ${
+          className={`text-center text-[17px] font-semibold ${
             notice ? "text-[#F2B8B5]" : canCapture ? "text-[#3FB68B]" : "text-white/60"
           }`}
           aria-live="polite"
@@ -820,7 +848,7 @@ function Bubble({ roll, pitch, ok }: { roll: number; pitch: number; ok: boolean 
   const dx = clamp(-roll) * r
   const dy = clamp(-pitch) * r
   return (
-    <svg viewBox="-28 -28 56 56" className="h-14 w-14" aria-hidden>
+    <svg viewBox="-28 -28 56 56" className="h-[72px] w-[72px]" aria-hidden>
       <circle r={r + 4} fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.35)" strokeWidth="1" />
       <line x1={-6} y1={0} x2={6} y2={0} stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
       <line x1={0} y1={-6} x2={0} y2={6} stroke="rgba(255,255,255,0.4)" strokeWidth="1" />
@@ -863,13 +891,13 @@ function SilhouetteGuide({ layers }: { layers: GuideLayers }) {
     {layers.lines && (
       <>
         <span
-          className="pointer-events-none absolute left-3 text-[11px] font-medium tracking-wide text-white"
+          className="pointer-events-none absolute left-3 text-[13px] font-semibold tracking-wide text-white"
           style={{ top: `${(FRAME.head / 200) * 100}%`, transform: "translateY(-135%)", textShadow: "0 0 3px rgba(0,0,0,0.9)" }}
         >
           Top of head inside this line
         </span>
         <span
-          className="pointer-events-none absolute left-3 text-[11px] font-medium tracking-wide text-white"
+          className="pointer-events-none absolute left-3 text-[13px] font-semibold tracking-wide text-white"
           style={{ top: `${(FRAME.feet / 200) * 100}%`, transform: "translateY(35%)", textShadow: "0 0 3px rgba(0,0,0,0.9)" }}
         >
           Feet inside this line
