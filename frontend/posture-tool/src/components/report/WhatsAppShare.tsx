@@ -77,7 +77,7 @@ export default function WhatsAppShare({ report }: { report: PostureReport }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="h-11 flex-1 rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-4 text-[14px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2] sm:flex-none"
+        className="h-11 flex-1 rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] whitespace-nowrap px-2 text-[13px] sm:px-4 sm:text-[14px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2] sm:flex-none"
       >
         WhatsApp
       </button>

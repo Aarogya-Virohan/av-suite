@@ -564,7 +564,7 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
               <button
                 type="button"
                 onClick={resetAll}
-                className="h-11 flex-1 rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-4 text-[14px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2] sm:flex-none"
+                className="h-11 flex-1 rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] whitespace-nowrap px-2 text-[13px] sm:px-4 sm:text-[14px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2] sm:flex-none"
               >
                 New assessment
               </button>
@@ -582,7 +582,7 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
                     setPdfBusy(false)
                   }
                 }}
-                className="h-11 flex-1 rounded-xl bg-[#4E888F] px-5 text-[14px] font-semibold text-white transition hover:bg-[#3B6A70] disabled:opacity-60 sm:flex-none"
+                className="h-11 flex-1 rounded-xl bg-[#4E888F] whitespace-nowrap px-2 text-[13px] sm:px-4 sm:text-[14px] font-semibold text-white transition hover:bg-[#3B6A70] disabled:opacity-60 sm:flex-none"
               >
                 {pdfBusy ? "Preparing PDF…" : "Download PDF"}
               </button>
