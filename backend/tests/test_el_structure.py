@@ -302,7 +302,7 @@ async def test_migration_b_data_qa() -> None:
     mode = {r[0]: r[5] for r in a.NEW}
     global_ids = {r[0] for r in a.PROD} | set(mode)
     ids = [r[0] for r in b.DESCRIPTIONS]
-    assert len(ids) == len(set(ids)) == 2863 and set(ids) <= global_ids
+    assert len(ids) == len(set(ids)) == 2871 and set(ids) <= global_ids
     for ex_id, text, _old in b.DESCRIPTIONS:
         n = len(re.findall(r"[A-Za-z0-9'’-]+", text))
         assert 0 < n <= 30, (ex_id, n)

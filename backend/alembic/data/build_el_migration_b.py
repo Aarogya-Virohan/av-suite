@@ -45,7 +45,27 @@ spec.loader.exec_module(B)
 
 RENAME = (B.LATERAL_FLEXION_ID, "Neck side-bend isometric (right)")
 # (prod title, new body part) from D2_flags.csv; row 660's body part moved in e7c3a9f1b5d2.
-BODY_PART = [("Hamstring stretch standing (supported)", "Legs")]
+BODY_PART = [
+    ("Hamstring stretch standing (supported)", "Legs"),  # D2 flags
+    # D1 / D3 notes (20 Nov): copies disagreed with their base row; the odd
+    # value (one-off SQL row or wrong region) moves to the family's value.
+    ("Biceps curl", "Elbow"), ("Double-leg heel raise", "Ankle & Foot"), ("Cat-camel", "Thoracic"),
+    ("Glute set", "Hip"), ("Glute set (supported)", "Hip"),
+    ("Calf raise", "Ankle & Foot"), ("Calf raise (supported)", "Ankle & Foot"),
+    ("Wall push-up", "Shoulder"), ("Wall angels (seated)", "Shoulder"), ("Wall angels (supported)", "Shoulder"),
+    ("Sit-to-stand (supported)", "Knee"),
+]
+# Onkar 20 Nov 17:47: text for the 8 rows left empty (prod title or bank key).
+DESC_OVERRIDE = {
+    "Open book (seated)": "Sit tall with your arms crossed on your chest. Turn your upper body to one side, opening the chest and following with your eyes. Keep your hips facing forward.",
+    "Prone T": "Lie face down with your arms out to the sides at shoulder level, thumbs up. Squeeze your shoulder blades together and lift both arms slightly, then lower slowly.",
+    "Hip hinge drill (supported)": "Stand holding a counter with one hand. Push your hips back with a flat back and soft knees, then squeeze your buttocks to stand tall again.",
+    "McGill side plank (supported)": "Lie on your side propped on your elbow, knees bent, top hand on a chair for balance. Lift your hips into a straight line, then lower slowly.",
+    "Lateral raise": "Stand holding light weights at your sides. Raise your arms out to the sides up to shoulder height, elbows slightly bent, then lower slowly.",
+    "Lumbar rotation stretch (seated)": "Sit tall, feet flat, arms crossed. Gently turn your trunk to one side until you feel a stretch in your back. Return and repeat to the other side.",
+    "Hip flexor stretch": "Kneel on one knee with the other foot in front. Tuck your pelvis under and shift forward until you feel a stretch at the front of the back hip.",
+    "NMC-SHO-00806-v1": "Stand tall, hand beside the same-side hip, palm facing back. Lift the arm diagonally across your body to above the opposite shoulder, turning the palm towards you. Lower slowly.",
+}
 EXTRA_BLOCKED = ["RES-THO-01340-v1", "RES-THO-01341-v1"]
 RUNNING = re.compile(
     r"\b(run|running|sprint|shuttle|agility|carioca|bound|bounding|skip|hop|hopping|pogo|jog|cutting)\b", re.I
@@ -140,6 +160,13 @@ def main(argv=None) -> int:
         if k and RUNNING.search(t) and d4.get(k):
             text[i] = d4[k]
             log["running/agility: D4 text"] += 1
+
+    # 3b. Onkar's text for the rows left empty
+    by_t = {t: i for i, t in title.items()}
+    by_k = {r[1]: r[0] for r in st.NEW}
+    for key, t in DESC_OVERRIDE.items():
+        text[by_t.get(key) or by_k[key]] = t
+        log["Onkar text for empty row"] += 1
 
     # 4. QA on the final set
     new_mode = {r[0]: r[5] for r in st.NEW}

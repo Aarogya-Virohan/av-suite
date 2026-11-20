@@ -9,12 +9,12 @@ alembic/data/el_descriptions_20nov.py, built by build_el_migration_b.py from
 the D1-D4 CSVs (Onkar 20 Nov 10:30):
 
 1. rx_mode may also be HIDDEN (not listed, searched or prescribed; row kept).
-2. exercises.description for 2,863 global exercises (max 30 words, no
+2. exercises.description for 2,871 global exercises (max 30 words, no
    "prescribed", no "the therapist" in patient rows). Only global rows; a
    row is written only while its description is still the 20 Nov value.
 3. 73 "(seated)" copies that cannot be done seated -> HIDDEN.
 4. Head-down postural drainage (RES-THO-01340, 01341) -> BLOCKED.
-5. Row 660 renamed "Neck side-bend isometric (right)"; one body part fix.
+5. Row 660 renamed "Neck side-bend isometric (right)"; 12 body part fixes (D1-D3 notes).
 
 Downgrade puts every value back (only where it still holds this
 migration's value) and restores the rx_mode check. Roll back by name:
