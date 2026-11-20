@@ -30,6 +30,13 @@ from app.main import app
 pytestmark = pytest.mark.asyncio
 
 
+@pytest.fixture(autouse=True)
+def _open_marketplace_writes(monkeypatch):
+    """These tests cover the install/enable code paths, which BE-3 keeps but
+    switches off by default (see tests/test_l2_security.py)."""
+    monkeypatch.setattr(settings, "MARKETPLACE_WRITES_ENABLED", True)
+
+
 async def create_workspace(
     db_session: AsyncSession,
     *,

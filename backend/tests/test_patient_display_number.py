@@ -10,6 +10,7 @@ from sqlalchemy import select, text
 from sqlalchemy.engine import make_url
 
 from app.core.config import settings
+from app.models.membership import Membership
 from app.models.clinic import Clinic
 from app.models.patient import Patient, PatientCounter
 from app.models.booking import AppointmentRequest
@@ -102,6 +103,8 @@ async def test_booking_approval_uses_next_clinic_display_number(db_session):
     db_session.add(clinic)
     await db_session.flush()
     therapist = (await db_session.execute(select(User).where(User.role == "therapist").limit(1))).scalar_one()
+    # AUD-06: approve needs a therapist who is a member of this clinic
+    db_session.add(Membership(user_id=therapist.id, clinic_id=clinic.id, role="therapist"))
     for index in range(2):
         await create_patient(
             db_session, str(clinic.id),

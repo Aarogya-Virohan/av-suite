@@ -3,11 +3,15 @@ from __future__ import annotations
 from datetime import date, datetime, time, timezone
 from uuid import UUID
 
+from sqlalchemy import select
+
 from app.enums.appointment import AppointmentSource, AppointmentStatus
 from app.enums.booking import AppointmentRequestStatus
 from app.enums.patient import PatientStatus
 from app.models.appointment import Appointment
 from app.models.booking import AppointmentRequest
+from app.models.membership import Membership
+from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.booking import AppointmentRequestRepository
 from app.repositories.clinic import ClinicRepository
@@ -158,6 +162,29 @@ class BookingService:
                 f"Appointment request '{request_id}' has already been approved."
             )
 
+        # AUD-06: an appointment needs a real therapist of this clinic. Check
+        # before any write so a bad request leaves nothing behind (was: a
+        # placeholder UUID and a FK error = 500).
+        therapist_id = payload.therapist_id
+        if therapist_id is None:
+            raise BookingValidationError(
+                "Select a therapist to approve this appointment request."
+            )
+        session = self.request_repository.session
+        is_member = await session.scalar(
+            select(Membership.id)
+            .join(User, User.id == Membership.user_id)
+            .where(
+                Membership.user_id == therapist_id,
+                Membership.clinic_id == clinic_id,
+                User.is_active.is_(True),
+            )
+        )
+        if is_member is None:
+            raise BookingValidationError(
+                "Selected therapist is not an active member of this clinic."
+            )
+
         # Find or create patient record
         matching_patients = await self.patient_repository.search_by_phone(
             req.phone, clinic_id=clinic_id
@@ -191,11 +218,6 @@ class BookingService:
                 start_t = time(hour=9, minute=0)
 
         start_dt = datetime.combine(sched_date, start_t, tzinfo=timezone.utc)
-
-        therapist_id = payload.therapist_id
-        if therapist_id is None:
-            # Note: therapist_id is required on Appointment ORM model, fallback to placeholder if not supplied
-            therapist_id = UUID("00000000-0000-0000-0000-000000000000")
 
         appointment_data = {
             "clinic_id": clinic_id,
