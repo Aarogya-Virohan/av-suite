@@ -317,3 +317,30 @@ def test_supabase_guide_has_no_real_connection_string():
     for m in re.finditer(r"postgres(?:ql)?(?:\+asyncpg)?://([^:\s]+):([^@\s]+)@", text):
         user, password = m.groups()
         assert "<" in password or password.upper() in {"PASSWORD", "YOUR-PASSWORD", "[YOUR-PASSWORD]"}, m.group(0)[:40]
+
+
+# --- Booking approve time is IST (Onkar 20 Nov, Q3) ---------------------------
+
+@pytest.mark.asyncio
+async def test_approve_default_and_given_time_are_ist(client: AsyncClient, db_session: AsyncSession):
+    from zoneinfo import ZoneInfo
+
+    from app.models.appointment import Appointment
+
+    clinic_id, headers, _ = await register(client)
+    therapist = (await staff(client, headers)).json()["data"]["id"]
+    ist = ZoneInfo("Asia/Kolkata")
+
+    for body, expected in (
+        ({"therapist_id": therapist, "scheduled_date": "2026-12-01"}, (9, 0)),
+        ({"therapist_id": therapist, "scheduled_date": "2026-12-01", "start_time": "17:30"}, (17, 30)),
+    ):
+        req_id = await _booking_request(client, clinic_id)
+        res = await client.post(f"{API}/appointment-requests/{req_id}/approve", json=body, headers=headers)
+        assert res.status_code == 200, res.text
+        appt = await db_session.scalar(
+            select(Appointment).where(Appointment.clinic_id == clinic_id).order_by(Appointment.created_at.desc())
+        )
+        await db_session.refresh(appt)
+        local = appt.scheduled_at.astimezone(ist)
+        assert (local.date().isoformat(), local.hour, local.minute) == ("2026-12-01", *expected)

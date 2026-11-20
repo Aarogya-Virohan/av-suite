@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
+
+CLINIC_TZ = ZoneInfo("Asia/Kolkata")
 
 from app.enums.appointment import AppointmentSource, AppointmentStatus
 from app.enums.booking import AppointmentRequestStatus
@@ -204,7 +207,14 @@ class BookingService:
                 }
             )
 
-        sched_date = payload.scheduled_date or req.preferred_date or date.today()
+        # Clinic wall-clock time is IST: the default slot and any start_time the
+        # staff type are IST, stored as an aware datetime (was UTC: 09:00 showed
+        # as 14:30).
+        sched_date = (
+            payload.scheduled_date
+            or req.preferred_date
+            or datetime.now(CLINIC_TZ).date()
+        )
         start_t = time(hour=9, minute=0)
         if payload.start_time:
             try:
@@ -217,7 +227,7 @@ class BookingService:
             except (ValueError, IndexError):
                 start_t = time(hour=9, minute=0)
 
-        start_dt = datetime.combine(sched_date, start_t, tzinfo=timezone.utc)
+        start_dt = datetime.combine(sched_date, start_t, tzinfo=CLINIC_TZ)
 
         appointment_data = {
             "clinic_id": clinic_id,
