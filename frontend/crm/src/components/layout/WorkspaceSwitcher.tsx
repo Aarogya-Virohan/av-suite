@@ -9,6 +9,7 @@ import { setStoredToken } from '../../lib/auth';
 import { useAuthStore } from '../../store';
 import { cn } from '../../lib/cn';
 import { ROLE_LABEL } from '../../lib/workspaces';
+import { asset } from '../../lib/hub';
 
 interface Workspace {
   id: string;
@@ -85,7 +86,7 @@ export function WorkspaceCard({ clinicName, roleText }: { clinicName: string; ro
       if (!token) throw new Error('Invalid response from server.');
       setStoredToken(token);
       // Full reload: cached queries belong to the old clinic.
-      window.location.assign('/dashboard');
+      window.location.assign(asset('/dashboard'));
     } catch (err: unknown) {
       console.error('Workspace switch failed', err);
       toast.error(err instanceof Error ? err.message : 'Could not switch clinic.');
@@ -161,7 +162,7 @@ export function WorkspaceCard({ clinicName, roleText }: { clinicName: string; ro
           type="button"
           onClick={() => {
             logout();
-            window.location.replace('/login');
+            window.location.replace(asset('/login'));
           }}
           className="cursor-pointer rounded-md p-1.5 text-[#aab2d6] transition-colors hover:bg-white/10 hover:text-[#ffb4a8]"
           aria-label="Logout"

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { asset } from '../../lib/hub';
 
 /**
  * Clinic logo on the left of the top bar (D-030). When the clinic has no logo,
@@ -42,9 +43,9 @@ export function AvBrand() {
   return (
     <span className="flex shrink-0 items-center" title="AV Suite">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/av-logo-wordmark.png" alt="AV Suite" className="hidden h-7 w-auto sm:block" />
+      <img src={asset('/brand/av-logo-wordmark.png')} alt="AV Suite" className="hidden h-7 w-auto sm:block" />
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brand/av-logo-mark.png" alt="AV Suite" className="h-8 w-8 object-contain sm:hidden" />
+      <img src={asset('/brand/av-logo-mark.png')} alt="AV Suite" className="h-8 w-8 object-contain sm:hidden" />
     </span>
   );
 }

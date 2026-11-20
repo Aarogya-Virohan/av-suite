@@ -7,7 +7,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store';
-import { setStoredToken, getStoredToken, isTokenExpired } from '../../lib/auth';
+import { setStoredToken, setStoredEmail, getStoredToken, isTokenExpired } from '../../lib/auth';
+import { asset, HUB_MODE, safeHubNext } from '../../lib/hub';
 import { apiClient } from '../../lib/api-client';
 import { Check, Lock, Mail, Loader2, Eye, EyeOff, Building2, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/brand';
@@ -30,15 +31,29 @@ export default function LoginPage() {
   // Set when the account belongs to more than one clinic.
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[] | null>(null);
   const [pendingClinicId, setPendingClinicId] = useState<string | null>(null);
+  const [sessionEnded, setSessionEnded] = useState(false);
+
+  // After sign-in: back to the tool that sent the user here (hub mode,
+  // ?next=/posture/...), else the CRM dashboard.
+  const goNext = React.useCallback(() => {
+    const next = HUB_MODE ? safeHubNext(new URLSearchParams(window.location.search).get('next')) : null;
+    if (next) {
+      // Another tool is another Next app: full page load, not router.
+      window.location.replace(next);
+      return;
+    }
+    router.replace('/dashboard');
+  }, [router]);
 
   useEffect(() => {
     const token = getStoredToken();
     if (token && !isTokenExpired(token)) {
-      router.replace('/dashboard');
+      goNext();
       return;
     }
+    setSessionEnded(new URLSearchParams(window.location.search).get('expired') === '1');
     setIsCheckingAuth(false);
-  }, [router]);
+  }, [goNext]);
 
   const {
     register,
@@ -63,10 +78,11 @@ export default function LoginPage() {
     }
 
     setStoredToken(token);
+    setStoredEmail(data.email.trim());
     setToken(token);
     await useAuthStore.getState().fetchMe();
     toast.success('Successfully logged in');
-    router.replace('/dashboard');
+    goNext();
   };
 
   const onSubmit = async (data: LoginFormValues) => {
@@ -126,20 +142,20 @@ export default function LoginPage() {
         <div className="relative flex items-center gap-3">
           <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-[13px] bg-white p-1.5 shadow-[0_0_0_2px_rgba(78,136,143,0.5)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+            <img src={asset('/brand/av-logo-mark.png')} alt="" className="h-full w-full object-contain" />
           </span>
           <div>
             <p className="font-display text-lg font-bold tracking-tight">AV Suite</p>
-            <p className="text-xs text-[#aab2d6]">Clinic CRM</p>
+            <p className="text-xs text-[#aab2d6]">Clinic CRM and clinical tools</p>
           </div>
         </div>
 
         <div className="relative max-w-md space-y-6">
           <h2 className="font-display text-[34px] font-bold leading-tight tracking-tight">
-            Run your physiotherapy clinic <span className="text-lime">in one place.</span>
+            Your clinic and your clinical tools, <span className="text-lime">one sign-in.</span>
           </h2>
           <ul className="space-y-3 text-sm text-[#c3c9e6]">
-            {['Patients, treatments and SOAP notes', 'Appointments and online booking', 'Billing, payments and analytics'].map(
+            {['Patients, appointments and billing', 'Exercise prescriptions and posture analysis', 'Psychosocial screening'].map(
               (item) => (
                 <li key={item} className="flex items-center gap-3">
                   <span className="grid h-6 w-6 place-items-center rounded-full bg-lime/15">
@@ -161,10 +177,15 @@ export default function LoginPage() {
           <div className="mb-8">
             <span className="mb-5 grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-white p-1.5 shadow-card lg:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+              <img src={asset('/brand/av-logo-mark.png')} alt="" className="h-full w-full object-contain" />
             </span>
             <h1 className="font-display text-[28px] font-bold tracking-tight text-ink">Welcome back</h1>
-            <p className="mt-1 text-sm text-muted">Sign in to access your clinic portal</p>
+            <p className="mt-1 text-sm text-muted">Sign in to AV Suite</p>
+            {sessionEnded && (
+              <p role="status" className="mt-4 rounded-[10px] border border-line bg-card px-3 py-2 text-xs font-medium text-ink-2">
+                Your session has ended. Please sign in again.
+              </p>
+            )}
           </div>
 
           {workspaces ? (
@@ -263,7 +284,7 @@ export default function LoginPage() {
                     <span>Signing in...</span>
                   </>
                 ) : (
-                  <span>Sign In to Dashboard</span>
+                  <span>Sign in</span>
                 )}
               </Button>
             </form>

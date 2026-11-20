@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getStoredToken, isTokenExpired } from '../../lib/auth';
 import { useAuthStore } from '../../store';
 import { Loader2 } from 'lucide-react';
+import { asset, redirectToHubLogin } from '../../lib/hub';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -18,7 +19,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!token || isTokenExpired(token)) {
       setIsChecking(true);
       useAuthStore.getState().logout();
-      window.location.replace('/login');
+      if (!redirectToHubLogin()) window.location.replace(asset('/login'));
       return false;
     }
 

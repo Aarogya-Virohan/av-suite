@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { safeNext } from "@/components/auth/AuthGate"
 import { ApiError, getToken, login, setSession, type WorkspaceOption } from "@/lib/api"
+import { asset, BASE_PATH, HUB_MODE, hubLoginUrl } from "@/lib/hub"
 
 // Same sign-in as the CRM and the Exercise Library: one AV Suite account,
 // and a clinic picker when the account belongs to more than one clinic.
@@ -32,9 +33,17 @@ function LoginForm() {
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[] | null>(null)
   const [pendingClinicId, setPendingClinicId] = useState<string | null>(null)
 
+  // Hub mode: one AV Suite login page in the CRM (HUB-2).
+  useEffect(() => {
+    if (HUB_MODE) {
+      const url = hubLoginUrl({ next: `${BASE_PATH}${next}`, expired: !!params.get("expired") })
+      if (url) window.location.replace(url)
+    }
+  }, [next, params])
+
   // Already signed in: straight on.
   useEffect(() => {
-    if (getToken()) router.replace(next)
+    if (!HUB_MODE && getToken()) router.replace(next)
   }, [router, next])
 
   async function signIn(clinicId?: string) {
@@ -74,7 +83,7 @@ function LoginForm() {
       <header className="bg-[linear-gradient(115deg,#0B1238_0%,#121F4A_60%,#1B4A54_100%)] text-white">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-4 px-4 py-3.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/av_logo_wordmark_white.png" alt="Aarogya Virohan" className="h-6 w-auto" />
+          <img src={asset("/brand/av_logo_wordmark_white.png")} alt="Aarogya Virohan" className="h-6 w-auto" />
           <span className="rounded-full bg-[#C1FF72] px-2.5 py-0.5 text-[11.5px] font-bold text-[#0B1238]">
             Posture Tool
           </span>

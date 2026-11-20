@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { BarChart3, ClipboardList, LogOut, Menu, Send, ShieldCheck, SlidersHorizontal, Users, X } from 'lucide-react';
+import { ArrowLeft, BarChart3, ClipboardList, LogOut, Menu, Send, ShieldCheck, SlidersHorizontal, Users, X } from 'lucide-react';
 import { clearStoredToken } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { Avatar } from '@/components/ui/brand';
 import { useMe } from './session-context';
+import { asset, redirectToHubLogin, toolUrl } from '@/lib/hub';
 
 const NAV = [
   { href: '/sessions', label: 'Screenings', icon: ClipboardList, capability: 'screening.view' },
@@ -51,13 +52,30 @@ function Brand() {
     <div className="flex items-center gap-3">
       <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-white p-1.5 shadow-[0_0_0_2px_rgba(78,136,143,0.5)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+        <img src={asset('/brand/av-logo-mark.png')} alt="" className="h-full w-full object-contain" />
       </span>
       <div className="min-w-0">
         <p className="font-display text-[15px] font-bold leading-tight tracking-tight text-white">Screening</p>
         <p className="truncate text-xs text-[#aab2d6]">{me.active_workspace?.name ?? 'AV Suite'}</p>
       </div>
     </div>
+  );
+}
+
+const crmUrl = toolUrl('crm');
+
+/** HUB-6: way back to the CRM hub (hidden when this build has no CRM address). */
+function BackToCrm() {
+  if (!crmUrl) return null;
+  return (
+    <a
+      href={crmUrl}
+      data-testid="back-to-crm"
+      className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#c3c9e6] transition-colors hover:bg-white/10 hover:text-white"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      Back to CRM
+    </a>
   );
 }
 
@@ -75,7 +93,7 @@ function UserFooter() {
         type="button"
         onClick={() => {
           clearStoredToken();
-          router.replace('/login');
+          if (!redirectToHubLogin({ keepNext: false })) router.replace('/login');
         }}
         className="grid h-9 w-9 cursor-pointer place-items-center rounded-lg text-[#b9c0e0] transition-colors hover:bg-white/10 hover:text-white"
         aria-label="Sign out"
@@ -104,7 +122,10 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
           <Brand />
           <NavLinks />
         </div>
-        <UserFooter />
+        <div>
+          <BackToCrm />
+          <UserFooter />
+        </div>
       </aside>
 
       {/* Mobile top bar */}
@@ -143,7 +164,10 @@ export function StaffShell({ children }: { children: React.ReactNode }) {
               </div>
               <NavLinks onNavigate={() => setOpen(false)} />
             </div>
-            <UserFooter />
+            <div>
+              <BackToCrm />
+              <UserFooter />
+            </div>
           </div>
         </div>
       ) : null}

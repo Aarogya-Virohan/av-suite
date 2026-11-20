@@ -13,6 +13,7 @@ import { CategoryEditDialog } from "@/components/library/CategoryEditDialog";
 import { PrescriptionBuilder } from "@/components/prescription/PrescriptionBuilder";
 import { Exercise, ExercisePhoto, PrescriptionItem } from "@/types/exercise";
 import { can, fetchCategories, fetchExercises, fetchMe, getToken, type CategoryGroup } from "@/lib/api";
+import { redirectToHubLogin } from "@/lib/hub";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const PAGE_SIZE = 30;
@@ -48,7 +49,7 @@ export default function Home() {
 
   // Route guard.
   useEffect(() => {
-    if (!getToken()) router.replace("/login");
+    if (!getToken() && !redirectToHubLogin()) router.replace("/login");
   }, [router]);
 
   useEffect(() => {
