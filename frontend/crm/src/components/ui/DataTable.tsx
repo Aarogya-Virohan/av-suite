@@ -128,7 +128,7 @@ export function DataTable<T extends { id: string }>({
                 {columns.map((col) => (
                   <th
                     key={col.key}
-                    className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted dark:text-slate-400"
+                    className="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted dark:text-slate-400"
                   >
                     {col.header}
                   </th>

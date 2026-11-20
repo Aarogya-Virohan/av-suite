@@ -3,12 +3,22 @@
 import React, { useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
-import { useInvoices, usePayments, usePackages } from '../../../features/billing/api';
+import {
+  cancelBlockReason,
+  useCancelInvoice,
+  useInvoices,
+  usePackages,
+  usePayments,
+  useVoidPayment,
+  VOID_REASON_MIN,
+} from '../../../features/billing/api';
+import { ReasonSlideOver } from '../../../features/billing/components/ReasonSlideOver';
+import { toast } from 'sonner';
 import { CreateInvoiceSlideOver } from '../../../features/billing/components/CreateInvoiceSlideOver';
 import { RecordPaymentSlideOver } from '../../../features/billing/components/RecordPaymentSlideOver';
 import { InvoicePreviewModal } from '../../../features/billing/components/InvoicePreviewModal';
 import { Invoice, Payment, Package, InvoiceStatus } from '../../../types/api';
-import { Plus, CreditCard, FileText, Package as PackageIcon, Eye, Printer } from 'lucide-react';
+import { Plus, CreditCard, FileText, Package as PackageIcon, Eye, Printer, Ban, Undo2 } from 'lucide-react';
 import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
 import { AccessRestricted } from '../../../components/ui/AccessRestricted';
 import { Avatar, Badge, type BadgeTone, Button, PageHeader, SegmentGroup, SegmentTab } from '../../../components/ui/brand';
@@ -57,6 +67,13 @@ export default function BillingPage() {
   // does not open a form that can only fail (Decisions.md L-9).
   const canCreateInvoice = hasCapability('invoices.create');
   const canRecordPayment = hasCapability('payments.record');
+  // CRM-4: cancel = invoices.edit, void = payments.delete (same as the server).
+  const canCancelInvoice = hasCapability('invoices.edit');
+  const canVoidPayment = hasCapability('payments.delete');
+  const [cancelTarget, setCancelTarget] = useState<Invoice | null>(null);
+  const [voidTarget, setVoidTarget] = useState<Payment | null>(null);
+  const cancelInvoice = useCancelInvoice();
+  const voidPayment = useVoidPayment();
 
   // The default tab is derived on every render, not frozen into useState:
   // capabilities can arrive after the first render, and freezing them made
@@ -122,7 +139,7 @@ export default function BillingPage() {
     {
       key: 'invoice_number',
       header: 'Invoice',
-      render: (inv) => <span className="font-semibold text-ink">{inv.invoice_number}</span>,
+      render: (inv) => <span className="whitespace-nowrap font-semibold text-ink">{inv.invoice_number}</span>,
     },
     {
       key: 'patient',
@@ -132,7 +149,7 @@ export default function BillingPage() {
         return (
           <div className="flex items-center gap-2.5">
             <Avatar name={name} size={30} />
-            <span className="font-medium text-ink">{name}</span>
+            <span className="whitespace-nowrap font-medium text-ink">{name}</span>
           </div>
         );
       },
@@ -140,12 +157,12 @@ export default function BillingPage() {
     {
       key: 'total_amount',
       header: 'Total',
-      render: (inv) => <span className="tabular-nums">{money(inv.total_amount)}</span>,
+      render: (inv) => <span className="whitespace-nowrap tabular-nums">{money(inv.total_amount)}</span>,
     },
     {
       key: 'paid_amount',
       header: 'Paid',
-      render: (inv) => <span className="font-semibold tabular-nums text-ink">{money(inv.paid_amount)}</span>,
+      render: (inv) => <span className="whitespace-nowrap font-semibold tabular-nums text-ink">{money(inv.paid_amount)}</span>,
     },
     {
       key: 'status',
@@ -160,7 +177,7 @@ export default function BillingPage() {
       key: 'actions',
       header: 'Actions',
       render: (inv) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 whitespace-nowrap">
           <button
             onClick={() => openPreview(inv, 'invoice')}
             className={cn(SMALL_ACTION, 'border border-line bg-card text-ink-2 hover:bg-canvas')}
@@ -168,13 +185,28 @@ export default function BillingPage() {
             <Eye className="h-3.5 w-3.5" />
             <span>Invoice</span>
           </button>
-          {inv.status === 'paid' && (
+          {(inv.status === 'paid' || inv.status === 'partial') && (
             <button
               onClick={() => openPreview(inv, 'receipt')}
               className={cn(SMALL_ACTION, 'bg-ok-wash text-ok hover:bg-[#d3eedc]')}
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Receipt</span>
+            </button>
+          )}
+          {canCancelInvoice && inv.status !== 'cancelled' && (
+            <button
+              onClick={() => {
+                const blocked = cancelBlockReason(inv);
+                if (blocked) toast.error(`${inv.invoice_number}: ${blocked}.`);
+                else setCancelTarget(inv);
+              }}
+              title={cancelBlockReason(inv) ?? 'Cancel this invoice'}
+              aria-label={`Cancel invoice ${inv.invoice_number}`}
+              className={cn(SMALL_ACTION, 'text-danger hover:bg-danger-wash', cancelBlockReason(inv) && 'opacity-50')}
+            >
+              <Ban className="h-3.5 w-3.5" />
+              <span>Cancel</span>
             </button>
           )}
         </div>
@@ -200,7 +232,7 @@ export default function BillingPage() {
         return (
           <div className="flex items-center gap-2.5">
             <Avatar name={name} size={30} />
-            <span className="font-medium text-ink">{name}</span>
+            <span className="whitespace-nowrap font-medium text-ink">{name}</span>
           </div>
         );
       },
@@ -208,7 +240,7 @@ export default function BillingPage() {
     {
       key: 'amount',
       header: 'Amount',
-      render: (p) => <span className="font-semibold tabular-nums text-ink">{money(p.amount)}</span>,
+      render: (p) => <span className="whitespace-nowrap font-semibold tabular-nums text-ink">{money(p.amount)}</span>,
     },
     {
       key: 'payment_method',
@@ -219,8 +251,45 @@ export default function BillingPage() {
         </Badge>
       ),
     },
-    { key: 'payment_date', header: 'Date', render: (p) => <span className="tabular-nums">{formatPaymentDate(p.payment_date)}</span> },
+    {
+      key: 'payment_date',
+      header: 'Date',
+      render: (p) => <span className="whitespace-nowrap tabular-nums">{formatPaymentDate(p.payment_date)}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (p) =>
+        p.status === 'voided' ? (
+          <span title={p.void_reason ?? undefined}>
+            <Badge tone="neutral" className="line-through">
+              Voided
+            </Badge>
+          </span>
+        ) : (
+          <Badge tone="ok">Received</Badge>
+        ),
+    },
   ];
+  if (canVoidPayment) {
+    paymentColumns.push({
+      key: 'actions',
+      header: 'Actions',
+      render: (p) =>
+        p.status === 'voided' ? (
+          <span className="text-xs text-muted">-</span>
+        ) : (
+          <button
+            onClick={() => setVoidTarget(p)}
+            aria-label={`Void payment ${p.id.slice(0, 8).toUpperCase()}`}
+            className={cn(SMALL_ACTION, 'text-danger hover:bg-danger-wash')}
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+            <span>Void</span>
+          </button>
+        ),
+    });
+  }
 
   const packageColumns: Column<Package>[] = [
     { key: 'name', header: 'Package', render: (pkg) => <span className="font-semibold text-ink">{pkg.name}</span> },
@@ -305,6 +374,60 @@ export default function BillingPage() {
         {/* Drawers & Printable Preview Modal */}
         <CreateInvoiceSlideOver isOpen={isInvoiceOpen} onClose={() => setIsInvoiceOpen(false)} />
         <RecordPaymentSlideOver isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />
+        <ReasonSlideOver
+          isOpen={!!cancelTarget}
+          onClose={() => setCancelTarget(null)}
+          title="Cancel Invoice"
+          subtitle={cancelTarget?.invoice_number}
+          summary={
+            cancelTarget && (
+              <>
+                Invoice <strong>{cancelTarget.invoice_number}</strong> for <strong>{getPatientName(cancelTarget)}</strong> (
+                {money(cancelTarget.total_amount)}) will be marked cancelled. It stays in the list and cannot be reopened or moved back to
+                draft.
+              </>
+            )
+          }
+          confirmLabel="Cancel Invoice"
+          isPending={cancelInvoice.isPending}
+          onConfirm={async (reason) => {
+            if (!cancelTarget) return;
+            try {
+              await cancelInvoice.mutateAsync({ invoiceId: cancelTarget.id, reason });
+              toast.success(`Invoice ${cancelTarget.invoice_number} cancelled`);
+              setCancelTarget(null);
+            } catch (err: any) {
+              toast.error(err?.message || 'Could not cancel the invoice');
+            }
+          }}
+        />
+        <ReasonSlideOver
+          isOpen={!!voidTarget}
+          onClose={() => setVoidTarget(null)}
+          title="Void Payment"
+          subtitle={voidTarget ? `#${voidTarget.id.slice(0, 8).toUpperCase()}` : undefined}
+          summary={
+            voidTarget && (
+              <>
+                The payment of <strong>{money(voidTarget.amount)}</strong> from <strong>{getPatientName(voidTarget)}</strong> will be
+                voided. The invoice balance goes up by the same amount. The row stays in the log, marked voided.
+              </>
+            )
+          }
+          confirmLabel="Void Payment"
+          minLength={VOID_REASON_MIN}
+          isPending={voidPayment.isPending}
+          onConfirm={async (reason) => {
+            if (!voidTarget) return;
+            try {
+              await voidPayment.mutateAsync({ paymentId: voidTarget.id, reason });
+              toast.success('Payment voided');
+              setVoidTarget(null);
+            } catch (err: any) {
+              toast.error(err?.message || 'Could not void the payment');
+            }
+          }}
+        />
         <InvoicePreviewModal
           isOpen={!!previewInvoice}
           onClose={closePreview}

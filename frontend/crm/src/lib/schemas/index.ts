@@ -99,6 +99,8 @@ export const invoiceItemSchema = z.object({
   quantity: z.number().min(1),
   unit_price: z.number().min(0, 'Unit price must be >= 0'),
   total_price: z.number().min(0),
+  /** UI only: line came from a fee item whose price is fixed (CRM-2). Not sent. */
+  fixed_price: z.boolean().optional(),
 });
 export type InvoiceItemValues = z.infer<typeof invoiceItemSchema>;
 

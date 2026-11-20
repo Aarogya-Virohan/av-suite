@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DataTable, Column } from '../../../components/ui/DataTable';
-import { usePatients } from '../../../features/patients/api';
+import { usePatientCaseId, usePatients } from '../../../features/patients/api';
 import { AddPatientSlideOver } from '../../../features/patients/components/AddPatientSlideOver';
 import { WhatsAppButton } from '../../../components/ui/WhatsAppButton';
 import { Patient, PatientStatus } from '../../../types/api';
@@ -45,6 +45,7 @@ export default function PatientsPage() {
   const patients = response?.data || [];
   const meta = response?.meta;
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const caseId = usePatientCaseId();
 
   if (!isAllowed) {
     // AccessRestricted renders its own AppShell.
@@ -53,12 +54,19 @@ export default function PatientsPage() {
 
   const columns: Column<Patient>[] = [
     {
+      key: 'display_number',
+      header: 'Patient ID',
+      render: (patient) => (
+        <span className="whitespace-nowrap font-mono text-xs font-semibold text-ink-2">{caseId(patient.display_number)}</span>
+      ),
+    },
+    {
       key: 'name',
       header: 'Patient Name',
       render: (patient) => (
         <div className="flex items-center gap-3">
           <Avatar name={`${patient.first_name} ${patient.last_name}`} size={34} />
-          <p className="min-w-0 truncate font-semibold text-ink">
+          <p className="min-w-0 truncate whitespace-nowrap font-semibold text-ink">
             {patient.first_name} {patient.last_name}
           </p>
         </div>
@@ -134,7 +142,7 @@ export default function PatientsPage() {
             setSearchTerm(term);
             setPage(1); // Reset to page 1 on new search
           }}
-          searchPlaceholder="Search by patient name or phone number..."
+          searchPlaceholder="Search by patient name, phone or patient ID..."
           emptyMessage={statusFilter !== 'all' ? `No ${statusFilter} patients found.` : 'No patients found.'}
           onRowClick={(patient) => router.push(`/patients/${patient.id}`)}
           totalItems={meta?.total}

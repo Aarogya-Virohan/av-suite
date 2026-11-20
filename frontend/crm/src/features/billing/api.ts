@@ -125,3 +125,43 @@ export async function downloadInvoicePdf(invoiceId: string, invoiceNumber: strin
   a.remove();
   window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 }
+
+/** Void a payment (POST /payments/{id}/void). Reason: at least 5 characters (PR #69). */
+export function useVoidPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ paymentId, reason }: { paymentId: string; reason: string }) => {
+      const res = await apiClient.post(`/payments/${paymentId}/void`, { reason });
+      return res.data?.data || res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Cancel an invoice (PATCH status=cancelled + cancel_reason). The server never
+ * moves an issued invoice back to draft, and a cancelled one stays cancelled.
+ */
+export function useCancelInvoice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ invoiceId, reason }: { invoiceId: string; reason: string }) => {
+      const res = await apiClient.patch(`/invoices/${invoiceId}`, { status: 'cancelled', cancel_reason: reason });
+      return res.data?.data || res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: BILLING_QUERY_KEY });
+    },
+  });
+}
+
+export const VOID_REASON_MIN = 5;
+
+/** Invoice can be cancelled from the UI: not already cancelled, and no live payments on it. */
+export function cancelBlockReason(inv: { status: string; paid_amount: number | string }): string | null {
+  if (inv.status === 'cancelled') return 'Already cancelled';
+  if (Number(inv.paid_amount || 0) > 0) return 'Void the payments on this invoice first';
+  return null;
+}

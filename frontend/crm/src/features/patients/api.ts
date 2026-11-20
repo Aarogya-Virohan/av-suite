@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../lib/api-client';
 import { Patient, PatientStatus } from '../../types/api';
 import { PatientFormValues } from '../../lib/schemas';
+import { useAuthStore } from '../../store';
+import { formatPatientNumber, normalizePatientSearch } from '../../lib/patientNumber';
 
 export const PATIENTS_QUERY_KEY = ['patients'];
 
@@ -11,7 +13,7 @@ export function usePatients(search?: string, page = 1, page_size = 10, enabled =
     queryKey: [...PATIENTS_QUERY_KEY, { search, page, page_size, status }],
     queryFn: async () => {
       const res = await apiClient.get('/patients', {
-        params: { search: search || undefined, page, page_size, status: status || undefined },
+        params: { search: search ? normalizePatientSearch(search) || undefined : undefined, page, page_size, status: status || undefined },
       });
       return res.data as { data: Patient[]; meta: { total: number; page: number; page_size: number } };
     },
@@ -108,4 +110,10 @@ export function useUploadPatientDocument() {
       });
     },
   });
+}
+
+/** Case ID formatter for this clinic: display_number -> "SPC-000123" (CRM-1). */
+export function usePatientCaseId() {
+  const clinicName = useAuthStore((s) => s.clinic?.name);
+  return (displayNumber: number | null | undefined) => formatPatientNumber(displayNumber, clinicName);
 }
