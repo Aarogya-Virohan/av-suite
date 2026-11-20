@@ -184,6 +184,66 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-012] Library structure: 9 domains and 51 categories as two tag groups; bank import
+
+- **Date**: 2026-11-20
+- **Context**: Shivank sir's exercise bank workbook (1,656 rows, sheet "Final Categories") sets 9 domains and 51 categories; his decisions are final (Onkar 19 Nov). Plan: CRM project `claude/ref/el-content-plan.md` v3. The v2 merge sheet had 6 known bugs (SAME collapse, default equipment, cross-region matches, eponyms, clean-up, category).
+- **Decision**:
+  - Domain and Category are two more groups in `exercise_categories` (`group_key` "domain", "category"; ids uuid5 like EL-D-005), shown first in the filter panel. No new table. `app/services/exercise_structure.py` holds the list and each category's domain.
+  - Matcher v4 (prod export 20 Nov vs bank): one-to-one SAME, default-equipment normalisation, body-region hard filter, opposite-movement check, synonym and eponym pass. Result: 252 SAME (on 252 prod rows), 188 VARIANT, 260 REVIEW (near name, all added), 956 NEW; 1,404 new global exercises, total 2,871. Review list (78 rows) and rule-set categories go to Onkar for a spot check.
+  - New rows: fixed ids uuid5(BANK_NS, bank Exercise ID), visible, title = the bank's patient-friendly name, `bank_key` = bank ID; matched prod rows get `bank_key` too. Existing rows are never deleted or renamed; the 600 "(supported)" rows stay (C11).
+  - Every global exercise gets one domain and one category (bank category for SAME rows, the base row's for "(seated)"/"(supported)" copies, nearest bank row, else rule plus a hand check).
+  - The Category list in the panel follows the picked domains (cheap: `parent_id` on category values, filtered in the browser).
+- **Migration**: `e7c3a9f1b5d2` (after `6ab832834814`), data frozen in `backend/alembic/data/el_structure_20nov.py`. Downgrade: `alembic downgrade 6ab832834814` removes the two groups, the new rows no Rx / template / clinic photo uses, and the columns.
+- **Affected Files**: `backend/alembic/versions/e7c3a9f1b5d2_*.py`, `backend/alembic/data/el_structure_20nov.py`, `backend/app/services/exercise_structure.py`, `exercise_categories.py`, `exercise_category_service.py`, `frontend/exercise-library/src/components/library/CategoryFilter.tsx`
+
+---
+
+## [EL-D-013] Rx mode: PATIENT, CAREGIVER, BLOCKED
+
+- **Date**: 2026-11-20
+- **Context**: Plan change C1. Therapist-applied techniques and supervised in-clinic items must never go on a home prescription; caregiver items need a label.
+- **Decision**:
+  - `exercises.rx_mode`: BLOCKED for bank rows "Therapist-applied" (188) and "Patient (supervised)" (15), and yoga rows with safety rule SR24 until contraindication rules are live; CAREGIVER for "Caregiver" (45); everything else PATIENT. Existing prod rows are all PATIENT (a prod row never takes a therapist or supervised bank row as its match).
+  - POST and PATCH /prescriptions refuse a BLOCKED exercise with 422 and a plain message; nothing is saved. The library card shows "Therapist only" and "Not for home" instead of Add; the builder blocks Save for such rows (they can still arrive from a template).
+  - CAREGIVER rows print "Caregiver-assisted" on the PDF card and show the same label in the app.
+- **Affected Files**: `backend/app/services/rx_rules.py`, `backend/app/api/v1/prescriptions.py`, `prescription_pdf.py`, `prescription_service.py`, `ExerciseCard.tsx`, `ExerciseRow.tsx`, `PrescriptionBuilder.tsx`
+
+---
+
+## [EL-D-014] Self-Epley: the therapist picks the side
+
+- **Date**: 2026-11-20
+- **Context**: Plan change C2. A wrong side or canal can make symptoms worse.
+- **Decision**: `exercises.requires_side` (only BAL-FAC-01072, Self-Epley) and `prescription_items.side` ("left" / "right"). Save without a side is refused (422, and the builder asks first). The side prints on the PDF card ("Left side"). A side sent for any other exercise is dropped.
+- **Affected Files**: as EL-D-013, plus `backend/app/models/prescription.py`, `backend/app/schemas/prescription.py`, `backend/app/repositories/prescription.py`
+
+---
+
+## [EL-D-015] Prescription PDF: brief description only, stop-pain line, WhatsApp button
+
+- **Date**: 2026-11-20
+- **Context**: Plan changes C3 and C5; EL-3.
+- **Decision**:
+  - Only `exercises.description` (the brief description) prints. The bank's longer "About this exercise" text is not stored on the exercise, so it cannot reach the PDF.
+  - The closing safety line now reads: "Stop and contact your physiotherapist if you feel sharp pain, dizziness, chest pain or numbness." Founders can change the wording at any time (one constant). The running footer is unchanged (report_letterhead.py is the CRM lane's).
+  - "Send on WhatsApp" in the builder: saves, downloads the PDF, opens wa.me with the existing message to the patient's number (no link in the text, L-4). Without a phone number WhatsApp opens its contact picker.
+  - Found while testing: PATCH /prescriptions returned the old items in its response (stale session collection); the prescription is now expired before it is read again.
+- **Affected Files**: `prescription_pdf.py`, `prescription_service.py`, `PrescriptionBuilder.tsx`, `src/lib/api.ts`
+
+---
+
+## [EL-D-016] EL-4 data clean and descriptions (Migration B)
+
+- **Date**: 2026-11-20
+- **Context**: EL-4; Onkar 20 Nov 06:18: every exercise gets a description, written by four separate chats (D1-D3 on the prod export, D4 on the bank).
+- **Decision**:
+  - In `e7c3a9f1b5d2`: the 8 Blogspot picture links are cleared (downgrade puts them back); the neck isometric row saved under "Other" gets body part "Neck".
+  - Migration B (Sat 21 Nov) loads the descriptions by id with `backend/alembic/data/build_el_descriptions.py`: refuses more than 30 words or "prescribed", skips EDIT-SUGGEST rows (clinic text) and test-clinic rows, D1-D3 wins over D4 for a matched row. The neck isometric row gets D2's title. Test-clinic rows are ON-7, not here.
+- **Affected Files**: `backend/alembic/data/build_el_descriptions.py`, `backend/tests/test_el_descriptions_builder.py`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -204,5 +264,7 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-14 | Imported exercises have no picture, description or categories. 44 "(seated)" variants (found by a name check) describe positions that cannot be done seated (for example "Prone Y raise (seated)", "Glute bridge (seated)"); they were imported as asked and need a physio review. Card titles in title case ("Rom") fixed by EL-D-008 | Open; pictures with the image pipeline, tags and review with the founders | Us + founders |
 | EL-L-15 | Templates, minimal version (EL-D-009): no AV templates yet (who writes and approves them is open with the founders); no edit screen (change = use, adjust, save as a new template, delete the old); no tags, phases or search; the guidance text is not saved in a template | Open; next release | Us + founders |
 | EL-L-16 | `release/el-nov` has no CI workflow (`.github/workflows/ci.yml` came to `release/crm-oct` in PR #47), so pull requests into it run no checks. Fixed when the round merges `dev` after the CRM round, or by merging `release/crm-oct`'s workflow earlier | Fixed by EL-D-011 (CI came with the merge of `dev`) | - |
+| EL-L-17 | Titles of the 1,404 new rows are the bank's patient-friendly names, some with two brackets (e.g. "Epley manoeuvre (posterior canal) (edge of bed)") | Open; tidy with the description round if founders want shorter names | Us |
+| EL-L-18 | Bank rows are AI drafts with no clinical sign-off ("Draft - awaiting clinical review"). Supervised in-bed basics (ankle pumps in bed, heel slides in bed) are BLOCKED by rule C1 while the prod versions stay PATIENT | Open; founders' review | Founders |
 
-*Last updated: 2026-11-12 (EL-D-011, EL-L-16 fixed) | Branch: release/el-nov*
+*Last updated: 2026-11-20 (EL-D-012..EL-D-016, EL-L-17, EL-L-18) | Branch: feat/el-structure*

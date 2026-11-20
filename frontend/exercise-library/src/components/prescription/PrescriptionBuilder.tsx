@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ClipboardList, Download, FilePlus2, History, Loader2, Save } from "lucide-react";
+import { ClipboardList, Download, FilePlus2, History, Loader2, MessageCircle, Save } from "lucide-react";
 import { Patient, PrescriptionItem, SavedPrescription } from "@/types/exercise";
 import {
   createPrescription,
@@ -43,7 +43,7 @@ interface SavedState {
 
 function itemsKey(items: PrescriptionItem[], guidance: string): string {
   return JSON.stringify([
-    items.map((i) => [i.exercise.id, i.sets, i.reps, i.hold, i.frequency, (i.note || "").trim()]),
+    items.map((i) => [i.exercise.id, i.sets, i.reps, i.hold, i.frequency, (i.note || "").trim(), i.side ?? ""]),
     guidance.trim(),
   ]);
 }
@@ -56,6 +56,7 @@ function toPayload(items: PrescriptionItem[]) {
     hold: i.hold,
     frequency: i.frequency,
     note: i.note?.trim() || undefined,
+    side: i.exercise.requiresSide ? i.side : undefined,
   }));
 }
 
@@ -78,7 +79,7 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
   const [history, setHistory] = useState<SavedPrescription[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saved, setSaved] = useState<SavedState | null>(null);
-  const [busy, setBusy] = useState<"save" | "pdf" | null>(null);
+  const [busy, setBusy] = useState<"save" | "pdf" | "whatsapp" | null>(null);
   const [guidance, setGuidance] = useState(DEFAULT_PHYSIO_NOTES);
   const [suggestions, setSuggestions] = useState<NoteSuggestions>({ notes: [], guidance: [] });
 
@@ -152,6 +153,7 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
         hold: it.hold,
         frequency: it.frequency,
         note: it.note ?? undefined,
+        side: it.side ?? undefined,
       });
     }
     const savedGuidance = rx.physio_notes ?? "";
@@ -191,6 +193,16 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
     }
     if (prescription.length === 0) {
       toast.error("Add at least one exercise.");
+      return false;
+    }
+    const blocked = prescription.filter((i) => i.exercise.rxMode === "BLOCKED");
+    if (blocked.length) {
+      toast.error(`Remove ${blocked.map((i) => i.exercise.name).join(", ")}: therapist only, not for a home prescription.`);
+      return false;
+    }
+    const noSide = prescription.filter((i) => i.exercise.requiresSide && !i.side);
+    if (noSide.length) {
+      toast.error(`Choose the affected side for ${noSide.map((i) => i.exercise.name).join(", ")}.`);
       return false;
     }
     return true;
@@ -244,6 +256,36 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
       toast(`Saved and downloaded ${filename}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create the PDF.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /**
+   * EL-3: save, download the PDF, then open WhatsApp with the message to the
+   * patient's number. WhatsApp cannot take a file from a link, so the PDF is
+   * attached by hand; the message carries no link (L-4).
+   */
+  const handleWhatsApp = async () => {
+    if (!validate()) return;
+    // Opened now, inside the click, so the browser does not block it.
+    const tab = window.open("", "_blank");
+    setBusy("whatsapp");
+    try {
+      const id = isSaved && editingRxId ? editingRxId : await persist();
+      const { blob, filename, whatsappLink } = await downloadPrescriptionPDF(id);
+      saveBlob(blob, filename);
+      if (whatsappLink && tab) {
+        tab.opener = null;
+        tab.location.href = whatsappLink;
+        toast(`${filename} downloaded. Attach it in the WhatsApp chat.`);
+      } else {
+        tab?.close();
+        toast.error("PDF downloaded, but WhatsApp could not be opened. Send the file from WhatsApp.");
+      }
+    } catch (err) {
+      tab?.close();
+      toast.error(err instanceof Error ? err.message : "Could not prepare the WhatsApp message.");
     } finally {
       setBusy(null);
     }
@@ -435,6 +477,15 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
             {busy === "pdf" ? "Preparing PDF..." : isSaved ? "Download PDF" : "Save & download PDF"}
           </button>
         </div>
+        <button
+          type="button"
+          onClick={handleWhatsApp}
+          disabled={busy !== null || prescription.length === 0}
+          className="mt-2 flex h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-grove/40 bg-card text-sm font-semibold text-grove transition-colors hover:bg-grove-wash disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy === "whatsapp" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+          {busy === "whatsapp" ? "Preparing..." : "Send on WhatsApp"}
+        </button>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Exercise, ExercisePhoto, Patient, PhotoAngle, SavedPrescription } from "@/types/exercise";
+import { Exercise, ExercisePhoto, Patient, PhotoAngle, RxMode, SavedPrescription, Side } from "@/types/exercise";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const API = `${BASE_URL}/api/v1`;
@@ -221,6 +221,8 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
     categoryIds: Array.isArray(be.categories)
       ? be.categories.filter((c) => c && typeof c.id === "string").map((c) => c.id as string)
       : [],
+    rxMode: be.rx_mode === "BLOCKED" || be.rx_mode === "CAREGIVER" ? (be.rx_mode as RxMode) : "PATIENT",
+    requiresSide: be.requires_side === true,
   };
 }
 
@@ -301,6 +303,8 @@ export interface CategoryValue {
   name: string;
   /** Exercises the clinic can see (its own and global) that carry it. */
   count: number;
+  /** Category values only: the domain it belongs to (EL-D-012). */
+  parent_id?: string;
 }
 
 export interface CategoryGroup {
@@ -348,6 +352,7 @@ export interface PrescriptionItemPayload {
   hold: number;
   frequency: string;
   note?: string;
+  side?: Side;
 }
 
 export async function fetchPrescriptions(patientId: string): Promise<SavedPrescription[]> {
@@ -398,13 +403,35 @@ function filenameFrom(disposition: string | null): string | null {
  * Build the PDF on the server, then fetch it with the session (the download
  * endpoint needs auth, so a plain link cannot be used).
  */
-export async function downloadPrescriptionPDF(id: string): Promise<{ blob: Blob; filename: string }> {
-  const meta = await json<{ filename?: string }>(`/prescriptions/${id}/pdf`, { method: "POST" });
+export async function downloadPrescriptionPDF(
+  id: string
+): Promise<{ blob: Blob; filename: string; whatsappLink: string }> {
+  const meta = await json<{ filename?: string; whatsapp_link?: string }>(`/prescriptions/${id}/pdf`, {
+    method: "POST",
+  });
   const response = await request(`/prescriptions/${id}/pdf/download`);
   const blob = await response.blob();
   const filename =
     filenameFrom(response.headers.get("Content-Disposition")) || meta?.filename || "Prescription.pdf";
-  return { blob, filename };
+  return { blob, filename, whatsappLink: whatsAppLink(meta?.whatsapp_link) };
+}
+
+/**
+ * wa.me link for the prescription message (EL-3). The backend builds it from
+ * the patient's phone with no public link in the text (L-4). Without a usable
+ * number (only "91" left) WhatsApp opens its contact picker instead.
+ */
+export function whatsAppLink(raw: string | undefined): string {
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.hostname !== "wa.me") return "";
+    const digits = url.pathname.replace(/\D/g, "");
+    if (digits.length < 12) return `https://wa.me/${url.search}`;
+    return url.toString();
+  } catch {
+    return "";
+  }
 }
 
 /** Save a blob under a file name (direct download, no new tab). */

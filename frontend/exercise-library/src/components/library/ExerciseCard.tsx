@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Exercise } from "@/types/exercise";
-import { Camera, Check, Tags, ImageOff, Lock, Maximize2, Play, Plus } from "lucide-react";
+import { Camera, Check, Tags, ImageOff, Lock, Maximize2, Play, Plus, ShieldAlert, Users } from "lucide-react";
 import { ImageViewer } from "@/components/library/ImageViewer";
 import { cn } from "@/lib/utils";
 import { useExercisePhoto } from "@/lib/exercisePhotos";
@@ -95,6 +95,21 @@ export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos, onEditCat
                   Clinic photo{photoCount > 1 ? "s" : ""}
                 </span>
               )}
+              {exercise.rxMode === "BLOCKED" && (
+                <span
+                  title="Done by the therapist in the clinic. It cannot go on a home prescription."
+                  className="inline-flex items-center gap-1 rounded-md bg-danger-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-danger"
+                >
+                  <ShieldAlert className="h-2.5 w-2.5" />
+                  Therapist only
+                </span>
+              )}
+              {exercise.rxMode === "CAREGIVER" && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-info-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-info">
+                  <Users className="h-2.5 w-2.5" />
+                  Caregiver-assisted
+                </span>
+              )}
               {!exercise.isFree && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-warn-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-warn">
                   <Lock className="h-2.5 w-2.5" />
@@ -127,6 +142,14 @@ export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos, onEditCat
               <Camera className="h-4 w-4" />
             </button>
           )}
+          {exercise.rxMode === "BLOCKED" ? (
+            <span
+              title="Therapist-applied or supervised in clinic. Not for home programmes."
+              className="flex h-9 shrink-0 cursor-not-allowed items-center rounded-[10px] border border-line px-3 text-[12px] font-semibold text-muted-foreground"
+            >
+              Not for home
+            </span>
+          ) : (
           <button
             type="button"
             disabled={isAdded}
@@ -142,6 +165,7 @@ export function ExerciseCard({ exercise, isAdded, onAdd, onEditPhotos, onEditCat
             {isAdded ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {isAdded ? "Added" : "Add"}
           </button>
+          )}
           </div>
         </div>
         {exercise.instructions && (

@@ -289,8 +289,14 @@ VALUES: dict[str, tuple[str, ...]] = {
 }
 
 GROUP_KEYS: tuple[str, ...] = tuple(key for key, _ in GROUPS)
-GROUP_LABELS: dict[str, str] = dict(GROUPS)
-GROUP_RANK: dict[str, int] = {key: i for i, key in enumerate(GROUP_KEYS)}
+
+# Panel order: the structure groups (Domain, Category; EL-D-012, seeded by
+# revision e7c3a9f1b5d2, see exercise_structure.py) come first, then the
+# EL-D-005 groups above. Kept as a literal so this module does not import
+# exercise_structure (which imports CATEGORY_NAMESPACE from here).
+PANEL_GROUPS: tuple[tuple[str, str], ...] = (("domain", "Domain"), ("category", "Category")) + GROUPS
+GROUP_LABELS: dict[str, str] = dict(PANEL_GROUPS)
+GROUP_RANK: dict[str, int] = {key: i for i, (key, _) in enumerate(PANEL_GROUPS)}
 
 
 def category_id(group_key: str, name: str) -> uuid.UUID:
