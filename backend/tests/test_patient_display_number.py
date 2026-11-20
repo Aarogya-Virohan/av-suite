@@ -102,8 +102,13 @@ async def test_booking_approval_uses_next_clinic_display_number(db_session):
     clinic = Clinic(name=f"Booking approval {uuid.uuid4()}")
     db_session.add(clinic)
     await db_session.flush()
-    therapist = (await db_session.execute(select(User).where(User.role == "therapist").limit(1))).scalar_one()
     # AUD-06: approve needs a therapist who is a member of this clinic
+    therapist = User(
+        clinic_id=clinic.id, email=f"bk-{uuid.uuid4()}@avtest.com", password_hash="x",
+        role="therapist", first_name="Bk", last_name="Therapist", is_active=True,
+    )
+    db_session.add(therapist)
+    await db_session.flush()
     db_session.add(Membership(user_id=therapist.id, clinic_id=clinic.id, role="therapist"))
     for index in range(2):
         await create_patient(
