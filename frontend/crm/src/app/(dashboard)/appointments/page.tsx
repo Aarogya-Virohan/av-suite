@@ -27,6 +27,7 @@ import { Avatar, Badge, type BadgeTone, Button, Card, PageHeader, SegmentGroup, 
 import { cn } from '../../../lib/cn';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { localToday } from '../../../lib/datetime';
+import { BASE_PATH } from '../../../lib/hub';
 
 const dayTitle = new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 const isDateParam = (v: string | null): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(`${v}T00:00:00`).getTime());
@@ -152,7 +153,7 @@ function AppointmentsPageContent() {
   const [bookingUrl, setBookingUrl] = useState<string | null>(null);
   React.useEffect(() => {
     if (bookingKey && typeof window !== 'undefined') {
-      setBookingUrl(`${window.location.origin}/booking/${encodeURIComponent(bookingKey)}`);
+      setBookingUrl(`${window.location.origin}${BASE_PATH}/booking/${encodeURIComponent(bookingKey)}`);
     }
   }, [bookingKey]);
   const [showQr, setShowQr] = useState(false);

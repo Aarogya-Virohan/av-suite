@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 
 import ReauthDialog from "@/components/auth/ReauthDialog"
 import { ApiError, clearSession, fetchMe, getToken, setReauthHandler, type Me } from "@/lib/api"
+import { BASE_PATH, redirectToHubLogin } from "@/lib/hub"
 
 interface Session {
   me: Me
@@ -27,7 +28,8 @@ export function safeNext(value: string | null): string {
 }
 
 function loginUrl(extra: string) {
-  const here = `${window.location.pathname}${window.location.search}`
+  // router adds the base path itself, so strip it from "next".
+  const here = `${window.location.pathname.slice(BASE_PATH.length) || "/"}${window.location.search}`
   return `/login?${extra}next=${encodeURIComponent(here)}`
 }
 
@@ -54,7 +56,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!getToken()) {
-      router.replace(loginUrl(""))
+      if (!redirectToHubLogin()) router.replace(loginUrl(""))
       return
     }
     let active = true
@@ -66,7 +68,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         if (!active) return
         if (err instanceof ApiError && err.status === 401) {
           clearSession()
-          router.replace(loginUrl("expired=1&"))
+          if (!redirectToHubLogin({ expired: true })) router.replace(loginUrl("expired=1&"))
           return
         }
         setState({
@@ -103,7 +105,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(() => {
     clearSession()
-    router.replace("/login")
+    if (!redirectToHubLogin({ keepNext: false })) router.replace("/login")
   }, [router])
 
   if (state.kind === "checking") {

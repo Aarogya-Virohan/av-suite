@@ -4,6 +4,7 @@ import SynthesisPanel from "./SynthesisPanel"
 import SignaturePanel from "./SignaturePanel"
 
 import { PostureReport } from "@/types/posture"
+import { asset } from "@/lib/hub"
 
 interface Props {
   data: PostureReport
@@ -17,7 +18,7 @@ function PoweredBy() {
     <div className="border-t border-[#E3DCCB] pt-4 text-center">
       <p className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[11px] uppercase tracking-[0.1em]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/av_mark.png" alt="" aria-hidden="true" className="mr-0.5 h-4 w-auto" />
+        <img src={asset("/brand/av_mark.png")} alt="" aria-hidden="true" className="mr-0.5 h-4 w-auto" />
         <span className="whitespace-nowrap">
           <span className="font-bold text-[#5D6380]">Powered by </span>
           <span className="font-bold text-[#0B1238]">Aarogya Virohan</span>
@@ -46,7 +47,10 @@ export default function ReportCard({
           carries it (one centred mark appeared only in the middle). The
           fade is baked into the PNG. Decorative, so it is a background,
           invisible to screen readers. */}
-      <div className="relative bg-[url('/brand/av_watermark_tile.png')] bg-[length:320px_auto] bg-repeat px-4 py-6 sm:px-10 sm:py-8">
+      <div
+        className="relative bg-[length:320px_auto] bg-repeat px-4 py-6 sm:px-10 sm:py-8"
+        style={{ backgroundImage: `url('${asset("/brand/av_watermark_tile.png")}')` }}
+      >
 
         <div className="relative space-y-10">
 

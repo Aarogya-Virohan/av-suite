@@ -14,6 +14,7 @@ import AuthGate, { useSession } from "@/components/auth/AuthGate"
 import { detectLandmarks, downloadPostureReportPdf, generateReport } from "@/lib/api"
 
 import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@/types/posture"
+import { asset, toolUrl } from "@/lib/hub"
 
 // "review" is the founders' landmark check (Q6, 10 October 2026): no report
 // exists until the clinician has confirmed the points.
@@ -33,6 +34,7 @@ const STEP_ORDER: { key: Step; label: string }[] = [
 function Header({ step }: { step: Step }) {
   const current = STEP_ORDER.findIndex((s) => s.key === step)
   const { me, signOut } = useSession()
+  const crmUrl = toolUrl("crm")
   const leave = () => {
     if (step !== "upload" && !window.confirm("Sign out? This assessment will be lost.")) return
     signOut()
@@ -41,11 +43,16 @@ function Header({ step }: { step: Step }) {
     <header className="bg-[linear-gradient(115deg,#0B1238_0%,#121F4A_60%,#1B4A54_100%)] text-white">
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/av_logo_wordmark_white.png" alt="Aarogya Virohan" className="h-6 w-auto" />
+        <img src={asset("/brand/av_logo_wordmark_white.png")} alt="Aarogya Virohan" className="h-6 w-auto" />
         <span className="rounded-full bg-[#C1FF72] px-2.5 py-0.5 text-[11.5px] font-bold text-[#0B1238]">
           Posture Tool
         </span>
         <div className="ml-auto flex min-w-0 items-center gap-3 text-[12px] sm:order-last sm:ml-4">
+          {crmUrl && (
+            <a href={crmUrl} className="font-semibold text-[#C1FF72] underline-offset-2 hover:underline" data-testid="back-to-crm">
+              Back to CRM
+            </a>
+          )}
           <span className="max-w-[160px] truncate text-[#C3C9E6]" title={me.user.email}>
             {me.clinic?.name ?? me.user.email}
           </span>

@@ -1,4 +1,5 @@
 import { clearStoredToken, getStoredToken } from './auth';
+import { BASE_PATH, redirectToHubLogin } from './hub';
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
@@ -80,11 +81,14 @@ async function request<T>(
     const err = readError(res.status, body);
     if (res.status === 401 && init.auth !== false) {
       clearStoredToken();
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith(`${BASE_PATH}/login`)) {
         // A full page load on purpose: it also drops the React Query cache that holds the
         // previous session's patient data. This helper runs outside React, so useRouter is not available.
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.assign('/login');
+        // Hub mode: the common AV Suite login in the CRM (HUB-4).
+        if (!redirectToHubLogin({ expired: true })) {
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.assign(`${BASE_PATH}/login`);
+        }
       }
     }
     throw err;

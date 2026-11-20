@@ -3,11 +3,12 @@ import "@fontsource-variable/inter";
 import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { asset } from "@/lib/hub";
 
 export const metadata: Metadata = {
   title: "Exercise Library · AV Suite",
   description: "Exercise library and home programme prescriptions for physiotherapists",
-  icons: { icon: "/brand/av-logo-mark.png" },
+  icons: { icon: asset("/brand/av-logo-mark.png") },
 };
 
 export default function RootLayout({
