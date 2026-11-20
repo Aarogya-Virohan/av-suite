@@ -255,3 +255,11 @@ def test_credentials_file_is_private(tmp_path):
     clinic_setup.write_credentials(out, "s", {"a@t.in": "pw"})
     assert oct(out.stat().st_mode & 0o777) == "0o600"
     assert out.read_text() == "s\ta@t.in\tpw\n"
+
+
+def test_demo_phones_are_one_fixed_series():
+    from tests.seed import demo_phone
+
+    phones = [demo_phone(i) for i in range(30)] + [demo_phone(100 + j) for j in range(15)]
+    assert len(set(phones)) == 45
+    assert all(p.startswith("90000") and len(p) == 10 and p.isdigit() for p in phones)

@@ -16,6 +16,9 @@ staging fingerprint. The seed never truncates or touches other clinics:
 --reset deletes only the demo clinic (slug av-demo-physio) and the
 @physiodemo.in accounts that belong to no other clinic.
 
+Demo phones: one fixed series 90000 00000.. (leads 9000000000-29, patients
+9000000100-114), so testers can tell demo rows from real ones.
+
 Logins: every demo user has the same password, AV_SEED_PASSWORD if set,
 else a generated one printed at the end (demo accounts only).
 """
@@ -175,6 +178,11 @@ async def reset_demo() -> None:
     _print_clean(f"reset: demo clinic {DEMO_SLUG} {'deleted' if clinic_id else 'was not there'}")
 
 
+def demo_phone(n: int) -> str:
+    """One fixed fake series, 90000 00000 to 90000 00999: easy to spot as demo data."""
+    return f"90000{n:05d}"
+
+
 def ist(d: date, hh: int, mm: int = 0) -> datetime:
     return datetime.combine(d, time(hh, mm), tzinfo=IST)
 
@@ -258,7 +266,7 @@ async def seed(password: str) -> dict[str, int]:
             first, last = names[i]
             body = {
                 "name": f"{first} {last}",
-                "phone": f"9{rng.randint(100000000, 999999999)}",
+                "phone": demo_phone(i),
                 "email": f"{first.lower()}.{last.lower()}{i}@example.com" if i % 3 else None,
                 "source": sources[i % len(sources)],
                 "stage": "qualified" if stage == "convert" else stage,
@@ -284,7 +292,7 @@ async def seed(password: str) -> dict[str, int]:
                 json={
                     "first_name": first,
                     "last_name": last,
-                    "phone": f"9{rng.randint(100000000, 999999999)}",
+                    "phone": demo_phone(100 + j),
                     "gender": rng.choice(["male", "female"]),
                     "age": age,
                     "date_of_birth": date(today.year - age, rng.randint(1, 12), rng.randint(1, 28)).isoformat(),
