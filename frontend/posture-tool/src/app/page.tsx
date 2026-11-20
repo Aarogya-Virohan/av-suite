@@ -6,6 +6,7 @@ import type { CaptureLevel } from "@/lib/tilt"
 import UploadZone from "@/components/posture/UploadZone"
 
 import ReportCard from "@/components/report/ReportCard"
+import WhatsAppShare from "@/components/report/WhatsAppShare"
 
 import LandmarkReview from "@/components/review/LandmarkReview"
 
@@ -559,7 +560,7 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
               before the report had been read; only at the end, a phone
               user scrolled ten screens to reach them. */}
           <div className="no-print sticky bottom-0 z-20 -mx-4 border-t border-[#E3DCCB] bg-[#FFFDF7]/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border">
-            <div className="mx-auto flex max-w-4xl gap-2.5 sm:justify-end">
+            <div className="mx-auto flex max-w-4xl flex-wrap gap-2.5 sm:justify-end">
               <button
                 type="button"
                 onClick={resetAll}
@@ -567,6 +568,7 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
               >
                 New assessment
               </button>
+              <WhatsAppShare report={report} />
               <button
                 type="button"
                 disabled={pdfBusy}
