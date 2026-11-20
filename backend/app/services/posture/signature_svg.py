@@ -202,7 +202,8 @@ def render_signature_svg(
         # line name printed ragged (seen 17 Nov 2026).
         rows = [(line, LABEL_SIZE) for line in name_lines]
         if not measured:
-            rows.append(("not measured", LABEL_SIZE - 2))
+            note = "under review" if p.get("severity") == "under_review" else "not measured"
+            rows.append((note, LABEL_SIZE - 2))
         for k, (line, size) in enumerate(rows):
             parts.append(
                 f'<text x="{lx:.1f}" y="{y0 + k * LABEL_SIZE * 1.05:.1f}" font-size="{size}" '

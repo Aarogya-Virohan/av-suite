@@ -32,14 +32,16 @@ def test_every_report_row_has_a_range_and_a_source():
 
 
 def test_one_range_format_read_from_thresholds():
-    assert rr.screening_range("PT-L01") == f"≥ 50{DEG}"
+    # POS-4 (21 Nov): head position and shoulder level asymmetry print
+    # "Under review" until F-2 is answered.
+    assert rr.screening_range("PT-L01") == "Under review"
     assert rr.screening_range("PT-L05") == f"± 4{DEG}"
     assert rr.screening_range("PT-L06") == f"± 5{DEG}"
     assert rr.screening_range("PT-A01") == f"≤ 5{DEG}"
     assert rr.screening_range("PT-A04") == f"≤ 3{DEG}"
     assert rr.screening_range("PT-A05") == rr.screening_range("PT-A06") == f"≤ 5{DEG}"
     assert rr.screening_range("PT-P01") == "≤ 10 mm"
-    assert rr.screening_range("PT-P02") == "≤ 5 mm"
+    assert rr.screening_range("PT-P02") == "Under review"
 
 
 def test_range_follows_a_band_change(monkeypatch):
@@ -54,8 +56,8 @@ def test_shown_range_matches_the_grade_at_its_edges():
 
 
 def test_measurement_payload_carries_the_range():
-    m = measurement("PT-P02", "Shoulder Level Asymmetry", 9.2, "mm", "mild")
-    assert m["screeningRange"] == "≤ 5 mm"
+    m = measurement("PT-P01", "Trunk Lateral Shift", 9.2, "mm", "none")
+    assert m["screeningRange"] == "≤ 10 mm"
     assert measurement("PT-X99", "Unknown", 1.0, DEG, "none")["screeningRange"] == ""
 
 
@@ -70,7 +72,7 @@ def _report(**extra):
     views = {
         "side": {"measurements": [measurement("PT-L01", rr.LABELS["PT-L01"], 72.0, DEG, "none")]},
         "front": {"measurements": [measurement("PT-A04", "Pelvic Obliquity", 2.1, DEG, "none")]},
-        "back": {"measurements": [measurement("PT-P02", "Shoulder Level Asymmetry", 9.2, "mm", "mild")]},
+        "back": {"measurements": [measurement("PT-P01", "Trunk Lateral Shift", 12.0, "mm", "mild")]},
     }
     return {"patient": {"name": "Sample Patient"}, "views": views, **extra}
 
@@ -79,8 +81,8 @@ def test_pdf_has_the_normal_range_column_and_the_sources_section():
     html = build_report_html(_report())
     text = _visible(html)
     assert "<th>Normal range</th>" in html
-    assert '<td class="range">≤ 5 mm</td>' in _visible(html)
-    assert f'<td class="range">≥ 50{DEG}</td>' in _visible(html)
+    assert '<td class="range">≤ 10 mm</td>' in _visible(html)
+    assert '<td class="range">Under review</td>' in _visible(html)
     assert "Normal ranges: basis and sources" in html
     assert "AV screening range" not in text
     assert "Moharrami et al. 2023" in html and f"0 to 5.6{DEG}" in html
@@ -95,7 +97,7 @@ def test_pdf_range_comes_from_the_server_not_the_posted_report():
     report["views"]["back"]["measurements"][0]["screeningRange"] = "0 to 999 mm"
     html = build_report_html(report)
     assert "0 to 999 mm" not in html
-    assert '<td class="range">≤ 5 mm</td>' in _visible(html)
+    assert '<td class="range">≤ 10 mm</td>' in _visible(html)
 
 
 def test_moharrami_only_in_the_sources_section():
