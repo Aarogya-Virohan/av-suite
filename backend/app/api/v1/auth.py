@@ -34,6 +34,7 @@ from app.schemas.auth import (
 )
 from app.schemas.envelope import ResponseEnvelope
 from app.services import auth_service
+from app.services.clinic_status import ensure_clinic_active
 from app.models.membership import Membership
 import logging
 
@@ -278,6 +279,8 @@ async def switch_workspace(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a member of the requested workspace",
         )
+
+    await ensure_clinic_active(db, membership.clinic_id)
 
     token = create_access_token(
         subject=auth_context.user.id,

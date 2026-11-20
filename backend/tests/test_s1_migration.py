@@ -96,7 +96,7 @@ async def test_s1_empty_database_upgrade_downgrade_upgrade_and_single_head(
     db_name, database_url = await _create_test_database(admin_dsn)
     try:
         _run_alembic(database_url, "upgrade", "head")
-        _run_alembic(database_url, "downgrade", "-1")
+        _run_alembic(database_url, "downgrade", "6ab832834814")
         _run_alembic(database_url, "upgrade", "head")
         environment = os.environ.copy()
         environment.update(DEBUG="false", DATABASE_URL=database_url)
@@ -257,7 +257,7 @@ async def test_s1_backfill_on_alembic_schema_preserves_rows_and_creates_owners(
         finally:
             await connection.close()
 
-        _run_alembic(database_url, "downgrade", "-1")
+        _run_alembic(database_url, "downgrade", "6ab832834814")
         connection = await asyncpg.connect(database_url.replace("+asyncpg", ""))
         try:
             assert await connection.fetchval("SELECT count(*) FROM clinics") == before[
