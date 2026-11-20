@@ -10,7 +10,8 @@ database engine) is imported:
 3. The database is either local (localhost / 127.0.0.1 / ::1 / unix socket /
    local sqlite file) or a remote database whose fingerprint "user@host/db"
    - is NOT listed in PROD_DB_FINGERPRINTS below or in the env var
-     AV_PROD_DB_FINGERPRINTS (comma separated), and
+     AV_PROD_DB_FINGERPRINTS (comma separated), does NOT belong to a
+     production Supabase project ref (PROD_SUPABASE_REFS), and
    - equals AV_STAGING_DB_FINGERPRINT exactly (the operator types the
      staging fingerprint once, so a copied prod URL cannot slip through).
 
@@ -27,9 +28,15 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 # Known production databases, "user@host/db" (no passwords). A match is a hard
-# stop even if every other check passes. Add the prod Supabase pooler user
-# here (QUESTIONS FOR ONKAR, L0); AV_PROD_DB_FINGERPRINTS extends it at run time.
+# stop even if every other check passes. AV_PROD_DB_FINGERPRINTS extends it at
+# run time.
 PROD_DB_FINGERPRINTS: frozenset[str] = frozenset()
+
+# Production Supabase project refs (not secret: they are in every project URL).
+# Any database whose user ("postgres.<ref>", pooler) or host
+# ("db.<ref>.supabase.co", direct) carries one of these is refused, whatever
+# the pooler host or region. twijgohkslvkeqeyntkm = av-suite-sg (prod, 20 Nov).
+PROD_SUPABASE_REFS: frozenset[str] = frozenset({"twijgohkslvkeqeyntkm"})
 
 LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", ""})
 PROD_ENV_NAMES = ("prod", "production", "live")
@@ -142,6 +149,12 @@ def check_target(
     user_host = fingerprint.split("/", 1)[0]
     if fingerprint in blocked or user_host in {b.split("/", 1)[0] for b in blocked}:
         raise UnsafeTarget(f"{target.fingerprint} is a production database.")
+    refs = set(PROD_SUPABASE_REFS) | {
+        r.strip().lower() for r in env.get("AV_PROD_SUPABASE_REFS", "").split(",") if r.strip()
+    }
+    for ref in refs:
+        if target.user.lower().endswith(f".{ref}") or f"{ref}." in target.host or target.host == ref:
+            raise UnsafeTarget(f"{target.fingerprint} is the production Supabase project ({ref}).")
 
     if target.is_local:
         return target

@@ -119,6 +119,24 @@ def test_seed_has_no_production_mode():
         seed.main(["--staging", "--production"])
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"postgresql+asyncpg://postgres.twijgohkslvkeqeyntkm:pw@{POOLER}:5432/postgres",
+        "postgresql+asyncpg://postgres.twijgohkslvkeqeyntkm:pw@aws-1-ap-south-1.pooler.supabase.com:6543/postgres",
+        "postgresql+asyncpg://postgres:pw@db.twijgohkslvkeqeyntkm.supabase.co:5432/postgres",
+    ],
+)
+def test_prod_supabase_ref_is_refused_on_any_host(url):
+    target = parse_database_url(url)
+    with pytest.raises(UnsafeTarget, match="production Supabase project"):
+        check_target(
+            staging_flag=True,
+            environ=env(AV_STAGING_DB_FINGERPRINT=target.fingerprint),
+            database_url=url,
+        )
+
+
 def test_remote_sqlite_is_not_local():
     assert not parse_database_url("sqlite+aiosqlite://remote-host/test.db").is_local
 
