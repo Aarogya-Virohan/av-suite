@@ -121,7 +121,8 @@ class Exercise(Base, TimestampMixin):
 
     # How the exercise may go on a home prescription (EL-D-013, plan C1):
     # PATIENT (normal), CAREGIVER (prints "Caregiver-assisted"), BLOCKED
-    # (therapist-applied or supervised in clinic; never on a home Rx).
+    # (therapist-applied or supervised in clinic; never on a home Rx),
+    # HIDDEN (EL-D-017: kept for old Rx, never listed, searched or prescribed).
     rx_mode: Mapped[str] = mapped_column(
         String(16), nullable=False, default="PATIENT", server_default=text("'PATIENT'")
     )

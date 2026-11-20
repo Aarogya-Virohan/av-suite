@@ -94,7 +94,7 @@ async def test_new_rows_and_prod_rows_are_consistent() -> None:
     assert max(titles.values()) == 1
     assert [r[1] for r in data.NEW if r[6]] == ["BAL-FAC-01072-v1"]
     modes = Counter(r[5] for r in data.NEW)
-    assert modes["CAREGIVER"] == 45 and modes["BLOCKED"] >= 203
+    assert modes["CAREGIVER"] == 45 and modes["BLOCKED"] == 208
     prod_ids = [r[0] for r in data.PROD]
     assert len(prod_ids) == len(set(prod_ids)) == 1467
     assert not set(prod_ids) & set(ids)
@@ -287,3 +287,59 @@ async def test_pdf_side_caregiver_and_stop_pain_line() -> None:
     assert SAFETY_NOTE in out
     # Only the brief description prints.
     assert out.count("Sit on the bed.") == 3
+
+
+# ------------------------------------------------------------------ Migration B (EL-D-016 / EL-D-017)
+
+DESC = ROOT / "alembic" / "data" / "el_descriptions_20nov.py"
+
+
+async def test_migration_b_data_qa() -> None:
+    import re
+
+    b = _load(DESC, "el_desc")
+    a = _load(DATA, "el_data3")
+    mode = {r[0]: r[5] for r in a.NEW}
+    global_ids = {r[0] for r in a.PROD} | set(mode)
+    ids = [r[0] for r in b.DESCRIPTIONS]
+    assert len(ids) == len(set(ids)) == 2863 and set(ids) <= global_ids
+    for ex_id, text, _old in b.DESCRIPTIONS:
+        n = len(re.findall(r"[A-Za-z0-9'’-]+", text))
+        assert 0 < n <= 30, (ex_id, n)
+        assert "prescribed" not in text.lower()
+        if mode.get(ex_id, "PATIENT") == "PATIENT":
+            assert not re.search(r"\bthe therapist\b", text, re.I), ex_id
+    assert len(b.HIDDEN) == 73 and set(b.HIDDEN) <= {r[0] for r in a.PROD}
+    assert b.TITLE_FIX[1] == "Neck side-bend isometric (right)"
+    assert len(b.BLOCKED) == 2 and {r[1] for r in a.NEW if r[0] in b.BLOCKED} == {
+        "RES-THO-01340-v1", "RES-THO-01341-v1"}
+    # every SR24 / Kapalbhati row is BLOCKED already in revision A
+    assert next(r[5] for r in a.NEW if r[1] == "MBP-THO-01655-v1") == "BLOCKED"
+
+
+async def test_hidden_not_listed_searched_counted_or_prescribed(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await _seed_structure(db_session)
+    _c, patient, headers = await _clinic(db_session)
+    tag = uuid.uuid4().hex[:5]
+    shown = await _ex(db_session, f"Prone press-up {tag}")
+    hidden = await _ex(db_session, f"Prone press-up {tag} (seated)", "HIDDEN")
+    cid = st.structure_id("category", "Range of motion")
+    for ex in (shown, hidden):
+        await db_session.execute(exercise_category_links.insert().values(exercise_id=ex, category_id=cid))
+    await db_session.commit()
+
+    r = await client.get(f"{API}/exercises", headers=headers, params={"search": tag, "page_size": 50})
+    assert [e["id"] for e in r.json()["data"]] == [str(shown)]
+    r = await client.get(f"{API}/exercises/categories", headers=headers)
+    rom = next(v for g in r.json()["data"] if g["key"] == "category" for v in g["values"] if v["id"] == str(cid))
+    assert rom["count"] == 1
+    r = await client.post(
+        f"{API}/prescriptions", headers=headers,
+        json={"patient_id": str(patient), "items": [{"exercise_id": str(hidden)}]},
+    )
+    assert r.status_code == 422 and "no longer offered" in r.text
+    # still readable by id (old prescriptions and templates point at it)
+    r = await client.get(f"{API}/exercises/{hidden}", headers=headers)
+    assert r.status_code == 200 and r.json()["data"]["rx_mode"] == "HIDDEN"

@@ -221,7 +221,10 @@ export function mapBackendExerciseToFrontend(be: Record<string, unknown>): Exerc
     categoryIds: Array.isArray(be.categories)
       ? be.categories.filter((c) => c && typeof c.id === "string").map((c) => c.id as string)
       : [],
-    rxMode: be.rx_mode === "BLOCKED" || be.rx_mode === "CAREGIVER" ? (be.rx_mode as RxMode) : "PATIENT",
+    rxMode:
+      be.rx_mode === "BLOCKED" || be.rx_mode === "CAREGIVER" || be.rx_mode === "HIDDEN"
+        ? (be.rx_mode as RxMode)
+        : "PATIENT",
     requiresSide: be.requires_side === true,
   };
 }

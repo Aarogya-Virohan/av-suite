@@ -128,7 +128,8 @@ async def list_with_counts(db: AsyncSession, clinic_id: str) -> list[dict]:
     can see (its own and global) carry each value. Counts do not depend on
     the filters picked."""
     visible = select(Exercise.id).where(
-        or_(Exercise.clinic_id == uuid.UUID(str(clinic_id)), Exercise.clinic_id.is_(None))
+        or_(Exercise.clinic_id == uuid.UUID(str(clinic_id)), Exercise.clinic_id.is_(None)),
+        Exercise.rx_mode != "HIDDEN",  # EL-D-017
     )
     counts_q = (
         select(exercise_category_links.c.category_id, func.count())

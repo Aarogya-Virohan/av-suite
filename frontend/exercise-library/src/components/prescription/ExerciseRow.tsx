@@ -38,6 +38,11 @@ export function ExerciseRow({ index, item, onChange, onRemove, noteSuggestions }
                 Therapist only: remove
               </span>
             )}
+            {item.exercise.rxMode === "HIDDEN" && (
+              <span className="ml-2 rounded-md bg-danger-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-danger">
+                No longer offered: remove
+              </span>
+            )}
             {item.exercise.rxMode === "CAREGIVER" && (
               <span className="ml-2 rounded-md bg-info-wash px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-info">
                 Caregiver-assisted

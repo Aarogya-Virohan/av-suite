@@ -86,7 +86,10 @@ def seed_rows() -> list[tuple[uuid.UUID, str, str, int]]:
 RX_PATIENT = "PATIENT"
 RX_CAREGIVER = "CAREGIVER"
 RX_BLOCKED = "BLOCKED"
-RX_MODES = (RX_PATIENT, RX_CAREGIVER, RX_BLOCKED)
+# Not listed, not searchable, not prescribable; the row stays for old Rx and
+# templates (EL-D-017: "(seated)" copies that cannot be done seated).
+RX_HIDDEN = "HIDDEN"
+RX_MODES = (RX_PATIENT, RX_CAREGIVER, RX_BLOCKED, RX_HIDDEN)
 
 SIDES = ("left", "right")
 

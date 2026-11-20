@@ -23,7 +23,8 @@ export interface Exercise {
   requiresSide?: boolean;
 }
 
-export type RxMode = "PATIENT" | "CAREGIVER" | "BLOCKED";
+/** HIDDEN (EL-D-017): never listed; can still arrive from an old Rx or template. */
+export type RxMode = "PATIENT" | "CAREGIVER" | "BLOCKED" | "HIDDEN";
 export type Side = "left" | "right";
 
 export type PhotoAngle = "front" | "side";

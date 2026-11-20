@@ -200,6 +200,11 @@ export function PrescriptionBuilder({ prescription, onChange, onRemove, onReplac
       toast.error(`Remove ${blocked.map((i) => i.exercise.name).join(", ")}: therapist only, not for a home prescription.`);
       return false;
     }
+    const gone = prescription.filter((i) => i.exercise.rxMode === "HIDDEN");
+    if (gone.length) {
+      toast.error(`Remove ${gone.map((i) => i.exercise.name).join(", ")}: no longer offered.`);
+      return false;
+    }
     const noSide = prescription.filter((i) => i.exercise.requiresSide && !i.side);
     if (noSide.length) {
       toast.error(`Choose the affected side for ${noSide.map((i) => i.exercise.name).join(", ")}.`);

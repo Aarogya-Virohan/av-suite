@@ -239,8 +239,23 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 - **Context**: EL-4; Onkar 20 Nov 06:18: every exercise gets a description, written by four separate chats (D1-D3 on the prod export, D4 on the bank).
 - **Decision**:
   - In `e7c3a9f1b5d2`: the 8 Blogspot picture links are cleared (downgrade puts them back); the neck isometric row saved under "Other" gets body part "Neck".
-  - Migration B (Sat 21 Nov) loads the descriptions by id with `backend/alembic/data/build_el_descriptions.py`: refuses more than 30 words or "prescribed", skips EDIT-SUGGEST rows (clinic text) and test-clinic rows, D1-D3 wins over D4 for a matched row. The neck isometric row gets D2's title. Test-clinic rows are ON-7, not here.
+  - Migration B (built 20 Nov, EL-D-017) loads the descriptions by id with `backend/alembic/data/build_el_descriptions.py`: refuses more than 30 words or "prescribed", skips EDIT-SUGGEST rows (clinic text) and test-clinic rows, D1-D3 wins over D4 for a matched row. The neck isometric row gets D2's title. Test-clinic rows are ON-7, not here.
 - **Affected Files**: `backend/alembic/data/build_el_descriptions.py`, `backend/tests/test_el_descriptions_builder.py`
+
+---
+
+## [EL-D-017] Migration B: D1-D4 descriptions, HIDDEN "(seated)" copies, neck row rename
+
+- **Date**: 2026-11-20
+- **Context**: D1-D4 delivered 20 Nov morning (3,131 rows), so Migration B moved from Saturday to the same day. Onkar decisions 20 Nov 10:30.
+- **Decision**:
+  - Revision `f3b9d1e5a7c4` (after `e7c3a9f1b5d2`), data frozen in `backend/alembic/data/el_descriptions_20nov.py`, built by `build_el_migration_b.py`: 2,863 global exercises get a description (max 30 words, no "prescribed", no "the therapist" in PATIENT rows). A row is written only while it still has its 20 Nov value; test-clinic rows untouched (ON-7).
+  - desc_p0 (169 rows) is pinned by `desc_p0_mapped.csv`: where a D chat matched it to another row, the mapped row gets its text; a "(seated)/(supported)" copy of the same exercise keeps it; another exercise takes its bank row's D4 text or, with none, stays empty and is listed (6 rows). Running and agility prod rows with a bank match take the D4 text.
+  - New `rx_mode` value HIDDEN: not in the library list, search, filter counts or body-part list, and refused on an Rx (422); still readable by id for old prescriptions and templates. 73 "(seated)" copies that cannot be done seated are HIDDEN (no delete, no rename). The whole "(seated)" family and the duplicate pairs join C11 (in review).
+  - Head-down postural drainage (RES-THO-01340, 01341) BLOCKED; all 5 SR24 rows (incl. Kapalbhati) were already BLOCKED in `e7c3a9f1b5d2`.
+  - Row 660 renamed "Neck side-bend isometric (right)" (the posture condition list keeps both names); "Hamstring stretch standing (supported)" body part Legs.
+- **Rollback**: `alembic downgrade e7c3a9f1b5d2` puts descriptions, modes, title and body part back.
+- **Affected Files**: `backend/alembic/versions/f3b9d1e5a7c4_*.py`, `backend/alembic/data/el_descriptions_20nov.py`, `build_el_migration_b.py`, `app/repositories/exercise.py`, `exercise_category_service.py`, `exercise_structure.py`, `rx_rules.py`, `app/api/v1/exercises.py`, EL frontend types / builder / row
 
 ---
 
@@ -267,4 +282,4 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-17 | Titles of the 1,404 new rows are the bank's patient-friendly names, some with two brackets (e.g. "Epley manoeuvre (posterior canal) (edge of bed)") | Open; tidy with the description round if founders want shorter names | Us |
 | EL-L-18 | Bank rows are AI drafts with no clinical sign-off ("Draft - awaiting clinical review"). Supervised in-bed basics (ankle pumps in bed, heel slides in bed) are BLOCKED by rule C1 while the prod versions stay PATIENT | Open; founders' review | Founders |
 
-*Last updated: 2026-11-20 (EL-D-012..EL-D-016, EL-L-17, EL-L-18) | Branch: feat/el-structure*
+*Last updated: 2026-11-20 (EL-D-012..EL-D-017, EL-L-17, EL-L-18) | Branch: feat/el-structure*
