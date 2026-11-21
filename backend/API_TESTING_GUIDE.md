@@ -28,7 +28,7 @@
 cd /home/tarun/projects/av-suite/backend
 
 # Start development server
-python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --no-proxy-headers
 ```
 
 **Expected Output:**
@@ -732,7 +732,7 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
 ps aux | grep uvicorn
 
 # If not running, start it
-python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --no-proxy-headers
 ```
 
 ---

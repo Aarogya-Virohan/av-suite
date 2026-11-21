@@ -81,7 +81,7 @@
 5. **Restart the application with the previous code version**
    ```bash
    git stash  # or git checkout <previous-commit>
-   uvicorn app.main:app --reload
+   uvicorn app.main:app --reload --no-proxy-headers
    ```
 
 #### Verification After Rollback
@@ -193,7 +193,7 @@
 2. **Restart the application**
    ```bash
    pkill -f uvicorn
-   uvicorn app.main:app --reload
+   uvicorn app.main:app --reload --no-proxy-headers
    ```
 
 #### Verification After Rollback

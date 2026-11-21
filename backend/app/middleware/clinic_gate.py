@@ -27,6 +27,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 PUBLIC_PATH_PREFIXES = (
+    f"{settings.API_V1_PREFIX}/platform/",
     f"{settings.API_V1_PREFIX}/auth",
     f"{settings.API_V1_PREFIX}/booking/branding",
     f"{settings.API_V1_PREFIX}/booking/request",
@@ -101,6 +102,26 @@ class ClinicGateMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         logger.debug(f"Middleware processing request: {request.method} {path}")
         
+        # Platform paths are exempt from clinic auth, but a supplied clinic token must
+        # never be silently accepted by a public platform authentication endpoint.
+        platform_prefix = f"{settings.API_V1_PREFIX}/platform/"
+        supplied_auth = request.headers.get("Authorization")
+        if path.startswith(platform_prefix) and supplied_auth:
+            try:
+                if not supplied_auth.startswith("Bearer "):
+                    raise InvalidTokenError("Invalid bearer token")
+                jwt.decode(
+                    supplied_auth.split(" ", 1)[1],
+                    settings.JWT_SECRET_KEY,
+                    algorithms=[settings.JWT_ALGORITHM],
+                    audience="av-platform",
+                )
+            except PyJWTError:
+                return JSONResponse(status_code=401, content={
+                    "data": None,
+                    "meta": {"error": {"code": "UNAUTHORIZED", "message": "Invalid token"}},
+                })
+
         # Skip public endpoints
         # PUBLIC_PATH_PREFIXES endpoints ko middleware bypass karte hain (no token needed)
         # Authentication aur public booking endpoints publicly accessible

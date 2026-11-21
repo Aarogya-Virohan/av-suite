@@ -15,10 +15,45 @@ print(settings.JWT_EXPIRE_MINUTES)
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, ValidationInfo, field_validator
+import ipaddress
+import re
 from typing import List
 import logging
+import base64
 
 logger = logging.getLogger(__name__)
+_TEST_JWT_SECRET = "c1f230d789abcec1f230d789abcec1f230d789abcec1f230d789abcec1f230d7"
+_TEST_PLATFORM_MFA_KEY = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+_JWT_PLACEHOLDERS = {"secret", "changeme", "change_me", "password", "your_secret_key", "test-secret-key"}
+
+
+def _is_predictable_hex_secret(value: str) -> bool:
+    lowered = value.lower()
+    if len(set(lowered)) == 1 or lowered in _JWT_PLACEHOLDERS:
+        return True
+    if lowered == lowered[0] * len(lowered):
+        return True
+    if len(lowered) >= 8 and (lowered == (lowered[:8] * (len(lowered) // 8 + 1))[:len(lowered)]):
+        return True
+    ascending = "0123456789abcdef"
+    descending = ascending[::-1]
+    doubled = ascending * 2
+    ascend_then_descend = ascending * 3 + descending
+    if any(
+        lowered in (sequence * 5)
+        for sequence in (ascending, descending, doubled, ascend_then_descend)
+    ):
+        return True
+    return False
+
+
+def _has_patterned_bytes(value: bytes) -> bool:
+    if len(set(value)) == 1:
+        return True
+    if value == bytes(range(32)) or value == bytes(range(32, 0, -1)):
+        return True
+    return any(value == value[:size] * (len(value) // size) + value[:len(value) % size] for size in range(1, 9))
 
 
 class Settings(BaseSettings):
@@ -54,16 +89,14 @@ class Settings(BaseSettings):
     # Multiple origins comma-separated format mein define ho sakte hain (e.g. via .env)
     # Security important: only trusted origins ko allow karo
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+
+    # Comma-separated trusted reverse-proxy IPs/CIDRs. Empty means no proxy
+    # headers are trusted and request.client.host is always used.
+    TRUSTED_PROXY_IPS: str = ""
     
     # Cloudflare Turnstile Configuration (Optional)
     TURNSTILE_SECRET_KEY: str | None = None
 
-    # Tool 03 public screener rate limiting. Name of a request header that
-    # the edge proxy always overwrites with the real client IP (on Railway:
-    # X-Real-IP). Unset means request.client.host, which uvicorn derives from
-    # X-Forwarded-For because the Dockerfile runs it with --proxy-headers.
-    SCREENER_CLIENT_IP_HEADER: str | None = None
-    
     # Database Configuration
     # DATABASE_URL: PostgreSQL async connection string
     # Format: postgresql+asyncpg://user.project:password@host:port/database
@@ -86,6 +119,9 @@ class Settings(BaseSettings):
     # 15 = 15 minutes (default for short-lived access tokens)
     # Shorter period = better security, longer period = better UX
     JWT_EXPIRE_MINUTES: int = 15
+
+    PLATFORM_JWT_EXPIRE_MINUTES: int = Field(default=480, gt=0)
+    PLATFORM_MFA_KEY: str
     
     # Redis Configuration (Optional)
     # Redis caching aur session management ke liye use hota hai
@@ -104,7 +140,59 @@ class Settings(BaseSettings):
         env_file=".env",                # .env file se load karo
         env_file_encoding="utf-8",      # UTF-8 encoding taaki unicode handle ho
         extra="ignore",                 # Extra env vars ko ignore karo (strict mode)
+        hide_input_in_errors=True,
     )
+
+    @field_validator("JWT_SECRET_KEY")
+    @classmethod
+    def validate_jwt_secret(cls, value: str, info: ValidationInfo) -> str:
+        normalized = value.strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", normalized):
+            raise ValueError("JWT_SECRET_KEY must be exactly 32 bytes encoded as hexadecimal")
+        if _is_predictable_hex_secret(normalized):
+            raise ValueError("JWT_SECRET_KEY must not be a placeholder or obvious pattern")
+        if info.data.get("ENVIRONMENT", "development").lower() == "production" and normalized == _TEST_JWT_SECRET:
+            raise ValueError("JWT_SECRET_KEY must be generated specifically for production")
+        return value
+
+    @field_validator("PLATFORM_MFA_KEY")
+    @classmethod
+    def validate_platform_mfa_key(cls, value: str, info: ValidationInfo) -> str:
+        from cryptography.fernet import Fernet, InvalidToken
+
+        try:
+            Fernet(value.encode("ascii"))
+            decoded_key = base64.urlsafe_b64decode(value.encode("ascii"))
+            is_test_key = value == _TEST_PLATFORM_MFA_KEY
+            if len(decoded_key) != 32 or (_has_patterned_bytes(decoded_key) and not is_test_key):
+                raise ValueError("patterned Fernet key")
+        except (ValueError, UnicodeEncodeError, InvalidToken) as exc:
+            raise ValueError("PLATFORM_MFA_KEY must be a valid Fernet key from Fernet.generate_key()") from exc
+        # The CI key is deliberately fixed for reproducible tests and must never be used in production.
+        if info.data.get("ENVIRONMENT", "development").lower() == "production" and value == _TEST_PLATFORM_MFA_KEY:
+            raise ValueError("PLATFORM_MFA_KEY must be generated specifically for production")
+        return value
+
+    @field_validator("CORS_ORIGINS")
+    @classmethod
+    def validate_cors_origins(cls, value: str) -> str:
+        origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+        if not origins or "*" in origins:
+            raise ValueError("CORS_ORIGINS must contain explicit origins; wildcard origins are not allowed")
+        return value
+
+    @field_validator("TRUSTED_PROXY_IPS")
+    @classmethod
+    def validate_trusted_proxy_ips(cls, value: str) -> str:
+        for proxy in (item.strip() for item in value.split(",")):
+            if proxy:
+                try:
+                    ipaddress.ip_network(proxy, strict=False)
+                except ValueError as exc:
+                    raise ValueError(
+                        "TRUSTED_PROXY_IPS must be comma-separated IP addresses or CIDR ranges"
+                    ) from exc
+        return value
 
     @property
     def cors_origins_list(self) -> List[str]:

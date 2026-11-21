@@ -104,7 +104,7 @@ app/
 **File**: [`backend/app/main.py`](file:///home/Dont_Fucking_Quit/av-suite/backend/app/main.py)
 
 ```
-uvicorn app.main:app                  ← PROCESS ENTRY POINT
+uvicorn app.main:app --no-proxy-headers ← PROCESS ENTRY POINT
 
 main.py execution order (module load):
   1. FastAPI() instance created

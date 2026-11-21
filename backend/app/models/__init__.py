@@ -91,4 +91,9 @@ __all__ = [
     "PsychosocialConsentRequest",
     "PsychosocialSharedReport",
     "ClinicFeeItem",
+    "PlatformOperator",
+    "PlatformAuditLog",
+    "PlatformAuthRateLimit",
 ]
+
+from app.models.platform import PlatformOperator, PlatformAuditLog, PlatformAuthRateLimit
