@@ -187,28 +187,56 @@ def ist(d: date, hh: int, mm: int = 0) -> datetime:
     return datetime.combine(d, time(hh, mm), tzinfo=IST)
 
 
+# Rx rules (EL-D-013 / EL-D-014, PR #75): only these modes may go on a home Rx,
+# and exercises that need a left / right side are left out of the demo.
+RX_SAFE_MODES = ("PATIENT", "CAREGIVER")
+
+
+async def exercise_rx_columns(db) -> set[str]:
+    """Which Rx rule columns the exercises table has (they arrive with PR #75)."""
+    from sqlalchemy import text
+
+    rows = await db.execute(
+        text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = current_schema() AND table_name = 'exercises' "
+            "AND column_name IN ('rx_mode', 'requires_side')"
+        )
+    )
+    return {r[0] for r in rows}
+
+
+def exercise_pick_sql(columns: set[str], limit: int) -> str:
+    """Global exercises, image links first, Blogspot links last.
+
+    With the Rx rule columns present, only PATIENT / CAREGIVER rows that do not
+    need a side are picked, so POST /prescriptions never answers 422.
+    """
+    where = ["clinic_id IS NULL"]
+    if "rx_mode" in columns:
+        where.append("rx_mode IN (" + ", ".join(f"'{m}'" for m in RX_SAFE_MODES) + ")")
+    if "requires_side" in columns:
+        where.append("requires_side IS NOT TRUE")
+    image = r"video_url ~* '\.(png|jpe?g|webp|gif)(\?|$)'"
+    blog = "video_url ~* 'blogspot|blogger'"
+    return (
+        "SELECT id FROM exercises WHERE " + " AND ".join(where) + " ORDER BY "
+        f"CASE WHEN {image} AND NOT {blog} THEN 0 ELSE 1 END, "
+        f"CASE WHEN {blog} THEN 1 ELSE 0 END, title LIMIT {int(limit)}"
+    )
+
+
 async def pick_exercises(limit: int = 40) -> list[str]:
-    """Exercises already in the DB: global ones with an image link first, Blogspot links last."""
-    from sqlalchemy import case, select
+    """Exercises already in the DB that a home Rx accepts (see exercise_pick_sql)."""
+    from sqlalchemy import text
 
     from app.core.database import AsyncSessionLocal
-    from app.models.exercise import Exercise
 
-    image_like = Exercise.video_url.op("~*")(r"\.(png|jpe?g|webp|gif)(\?|$)")
-    blogspot = Exercise.video_url.op("~*")("blogspot|blogger")
     async with AsyncSessionLocal() as db:
-        rows = (
-            await db.scalars(
-                select(Exercise.id)
-                .where(Exercise.clinic_id.is_(None))
-                .order_by(
-                    case((image_like & ~blogspot, 0), else_=1),
-                    case((blogspot, 1), else_=0),
-                    Exercise.title,
-                )
-                .limit(limit)
-            )
-        ).all()
+        columns = await exercise_rx_columns(db)
+        rows = (await db.execute(text(exercise_pick_sql(columns, limit)))).scalars().all()
+    rule = "rx_mode PATIENT/CAREGIVER, no side" if columns else "no Rx rule columns"
+    _print_clean(f"exercises for Rx: {len(rows)} picked ({rule})")
     return [str(r) for r in rows]
 
 

@@ -281,3 +281,15 @@ def test_demo_phones_are_one_fixed_series():
     phones = [demo_phone(i) for i in range(30)] + [demo_phone(100 + j) for j in range(15)]
     assert len(set(phones)) == 45
     assert all(p.startswith("90000") and len(p) == 10 and p.isdigit() for p in phones)
+
+
+def test_exercise_pick_sql_follows_rx_rules_when_columns_exist():
+    from tests.seed import exercise_pick_sql
+
+    old = exercise_pick_sql(set(), 40)
+    assert "rx_mode" not in old and "requires_side" not in old
+    assert "clinic_id IS NULL" in old and old.endswith("LIMIT 40")
+    new = exercise_pick_sql({"rx_mode", "requires_side"}, 40)
+    assert "rx_mode IN ('PATIENT', 'CAREGIVER')" in new
+    assert "requires_side IS NOT TRUE" in new
+    assert "BLOCKED" not in new and "HIDDEN" not in new
