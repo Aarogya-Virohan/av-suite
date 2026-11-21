@@ -17,7 +17,7 @@ from app.schemas.prescription import (
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
-from app.services import prescription_service, rx_rules
+from app.services import prescription_service, rx_rules, rx_scope
 from app.services.audit import log_event_safely
 from fastapi.responses import Response
 
@@ -49,6 +49,11 @@ async def create_prescription(
     try:
         clinic_id = request.state.clinic_id
         physio_id = user.id
+        # AUD-05: own clinic's patient, global or own-clinic exercises only.
+        await rx_scope.check_patient(db, uuid.UUID(str(clinic_id)), prescription_in.patient_id)
+        await rx_scope.check_exercises(
+            db, uuid.UUID(str(clinic_id)), (i.exercise_id for i in prescription_in.items)
+        )
         await rx_rules.check_items(db, prescription_in.items)
 
         prescription = await prescription_service.create_prescription(
@@ -191,6 +196,10 @@ async def update_prescription(
                 detail="You can only edit your own prescriptions.",
             )
         if patch_in.items is not None:
+            # AUD-05: same exercise scope on edit.
+            await rx_scope.check_exercises(
+                db, uuid.UUID(str(clinic_id)), (i.exercise_id for i in patch_in.items)
+            )
             await rx_rules.check_items(db, patch_in.items)
         prescription = await prescription_service.patch_prescription(
             db, uuid.UUID(clinic_id), id, patch_in

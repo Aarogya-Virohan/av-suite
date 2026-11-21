@@ -344,3 +344,92 @@ async def test_approve_default_and_given_time_are_ist(client: AsyncClient, db_se
         await db_session.refresh(appt)
         local = appt.scheduled_at.astimezone(ist)
         assert (local.date().isoformat(), local.hour, local.minute) == ("2026-12-01", *expected)
+
+
+# --- AUD-05: prescriptions are clinic scoped ----------------------------------
+
+async def _patient(client, headers, name="Rx"):
+    res = await client.post(f"{API}/patients", json={"first_name": name, "last_name": "Patient",
+                                                     "phone": f"9{uuid.uuid4().int % 10**9:09d}"}, headers=headers)
+    assert res.status_code == 201, res.text
+    return res.json()["data"]["id"]
+
+
+async def _exercise(db_session, clinic_id=None, title="AUD05 ex"):
+    from app.models.exercise import Exercise
+
+    ex = Exercise(clinic_id=clinic_id, title=f"{title} {uuid.uuid4().hex[:6]}", is_free=True)
+    db_session.add(ex)
+    await db_session.commit()
+    return str(ex.id)
+
+
+@pytest.mark.asyncio
+async def test_rx_cross_clinic_and_unknown_ids(client: AsyncClient, db_session: AsyncSession):
+    from app.models.prescription import Prescription
+
+    clinic_a, a, _ = await register(client, "A")
+    clinic_b, b, _ = await register(client, "B")
+    await entitle(db_session, clinic_a, "exercise-library", "exercise-prescription")
+    own_patient = await _patient(client, a)
+    foreign_patient = await _patient(client, b, "Foreign")
+    global_ex = await _exercise(db_session)
+    own_ex = await _exercise(db_session, clinic_a)
+    foreign_ex = await _exercise(db_session, clinic_b)
+    url = f"{API}/prescriptions"
+
+    def body(patient, *exercises):
+        return {"patient_id": patient, "items": [{"exercise_id": e, "sets": 2, "reps": 10} for e in exercises]}
+
+    before = len((await db_session.scalars(select(Prescription))).all())
+    for payload, code in (
+        (body(foreign_patient, global_ex), 404),
+        (body(str(uuid.uuid4()), global_ex), 404),
+        (body(own_patient, foreign_ex), 422),
+        (body(own_patient, str(uuid.uuid4())), 422),
+        (body(own_patient, global_ex, foreign_ex), 422),
+    ):
+        res = await client.post(url, json=payload, headers=a)
+        assert res.status_code == code, (payload, res.status_code, res.text)
+        assert "Foreign" not in res.text
+    assert len((await db_session.scalars(select(Prescription))).all()) == before
+
+    ok = await client.post(url, json=body(own_patient, global_ex, own_ex), headers=a)
+    assert ok.status_code == 201, ok.text
+    rx_id = ok.json()["data"]["id"]
+
+    patch = await client.patch(f"{url}/{rx_id}", json={"items": [{"exercise_id": foreign_ex}]}, headers=a)
+    assert patch.status_code == 422, patch.text
+    patch = await client.patch(f"{url}/{rx_id}", json={"items": [{"exercise_id": own_ex, "sets": 3}]}, headers=a)
+    assert patch.status_code == 200, patch.text
+
+
+# --- AUD-13: API docs hidden only in production --------------------------------
+
+def test_api_docs_hidden_only_in_production():
+    from app.main import api_docs_urls
+
+    for env in ("production", "Production", " production "):
+        assert api_docs_urls(env) == {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    for env in ("staging", "development", "", None):
+        assert api_docs_urls(env)["docs_url"] == "/docs"
+        assert api_docs_urls(env)["openapi_url"] == "/openapi.json"
+
+
+@pytest.mark.asyncio
+async def test_api_docs_off_in_production_app():
+    from fastapi import FastAPI
+    from httpx import ASGITransport
+
+    from app.main import api_docs_urls
+
+    prod = FastAPI(**api_docs_urls("production"))
+    async with AsyncClient(transport=ASGITransport(app=prod), base_url="http://t") as c:
+        for path in ("/docs", "/redoc", "/openapi.json"):
+            assert (await c.get(path)).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_docs_on_outside_production(client: AsyncClient):
+    for path in ("/docs", "/openapi.json"):
+        assert (await client.get(path)).status_code == 200
