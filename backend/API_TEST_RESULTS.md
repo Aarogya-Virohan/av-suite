@@ -335,7 +335,7 @@ curl http://localhost:8000/health
 # View server logs
 cd /home/shit/DFQ/av-suite/backend
 source venv/bin/activate
-python3 -m uvicorn app.main:app --reload
+python3 -m uvicorn app.main:app --reload --no-proxy-headers
 
 # Test database connection
 python3 test_supabase_connection.py

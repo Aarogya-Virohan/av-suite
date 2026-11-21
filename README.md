@@ -198,7 +198,7 @@ http://localhost:3000
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --no-proxy-headers
 ```
 
 Backend runs on:

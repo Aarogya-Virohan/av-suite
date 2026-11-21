@@ -220,12 +220,13 @@ if __name__ == "__main__":
     
     # Development server start karte hain
     # Note: Production mein Docker/k8s/external server use karo
-    # uvicorn --host 0.0.0.0 --port 8000 --workers 4 app.main:app
+    # uvicorn --host 0.0.0.0 --port 8000 --workers 4 --no-proxy-headers app.main:app
     
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=8000,
+        proxy_headers=False,
         reload=settings.DEBUG,  # Auto-reload development mein
         log_level="info",
     )

@@ -482,15 +482,22 @@ async def test_rate_limit_per_token(client, db_session, env, therapist_auth_head
     assert int(blocked.headers["Retry-After"]) >= 1
 
 
-async def test_rate_limit_per_ip_and_trusted_header(client, monkeypatch):
+async def test_rate_limit_per_ip_and_trusted_proxy_chain(client, monkeypatch):
     monkeypatch.setattr(rate_limit.ip_limiter, "limit", 2)
     for _ in range(2):
         assert (await client.get(f"{API}/screener/{'a' * 43}")).status_code == 404
     assert (await client.get(f"{API}/screener/{'b' * 43}")).status_code == 429
 
     rate_limit.ip_limiter.reset()
-    monkeypatch.setattr(settings, "SCREENER_CLIENT_IP_HEADER", "X-Real-IP")
+    monkeypatch.setattr(settings, "TRUSTED_PROXY_IPS", "127.0.0.1/32")
     for ip in ("1.1.1.1", "1.1.1.1", "2.2.2.2", "2.2.2.2"):
-        res = await client.get(f"{API}/screener/{'c' * 43}", headers={"X-Real-IP": ip})
+        res = await client.get(
+            f"{API}/screener/{'c' * 43}", headers={"X-Forwarded-For": ip}
+        )
         assert res.status_code == 404
-    assert (await client.get(f"{API}/screener/{'c' * 43}", headers={"X-Real-IP": "1.1.1.1"})).status_code == 429
+    assert (
+        await client.get(
+            f"{API}/screener/{'c' * 43}",
+            headers={"X-Forwarded-For": "1.1.1.1"},
+        )
+    ).status_code == 429

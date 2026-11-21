@@ -21,7 +21,8 @@ if "DATABASE_URL" not in os.environ:
         os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
     elif not os.path.isfile(".env"):
         os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-at-least-32-chars-long-123456")
+os.environ.setdefault("JWT_SECRET_KEY", "c1f230d789abcec1f230d789abcec1f230d789abcec1f230d789abcec1f230d7")
+os.environ.setdefault("PLATFORM_MFA_KEY", "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")
 os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("CLINIC_DOCUMENTS_BUCKET", "test-bucket")
