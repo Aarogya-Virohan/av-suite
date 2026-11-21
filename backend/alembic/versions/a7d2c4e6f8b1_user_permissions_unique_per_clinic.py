@@ -7,7 +7,7 @@ Overrides are per clinic everywhere in the code, so the key is now
 change on upgrade.
 
 Revision ID: a7d2c4e6f8b1
-Revises: 6ab832834814
+Revises: f3b9d1e5a7c4 (PR #75 EL head; was 6ab832834814 before the L2 rebase)
 Create Date: 2026-11-20 19:30:00
 
 """
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 
 
 revision: str = "a7d2c4e6f8b1"
-down_revision: Union[str, Sequence[str], None] = "6ab832834814"
+down_revision: Union[str, Sequence[str], None] = "f3b9d1e5a7c4"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
