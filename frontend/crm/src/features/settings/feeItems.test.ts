@@ -12,6 +12,7 @@ describe('normalizePrice', () => {
   });
   it('labels categories', () => {
     expect(feeCategoryLabel('exercise_rx')).toBe('Exercise prescription');
+    expect(feeCategoryLabel('custom')).toBe('Treatment / Other');
     expect(feeCategoryLabel('unknown')).toBe('unknown');
   });
 });

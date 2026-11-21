@@ -137,7 +137,7 @@ export function AddUserSlideOver({ isOpen, onClose }: Props) {
           </select>
           {errors.role && <p className={errorText}>{errors.role}</p>}
         </div>
-        {canSetTools && role && role !== 'admin' && (
+        {canSetTools && role && (
           <ToolCheckboxes value={tools} onChange={setTools} available={myTools?.available} labels={myTools?.labels} role={role} />
         )}
         <div className="flex items-center justify-end gap-3 border-t border-line pt-4">

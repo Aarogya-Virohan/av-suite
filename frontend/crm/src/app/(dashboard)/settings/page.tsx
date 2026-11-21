@@ -322,7 +322,7 @@ export default function SettingsPage() {
       header: 'Actions',
       render: (u) => (
         <div className="flex items-center gap-2">
-          {canEditPermissions && u.role !== 'admin' && (
+          {canEditPermissions && (
             <button
               onClick={() => setToolsUser(u)}
               className="inline-flex h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-ink-2 transition-colors hover:bg-canvas"

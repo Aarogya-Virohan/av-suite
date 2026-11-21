@@ -14,9 +14,11 @@ export function UserToolsSlideOver({ isOpen, onClose, user }: { isOpen: boolean;
   const { data, isLoading, error } = useUserTools(user?.id, isOpen);
   const save = useSetUserTools();
   const [value, setValue] = useState<ToolKey[]>([]);
+  const [saveError, setSaveError] = useState('');
 
   React.useEffect(() => {
     if (isOpen && data) setValue(enabledTools(data.tools));
+    if (isOpen) setSaveError('');
   }, [isOpen, data]);
 
   const name = user ? `${user.first_name} ${user.last_name}` : '';
@@ -24,12 +26,18 @@ export function UserToolsSlideOver({ isOpen, onClose, user }: { isOpen: boolean;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    setSaveError('');
     try {
       await save.mutateAsync({ userId: user.id, tools: value });
       toast.success(`Tool access saved for ${name}`);
       onClose();
     } catch (err: any) {
-      toast.error(err?.message || 'Could not save tool access');
+      // The server owns the rules (plan, Tool 03 clinical rules such as an admin
+      // giving Psychosocial to themselves in a multi-staff clinic). The UI does
+      // not pre-block; it shows the server's reason here and keeps the panel open.
+      const msg = err?.message || 'Could not save tool access';
+      setSaveError(msg);
+      toast.error(msg);
     }
   };
 
@@ -43,7 +51,12 @@ export function UserToolsSlideOver({ isOpen, onClose, user }: { isOpen: boolean;
         ) : error ? (
           <p className="text-sm font-medium text-danger">{(error as Error).message || 'Could not load tool access'}</p>
         ) : (
-          <ToolCheckboxes value={value} onChange={setValue} available={data?.available} labels={data?.labels} role={data?.role ?? user?.role} />
+          <ToolCheckboxes value={value} onChange={(v) => { setValue(v); setSaveError(''); }} available={data?.available} labels={data?.labels} role={data?.role ?? user?.role} />
+        )}
+        {saveError && (
+          <div role="alert" className="rounded-xl border border-danger/30 bg-danger-wash p-3 text-sm font-medium text-danger">
+            Not saved: {saveError}
+          </div>
         )}
         <p className="text-xs text-muted">
           Custom scopes set in Edit Permissions stay as they are for tools that remain ticked.

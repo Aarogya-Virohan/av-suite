@@ -8,7 +8,7 @@ export const FEE_CATEGORIES: { value: FeeCategory; label: string }[] = [
   { value: 'consultation', label: 'Consultation' },
   { value: 'posture', label: 'Posture assessment' },
   { value: 'exercise_rx', label: 'Exercise prescription' },
-  { value: 'custom', label: 'Other' },
+  { value: 'custom', label: 'Treatment / Other' },
 ];
 
 export const feeCategoryLabel = (c: string) => FEE_CATEGORIES.find((x) => x.value === c)?.label ?? c;
