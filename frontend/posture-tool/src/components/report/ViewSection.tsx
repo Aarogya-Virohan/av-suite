@@ -14,7 +14,8 @@ interface Props {
 const SIDE_HIDDEN_SEVERITIES: ReadonlySet<string> = new Set([
   "none",
   "insufficient_data",
-  "not_available"
+  "not_available",
+  "under_review"
 ])
 
 // Same layout as the PDF (pdf_service._view_section): the annotated

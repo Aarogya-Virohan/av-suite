@@ -5,6 +5,8 @@ export type Severity =
   | "severe"
   | "insufficient_data"
   | "not_available"
+  // POS-4: measured, not graded until the band is confirmed (F-2).
+  | "under_review"
 
 export interface Measurement {
   paramId: string

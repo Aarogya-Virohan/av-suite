@@ -6,6 +6,7 @@ import type { CaptureLevel } from "@/lib/tilt"
 import UploadZone from "@/components/posture/UploadZone"
 
 import ReportCard from "@/components/report/ReportCard"
+import WhatsAppShare from "@/components/report/WhatsAppShare"
 
 import LandmarkReview from "@/components/review/LandmarkReview"
 
@@ -559,14 +560,15 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
               before the report had been read; only at the end, a phone
               user scrolled ten screens to reach them. */}
           <div className="no-print sticky bottom-0 z-20 -mx-4 border-t border-[#E3DCCB] bg-[#FFFDF7]/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border">
-            <div className="mx-auto flex max-w-4xl gap-2.5 sm:justify-end">
+            <div className="mx-auto flex max-w-4xl flex-wrap gap-2.5 sm:justify-end">
               <button
                 type="button"
                 onClick={resetAll}
-                className="h-11 flex-1 rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-4 text-[14px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2] sm:flex-none"
+                className="h-11 flex-1 rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] whitespace-nowrap px-2 text-[13px] sm:px-4 sm:text-[14px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2] sm:flex-none"
               >
                 New assessment
               </button>
+              <WhatsAppShare report={report} />
               <button
                 type="button"
                 disabled={pdfBusy}
@@ -580,7 +582,7 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
                     setPdfBusy(false)
                   }
                 }}
-                className="h-11 flex-1 rounded-xl bg-[#4E888F] px-5 text-[14px] font-semibold text-white transition hover:bg-[#3B6A70] disabled:opacity-60 sm:flex-none"
+                className="h-11 flex-1 rounded-xl bg-[#4E888F] whitespace-nowrap px-2 text-[13px] sm:px-4 sm:text-[14px] font-semibold text-white transition hover:bg-[#3B6A70] disabled:opacity-60 sm:flex-none"
               >
                 {pdfBusy ? "Preparing PDF…" : "Download PDF"}
               </button>

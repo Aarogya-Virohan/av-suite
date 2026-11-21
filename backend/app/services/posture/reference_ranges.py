@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services.posture.classifier import THRESHOLDS
+from app.services.posture.classifier import BANDS_UNDER_REVIEW, THRESHOLDS
 
 # Report labels that are not built from the measurement itself. The knee
 # and trunk rows pick their labels from the sign in api/v1/posture.py.
@@ -53,6 +53,14 @@ SOURCES_HEADING = "Normal ranges: basis and sources"
 SCREENING_NOTE = (
     "Normal range is the band the AV screening grade treats as Normal. "
     "It is a screening range, not a population reference value."
+)
+
+# POS-4 (21 Nov 2026): printed in the range cell of a band with no
+# published basis, and added to its line in the sources section.
+UNDER_REVIEW_RANGE = "Under review"
+UNDER_REVIEW_NOTE = (
+    "Normal band under review with the AV clinical team; this row is "
+    "measured but not graded."
 )
 
 # One entry per report row, in report order. "basis" is the
@@ -116,6 +124,8 @@ def screening_range(param_id: str) -> str:
     "\u00b1 4\u00b0", "\u2264 10 mm" (Onkar's review, 17 November 2026).
     Empty when the parameter has no band or no unit here.
     """
+    if param_id in BANDS_UNDER_REVIEW:
+        return UNDER_REVIEW_RANGE
     rule = THRESHOLDS.get(param_id)
     unit = UNITS.get(param_id)
     if not rule or unit is None:
@@ -181,5 +191,7 @@ def source_lines(views: dict[str, Any] | None) -> list[tuple[str, str]]:
         text = entry["basis"].rstrip(".") + "."
         if entry["note"]:
             text += " " + entry["note"]
+        if any(pid in BANDS_UNDER_REVIEW for pid in entry["params"].split(",")):
+            text += " " + UNDER_REVIEW_NOTE
         lines.append((", ".join(names), text))
     return lines

@@ -114,6 +114,7 @@ SEVERITY_STYLES: dict[str, tuple[str, str]] = {
     "severe": ("#b91c1c", "#fef2f2"),
     "insufficient_data": ("#64748b", "#f8fafc"),
     "not_available": ("#64748b", "#f8fafc"),
+    "under_review": ("#64748b", "#f8fafc"),
 }
 
 # Wording supplied by the founders, verbatim, 10 October 2026 (Q6), for the
@@ -136,7 +137,7 @@ SIDE_NOTE = "Left and right refer to the patient's own sides."
 # put a direction on every healthy patient. The side stays in the report JSON
 # either way, so tracking a direction over time is unaffected.
 SIDE_HIDDEN_SEVERITIES = frozenset(
-    {"none", "insufficient_data", "not_available"}
+    {"none", "insufficient_data", "not_available", "under_review"}
 )
 
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -396,7 +397,13 @@ def _biomech_signature_section(signature: dict | None) -> str:
     for r in signature["regions"]:
         worst = r.get("worst")
         if worst is None:
-            text = "No parameter" if not r.get("parameters") else "Not measured"
+            params = r.get("parameters") or []
+            if not params:
+                text = "No parameter"
+            elif any(p.get("severity") == "under_review" for p in params):
+                text = "Under review"
+            else:
+                text = "Not measured"
             badge = f'<span class="sig-none">{text}</span>'
         else:
             colour, background = SEVERITY_STYLES[worst]
