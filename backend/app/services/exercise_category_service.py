@@ -19,7 +19,8 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from app.models.exercise import Exercise
 from app.models.exercise_category import ExerciseCategory, exercise_category_links
-from app.services.exercise_categories import GROUP_KEYS, GROUP_LABELS, GROUP_RANK
+from app.services.exercise_categories import GROUP_LABELS, GROUP_RANK
+from app.services.exercise_structure import CATEGORY_PARENT
 
 
 class CategoryError(ValueError):
@@ -118,7 +119,7 @@ async def categories_for(
     for exercise_id, category in rows.all():
         out[exercise_id].append(category)
     for items in out.values():
-        items.sort(key=lambda c: (GROUP_RANK.get(c.group_key, len(GROUP_KEYS)), c.sort_order))
+        items.sort(key=lambda c: (GROUP_RANK.get(c.group_key, len(GROUP_RANK)), c.sort_order))
     return dict(out)
 
 
@@ -127,7 +128,8 @@ async def list_with_counts(db: AsyncSession, clinic_id: str) -> list[dict]:
     can see (its own and global) carry each value. Counts do not depend on
     the filters picked."""
     visible = select(Exercise.id).where(
-        or_(Exercise.clinic_id == uuid.UUID(str(clinic_id)), Exercise.clinic_id.is_(None))
+        or_(Exercise.clinic_id == uuid.UUID(str(clinic_id)), Exercise.clinic_id.is_(None)),
+        Exercise.rx_mode != "HIDDEN",  # EL-D-017
     )
     counts_q = (
         select(exercise_category_links.c.category_id, func.count())
@@ -142,14 +144,21 @@ async def list_with_counts(db: AsyncSession, clinic_id: str) -> list[dict]:
     for category in rows.scalars().all():
         by_group[category.group_key].append(category)
     groups = []
-    for key in sorted(by_group, key=lambda k: GROUP_RANK.get(k, len(GROUP_KEYS))):
+    for key in sorted(by_group, key=lambda k: GROUP_RANK.get(k, len(GROUP_RANK))):
         values = sorted(by_group[key], key=lambda c: c.sort_order)
         groups.append(
             {
                 "key": key,
                 "label": GROUP_LABELS.get(key, key),
+                # Category values carry their domain (parent_id) so the panel
+                # can show only the picked domain's categories (EL-D-012).
                 "values": [
-                    {"id": c.id, "name": c.name, "count": counts.get(c.id, 0)}
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "count": counts.get(c.id, 0),
+                        **({"parent_id": CATEGORY_PARENT.get(c.id)} if key == "category" else {}),
+                    }
                     for c in values
                 ],
             }

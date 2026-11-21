@@ -46,6 +46,7 @@ class PrescriptionRepository(BaseRepository[Prescription]):
                     frequency=item.frequency,
                     hold_angle=item.hold_angle,
                     note=item.note,
+                    side=item.side,
                 )
             )
 
@@ -154,6 +155,7 @@ class PrescriptionRepository(BaseRepository[Prescription]):
                     frequency=item.frequency,
                     hold_angle=item.hold_angle,
                     note=item.note,
+                    side=item.side,
                 )
             )
         if db_items:

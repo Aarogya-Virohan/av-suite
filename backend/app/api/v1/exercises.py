@@ -354,6 +354,7 @@ async def get_exercises_by_condition(
                 "cervical flexion isometrics (front press)",
                 "cervical  extension isometrics  (back press)",
                 " lateral flexion  isometric  – right side",
+                "neck side-bend isometric (right)",  # same row, renamed (EL-D-017)
                 "neck side stretch",
             ],
             "rounded shoulders": ["wall slides", "scapular squeezes", "wall push ups"],
@@ -371,7 +372,8 @@ async def get_exercises_by_condition(
         query = select(Exercise).where(
             or_(
                 Exercise.clinic_id == uuid.UUID(clinic_id), Exercise.clinic_id.is_(None)
-            )
+            ),
+            Exercise.rx_mode != "HIDDEN",  # EL-D-017
         )
 
         if cond_clean in condition_map:
