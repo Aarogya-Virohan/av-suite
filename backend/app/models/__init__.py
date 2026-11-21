@@ -1,5 +1,6 @@
 from app.models.base import Base, TimestampMixin, UUIDMixin, SoftDeleteMixin
 from app.models.clinic import Clinic, ClinicPlanTier
+from app.models.organization import Organization, OrganizationMembership
 from app.models.user import User
 from app.models.membership import Membership
 from app.models.user_permission import UserPermission
@@ -46,6 +47,8 @@ __all__ = [
     "SoftDeleteMixin",
     "Clinic",
     "ClinicPlanTier",
+    "Organization",
+    "OrganizationMembership",
     "User",
     "Membership",
     "UserPermission",

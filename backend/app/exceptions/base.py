@@ -57,6 +57,18 @@ class ProductNotEntitledError(BaseAppException):
         )
 
 
+class WorkspaceSuspendedError(BaseAppException):
+    """Raised when a clinic or its organization is suspended."""
+
+    def __init__(self, level: str):
+        super().__init__(
+            message="This workspace is suspended.",
+            code="WORKSPACE_SUSPENDED",
+            status_code=403,
+            details={"level": level},
+        )
+
+
 class ConflictError(BaseAppException):
     """Raised when an operation conflicts with existing state (e.g., unique key violation)."""
 

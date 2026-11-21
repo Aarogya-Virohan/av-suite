@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import create_access_token, decode_token, get_password_hash
 from app.enums.clinic import ClinicType
+from app.enums.organization import ClinicStatus
 from app.enums.user import UserRole
 from app.models.clinic import Clinic
 from app.models.membership import Membership
@@ -237,6 +238,46 @@ async def test_workspace_switch_uses_membership_and_rejects_nonmember(
     still_b = await client.get(f"{settings.API_V1_PREFIX}/me", headers=headers_b)
     assert still_b.status_code == 200
     assert still_b.json()["data"]["active_workspace"]["id"] == str(clinic_b.id)
+
+
+async def test_workspace_switch_rejects_suspended_target_without_issuing_token(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    clinic_a = Clinic(name="Switch Active")
+    clinic_b = Clinic(name="Switch Suspended")
+    user = User(
+        email=f"switch-suspended-{uuid.uuid4()}@avtest.com",
+        password_hash=get_password_hash("Password123!"),
+        role=UserRole.ADMIN,
+        first_name="Switch",
+        last_name="User",
+        is_active=True,
+    )
+    db_session.add_all([clinic_a, clinic_b, user])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            Membership(user_id=user.id, clinic_id=clinic_a.id, role=UserRole.ADMIN),
+            Membership(user_id=user.id, clinic_id=clinic_b.id, role=UserRole.THERAPIST),
+        ]
+    )
+    token_a = create_access_token(
+        subject=user.id, clinic_id=clinic_a.id, role=UserRole.ADMIN.value
+    )
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    clinic_b.status = ClinicStatus.SUSPENDED
+    await db_session.commit()
+
+    rejected = await client.post(
+        f"{settings.API_V1_PREFIX}/auth/switch-workspace",
+        headers=headers_a,
+        json={"clinic_id": str(clinic_b.id)},
+    )
+
+    assert rejected.status_code == 403
+    assert rejected.json()["meta"]["error"]["code"] == "WORKSPACE_SUSPENDED"
+    assert rejected.json().get("data") is None
+    assert "access_token" not in rejected.json()
 
 
 async def test_staff_removal_removes_only_active_workspace_membership(
