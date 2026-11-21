@@ -8,6 +8,8 @@ import uuid
 
 import asyncpg
 import pytest
+from alembic.config import Config as AlembicConfig
+from alembic.script import ScriptDirectory
 from sqlalchemy.engine import make_url
 
 from app.core.config import settings
@@ -16,6 +18,7 @@ from app.models import Clinic, OrganizationMembership
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 S1_REVISION = "s1fnd20261120"
 S1_PARENT = "6ab832834814"
+S1_MERGE_REVISION = "1912c0f3f42f"
 
 
 def _s1_index_columns_from_metadata() -> dict[str, tuple[str, ...]]:
@@ -109,7 +112,11 @@ async def test_s1_empty_database_upgrade_downgrade_upgrade_and_single_head(
             text=True,
         ).stdout
         assert heads.count("(head)") == 1
-        assert S1_REVISION in heads
+        assert S1_MERGE_REVISION in heads
+        merge_script = ScriptDirectory.from_config(
+            AlembicConfig(str(BACKEND_DIR / "alembic.ini"))
+        ).get_revision(S1_MERGE_REVISION)
+        assert S1_REVISION in merge_script.down_revision
     finally:
         await _drop_test_database(admin_dsn, db_name)
 
