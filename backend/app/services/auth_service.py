@@ -22,10 +22,14 @@ from fastapi import HTTPException, status
 from app.models.clinic import Clinic
 from app.models.membership import Membership
 from app.models.user import User
+from app.enums.organization import OrganizationRole
+from app.models.organization import OrganizationMembership
 from app.enums.user import UserRole
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.services.product_entitlements import ensure_crm_entitlement
+from app.services.clinic_status import ensure_clinic_active
+from app.exceptions import BaseAppException
 import logging
 import uuid
 
@@ -126,7 +130,13 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
         membership = Membership(
             user_id=new_user.id, clinic_id=new_clinic.id, role=UserRole.ADMIN
         )
-        db.add(membership)
+        organization_membership = OrganizationMembership(
+            user_id=new_user.id,
+            organization_id=new_clinic.organization_id,
+            role=OrganizationRole.ORG_OWNER,
+        )
+        db.add_all([membership, organization_membership])
+        await db.flush()
         await ensure_crm_entitlement(db, new_clinic.id)
 
         # commit() transaction finalize karte hain
@@ -264,6 +274,8 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
                 },
             )
 
+        await ensure_clinic_active(db, active_membership.clinic_id)
+
         access_token = create_access_token(
             subject=user.id,
             clinic_id=str(active_membership.clinic_id),
@@ -275,6 +287,8 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
 
     except HTTPException:
         # Already processed exceptions ko re-raise karte hain
+        raise
+    except BaseAppException:
         raise
     except Exception as e:
         # Unexpected errors ko log karte hain
