@@ -37,6 +37,9 @@ class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
     first_name: str | None = Field(default=None, min_length=1, max_length=100)
     last_name: str | None = Field(default=None, min_length=1, max_length=100)
+    # BE-1: tool checkboxes to switch on for the new user. None / [] = none.
+    # Keys: "psycho-social-screening", "exercise-library", "posture-tool".
+    tools: list[str] | None = None
 
     @field_validator("password")
     @classmethod
@@ -92,5 +95,23 @@ class UserRead(UserBase):
     clinic_id: UUID
     first_name: str | None = None
     last_name: str | None = None
+    # BE-1: tool checkbox state per tool key (effective, role template included).
+    tools: dict[str, bool] | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class UserToolsUpdate(BaseModel):
+    """BE-1: PUT /users/{id}/tools. Exactly these tools end up on; others off."""
+
+    tools: list[str]
+
+
+class UserToolsRead(BaseModel):
+    """BE-1: checkbox state for one user plus what the clinic plan allows."""
+
+    user_id: UUID
+    role: UserRole
+    tools: dict[str, bool]
+    available: dict[str, bool]
+    labels: dict[str, str]
