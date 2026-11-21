@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AppShell } from '../../../../components/layout/AppShell';
-import { usePatient, useDeletePatient } from '../../../../features/patients/api';
+import { usePatient, useDeletePatient, usePatientCaseId } from '../../../../features/patients/api';
 import { useAuthStore } from '../../../../store';
 import { getPermissionsForRole, canAccessModule, usePermissionSubscription } from '../../../../config/permissions';
 import { AccessRestricted } from '../../../../components/ui/AccessRestricted';
@@ -35,6 +35,7 @@ export default function PatientWorkspacePage() {
   const canOpenWorkspace = canAccessModule('patients');
   const permissions = getPermissionsForRole(role).patientTabs;
   const { data: patient, isLoading } = usePatient(patientId, canOpenWorkspace);
+  const caseId = usePatientCaseId();
   const [activeTab, setActiveTab] = useState<TabKey>('timeline');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const deletePatient = useDeletePatient();
@@ -176,6 +177,10 @@ export default function PatientWorkspacePage() {
                   <WhatsAppButton phone={patient.phone} name={`${patient.first_name} ${patient.last_name}`} />
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                  <span>
+                    Patient ID: <strong className="font-mono font-semibold text-ink-2">{caseId(patient.display_number)}</strong>
+                  </span>
+                  <span aria-hidden="true">·</span>
                   <span>
                     Phone: <strong className="font-semibold text-ink-2">{patient.phone}</strong>
                   </span>

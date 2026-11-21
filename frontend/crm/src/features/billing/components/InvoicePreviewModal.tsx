@@ -4,7 +4,7 @@ import React from 'react';
 import { Invoice } from '../../../types/api';
 import { usePatient } from '../../patients/api';
 import { useClinicSettings } from '../../settings/api';
-import { downloadInvoicePdf, useInvoicePayments } from '../api';
+import { downloadInvoicePdf, invoicePdfFilename, useInvoicePayments } from '../api';
 import { hasCapability } from '../../../config/permissions';
 import { useAuthStore } from '../../../store';
 import { formatMoney } from '../../../lib/money';
@@ -116,12 +116,14 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
   const docTitle = isReceipt ? 'Payment Receipt' : 'Invoice';
 
   // The server renders the real PDF with the same content (D-027, L-41).
-  const downloadPdf = async () => {
+  const downloadPdf = async (): Promise<boolean> => {
     setDownloading(true);
     try {
       await downloadInvoicePdf(invoice.id, invoice.invoice_number, isReceipt ? 'receipt' : 'invoice');
+      return true;
     } catch {
       toast.error(`Could not download the ${isReceipt ? 'receipt' : 'invoice'} PDF. Please try again.`);
+      return false;
     } finally {
       setDownloading(false);
     }
@@ -141,7 +143,9 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
     window.print();
   };
 
-  // Click-to-chat with the patient; the PDF is attached by hand in WhatsApp.
+  // CRM-5: wa.me with a prefilled text + the PDF downloaded in the same click,
+  // so staff attach it in WhatsApp. No public link until DPDP consent (L-4).
+  // wa.me opens first (sync, so the popup is not blocked), then the download.
   const sendOnWhatsApp = () => {
     const lines = [
       `Hi ${patientName},`,
@@ -153,13 +157,16 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
     if (!isReceipt && balance > 0) lines.push(`Balance due: ${money(balance)}`);
     lines.push('', `The ${isReceipt ? 'receipt' : 'invoice'} PDF is attached.`, '', 'Thank you.');
     openWhatsApp(patient?.phone, patientName, lines.join('\n'), clinicName);
+    void downloadPdf().then((ok) =>
+      ok && toast.info(`PDF downloaded. Attach ${invoicePdfFilename(isReceipt ? 'receipt' : 'invoice', invoice.invoice_number)} in WhatsApp.`),
+    );
   };
 
   return (
     <div
       // Top-aligned and scrollable: a centred flex box cut off the toolbar
       // (Print and Close) when the document was taller than the screen (C-13).
-      className="fixed inset-0 z-50 overflow-y-auto bg-midnight/60 p-4 backdrop-blur-xs sm:py-8"
+      className="fixed inset-0 z-50 overflow-y-auto bg-midnight/60 p-2 backdrop-blur-xs sm:p-4 sm:py-8"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -167,31 +174,47 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
       aria-modal="true"
       aria-label={`${docTitle} ${invoice.invoice_number}`}
     >
-      <div className="mx-auto w-full max-w-2xl space-y-5 rounded-2xl border border-line bg-card p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+      <div className="mx-auto w-full max-w-2xl space-y-5 rounded-2xl border border-line bg-card p-4 shadow-2xl sm:p-6 dark:border-slate-800 dark:bg-slate-900">
         {/* Header Actions (not printed) */}
-        <div className="no-print sticky -top-4 z-10 sm:-top-8 -mx-6 -mt-6 flex items-center justify-between rounded-t-2xl border-b border-line bg-card px-6 py-4 dark:bg-slate-900">
-          <h2 className="font-display text-lg font-bold text-ink">
-            {docTitle} · {invoice.invoice_number}
-          </h2>
-          <div className="flex items-center gap-2">
-            {patient?.phone && (
-              <Button variant="secondary" onClick={sendOnWhatsApp} title="Open WhatsApp with a message to the patient. Attach the downloaded PDF there.">
-                <MessageSquare className="h-4 w-4" />
-                <span className="hidden sm:inline">WhatsApp</span>
-              </Button>
-            )}
-            <Button variant="secondary" onClick={printOrSave} title="Print this page">
+        <div className="no-print sticky -top-4 z-10 -mx-4 -mt-4 flex flex-col gap-3 rounded-t-2xl border-b border-line bg-card px-4 py-3 sm:-top-8 sm:-mx-6 sm:-mt-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4 dark:bg-slate-900">
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <h2 className="min-w-0 truncate font-display text-base font-bold text-ink sm:text-lg">
+              {docTitle} · {invoice.invoice_number}
+            </h2>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-ink sm:hidden"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={sendOnWhatsApp}
+              disabled={!patient?.phone || downloading}
+              title={
+                patient?.phone
+                  ? 'Opens WhatsApp with a message and downloads the PDF. Attach the PDF in WhatsApp.'
+                  : 'No phone number on this patient'
+              }
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span>WhatsApp</span>
+            </Button>
+            <Button variant="secondary" onClick={printOrSave} title="Print this page" aria-label="Print">
               <Printer className="h-4 w-4" />
               <span className="hidden sm:inline">Print</span>
             </Button>
-            <Button onClick={downloadPdf} disabled={downloading} title="Download the PDF made by the server">
+            <Button onClick={() => void downloadPdf()} disabled={downloading} title="Download the PDF made by the server">
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               <span><span className="hidden sm:inline">Download </span>PDF</span>
             </Button>
             <button
               onClick={onClose}
               aria-label="Close"
-              className="cursor-pointer rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-ink"
+              className="hidden cursor-pointer rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-ink sm:block"
             >
               <X className="h-5 w-5" />
             </button>
@@ -199,7 +222,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
         </div>
 
         {/* Printable document */}
-        <div className="print-area space-y-6 rounded-xl border border-line bg-white p-8 font-sans text-xs text-[#141a33]">
+        <div className="print-area space-y-6 overflow-x-auto rounded-xl border border-line bg-white p-4 sm:p-8 font-sans text-xs text-[#141a33]">
           <div className="flex items-start justify-between gap-6 border-b-2 border-[#0b1238] pb-4">
             <div className="flex items-center gap-3">
               {clinic?.branding_logo_url && (
@@ -223,7 +246,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
               <span className="block font-display text-lg font-extrabold uppercase text-[#0b1238]">
                 {isReceipt ? 'Receipt' : 'Invoice'}
               </span>
-              <span className="font-mono text-[#5d6380]">Ref: {invoice.invoice_number}</span>
+              <span className="whitespace-nowrap font-mono text-[#5d6380]">Ref: {invoice.invoice_number}</span>
             </div>
           </div>
 

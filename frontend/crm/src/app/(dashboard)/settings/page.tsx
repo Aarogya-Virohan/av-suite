@@ -9,7 +9,7 @@ import { useUsers, useDeleteUser } from '../../../features/users/api';
 import { useAuditLogs } from '../../../features/audit/api';
 import { useAuthStore } from '../../../store';
 import { canAccessModule, hasCapability, usePermissionSubscription } from '../../../config/permissions';
-import { Settings as SettingsIcon, Users, FileText, Save, Plus, Loader2, Trash2, Info, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Settings as SettingsIcon, IndianRupee, Wrench, Users, FileText, Save, Plus, Loader2, Trash2, Info, RotateCcw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   CLINIC_PROFILE_KEYS,
@@ -23,7 +23,10 @@ import {
   type ProfileForm,
   clinicProfileErrors,
 } from '../../../features/settings/profile';
+import { FeeListPanel } from '../../../features/settings/components/FeeListPanel';
 import { AddUserSlideOver } from '../../../features/users/components/AddUserSlideOver';
+import { UserToolsSlideOver } from '../../../features/users/components/UserToolsSlideOver';
+import { TOOL_KEYS, toolLabel } from '../../../features/users/tools';
 import { UserPermissionsSlideOver } from '../../../features/users/components/UserPermissionsSlideOver';
 import { JsonViewerSlideOver } from '../../../components/ui/JsonViewerSlideOver';
 import {
@@ -40,7 +43,7 @@ import {
 } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
 
-type TabKey = 'clinic' | 'users' | 'audit';
+type TabKey = 'clinic' | 'fees' | 'users' | 'audit';
 
 /** The AV Suite theme colour (globals.css --brand-navy). Used when a clinic has no colour of its own. */
 const THEME_DEFAULT_COLOR = '#0b1238';
@@ -82,11 +85,15 @@ export default function SettingsPage() {
   const canDeleteUser = hasCapability('users.delete');
   const canEditPermissions = hasCapability('permissions.edit');
   const canViewAudit = hasCapability('audit.view');
+  // Fee list: GET needs invoices.create, writes are admin only (PR #71).
+  const canViewFees = hasCapability('invoices.create');
+  const isAdmin = useAuthStore((s) => s.role) === 'admin';
 
   // Default tab is derived each render (capabilities can load after the first
   // render); a user's explicit choice wins while it stays visible.
   const tabs: { key: TabKey; label: string; icon: React.ElementType; visible: boolean }[] = [
     { key: 'clinic', label: 'Clinic & Branding', icon: SettingsIcon, visible: canViewClinic },
+    { key: 'fees', label: 'Fee List', icon: IndianRupee, visible: canViewFees },
     { key: 'users', label: 'User Management', icon: Users, visible: canViewUsers },
     { key: 'audit', label: 'Audit Log', icon: FileText, visible: canViewAudit },
   ];
@@ -105,6 +112,7 @@ export default function SettingsPage() {
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [toolsUser, setToolsUser] = useState<User | null>(null);
   const [auditPage, setAuditPage] = useState(1);
   const [auditOnlyMine, setAuditOnlyMine] = useState(false);
   const [selectedLogForDetails, setSelectedLogForDetails] = useState<AuditLog | null>(null);
@@ -266,8 +274,8 @@ export default function SettingsPage() {
       render: (u) => (
         <div className="flex items-center gap-3">
           <Avatar name={`${u.first_name} ${u.last_name}`} size={32} />
-          <div>
-            <p className="font-semibold text-ink">
+          <div className="min-w-0">
+            <p className="whitespace-nowrap font-semibold text-ink">
               {u.first_name} {u.last_name}
               {u.id === userId && <span className="ml-1.5 text-xs font-medium text-muted">(you)</span>}
             </p>
@@ -280,10 +288,29 @@ export default function SettingsPage() {
       key: 'role',
       header: 'Role',
       render: (u) => (
-        <Badge tone={ROLE_TONE[u.role] ?? 'neutral'} className="capitalize">
+        <Badge tone={ROLE_TONE[u.role] ?? 'neutral'} className="whitespace-nowrap capitalize">
           {u.role.replace(/_/g, ' ')}
         </Badge>
       ),
+    },
+    {
+      key: 'tools',
+      header: 'Tools',
+      render: (u) => {
+        if (!u.tools) return <span className="text-xs text-muted">-</span>;
+        const on = TOOL_KEYS.filter((k) => u.tools?.[k]);
+        return on.length ? (
+          <div className="flex flex-wrap gap-1">
+            {on.map((k) => (
+              <Badge key={k} tone="active" className="whitespace-nowrap">
+                {toolLabel(k)}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs text-muted">None</span>
+        );
+      },
     },
     {
       key: 'is_active',
@@ -297,6 +324,15 @@ export default function SettingsPage() {
         <div className="flex items-center gap-2">
           {canEditPermissions && (
             <button
+              onClick={() => setToolsUser(u)}
+              className="inline-flex h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-ink-2 transition-colors hover:bg-canvas"
+            >
+              <Wrench className="h-3.5 w-3.5" />
+              Tool Access
+            </button>
+          )}
+          {canEditPermissions && (
+            <button
               onClick={() => {
                 setSelectedUser(u);
                 setIsPermissionsOpen(true);
@@ -304,7 +340,7 @@ export default function SettingsPage() {
               className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg bg-info-wash px-2.5 text-xs font-semibold text-info transition-colors hover:bg-[#dde2fa]"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-              Edit Permissions
+              <span className="whitespace-nowrap">Edit Permissions</span>
             </button>
           )}
           {canDeleteUser && u.id !== userId && (
@@ -545,6 +581,8 @@ export default function SettingsPage() {
           </form>
         )}
 
+        {activeTab === 'fees' && <FeeListPanel canEdit={isAdmin} />}
+
         {/* User Management Tab */}
         {activeTab === 'users' && <DataTable columns={userColumns} data={users} isLoading={isLoadingUsers} />}
 
@@ -593,6 +631,7 @@ export default function SettingsPage() {
       </div>
 
       <AddUserSlideOver isOpen={isAddUserOpen} onClose={() => setIsAddUserOpen(false)} />
+      <UserToolsSlideOver isOpen={!!toolsUser} onClose={() => setToolsUser(null)} user={toolsUser} />
       <UserPermissionsSlideOver
         isOpen={isPermissionsOpen}
         onClose={() => setIsPermissionsOpen(false)}
