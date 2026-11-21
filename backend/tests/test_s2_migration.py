@@ -6,12 +6,14 @@ import sys
 import uuid
 import asyncpg
 import pytest
+from alembic.config import Config as AlembicConfig
+from alembic.script import ScriptDirectory
 from sqlalchemy.engine import make_url
 from app.core.config import settings
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 S2_REVISION = "s2plat20261120"
-S1_REVISION = "s1fnd20261120"
+S2_PARENT = "1912c0f3f42f"
 
 
 def _connection_strings(source: str):
@@ -34,6 +36,11 @@ def _alembic(database_url: str, command: str, target: str | None = None):
 
 @pytest.mark.asyncio
 async def test_s2_migration_round_trip_and_schema(test_database_url_safety_check):
+    script = ScriptDirectory.from_config(
+        AlembicConfig(str(BACKEND_DIR / "alembic.ini"))
+    )
+    assert script.get_revision(S2_REVISION).down_revision == S2_PARENT
+
     source = settings.TEST_DATABASE_URL or settings.DATABASE_URL
     test_database_url_safety_check(source)
     admin_dsn = _connection_strings(source)
@@ -72,7 +79,7 @@ async def test_s2_migration_round_trip_and_schema(test_database_url_safety_check
             assert ("platform_audit_logs", "clinic_id", "clinics") in fks
         finally:
             await conn.close()
-        _alembic(database_url, "downgrade", S1_REVISION)
+        _alembic(database_url, "downgrade", S2_PARENT)
         conn = await asyncpg.connect(database_url.replace("+asyncpg", ""))
         try:
             remaining = await conn.fetchval("SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('platform_operators', 'platform_audit_logs', 'platform_auth_rate_limits')")

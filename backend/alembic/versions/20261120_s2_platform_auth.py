@@ -1,14 +1,14 @@
 """Add platform operators and append-only audit logs.
 
 Revision ID: s2plat20261120
-Revises: s1fnd20261120
+Revises: 1912c0f3f42f
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "s2plat20261120"
-down_revision = "s1fnd20261120"
+down_revision = "1912c0f3f42f"
 branch_labels = None
 depends_on = None
 
