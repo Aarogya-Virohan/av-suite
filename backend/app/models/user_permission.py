@@ -23,7 +23,12 @@ class UserPermission(UUIDMixin, TimestampMixin, Base):
 
     __tablename__: str = "user_permissions"
     __table_args__ = (
-        UniqueConstraint("user_id", "capability_key", name="uq_user_permissions_user_capability"),
+        UniqueConstraint(
+            "clinic_id",
+            "user_id",
+            "capability_key",
+            name="uq_user_permissions_clinic_user_capability",
+        ),
         Index("ix_user_permissions_clinic_user", "clinic_id", "user_id"),
     )
 

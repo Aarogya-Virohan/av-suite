@@ -40,12 +40,19 @@ validate_role_templates()
 # Swagger UI: http://localhost:8000/docs
 from app.exceptions import BaseAppException, app_exception_handler
 
+def api_docs_urls(environment: str | None) -> dict[str, str | None]:
+    """AUD-13: no public route map in production. Staging and local keep
+    /docs, /redoc and /openapi.json (smoke suite, schema.ts dumps)."""
+    if (environment or "").strip().lower() == "production":
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
 app = FastAPI(
     title="AV Suite Backend Foundation",
     version="0.1.0",
     description="Rehabilitation exercises management backend platform",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    **api_docs_urls(settings.ENVIRONMENT),
 )
 
 # Register central exception handler for custom application errors

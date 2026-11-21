@@ -25,6 +25,9 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-at-least-32-chars-long-
 os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("CLINIC_DOCUMENTS_BUCKET", "test-bucket")
+# Test fixtures still create clinics through POST /auth/register; prod keeps
+# it off (AUD-04, see tests/test_l2_security.py for the 404 check).
+os.environ.setdefault("SELF_SIGNUP_ENABLED", "true")
 
 from app.main import app
 from app.core.database import get_db

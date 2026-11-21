@@ -36,6 +36,7 @@ from app.schemas.envelope import ResponseEnvelope
 from app.services import auth_service
 from app.models.membership import Membership
 import logging
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,7 @@ async def get_me(
     "/register",
     response_model=ResponseEnvelope[TokenResponse],
     status_code=201,
+    include_in_schema=False,
     tags=["Authentication"],
 )
 async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
@@ -155,6 +157,11 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         "clinic_name": "City Medical Clinic"
       }'
     """
+    if not settings.SELF_SIGNUP_ENABLED:
+        # AUD-04: signup is closed for launch; answer like an unknown route so
+        # the endpoint cannot be probed for email enumeration.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
 
     logger.info(f"Registration request received for email: {request.email}")
 
