@@ -133,7 +133,10 @@ async def patch_prescription(
             await repo.update_prescription_items(prescription_id, patch)
 
         await db.commit()
-        # Fetch again to ensure all relationships are fresh and loaded
+        # Fetch again to ensure all relationships are fresh and loaded. The
+        # loaded rx still held the old items in the session, so the response
+        # showed them after a PATCH (found 20 Nov, EL side test): expire it.
+        db.expire(rx)
         return await get_prescription_by_id(db, clinic_id, prescription_id)
     except Exception as e:
         logger.error(f"Error updating prescription {prescription_id}: {str(e)}")
@@ -186,6 +189,8 @@ def _rx_doc(rx: Prescription) -> RxDoc:
                 # downloaded into the PDF (EL-D-003).
                 image_url=(exercise_media.image_url(ex.video_url) if ex else None),
                 exercise_id=(str(ex.id) if ex else None),
+                rx_mode=(ex.rx_mode if ex and ex.rx_mode else "PATIENT"),
+                side=item.side,
             )
         )
     return RxDoc(

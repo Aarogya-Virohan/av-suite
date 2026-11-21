@@ -17,7 +17,15 @@ export interface Exercise {
   isGlobal?: boolean;
   /** Ids of the categories the exercise carries (EL-D-005). */
   categoryIds?: string[];
+  /** How it may go on a home prescription (EL-D-013). BLOCKED = therapist only. */
+  rxMode?: RxMode;
+  /** The therapist must pick the affected side (EL-D-014, Self-Epley). */
+  requiresSide?: boolean;
 }
+
+/** HIDDEN (EL-D-017): never listed; can still arrive from an old Rx or template. */
+export type RxMode = "PATIENT" | "CAREGIVER" | "BLOCKED" | "HIDDEN";
+export type Side = "left" | "right";
 
 export type PhotoAngle = "front" | "side";
 
@@ -34,6 +42,7 @@ export interface PrescriptionItem {
   hold: number;
   frequency: string;
   note?: string;
+  side?: Side;
 }
 
 export interface Patient {
@@ -59,6 +68,7 @@ export interface SavedPrescription {
     hold: number;
     frequency: string;
     note?: string | null;
+    side?: Side | null;
     exercise?: Record<string, unknown> | null;
   }>;
 }

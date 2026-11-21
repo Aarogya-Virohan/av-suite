@@ -59,6 +59,9 @@ class ExerciseRead(ExerciseBase):
     # Categories in filter panel order. Filled by the list, detail, create and
     # update endpoints; empty elsewhere (EL-D-005).
     categories: list[ExerciseCategoryRef] = []
+    # EL-D-013 / EL-D-014. Read-only; set by data migrations only.
+    rx_mode: str = "PATIENT"
+    requires_side: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

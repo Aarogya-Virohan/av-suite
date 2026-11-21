@@ -17,7 +17,7 @@ from app.schemas.prescription import (
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
-from app.services import prescription_service
+from app.services import prescription_service, rx_rules
 from app.services.audit import log_event_safely
 from fastapi.responses import Response
 
@@ -49,6 +49,7 @@ async def create_prescription(
     try:
         clinic_id = request.state.clinic_id
         physio_id = user.id
+        await rx_rules.check_items(db, prescription_in.items)
 
         prescription = await prescription_service.create_prescription(
             # user.id is already a UUID object; uuid.UUID() only accepts a string,
@@ -189,6 +190,8 @@ async def update_prescription(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only edit your own prescriptions.",
             )
+        if patch_in.items is not None:
+            await rx_rules.check_items(db, patch_in.items)
         prescription = await prescription_service.patch_prescription(
             db, uuid.UUID(clinic_id), id, patch_in
         )
