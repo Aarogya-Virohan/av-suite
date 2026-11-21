@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 import uuid
 from datetime import datetime
 from app.schemas.exercise import ExerciseRead
@@ -14,6 +14,8 @@ class PrescriptionItemCreate(BaseModel):
     frequency: str = "Daily"
     hold_angle: Optional[int] = None
     note: Optional[str] = None
+    # Required for exercises with requires_side (EL-D-014); ignored otherwise.
+    side: Optional[Literal["left", "right"]] = None
 
 class PrescriptionItemRead(BaseModel):
     id: uuid.UUID
@@ -25,6 +27,7 @@ class PrescriptionItemRead(BaseModel):
     frequency: str
     hold_angle: Optional[int]
     note: Optional[str]
+    side: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     exercise: Optional[ExerciseRead] = None

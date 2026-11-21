@@ -9,6 +9,7 @@ from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
+from jwt import PyJWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -126,9 +127,11 @@ async def get_authenticated_context(
 
     try:
         claims = decode_token(token)
-        user_id = UUID(claims["sub"])
-        clinic_id = UUID(claims["clinic_id"])
-    except (ValueError, KeyError) as exc:
+        user_id = UUID(str(claims["sub"]))
+        clinic_id = UUID(str(claims["clinic_id"]))
+    except (PyJWTError, ValueError, KeyError, TypeError) as exc:
+        # AUD-02 / L-47: expired, bad-signature or garbage tokens are 401,
+        # never 500, so the frontends can send the user back to login.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials clinic mismatch",

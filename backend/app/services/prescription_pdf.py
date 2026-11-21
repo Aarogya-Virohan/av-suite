@@ -65,11 +65,13 @@ DOC_TITLE = "Home Exercise Programme"
 # Founders' feedback 23 Oct 2026, item 4 (was "Physical Therapy & Rehabilitation").
 LETTERHEAD_SUBTITLE = "Exercise Prescription Tool"
 
-# Wording taken from the old browser print view (A4PrintView.tsx), not new.
+# Stop-pain line closing every prescription (plan C5, EL-D-015). Founders can
+# change the wording at any time; it lives only here.
 SAFETY_NOTE = (
-    "If you experience sharp pain during any exercise, stop immediately and "
-    "contact your therapist."
+    "Stop and contact your physiotherapist if you feel sharp pain, dizziness, "
+    "chest pain or numbness."
 )
+CAREGIVER_LABEL = "Caregiver-assisted"
 
 # Image fetching limits.
 IMAGE_TIMEOUT_S = 6.0
@@ -103,6 +105,9 @@ class RxItem:
     # present they replace the library picture.
     exercise_id: str | None = None
     photo_srcs: list[str] = field(default_factory=list)
+    # EL-D-013 / EL-D-014: caregiver label and the side the therapist picked.
+    rx_mode: str = "PATIENT"
+    side: str | None = None
 
 
 @dataclass
@@ -353,14 +358,24 @@ def _exercise_card(index: int, item: RxItem) -> str:
         if item.note
         else ""
     )
+    # Only the brief description prints (plan C3); the longer "About this
+    # exercise" text is not stored on the exercise and never reaches the PDF.
     instructions = (
         f'<p class="ex-instr">{_esc(item.instructions)}</p>' if item.instructions else ""
     )
+    flags = ""
+    if item.side in ("left", "right"):
+        flags += f'<span class="ex-flag side">{_esc(item.side.capitalize())} side</span>'
+    if item.rx_mode == "CAREGIVER":
+        flags += f'<span class="ex-flag care">{_esc(CAREGIVER_LABEL)}</span>'
+    if flags:
+        flags = f'<p class="ex-flags">{flags}</p>' 
     return f"""
 <div class="ex-card">
   <p class="ex-head"><span class="ex-num">{index}</span>
     <span class="ex-title">{_esc(display_title(item.title))}</span>
     <span class="ex-part">{_esc(item.body_part)}</span></p>
+  {flags}
   <div class="{img_class}">{image}</div>
   <table class="ex"><tr>
   <td class="ex-body">
@@ -471,6 +486,11 @@ p {{ margin: 0; }}
   text-transform: uppercase; color: {MUTED}; }}
 .dose .v {{ display: block; font-weight: 700; font-size: 10pt; color: {INK}; }}
 .ex-instr {{ font-size: 8.8pt; color: {INK}; }}
+.ex-flags {{ margin: -0.6mm 0 2mm 0; }}
+.ex-flag {{ display: inline-block; font-size: 7.4pt; font-weight: 700; border-radius: 1.6mm;
+  padding: 0.6mm 2mm; margin-right: 1.6mm; }}
+.ex-flag.side {{ color: #fff; background: {MIDNIGHT}; }}
+.ex-flag.care {{ color: {BRAND_DARK}; background: #fff; border: 1px solid {GROVE}; }}
 .ex-note {{ margin-top: 1.6mm; font-size: 8.4pt; color: {INK}; border-left: 0.7mm solid {GROVE};
   padding-left: 2.4mm; }}
 .ex-note span {{ display: block; font-size: 6.2pt; font-weight: 700; letter-spacing: 0.8px;

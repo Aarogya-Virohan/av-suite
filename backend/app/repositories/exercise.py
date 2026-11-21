@@ -35,7 +35,8 @@ class ExerciseRepository(BaseRepository[Exercise]):
             or_(
                 Exercise.clinic_id == uuid.UUID(clinic_id),
                 Exercise.clinic_id.is_(None)
-            )
+            ),
+            Exercise.rx_mode != "HIDDEN",  # EL-D-017
         )
 
         if body_part:
@@ -85,7 +86,7 @@ class ExerciseRepository(BaseRepository[Exercise]):
             Exercise.clinic_id.is_(None),
         )
         part = func.coalesce(func.nullif(func.trim(Exercise.body_part), ""), "Other")
-        query = select(part, func.count()).where(visible).group_by(part)
+        query = select(part, func.count()).where(visible, Exercise.rx_mode != "HIDDEN").group_by(part)
         rows = (await self.session.execute(query)).all()
         return sorted(((name, count) for name, count in rows), key=lambda r: sort_key(r[0]))
 

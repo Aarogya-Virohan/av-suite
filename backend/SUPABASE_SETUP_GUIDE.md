@@ -67,7 +67,7 @@ Components:
 - database: "postgres" (default database)
 
 Example:
-postgresql+asyncpg://postgres.vlupywockwfvcduaiwrn:AZ^EYQa$khCa1MCKvUvf@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres
+postgresql+asyncpg://postgres.<project-ref>:<db-password>@aws-1-<region>.pooler.supabase.com:5432/postgres
 */
 
 

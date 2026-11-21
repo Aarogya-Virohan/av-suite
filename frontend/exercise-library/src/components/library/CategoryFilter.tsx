@@ -46,6 +46,23 @@ export function CategoryFilter({ groups, selected, onChange, total, unavailable 
   const toggle = (id: string) =>
     onChange(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
 
+  // Category values follow the picked domains (EL-D-012): with no domain
+  // picked all 51 show; a ticked category always stays visible.
+  const shownGroups = useMemo(() => {
+    const domains = groups.find((g) => g.key === "domain");
+    const picked = new Set(domains ? domains.values.filter((v) => selected.includes(v.id)).map((v) => v.id) : []);
+    if (picked.size === 0) return groups;
+    return groups.map((g) =>
+      g.key === "category"
+        ? {
+            ...g,
+            label: `${g.label} (in picked domain${picked.size > 1 ? "s" : ""})`,
+            values: g.values.filter((v) => (v.parent_id && picked.has(v.parent_id)) || selected.includes(v.id)),
+          }
+        : g
+    );
+  }, [groups, selected]);
+
   return (
     <div>
       <button
@@ -129,7 +146,7 @@ export function CategoryFilter({ groups, selected, onChange, total, unavailable 
               </button>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto p-3">
-              {groups.map((g) => (
+              {shownGroups.map((g) => (
                 <GroupBox key={g.key} group={g} selected={selected} onToggle={toggle} />
               ))}
             </div>
