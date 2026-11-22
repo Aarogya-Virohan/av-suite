@@ -6,8 +6,13 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { SlideOver } from '../../../components/ui/SlideOver';
 import { useCreateUser } from '../api';
+import { apiErrorCode } from '../../../lib/api-client';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
+import { hasCapability } from '../../../config/permissions';
+import { useAuthStore } from '../../../store';
+import { type ToolKey, useUserTools } from '../tools';
+import { ToolCheckboxes } from './ToolCheckboxes';
 
 interface Props {
   isOpen: boolean;
@@ -34,7 +39,13 @@ export function AddUserSlideOver({ isOpen, onClose }: Props) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [tools, setTools] = useState<ToolKey[]>([]);
   const createUser = useCreateUser();
+  // Sending tools needs permissions.edit (BE-1). The clinic plan (available)
+  // is read from the signed-in user's own tool record.
+  const canSetTools = hasCapability('permissions.edit');
+  const myId = useAuthStore((s) => s.userId);
+  const { data: myTools } = useUserTools(myId, isOpen && canSetTools);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -43,6 +54,7 @@ export function AddUserSlideOver({ isOpen, onClose }: Props) {
       setEmail('');
       setPassword('');
       setRole('');
+      setTools([]);
       setErrors({});
     }
   }, [isOpen]);
@@ -69,11 +81,16 @@ export function AddUserSlideOver({ isOpen, onClose }: Props) {
         email: email.trim(),
         password,
         role,
+        ...(canSetTools && tools.length ? { tools: tools.filter((t) => myTools?.available?.[t] !== false) } : {}),
       });
       toast.success(`${firstName.trim()} ${lastName.trim()} added`);
       onClose();
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to create user');
+      toast.error(
+        apiErrorCode(err) === 'EMAIL_TAKEN' || err?.response?.status === 409
+          ? 'This email already has an AV Suite account. Use a different email.'
+          : err?.message || 'Failed to create user',
+      );
     }
   };
 
@@ -120,6 +137,9 @@ export function AddUserSlideOver({ isOpen, onClose }: Props) {
           </select>
           {errors.role && <p className={errorText}>{errors.role}</p>}
         </div>
+        {canSetTools && role && (
+          <ToolCheckboxes value={tools} onChange={setTools} available={myTools?.available} labels={myTools?.labels} role={role} />
+        )}
         <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
