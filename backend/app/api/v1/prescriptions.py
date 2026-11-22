@@ -276,7 +276,7 @@ async def generate_pdf(
                 detail="You can only generate your own prescription PDF.",
             )
         response = await prescription_service.generate_prescription_pdf_response(
-            db, uuid.UUID(clinic_id), id
+            db, uuid.UUID(clinic_id), id, user_id=user.id
         )
         return ResponseEnvelope(data=response)
     except ValueError as e:

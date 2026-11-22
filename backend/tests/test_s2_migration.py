@@ -52,7 +52,7 @@ async def test_s2_migration_round_trip_and_schema(test_database_url_safety_check
         await admin.close()
     database_url = make_url(source).set(database=name).render_as_string(hide_password=False)
     try:
-        _alembic(database_url, "upgrade", "head")
+        _alembic(database_url, "upgrade", S2_REVISION)
         conn = await asyncpg.connect(database_url.replace("+asyncpg", ""))
         try:
             tables = await conn.fetch("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename IN ('platform_operators', 'platform_audit_logs', 'platform_auth_rate_limits')")
@@ -86,8 +86,10 @@ async def test_s2_migration_round_trip_and_schema(test_database_url_safety_check
             assert remaining == 0
         finally:
             await conn.close()
-        _alembic(database_url, "upgrade", "head")
+        _alembic(database_url, "upgrade", S2_REVISION)
         assert S2_REVISION in _alembic(database_url, "current")
+        _alembic(database_url, "upgrade", "head")
+        assert "s3usage20261122" in _alembic(database_url, "current")
         assert _alembic(database_url, "heads").count("(head)") == 1
     finally:
         admin = await asyncpg.connect(admin_dsn)

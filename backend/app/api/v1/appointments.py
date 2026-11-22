@@ -72,7 +72,7 @@ async def create_appointment(
         )
 
     try:
-        appointment = await service.create_appointment(clinic.id, payload)
+        appointment = await service.create_appointment(clinic.id, payload, user_id=user.id)
         await log_event_safely(service.appointment_repository.session, clinic.id, user.id, "create", "appointment", appointment.id,
                                {"patient_id": str(appointment.patient_id), "therapist_id": str(appointment.therapist_id)})
         return AppointmentResponse.model_validate(appointment)

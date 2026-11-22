@@ -29,6 +29,7 @@ from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 from app.core.security import get_password_hash, verify_password, create_access_token
 from app.services.product_entitlements import ensure_crm_entitlement
 from app.services.clinic_status import ensure_clinic_active
+from app.services.usage_events import record_usage
 from app.exceptions import BaseAppException
 import logging
 import uuid
@@ -282,6 +283,9 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
             role=active_membership.role.value,
         )
 
+        clinic = await db.get(Clinic, active_membership.clinic_id)
+        if clinic is not None:
+            await record_usage(db, clinic, user.id, "platform", "login")
         logger.info(f"Successful login for user: {user.id}")
         return TokenResponse(access_token=access_token)
 
