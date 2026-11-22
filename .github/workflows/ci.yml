@@ -106,9 +106,10 @@ jobs:
         working-directory: backend
     env:
       # Dummy values: the tests need these set, never real secrets.
-      JWT_SECRET_KEY: ci-only-not-a-secret
+      JWT_SECRET_KEY: c1f230d789abcec1f230d789abcec1f230d789abcec1f230d789abcec1f230d7
+      PLATFORM_MFA_KEY: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
       SUPABASE_URL: http://localhost
-      SUPABASE_SECRET_KEY: ci-only-not-a-secret
+      SUPABASE_SECRET_KEY: c1f230d789abcec1f230d789abcec1f230d789abcec1f230d789abcec1f230d7
     steps:
       - uses: actions/checkout@v5
       - name: System libraries (same as backend/Dockerfile)

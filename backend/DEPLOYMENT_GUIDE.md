@@ -657,3 +657,7 @@ For more information:
 - Docker Documentation: https://docs.docker.com
 - Kubernetes Documentation: https://kubernetes.io/docs
 - Nginx Documentation: https://nginx.org/en/docs
+
+## Platform Auth deployment requirement
+
+`PLATFORM_MFA_KEY` is a required environment variable and must be configured in Railway before merging/deploying S2. Generate it securely with `Fernet.generate_key()` and store it in the Railway service environment. The service may fail to start if this variable is missing or invalid.
