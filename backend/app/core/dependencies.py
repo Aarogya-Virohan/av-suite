@@ -11,8 +11,6 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-
 def get_client_ip(request: Request) -> str:
     """
     Extract the real client IP address from Cloudflare or reverse proxy headers.
@@ -305,3 +303,25 @@ async def require_front_desk(
     return _require_user_roles(
         auth_context.user, auth_context.membership_role, (UserRole.FRONT_DESK,)
     )
+
+
+async def get_platform_operator(token: TokenDep, session: SessionDep, request: Request):
+    """Authenticate only AV platform tokens; clinic identities never cross this boundary."""
+    import jwt
+    from app.core.config import settings
+    from app.exceptions import BaseAppException
+    from app.models.platform import PlatformOperator
+
+    try:
+        claims = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM], audience="av-platform", options={"require": ["sub", "aud", "typ", "ver", "exp"]})
+        if claims.get("typ") != "platform":
+            raise jwt.InvalidTokenError("Wrong token type")
+        operator_id = UUID(claims["sub"])
+    except (jwt.PyJWTError, ValueError, KeyError, TypeError) as exc:
+        raise BaseAppException("Unauthorized", "UNAUTHORIZED", 401) from exc
+
+    operator = await session.get(PlatformOperator, operator_id)
+    if operator is None or not operator.is_active or claims.get("ver") != operator.token_version:
+        raise BaseAppException("Unauthorized", "UNAUTHORIZED", 401)
+    request.state.platform_operator_token_version = claims["ver"]
+    return operator

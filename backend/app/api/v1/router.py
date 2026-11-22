@@ -6,6 +6,7 @@ Purpose: API V1 endpoints ko consolidate aur organize karna.
 from fastapi import APIRouter
 from app.api.v1 import (
     auth,
+    platform_auth,
     exercises,
     exercise_templates,
     patients,
@@ -34,6 +35,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 api_router = APIRouter()
+api_router.include_router(platform_auth.router, prefix="/platform", tags=["Platform authentication"])
 
 # --- Existing routers (unchanged) ---
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
