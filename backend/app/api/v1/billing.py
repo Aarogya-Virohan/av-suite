@@ -331,7 +331,7 @@ async def create_invoice(
     """Create a new invoice with line items for the clinic."""
 
     try:
-        invoice = await service.create_invoice(clinic.id, payload)
+        invoice = await service.create_invoice(clinic.id, payload, user_id=user.id)
         await log_event_safely(service.invoice_repository.session, clinic.id, user.id, "create", "invoice", invoice.id,
                                {"patient_id": str(invoice.patient_id), "total_amount": str(invoice.total_amount),
                                 "discount_reason": invoice.discount_reason})
@@ -544,7 +544,7 @@ async def record_payment_for_invoice(
         )
 
     try:
-        payment = await service.record_payment(clinic.id, payload)
+        payment = await service.record_payment(clinic.id, payload, user_id=user.id)
         await log_event_safely(service.payment_repository.session, clinic.id, user.id, "create", "payment", payment.id,
                                {"invoice_id": str(payment.invoice_id), "patient_id": str(payment.patient_id), "amount": str(payment.amount)})
         return PaymentResponse.model_validate(payment)
@@ -571,7 +571,7 @@ async def record_payment(
     """Record a payment against an invoice."""
 
     try:
-        payment = await service.record_payment(clinic.id, payload)
+        payment = await service.record_payment(clinic.id, payload, user_id=user.id)
         await log_event_safely(service.payment_repository.session, clinic.id, user.id, "create", "payment", payment.id,
                                {"invoice_id": str(payment.invoice_id), "patient_id": str(payment.patient_id), "amount": str(payment.amount)})
         return PaymentResponse.model_validate(payment)

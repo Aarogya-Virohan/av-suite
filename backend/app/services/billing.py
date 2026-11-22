@@ -17,6 +17,8 @@ from app.services.invoice_pdf import (
 from app.enums.billing import InvoiceStatus, PaymentStatus
 from app.enums.package import PackageStatus
 from app.models.billing import Invoice, Package, PatientPackage, Payment, InvoiceCounter
+from app.models.clinic import Clinic
+from app.services.usage_events import record_usage
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.billing import (
@@ -280,7 +282,7 @@ class BillingService:
 
     # --- Invoice Methods ---
 
-    async def create_invoice(self, clinic_id: UUID, payload: InvoiceCreate) -> Invoice:
+    async def create_invoice(self, clinic_id: UUID, payload: InvoiceCreate, user_id: UUID | None = None) -> Invoice:
         """Create a clinic-scoped invoice with line items, calculating subtotal and total."""
 
         patient = await self.patient_repository.get_by_patient_id(
@@ -446,6 +448,10 @@ class BillingService:
             raise BillingNotFoundError(
                 f"Created invoice '{invoice.id}' could not be reloaded."
             )
+        await self.invoice_repository.session.flush()
+        clinic = await self.invoice_repository.session.get(Clinic, clinic_id)
+        if clinic is not None:
+            await record_usage(self.invoice_repository.session, clinic, user_id, "crm", "invoice_created")
         await self.invoice_repository.session.commit()
         return loaded_invoice
 
@@ -583,7 +589,7 @@ class BillingService:
             in str(original).lower()
         )
 
-    async def record_payment(self, clinic_id: UUID, payload: PaymentCreate) -> Payment:
+    async def record_payment(self, clinic_id: UUID, payload: PaymentCreate, user_id: UUID | None = None) -> Payment:
         """Record a payment against an invoice and update invoice status."""
 
         invoice = await self.invoice_repository.get_by_id_with_items(
@@ -637,6 +643,10 @@ class BillingService:
         )
         if loaded_payment is None:
             raise BillingNotFoundError(f"Created payment '{payment.id}' could not be reloaded.")
+        await self.payment_repository.session.flush()
+        clinic = await self.payment_repository.session.get(Clinic, clinic_id)
+        if clinic is not None:
+            await record_usage(self.payment_repository.session, clinic, user_id, "crm", "payment_recorded")
         await self.payment_repository.session.commit()
         return loaded_payment
 

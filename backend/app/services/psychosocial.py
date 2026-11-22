@@ -41,6 +41,7 @@ from app.screening.registry import get_instrument
 from app.screening.scoring import ScoringError, score
 from app.screening.types import Instrument, Item
 from app.services.audit import AuditLogService
+from app.services.usage_events import record_usage
 
 LINK_TTL_DAYS_DEFAULT = 7  # F5 default, pending founder sign-off
 LINK_TTL_DAYS_MAX = 30
@@ -254,6 +255,10 @@ async def create_assignment(
         for index, instrument in enumerate(instruments)
     ]
     db.add(assignment)
+    await db.flush()
+    clinic = await db.get(Clinic, clinic_id)
+    if clinic is not None:
+        await record_usage(db, clinic, user_id, "psycho-social-screening", "screening_assigned")
     if repeat_every_days is not None:
         # Same transaction: the link and its repeat are saved together.
         from app.services.psychosocial_schedule import upsert_schedules
@@ -1262,6 +1267,9 @@ async def submit_session(db: AsyncSession, token: str, instrument_id: str) -> Ps
     session.completed_at = utcnow()
     session.status = "completed"
     await db.flush()
+    clinic = await db.get(Clinic, session.clinic_id)
+    if clinic is not None:
+        await record_usage(db, clinic, assignment.assigned_by, "psycho-social-screening", "screening_completed")
 
     await db.refresh(assignment, attribute_names=["sessions"])
     if all(s.status == "completed" for s in assignment.sessions):

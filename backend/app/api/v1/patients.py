@@ -245,7 +245,9 @@ async def create_patient(
         
         # Service layer ko call karte hain
         # New patient database record create hota hai
-        patient = await patient_service.create_patient(db, clinic_id, patient_in)
+        patient = await patient_service.create_patient(
+            db, clinic_id, patient_in, user_id=getattr(request.state, "user_id", None)
+        )
         
         await audit_service.log_event(
             clinic_id=clinic_id,

@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     auth,
     platform_auth,
+    platform_api,
     exercises,
     exercise_templates,
     patients,
@@ -35,6 +36,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 api_router = APIRouter()
+api_router.include_router(platform_api.router, prefix="/platform", tags=["Platform API"])
 api_router.include_router(platform_auth.router, prefix="/platform", tags=["Platform authentication"])
 
 # --- Existing routers (unchanged) ---
