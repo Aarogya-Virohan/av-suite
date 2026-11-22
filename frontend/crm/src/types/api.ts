@@ -21,6 +21,8 @@ export interface User {
   last_name: string;
   phone?: string | null;
   is_active: boolean;
+  /** BE-1: effective tool state, e.g. {"exercise-library": true}. Missing on older APIs. */
+  tools?: Partial<Record<'psycho-social-screening' | 'exercise-library' | 'posture-tool', boolean>>;
   created_at?: string;
   updated_at?: string;
 }

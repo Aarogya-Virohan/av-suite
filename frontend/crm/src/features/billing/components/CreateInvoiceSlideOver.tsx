@@ -11,7 +11,8 @@ import { invoiceFormSchema, InvoiceFormValues } from '../../../lib/schemas';
 // INV-0002, ...) and any number sent by the client is ignored, so the form
 // has no number field. The number is shown after the invoice is created.
 import { useCreateInvoice, usePackages, type InvoiceCreatePayload } from '../api';
-import { usePatients } from '../../patients/api';
+import { usePatientCaseId, usePatients } from '../../patients/api';
+import { useFeeItems, feeCategoryLabel } from '../../settings/feeItems';
 import { hasCapability } from '../../../config/permissions';
 import { Button, FieldLabel, inputClass } from '../../../components/ui/brand';
 import { formatMoney } from '../../../lib/money';
@@ -81,6 +82,9 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
   // Packages from the clinic's catalogue can be added as a ready line (C-15).
   const { data: packages = [] } = usePackages(isOpen && hasCapability('packages.view'));
   const activePackages = packages.filter((p) => p.status === 'active');
+  // Clinic fee list from Settings (CRM-2). Same capability as this form.
+  const { data: feeItems = [] } = useFeeItems(isOpen && hasCapability('invoices.create'));
+  const caseId = usePatientCaseId();
   // Discount and tax can be typed in rupees or percent (C-16). A percent is
   // sent as discount_percent / tax_percent and the server works out the rupee
   // amount, so the invoice keeps the percent for printing (D-026).
@@ -152,10 +156,21 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
       unit_price: Number(pkg.price),
       total_price: Number(pkg.price),
     };
+    putLine(line);
+  };
+
+  // Fill the empty starting line instead of leaving a blank one behind.
+  const putLine = (line: InvoiceFormValues['items'][number]) => {
     const first = items[0];
-    // Fill the empty starting line instead of leaving a blank one behind.
     if (items.length === 1 && !first?.description?.trim() && !num(first?.unit_price)) update(0, line);
     else append(line);
+  };
+
+  const addFeeItem = (feeId: string) => {
+    const fee = feeItems.find((f) => f.id === feeId);
+    if (!fee) return;
+    const price = Number(fee.default_price);
+    putLine({ description: fee.name, quantity: 1, unit_price: price, total_price: price, fixed_price: !fee.price_editable });
   };
   const totalAmount = paise(Math.max(0, subtotal - discountAmount + taxAmount));
   const reasonNeeded = needsDiscountReason({
@@ -200,7 +215,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
         subtotal,
         total_amount: totalAmount,
         items: values.items.map((i) => ({
-          ...i,
+          quantity: i.quantity,
           description: i.description.trim(),
           unit_price: paise(num(i.unit_price)),
           total_price: paise(num(i.quantity || 1) * num(i.unit_price)),
@@ -225,7 +240,7 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
             <option value="">Select patient…</option>
             {patients.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.first_name} {p.last_name} ({p.phone})
+                {p.first_name} {p.last_name} ({p.phone}){p.display_number != null ? ` · ${caseId(p.display_number)}` : ''}
               </option>
             ))}
           </select>
@@ -256,7 +271,22 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-line pb-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-grove">Line Items</h4>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            {feeItems.length > 0 && (
+              <select
+                aria-label="Add a fee item from the fee list"
+                value=""
+                onChange={(e) => addFeeItem(e.target.value)}
+                className="h-8 max-w-[180px] cursor-pointer rounded-lg border border-line bg-card px-2 text-xs font-semibold text-ink-2 transition-colors hover:border-grove focus:border-grove focus:outline-none"
+              >
+                <option value="">+ Add fee item…</option>
+                {feeItems.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} · {rupees(Number(f.default_price))} ({feeCategoryLabel(f.category)})
+                  </option>
+                ))}
+              </select>
+            )}
             {activePackages.length > 0 && (
               <select
                 aria-label="Add a package from the catalogue"
@@ -323,8 +353,10 @@ export function CreateInvoiceSlideOver({ isOpen, onClose }: CreateInvoiceSlideOv
                       type="number"
                       min={0}
                       step="0.01"
+                      readOnly={!!items[idx]?.fixed_price}
+                      title={items[idx]?.fixed_price ? 'Fixed price from the fee list' : undefined}
                       aria-label={`Item ${idx + 1} unit price`}
-                      className={cn(smallInput, itemErr?.unit_price && 'border-danger')}
+                      className={cn(smallInput, items[idx]?.fixed_price && 'cursor-not-allowed bg-slate-100', itemErr?.unit_price && 'border-danger')}
                     />
                   </div>
                   <div>
