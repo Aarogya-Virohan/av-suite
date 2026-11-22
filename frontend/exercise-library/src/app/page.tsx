@@ -8,9 +8,10 @@ import { SplitLayout } from "@/components/layout/SplitLayout";
 import { SearchBar } from "@/components/library/SearchBar";
 import { BodyPartFilter } from "@/components/library/BodyPartFilter";
 import { ExerciseList } from "@/components/library/ExerciseList";
+import { PhotoDialog } from "@/components/library/PhotoDialog";
 import { PrescriptionBuilder } from "@/components/prescription/PrescriptionBuilder";
-import { Exercise, PrescriptionItem } from "@/types/exercise";
-import { fetchBodyParts, fetchExercises, getToken, type BodyPartCount } from "@/lib/api";
+import { Exercise, ExercisePhoto, PrescriptionItem } from "@/types/exercise";
+import { can, fetchBodyParts, fetchExercises, fetchMe, getToken, type BodyPartCount } from "@/lib/api";
 
 const SEARCH_DEBOUNCE_MS = 250;
 const PAGE_SIZE = 30;
@@ -36,12 +37,27 @@ export default function Home() {
   // Bumped on every new search/filter; a page that arrives for an older
   // query is dropped instead of being appended to the new list.
   const queryVersion = useRef(0);
+  // Clinic photos: who may add them, and which exercise is open.
+  const [canEditPhotos, setCanEditPhotos] = useState(false);
+  const [photoExerciseId, setPhotoExerciseId] = useState<string | null>(null);
   const moreController = useRef<AbortController | null>(null);
 
   // Route guard.
   useEffect(() => {
     if (!getToken()) router.replace("/login");
   }, [router]);
+
+  useEffect(() => {
+    if (!getToken()) return;
+    fetchMe()
+      .then((me) => setCanEditPhotos(can(me, "exercises.edit")))
+      .catch(() => setCanEditPhotos(false));
+  }, []);
+
+  const updatePhotos = useCallback((exerciseId: string, photos: ExercisePhoto[]) => {
+    setExercises((prev) => prev.map((e) => (e.id === exerciseId ? { ...e, photos } : e)));
+  }, []);
+  const photoExercise = exercises.find((e) => e.id === photoExerciseId) ?? null;
 
   // Debounce typing so a word is one request, not one per letter.
   useEffect(() => {
@@ -234,6 +250,7 @@ export default function Home() {
                 loadingMore={loadingMore}
                 loadMoreError={loadMoreError}
                 onLoadMore={loadMore}
+                onEditPhotos={canEditPhotos ? (e) => setPhotoExerciseId(e.id) : undefined}
               />
             </>
           }
@@ -245,6 +262,13 @@ export default function Home() {
               onReplace={setPrescription}
             />
           }
+        />
+      )}
+      {photoExercise && (
+        <PhotoDialog
+          exercise={photoExercise}
+          onClose={() => setPhotoExerciseId(null)}
+          onPhotosChange={updatePhotos}
         />
       )}
     </div>

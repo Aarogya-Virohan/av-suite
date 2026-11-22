@@ -22,11 +22,27 @@ class ExerciseUpdate(BaseModel):
     is_free: Optional[bool] = None
     video_url: Optional[str] = None
 
+class ExercisePhotoInfo(BaseModel):
+    """One of the caller's clinic photos for an exercise. The image itself is
+    served by GET /exercises/{id}/photos/{angle}; updated_at changes on every
+    upload, so clients can use it to refresh a cached copy."""
+
+    angle: str
+    width: int
+    height: int
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ExerciseRead(ExerciseBase):
     id: uuid.UUID
     clinic_id: Optional[uuid.UUID]
     created_at: datetime
     updated_at: datetime
+    # The caller's clinic photos (front, side). Filled by the list and detail
+    # endpoints; empty elsewhere (EL-D-004).
+    photos: list[ExercisePhotoInfo] = []
 
     model_config = ConfigDict(from_attributes=True)
 

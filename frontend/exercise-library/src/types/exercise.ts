@@ -11,6 +11,16 @@ export interface Exercise {
   isFree: boolean;
   videoUrl?: string;
   imageUrl?: string;
+  /** The clinic's own photos of this exercise (front, side). */
+  photos?: ExercisePhoto[];
+}
+
+export type PhotoAngle = "front" | "side";
+
+export interface ExercisePhoto {
+  angle: PhotoAngle;
+  /** Changes on every upload; used to refresh a cached copy. */
+  updatedAt: string;
 }
 
 export interface PrescriptionItem {

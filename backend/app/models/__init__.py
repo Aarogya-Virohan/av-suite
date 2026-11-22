@@ -11,6 +11,7 @@ from app.models.product import (
 )
 from app.models.patient import Patient, PatientStatus
 from app.models.exercise import Exercise
+from app.models.exercise_photo import ExercisePhoto
 from app.models.prescription import Prescription, PrescriptionItem
 from app.models.posture_session import PostureSession, PostureMeasurement
 
@@ -40,6 +41,7 @@ __all__ = [
     "Patient",
     "PatientStatus",
     "Exercise",
+    "ExercisePhoto",
     "Prescription",
     "PrescriptionItem",
     "PostureSession",

@@ -17,6 +17,7 @@ interface ExerciseListProps {
   loadingMore: boolean;
   loadMoreError: string | null;
   onLoadMore: () => void;
+  onEditPhotos?: (exercise: Exercise) => void;
 }
 
 /**
@@ -35,6 +36,7 @@ export function ExerciseList({
   loadingMore,
   loadMoreError,
   onLoadMore,
+  onEditPhotos,
 }: ExerciseListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -94,6 +96,7 @@ export function ExerciseList({
           exercise={exercise}
           isAdded={addedIds.includes(exercise.id)}
           onAdd={onAdd}
+          onEditPhotos={onEditPhotos}
         />
       ))}
 

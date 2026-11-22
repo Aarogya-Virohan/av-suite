@@ -20,7 +20,7 @@ Features:
 - Pagination support: Large exercise libraries handle
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 import uuid
@@ -30,11 +30,11 @@ from app.enums.user import UserRole
 from app.core.database import get_db
 from app.core.dependencies import require_capability
 from app.enums.permission import CapabilityScope
-from app.schemas.exercise import ExerciseCreate, ExerciseRead, ExerciseUpdate
+from app.schemas.exercise import ExerciseCreate, ExercisePhotoInfo, ExerciseRead, ExerciseUpdate
 from app.schemas.envelope import ResponseEnvelope, MetaPagination
 from app.schemas.common import PaginationParams
 from app.dependencies.pagination import get_pagination_params
-from app.services import exercise_service
+from app.services import exercise_photos, exercise_service
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ async def list_exercises(
         )
 
         logger.info(f"Retrieved {len(exercises)} exercises, total: {total}")
-        return ResponseEnvelope(data=exercises, meta=meta)
+        return ResponseEnvelope(data=await _with_photos(db, clinic_id, exercises), meta=meta)
 
     except Exception as e:
         logger.error(f"List exercises error: {str(e)}")
@@ -446,7 +446,7 @@ async def get_exercise(
             )
 
         logger.info(f"Exercise found: {exercise.id}")
-        return ResponseEnvelope(data=exercise)
+        return ResponseEnvelope(data=(await _with_photos(db, clinic_id, [exercise]))[0])
 
     except HTTPException:
         # Already handled exceptions ko re-raise karte hain
@@ -493,3 +493,125 @@ async def delete_exercise(
             detail="Exercise not found or not in caller's clinic",
         )
     return ResponseEnvelope(data={"message": "Exercise deleted successfully."})
+
+
+# --------------------------------------------------------------------------
+# Clinic photos of an exercise (front and side), EL-D-004
+# --------------------------------------------------------------------------
+
+
+async def _with_photos(db: AsyncSession, clinic_id, exercises) -> List[ExerciseRead]:
+    """ExerciseRead rows with the caller's clinic photos attached."""
+    rows = [ExerciseRead.model_validate(e) for e in exercises]
+    if not rows or not clinic_id:
+        return rows
+    photos = await exercise_photos.photos_for(
+        db, uuid.UUID(str(clinic_id)), [r.id for r in rows]
+    )
+    for r in rows:
+        r.photos = [
+            ExercisePhotoInfo.model_validate(p) for p in photos.get(r.id, [])
+        ]
+    return rows
+
+
+async def _visible_exercise(db: AsyncSession, clinic_id, exercise_id: uuid.UUID):
+    exercise = await exercise_service.get_exercise_by_id(db, str(clinic_id), str(exercise_id))
+    if not exercise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exercise not found or not in caller's clinic",
+        )
+    return exercise
+
+
+def _user_id(request: Request):
+    raw = getattr(request.state, "user_id", None)
+    try:
+        return uuid.UUID(str(raw)) if raw else None
+    except ValueError:
+        return None
+
+
+def _angle_or_422(angle: str) -> str:
+    try:
+        return exercise_photos.check_angle(angle)
+    except exercise_photos.PhotoError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+
+@router.put(
+    "/{id}/photos/{angle}",
+    response_model=ResponseEnvelope[ExercisePhotoInfo],
+    tags=["Exercises"],
+)
+async def upload_exercise_photo(
+    request: Request,
+    id: uuid.UUID,
+    angle: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_capability("exercises.edit")),
+):
+    """Add or replace this clinic's photo of an exercise from one angle.
+    Works for global exercises too; only this clinic sees the photo."""
+    angle = _angle_or_422(angle)
+    clinic_id = uuid.UUID(str(request.state.clinic_id))
+    await _visible_exercise(db, clinic_id, id)
+    raw = await file.read(exercise_photos.MAX_UPLOAD_BYTES + 1)
+    try:
+        row = await exercise_photos.save_photo(
+            db, clinic_id, id, angle, raw, _user_id(request)
+        )
+    except exercise_photos.PhotoError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    except exercise_photos.PhotoStorageUnavailable:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Photo storage is not available right now. Please try again later.",
+        )
+    return ResponseEnvelope(data=ExercisePhotoInfo.model_validate(row))
+
+
+@router.get("/{id}/photos/{angle}", tags=["Exercises"])
+async def get_exercise_photo(
+    request: Request,
+    id: uuid.UUID,
+    angle: str,
+    db: AsyncSession = Depends(get_db),
+    _: CapabilityScope = Depends(require_capability("exercises.view")),
+):
+    """The photo itself (JPEG), for the caller's clinic only."""
+    angle = _angle_or_422(angle)
+    clinic_id = uuid.UUID(str(request.state.clinic_id))
+    row = await exercise_photos.get_photo(db, clinic_id, id, angle)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    data = await exercise_photos.load_photo_bytes(row)
+    if data is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Photo storage is not available right now. Please try again later.",
+        )
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.delete(
+    "/{id}/photos/{angle}", response_model=ResponseEnvelope[dict], tags=["Exercises"]
+)
+async def delete_exercise_photo(
+    request: Request,
+    id: uuid.UUID,
+    angle: str,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_capability("exercises.edit")),
+):
+    angle = _angle_or_422(angle)
+    clinic_id = uuid.UUID(str(request.state.clinic_id))
+    if not await exercise_photos.delete_photo(db, clinic_id, id, angle):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
+    return ResponseEnvelope(data={"message": "Photo removed."})

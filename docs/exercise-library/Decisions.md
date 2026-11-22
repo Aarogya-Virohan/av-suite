@@ -59,6 +59,24 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 
 ---
 
+## [EL-D-004] Clinic photos of an exercise, front and side
+
+- **Date**: 2026-10-27
+- **Context**: Founders' feedback item 2 (23 Oct 2026): admin or therapist can take a picture of an exercise from two angles to personalise it. Answer to question 2 (27 Oct): option A, the clinic adds its own photos of the exercise and only that clinic sees them. Photos of patients are out of scope.
+- **Decision**:
+  - New table `exercise_photos` (migration `c1e5f7a9b3d2`): clinic, exercise, angle (`front` or `side`), storage key, size, uploader. One photo per clinic, exercise and angle. Works for global exercises too; the photo belongs to the clinic, not to the exercise.
+  - API: `PUT` and `DELETE /exercises/{id}/photos/{angle}` need `exercises.edit` (admins by default; a therapist only when the admin grants it, no role template changed). `GET /exercises/{id}/photos/{angle}` needs `exercises.view` and returns the JPEG for the caller's clinic only (`Cache-Control: private`). The list and detail responses carry `photos` (angle, size, `updated_at`) for the caller's clinic.
+  - Every upload is decoded and re-encoded as JPEG with Pillow: EXIF data (GPS, camera, time) is dropped, the long side is capped at 1600 px, only JPG, PNG and WebP of at least 200 px are accepted, 10 MB at most.
+  - Files go to the private bucket under `exercise-photos/<clinic>/<exercise>/<angle>-<random>.jpg`. No silent local fallback (Railway's disk is wiped on deploy): when storage is down the upload returns 503. A replaced or removed photo's file is deleted from the bucket (new `delete_file` in the shared `app/core/storage.py`, additive only). `EXERCISE_PHOTOS_LOCAL_DIR` is for local runs and must not be set on Railway.
+  - Library: the card shows the clinic's front photo before the library picture, with a "Clinic photo(s)" tag; users with `exercises.edit` get a camera button that opens front and side slots (add, replace, remove; on phones the file picker offers the camera). The dialog says "Use photos of the exercise only. Do not upload photos of patients."
+  - PDF: the clinic's photos replace the library picture (two side by side when both angles exist); the library picture is then not downloaded.
+- **Migration order**: the open CDSS branch also chains from `a8c4e2f1d903`. Whichever of the two reaches dev second points its first migration's `down_revision` at the other's last revision and is tested again (noted in the migration file).
+- **Verified**: backend `pytest` on a fresh Postgres: base `release/el-oct` 934a2b9 349 pass / 10 known environment failures; this branch 361 pass / the same 10 (12 new: EXIF removed and size capped, PNG with transparency, bad, tiny, GIF and oversize files refused, upload, view, list, replace (old file removed), delete, other clinic sees nothing and cannot delete, no photo on another clinic's own exercise, therapist with view only can see but not add, with `exercises.edit` can add, no storage gives 503 and saves nothing, bucket key and delete on replace, PDF uses both photos and skips the library picture). Mutations: dropping the clinic filter and writing EXIF back each made a test fail. Migration: upgrade, downgrade, upgrade on a fresh database; `alembic check` shows no difference for `exercise_photos` (two enum differences on `clinics.type` and `memberships.role` exist on the base too). Frontend `tsc`, `eslint`, `next build` clean. Playwright on the production build at 1440 and 390 px: camera button for the admin, bad file shows the error, front and side upload, remove, Escape closes, card shows the clinic photo after a reload, a therapist with view only sees the photo and no camera button; no page errors. Real PDF rasterised: two photos side by side, one photo, library picture.
+- **Not verified**: live upload to the Supabase bucket (tested with a fake bucket and local disk); phone camera capture on a real device.
+- **Affected Files**: `backend/alembic/versions/c1e5f7a9b3d2_exercise_photos.py`, `backend/app/models/exercise_photo.py`, `backend/app/models/__init__.py`, `backend/app/services/exercise_photos.py`, `backend/app/core/storage.py`, `backend/app/api/v1/exercises.py`, `backend/app/schemas/exercise.py`, `backend/app/services/prescription_service.py`, `backend/app/services/prescription_pdf.py`, `backend/tests/test_exercise_photos.py`, `frontend/exercise-library/src/**`
+
+---
+
 ## Known Limitations
 
 | # | Item | Status | Owner |
@@ -70,5 +88,7 @@ Earlier history in `docs/crm/Decisions.md`: D-021 (Exercise Library redesign and
 | EL-L-05 | Exercise pictures and videos share `video_url`. Since EL-D-003 the API reads them apart (`image_url`, `demo_video_url`); the stored column is still shared. No relative names left in production (24 Oct) | Partly fixed; proper media model with the founders' answer on personalised photos | Backend + founders |
 | EL-L-06 | The CRM settings page accepts any `image/*` logo and the settings API does not check the value. SVG logos never print on the prescription (name only) | Open; limit the CRM upload to PNG/JPEG/WebP, in the CRM round | CRM |
 | EL-L-07 | The PDF names the prescribing therapist. "Head of clinic" needs clinic profile fields that do not exist yet (CRM L-14) | Open; founders to choose, fields come with the CRM clinic profile work | Founders + backend |
+| EL-L-08 | The Exercise Library asks `/auth/me` twice on load (header and page) | Accepted; merge into one call when the header is next changed | Frontend |
+| EL-L-09 | Library pictures and videos still share `video_url`; clinic photos have their own table (EL-D-004). Moving library pictures into the same model waits for the categories work (founders' reference for Q1) | Open | Backend |
 
-*Last updated: 2026-10-24 (EL-D-003, EL-L-05 updated) | Branch: feat/el-media*
+*Last updated: 2026-10-27 (EL-D-004, EL-L-08, EL-L-09) | Branch: feat/el-photos*
