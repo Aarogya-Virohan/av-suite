@@ -116,6 +116,9 @@ def summarise_view(measurements: list[dict[str, Any]]) -> str:
     major = labels(("moderate", "severe"))
     mild = labels(("mild",))
     unmeasured = labels(("insufficient_data", "not_available"))
+    # POS-4: measured, not graded. Counted apart so "graded normal" is
+    # never said about a row that carries no grade.
+    review = labels(("under_review",))
 
     parts: list[str] = []
 
@@ -127,12 +130,19 @@ def summarise_view(measurements: list[dict[str, Any]]) -> str:
     if mild:
         parts.append("Mild deviation in: " + ", ".join(mild) + ".")
 
+    graded = len(measurements) - len(unmeasured) - len(review)
     if not major and not mild:
-        parts.append(
-            "All measured parameters graded normal."
-            if len(unmeasured) < len(measurements)
-            else "No parameter could be measured on this view."
-        )
+        if graded > 0:
+            parts.append(
+                "All graded parameters normal."
+                if review
+                else "All measured parameters graded normal."
+            )
+        elif not review:
+            parts.append("No parameter could be measured on this view.")
+
+    if review:
+        parts.append("Band under review, not graded: " + ", ".join(review) + ".")
 
     if unmeasured and len(unmeasured) < len(measurements):
         parts.append("Not measured: " + ", ".join(unmeasured) + ".")
@@ -189,7 +199,9 @@ def build_side_view_result(
 # 2026-10-27.1: phone tilt correction. Guided captures are measured with
 # their points turned back by the phone's roll at capture (level.py), so
 # angles against the image vertical or horizontal can move by the roll.
-ANALYSIS_VERSION = "2026-10-27.1"
+# 2026-11-21.1: POS-4. Head position and shoulder level asymmetry are not
+# graded (UNDER REVIEW) until the founders confirm their bands (F-2).
+ANALYSIS_VERSION = "2026-11-21.1"
 
 
 def build_report_response(
