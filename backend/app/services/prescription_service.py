@@ -5,6 +5,8 @@ import asyncio
 from typing import List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.prescription import Prescription
+from app.models.clinic import Clinic
+from app.services.usage_events import record_usage
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
 from app.repositories.prescription import PrescriptionRepository
 from app.utils.whatsapp import build_whatsapp_link
@@ -39,6 +41,10 @@ async def create_prescription(
         db_prescription = await repo.create_prescription(
             clinic_id, physio_id, prescription_in
         )
+        await db.flush()
+        clinic = await db.get(Clinic, clinic_id)
+        if clinic is not None:
+            await record_usage(db, clinic, physio_id, "exercise-prescription", "prescription_created")
 
         # Return prescription with relationships loaded
         return await get_prescription_by_id(db, clinic_id, db_prescription.id)
@@ -250,7 +256,7 @@ def prescription_pdf_filename(rx: Prescription) -> str:
 
 
 async def generate_prescription_pdf(
-    db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID
+    db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID, user_id: uuid.UUID | None = None
 ) -> str:
     """
     Render the prescription PDF and store it. Returns the authenticated
@@ -272,6 +278,10 @@ async def generate_prescription_pdf(
 
     repo = PrescriptionRepository(db)
     await repo.update_pdf_key(rx, pdf_key)
+    await db.flush()
+    clinic = await db.get(Clinic, clinic_id)
+    if clinic is not None:
+        await record_usage(db, clinic, user_id, "exercise-prescription", "prescription_pdf")
     logger.info(
         "Prescription PDF generated: %s (%d bytes, key %s)", rx.id, len(pdf_bytes), pdf_key
     )
@@ -358,11 +368,14 @@ def _build_prescription_message(patient_name: str, clinic_name: str) -> str:
 
 
 async def generate_prescription_pdf_response(
-    db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID
+    db: AsyncSession, clinic_id: uuid.UUID, prescription_id: uuid.UUID, user_id: uuid.UUID | None = None
 ) -> dict[str, object]:
     """Generate the PDF and return its download path, file name and WhatsApp link."""
 
-    pdf_url = await generate_prescription_pdf(db, clinic_id, prescription_id)
+    if user_id is None:
+        pdf_url = await generate_prescription_pdf(db, clinic_id, prescription_id)
+    else:
+        pdf_url = await generate_prescription_pdf(db, clinic_id, prescription_id, user_id=user_id)
     rx = await get_prescription_by_id(db, clinic_id, prescription_id)
     if not rx or not rx.patient:
         raise ValueError("Prescription not found")

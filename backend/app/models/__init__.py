@@ -94,6 +94,8 @@ __all__ = [
     "PlatformOperator",
     "PlatformAuditLog",
     "PlatformAuthRateLimit",
+    "UsageEvent",
 ]
 
 from app.models.platform import PlatformOperator, PlatformAuditLog, PlatformAuthRateLimit
+from app.models.usage_event import UsageEvent

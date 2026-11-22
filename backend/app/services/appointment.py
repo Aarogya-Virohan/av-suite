@@ -5,6 +5,8 @@ from uuid import UUID
 
 from app.enums.appointment import AppointmentStatus
 from app.models.appointment import Appointment
+from app.models.clinic import Clinic
+from app.services.usage_events import record_usage
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.patient import PatientRepository
 from app.repositories.user import UserRepository
@@ -38,7 +40,7 @@ class AppointmentService:
         self.patient_repository = patient_repository
         self.user_repository = user_repository
 
-    async def create_appointment(self, clinic_id: UUID, payload: AppointmentCreate) -> Appointment:
+    async def create_appointment(self, clinic_id: UUID, payload: AppointmentCreate, user_id: UUID | None = None) -> Appointment:
         """Validate and create a clinic-scoped appointment."""
 
         if payload.duration_minutes <= 0:
@@ -59,7 +61,12 @@ class AppointmentService:
         obj_in = payload.model_dump()
         obj_in["clinic_id"] = clinic_id
         appointment = await self.appointment_repository.create(obj_in)
-        await self.appointment_repository.session.commit()
+        db = self.appointment_repository.session
+        await db.flush()
+        clinic = await db.get(Clinic, clinic_id)
+        if clinic is not None:
+            await record_usage(db, clinic, user_id, "crm", "appointment_created")
+        await db.commit()
         return appointment
 
     async def get_appointment(self, clinic_id: UUID, appointment_id: UUID) -> Appointment:

@@ -19,6 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
 from app.models.patient import Patient
+from app.models.clinic import Clinic
+from app.services.usage_events import record_usage
 from app.services.patient_number import allocate_patient_display_number
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.schemas.common import PaginationParams
@@ -154,7 +156,8 @@ async def get_patients(
 async def create_patient(
     db: AsyncSession,
     clinic_id: str,
-    patient_in: PatientCreate
+    patient_in: PatientCreate,
+    user_id: uuid.UUID | None = None,
 ) -> Patient:
     """
     Function ka purpose: New patient create karna clinic mein
@@ -216,8 +219,12 @@ async def create_patient(
         
         # Database mein add karte hain
         db.add(patient)
+        await db.flush()
         
-        # Transaction commit karte hain
+        clinic = await db.get(Clinic, clinic_uuid)
+        if clinic is not None:
+            await record_usage(db, clinic, user_id, "platform", "patient_created")
+        # Event and patient commit together.
         await db.commit()
         
         # Auto-generated fields load karte hain (id, created_at, updated_at)
