@@ -8,6 +8,7 @@
 import type { PostureReport } from "@/types/posture"
 import { formatReportDate } from "@/lib/formatDate"
 import { AV_FALLBACK, initials, present, safeLogo } from "@/lib/branding"
+import { asset } from "@/lib/hub"
 
 type Props = Pick<PostureReport, "patient" | "reportId" | "branding">
 
@@ -74,7 +75,7 @@ export function Letterhead({ patient, branding }: Props) {
     <div className="flex flex-col gap-4 bg-[linear-gradient(115deg,#0B1238_0%,#121F4A_55%,#1B4A54_100%)] px-5 py-5 text-white sm:flex-row sm:items-center sm:gap-6 sm:px-10">
       <div className="sm:flex-[1.25]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/av_logo_wordmark_white.png" alt="Aarogya Virohan" className="h-8 w-auto" />
+        <img src={asset("/brand/av_logo_wordmark_white.png")} alt="Aarogya Virohan" className="h-8 w-auto" />
         <p className="mt-2 text-[12px] text-[#C9D0EA]">
           {AV_FALLBACK.phone} &nbsp;·&nbsp; {AV_FALLBACK.email}
         </p>

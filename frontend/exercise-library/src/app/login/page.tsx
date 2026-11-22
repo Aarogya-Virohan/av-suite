@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { ApiError, getToken, login, setSession, type WorkspaceOption } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { asset, BASE_PATH, HUB_MODE, hubLoginUrl } from "@/lib/hub";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
@@ -39,9 +40,17 @@ function LoginForm() {
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[] | null>(null);
   const [pendingClinicId, setPendingClinicId] = useState<string | null>(null);
 
+  // Hub mode: one AV Suite login page in the CRM (HUB-2).
+  useEffect(() => {
+    if (HUB_MODE) {
+      const url = hubLoginUrl({ next: `${BASE_PATH}/`, expired: !!params.get("expired") });
+      if (url) window.location.replace(url);
+    }
+  }, [params]);
+
   // Already signed in: straight to the library.
   useEffect(() => {
-    if (getToken()) router.replace("/");
+    if (!HUB_MODE && getToken()) router.replace("/");
   }, [router]);
 
   async function signIn(clinicId?: string) {
@@ -87,7 +96,7 @@ function LoginForm() {
         <div className="relative flex items-center gap-3">
           <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-[13px] bg-white p-1.5 shadow-[0_0_0_2px_rgba(78,136,143,0.5)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+            <img src={asset("/brand/av-logo-mark.png")} alt="" className="h-full w-full object-contain" />
           </span>
           <div>
             <p className="font-display text-lg font-bold tracking-tight">AV Suite</p>
@@ -124,7 +133,7 @@ function LoginForm() {
           <div className="mb-8">
             <span className="mb-5 grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-white p-1.5 shadow-card lg:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+              <img src={asset("/brand/av-logo-mark.png")} alt="" className="h-full w-full object-contain" />
             </span>
             <h1 className="font-display text-[28px] font-bold tracking-tight text-ink">Welcome back</h1>
             <p className="mt-1 text-sm text-muted-foreground">Sign in to the Exercise Library</p>

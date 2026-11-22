@@ -8,6 +8,7 @@ import { setStoredToken } from '@/lib/auth';
 import { useTokenStatus } from '@/lib/use-token';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/brand';
+import { asset, BASE_PATH, HUB_MODE, hubLoginUrl } from '@/lib/hub';
 
 interface Workspace {
   clinic_id: string;
@@ -31,8 +32,16 @@ export default function LoginPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[] | null>(null);
   const [pendingClinic, setPendingClinic] = useState<string | null>(null);
 
+  // Hub mode: one AV Suite login page in the CRM (HUB-2).
   useEffect(() => {
-    if (tokenStatus === 'valid') router.replace('/sessions');
+    if (HUB_MODE) {
+      const url = hubLoginUrl({ next: `${BASE_PATH}/sessions` });
+      if (url) window.location.replace(url);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!HUB_MODE && tokenStatus === 'valid') router.replace('/sessions');
   }, [tokenStatus, router]);
 
   async function signIn(clinicId?: string) {
@@ -111,7 +120,7 @@ export default function LoginPage() {
         <div className="relative flex items-center gap-3">
           <span className="grid h-12 w-12 place-items-center overflow-hidden rounded-[13px] bg-white p-1.5 shadow-[0_0_0_2px_rgba(78,136,143,0.5)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+            <img src={asset('/brand/av-logo-mark.png')} alt="" className="h-full w-full object-contain" />
           </span>
           <div>
             <p className="font-display text-lg font-bold tracking-tight">AV Suite</p>
@@ -143,7 +152,7 @@ export default function LoginPage() {
           <div className="mb-8">
             <span className="mb-5 grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-white p-1.5 shadow-card lg:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+              <img src={asset('/brand/av-logo-mark.png')} alt="" className="h-full w-full object-contain" />
             </span>
             <h1 className="font-display text-[28px] font-bold tracking-tight text-ink">Welcome back</h1>
             <p className="mt-1 text-sm text-muted">Sign in with your AV Suite clinic account</p>

@@ -1,6 +1,7 @@
 'use client';
 
 import { Lock } from 'lucide-react';
+import { asset } from '@/lib/hub';
 
 /**
  * Pieces shared by the patient's public pages: the screener and the
@@ -57,7 +58,7 @@ export function Shell({
         <div className="mx-auto flex max-w-xl items-center gap-3 px-4 py-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-white p-1 shadow-card">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+            <img src={asset('/brand/av-logo-mark.png')} alt="" className="h-full w-full object-contain" />
           </span>
           <p className="truncate text-sm font-semibold text-ink">{clinic || 'Your clinic'}</p>
           <span className="ml-auto inline-flex items-center gap-1 text-xs text-muted">

@@ -39,6 +39,7 @@ import {
   inputClass,
 } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
+import { asset } from '../../../lib/hub';
 
 type TabKey = 'clinic' | 'users' | 'audit';
 
@@ -527,7 +528,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-white p-1">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={logoBase64 || '/brand/av-logo-mark.png'} alt="" className="h-full w-full object-contain" />
+                    <img src={logoBase64 || asset('/brand/av-logo-mark.png')} alt="" className="h-full w-full object-contain" />
                   </span>
                   <div className="min-w-0">
                     <p className="truncate font-display text-sm font-bold">{clinicName || 'Your clinic'}</p>

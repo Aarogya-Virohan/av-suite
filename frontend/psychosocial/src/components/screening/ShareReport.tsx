@@ -12,6 +12,7 @@ import { Badge, type BadgeTone, Button, Card, FieldLabel, inputClass } from '@/c
 import { SlideOver } from '@/components/ui/SlideOver';
 import { useMe } from '@/components/staff/session-context';
 import { InfoNote } from './indicators';
+import { BASE_PATH } from '@/lib/hub';
 
 const EXPIRY = [7, 14, 30] as const;
 
@@ -197,7 +198,7 @@ function ShareForm({
 function ShareReady({ patient, created }: { patient: Patient | null; created: SharedReportCreated }) {
   const me = useMe();
   const [copied, setCopied] = useState(false);
-  const url = typeof window === 'undefined' ? created.report_path : `${window.location.origin}${created.report_path}`;
+  const url = typeof window === 'undefined' ? created.report_path : `${window.location.origin}${BASE_PATH}${created.report_path}`;
   const message = reportMessage({
     firstName: patient?.first_name ?? 'there',
     clinicName: me.active_workspace?.name ?? 'your clinic',

@@ -1,6 +1,8 @@
 import { UserRole } from '../types/api';
 
 const TOKEN_KEY = 'token';
+// Shown by the posture tool and the exercise library; the hub login sets it too.
+const EMAIL_KEY = 'userEmail';
 
 export interface JwtPayload {
   sub: string;        // user_id
@@ -19,9 +21,20 @@ export function setStoredToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
 }
 
+export function setStoredEmail(email: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(EMAIL_KEY, email);
+  } catch {
+    // storage blocked: the tools fall back to /auth/me
+  }
+}
+
+/** Logout for every tool: they all read the same keys on the same origin (HUB-4). */
 export function clearStoredTokens(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(EMAIL_KEY);
 }
 
 export function parseJwt(token: string): JwtPayload | null {

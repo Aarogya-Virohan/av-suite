@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } from '../../../../features/prescriptions/api';
 import { Avatar, Button, Card } from '../../../../components/ui/brand';
 import { cn } from '../../../../lib/cn';
+import { toolUrl } from '../../../../lib/hub';
 
 type TabKey = 'timeline' | 'documents' | 'treatments' | 'soapNotes' | 'progression' | 'rx' | 'billing';
 
@@ -234,7 +235,7 @@ export default function PatientWorkspacePage() {
             </button>
 
             <a
-              href={`${(process.env.NEXT_PUBLIC_POSTURE_APP_URL || 'http://localhost:3002').replace(/\/+$/, '')}/analyze?patient_id=${patient.id}`}
+              href={`${toolUrl('posture') ?? 'http://localhost:3002'}/analyze?patient_id=${patient.id}`}
               target="_blank"
               rel="noreferrer"
               className={ACTION_CLASS}
@@ -244,7 +245,7 @@ export default function PatientWorkspacePage() {
             </a>
 
             <a
-              href={`${(process.env.NEXT_PUBLIC_EXERCISE_APP_URL || 'http://localhost:3001').replace(/\/+$/, '')}/prescribe?patient_id=${patient.id}`}
+              href={`${toolUrl('exercises') ?? 'http://localhost:3001'}/prescribe?patient_id=${patient.id}`}
               target="_blank"
               rel="noreferrer"
               className={ACTION_CLASS}
