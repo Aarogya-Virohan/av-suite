@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import SessionDep, get_client_ip, get_platform_operator
@@ -171,6 +172,23 @@ async def _clinic_row(db, c):
     last = await db.scalar(select(func.max(UsageEvent.created_at)).where(UsageEvent.clinic_id == c.id))
     return {"id":c.id,"organization_id":c.organization_id,"name":c.name,"slug":c.slug,"type":c.type.value if hasattr(c.type,"value") else c.type,"status":c.status,"staff_count":staff,"last_activity_at":last,"created_at":c.created_at}
 
+async def _flush_new(db, obj):
+    try:
+        async with db.begin_nested():
+            db.add(obj)
+            await db.flush()
+    except IntegrityError:
+        raise BaseAppException("Slug already in use", "CONFLICT", 409)
+
+async def _target_name(db, a):
+    try:
+        if a.target_type=="organization" and a.target_id: return await db.scalar(select(Organization.name).where(Organization.id==UUID(a.target_id)))
+        if a.target_type in ("clinic","entitlement") and a.clinic_id: return await db.scalar(select(Clinic.name).where(Clinic.id==a.clinic_id))
+        if a.target_type=="operator" and a.target_id: return await db.scalar(select(PlatformOperator.name).where(PlatformOperator.id==UUID(a.target_id)))
+    except ValueError:
+        return None
+    return None
+
 async def _page(db, stmt, count_stmt, page, page_size):
     total = await db.scalar(count_stmt) or 0
     rows = (await db.execute(stmt.offset((page-1)*page_size).limit(page_size))).scalars().all()
@@ -201,7 +219,7 @@ async def organizations(db: SessionDep, search: str|None=None, type: str|None=No
 @router.post("/organizations", response_model=ResponseEnvelope[OrganizationOut])
 async def create_organization(body:OrganizationCreateBody,request:Request,db:SessionDep,actor:PlatformOperator=Depends(require_platform_permission("platform.organizations.manage"))):
     reason=_reason(body); o=Organization(name=body.name,slug=body.slug,type=body.type,contact_email=body.contact_email,contact_phone=body.contact_phone,status="active")
-    db.add(o); await db.flush(); after=_org(o); _audit(db,request,actor,action="organization.created",target_type="organization",target_id=o.id,reason=reason,before=None,after=after,organization_id=o.id)
+    await _flush_new(db,o); after=_org(o); _audit(db,request,actor,action="organization.created",target_type="organization",target_id=o.id,reason=reason,before=None,after=after,organization_id=o.id)
     return {"data":after,"meta":{}}
 
 @router.get("/organizations/{org_id}", response_model=ResponseEnvelope[OrganizationDetailOut])
@@ -239,7 +257,7 @@ async def create_clinic(org_id:UUID,body:ClinicCreateBody,request:Request,db:Ses
     reason=_reason(body); o=await db.get(Organization,org_id)
     if not o: raise BaseAppException("Organization not found","NOT_FOUND",404)
     c=Clinic(name=body.name,slug=body.slug,type=body.type,organization_id=o.id,status="active")
-    db.add(c); await db.flush(); after=await _clinic_row(db,c)
+    await _flush_new(db,c); after=await _clinic_row(db,c)
     _audit(db,request,actor,action="clinic.created",target_type="clinic",target_id=c.id,reason=reason,before=None,after=after,organization_id=o.id,clinic_id=c.id)
     return {"data":after,"meta":{}}
 
@@ -328,12 +346,7 @@ async def audit_logs(db:SessionDep,operator_id:UUID|None=None,organization_id:UU
     rows=(await db.execute(select(PlatformAuditLog,PlatformOperator.name).outerjoin(PlatformOperator,PlatformOperator.id==PlatformAuditLog.operator_id).where(*cond).order_by(PlatformAuditLog.created_at.desc()).offset((page-1)*page_size).limit(page_size))).all()
     data=[]
     for a,oname in rows:
-        target_name=None
-        try:
-            if a.target_type=="organization" and a.target_id: target_name=await db.scalar(select(Organization.name).where(Organization.id==UUID(a.target_id)))
-            elif a.target_type in ("clinic","entitlement") and a.clinic_id: target_name=await db.scalar(select(Clinic.name).where(Clinic.id==a.clinic_id))
-            elif a.target_type=="operator" and a.target_id: target_name=await db.scalar(select(PlatformOperator.name).where(PlatformOperator.id==UUID(a.target_id)))
-        except ValueError: pass
+        target_name=await _target_name(db,a)
         data.append({"id":a.id,"operator_id":a.operator_id,"operator_name":oname,"action":a.action,"target_type":a.target_type,"target_id":a.target_id,"target_name":target_name,"organization_id":a.organization_id,"clinic_id":a.clinic_id,"reason":a.reason,"ip":a.ip,"user_agent":a.user_agent,"details":a.details,"created_at":a.created_at})
     return {"data":data,"meta":{"total":total,"page":page,"page_size":page_size}}
 
@@ -364,5 +377,5 @@ async def overview(db:SessionDep,_:PlatformOperator=Depends(require_platform_per
     recent=(await db.execute(select(PlatformAuditLog,PlatformOperator.name).outerjoin(PlatformOperator,PlatformOperator.id==PlatformAuditLog.operator_id).order_by(PlatformAuditLog.created_at.desc()).limit(10))).all()
     recent_audit=[]
     for a,name in recent:
-        recent_audit.append({"id":a.id,"operator_id":a.operator_id,"operator_name":name,"action":a.action,"target_type":a.target_type,"target_id":a.target_id,"target_name":None,"organization_id":a.organization_id,"clinic_id":a.clinic_id,"reason":a.reason,"ip":a.ip,"user_agent":a.user_agent,"details":a.details,"created_at":a.created_at})
+        recent_audit.append({"id":a.id,"operator_id":a.operator_id,"operator_name":name,"action":a.action,"target_type":a.target_type,"target_id":a.target_id,"target_name":await _target_name(db,a),"organization_id":a.organization_id,"clinic_id":a.clinic_id,"reason":a.reason,"ip":a.ip,"user_agent":a.user_agent,"details":a.details,"created_at":a.created_at})
     return {"data":{"organizations":{"total":organizations_total,"active":organizations_active,"suspended":organizations_suspended,"by_type":by_type},"clinics":{"total":clinics_total,"active":clinics_active,"suspended":clinics_suspended},"products":product_data,"usage_last_30_days":usage_count,"recent_audit":recent_audit},"meta":{}}

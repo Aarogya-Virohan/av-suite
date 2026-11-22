@@ -334,3 +334,42 @@ async def test_all_s3_mutations_reject_missing_reasons(client, db_session):
         response = await getattr(client, method)(path, headers=headers, json=body)
         assert response.status_code == 422, (method, path, response.text)
         assert response.json()["meta"]["error"]["code"] == "VALIDATION_ERROR"
+
+
+async def test_duplicate_organization_and_clinic_slug_return_409_without_audit(client, db_session):
+    owner = operator()
+    db_session.add(owner)
+    await db_session.commit()
+    headers = {"Authorization": f"Bearer {create_platform_access_token(owner)}"}
+    slug = f"dup-{uuid.uuid4()}"
+    first = await client.post(f"{API}/organizations", headers=headers, json={"name": "Dup Org", "slug": slug, "type": "clinic", "reason": "onboard"})
+    assert first.status_code == 200
+    org_id = first.json()["data"]["id"]
+    second = await client.post(f"{API}/organizations", headers=headers, json={"name": "Dup Org 2", "slug": slug, "type": "clinic", "reason": "onboard"})
+    assert second.status_code == 409
+    assert second.json()["meta"]["error"]["code"] == "CONFLICT"
+
+    clinic_slug = f"dup-clinic-{uuid.uuid4()}"
+    body = {"name": "Branch", "slug": clinic_slug, "type": "clinic", "reason": "new branch"}
+    assert (await client.post(f"{API}/organizations/{org_id}/clinics", headers=headers, json=body)).status_code == 200
+    dup = await client.post(f"{API}/organizations/{org_id}/clinics", headers=headers, json=body)
+    assert dup.status_code == 409
+    await db_session.flush()
+    org_rows = await db_session.scalar(select(func.count(PlatformAuditLog.id)).where(PlatformAuditLog.action == "organization.created", PlatformAuditLog.target_id == org_id))
+    clinic_rows = await db_session.scalar(select(func.count(PlatformAuditLog.id)).where(PlatformAuditLog.action == "clinic.created", PlatformAuditLog.organization_id == uuid.UUID(org_id)))
+    assert org_rows == 1 and clinic_rows == 1  # failed duplicates write no audit row
+
+
+async def test_overview_recent_audit_has_target_name(client, db_session):
+    owner = operator()
+    db_session.add(owner)
+    await db_session.commit()
+    headers = {"Authorization": f"Bearer {create_platform_access_token(owner)}"}
+    name = f"Named Org {uuid.uuid4()}"
+    created = await client.post(f"{API}/organizations", headers=headers, json={"name": name, "slug": f"named-{uuid.uuid4()}", "type": "clinic", "reason": "onboard"})
+    assert created.status_code == 200
+    org_id = created.json()["data"]["id"]
+    overview = await client.get(f"{API}/overview", headers=headers)
+    assert overview.status_code == 200
+    rows = [r for r in overview.json()["data"]["recent_audit"] if r["target_id"] == org_id]
+    assert rows and rows[0]["target_name"] == name
