@@ -1,6 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { getStoredToken, clearStoredTokens } from './auth';
 import { useAuthStore } from '../store';
+import { asset, redirectToHubLogin } from './hub';
 
 const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const BASE_URL = rawBaseUrl.replace(/\/+$/, '');
@@ -83,8 +84,8 @@ apiClient.interceptors.response.use(
       clearStoredTokens();
       // Clear Zustand in-memory auth state — .getState() is valid outside React per Zustand docs
       useAuthStore.getState().logout();
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (typeof window !== 'undefined' && window.location.pathname !== asset('/login')) {
+        if (!redirectToHubLogin({ expired: true })) window.location.href = asset('/login');
       }
     }
 

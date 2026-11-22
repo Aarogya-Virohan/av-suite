@@ -1,4 +1,5 @@
 import { Exercise, ExercisePhoto, Patient, PhotoAngle, RxMode, SavedPrescription, Side } from "@/types/exercise";
+import { BASE_PATH, redirectToHubLogin } from "@/lib/hub";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const API = `${BASE_URL}/api/v1`;
@@ -142,7 +143,7 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   // Expired or revoked token: back to login instead of a broken page.
   if (response.status === 401 && token && typeof window !== "undefined") {
     clearSession();
-    window.location.assign("/login?expired=1");
+    if (!redirectToHubLogin({ expired: true })) window.location.assign(`${BASE_PATH}/login?expired=1`);
   }
   throw error;
 }

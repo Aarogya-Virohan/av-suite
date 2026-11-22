@@ -11,6 +11,7 @@ import type { Me } from '@/lib/types';
 import { Button } from '@/components/ui/brand';
 import { MeProvider, PRODUCT_KEY } from '@/components/staff/session-context';
 import { StaffShell } from '@/components/staff/StaffShell';
+import { redirectToHubLogin } from '@/lib/hub';
 
 function FullScreen({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-screen items-center justify-center bg-canvas p-6">{children}</div>;
@@ -24,7 +25,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (tokenStatus === 'missing') {
       clearStoredToken();
-      router.replace('/login');
+      if (!redirectToHubLogin()) router.replace('/login');
     }
   }, [tokenStatus, router]);
 
@@ -70,7 +71,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
             className="mt-6"
             onClick={() => {
               clearStoredToken();
-              router.replace('/login');
+              if (!redirectToHubLogin({ keepNext: false })) router.replace('/login');
             }}
           >
             Sign in with another account

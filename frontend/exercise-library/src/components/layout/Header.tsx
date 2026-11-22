@@ -3,8 +3,13 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, LogOut } from "lucide-react";
+import { ArrowLeft, ExternalLink, LogOut } from "lucide-react";
 import { clearSession, fetchMe, type Me } from "@/lib/api";
+import { asset, HUB_MODE, redirectToHubLogin, toolUrl } from "@/lib/hub";
+
+const crmUrl = toolUrl("crm");
+// Standalone builds keep today's link until the hub cutover.
+const postureUrl = toolUrl("posture") ?? "https://av-suite.vercel.app";
 
 function initials(me: Me | null): string {
   const f = me?.user.first_name?.trim()?.[0] ?? "";
@@ -30,7 +35,7 @@ export function Header() {
 
   const handleLogout = () => {
     clearSession();
-    router.push("/login");
+    if (!redirectToHubLogin({ keepNext: false })) router.push("/login");
   };
 
   const fullName = me
@@ -42,7 +47,7 @@ export function Header() {
       <Link href="/" className="flex min-w-0 items-center gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-white p-1 shadow-[0_0_0_1.5px_rgba(78,136,143,0.35)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/av-logo-mark.png" alt="" className="h-full w-full object-contain" />
+          <img src={asset("/brand/av-logo-mark.png")} alt="" className="h-full w-full object-contain" />
         </span>
         <span className="min-w-0 leading-tight">
           <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-logo-teal-ink">
@@ -53,14 +58,24 @@ export function Header() {
       </Link>
 
       <div className="flex items-center gap-2 sm:gap-4">
+        {crmUrl && (
+          <a
+            href={crmUrl}
+            data-testid="back-to-crm"
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-ink-2 transition-colors hover:bg-muted hover:text-ink"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Back to CRM</span>
+            <span className="sm:hidden">CRM</span>
+          </a>
+        )}
         <a
-          href="https://av-suite.vercel.app"
-          target="_blank"
-          rel="noopener noreferrer"
+          href={postureUrl}
+          {...(HUB_MODE ? {} : { target: "_blank", rel: "noopener noreferrer" })}
           className="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-ink-2 transition-colors hover:bg-muted hover:text-ink md:flex"
         >
           Posture Tool
-          <ExternalLink className="h-3.5 w-3.5" />
+          {!HUB_MODE && <ExternalLink className="h-3.5 w-3.5" />}
         </a>
 
         {me && (

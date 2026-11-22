@@ -16,12 +16,24 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Dumbbell,
+  PersonStanding,
+  ClipboardList,
+  Lock,
 } from 'lucide-react';
 import { useAuthStore, useUiStore } from '../../store';
 import { canAccessModule, hasCapability, ModuleVisibility, usePermissionSubscription } from '../../config/permissions';
 import { useClinicSettings } from '../../features/settings/api';
 import { cn } from '../../lib/cn';
 import { WorkspaceCard } from './WorkspaceSwitcher';
+import { asset } from '../../lib/hub';
+import { TOOLS, TOOL_STATE_TEXT, toolState, useEnabledProducts, type ToolDef } from '../../features/hub/tools';
+
+const TOOL_ICONS: Record<ToolDef['key'], React.ElementType> = {
+  exercises: Dumbbell,
+  posture: PersonStanding,
+  screening: ClipboardList,
+};
 
 interface NavItem {
   label: string;
@@ -75,6 +87,9 @@ export function SidebarNavigation() {
     if (window.matchMedia('(max-width: 767px)').matches) setSidebarOpen(false);
   };
   const { data: clinicSettings } = useClinicSettings(hasCapability('settings.view')); // L-29
+  const capabilities = useAuthStore((s) => s.capabilities);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { data: enabledProducts } = useEnabledProducts(isAuthenticated);
 
   const effectiveClinic = clinic || clinicSettings;
   const clinicName = effectiveClinic?.name || 'Your clinic';
@@ -102,7 +117,7 @@ export function SidebarNavigation() {
       <div className={cn('relative flex h-[72px] items-center gap-3', isSidebarOpen ? 'px-4' : 'justify-center px-2')}>
         <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-[11px] bg-white p-1 shadow-[0_0_0_2px_rgba(78,136,143,0.5),0_4px_14px_rgba(0,0,0,0.25)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/av-logo-mark.png" alt="AV Suite" className="h-full w-full object-contain" />
+          <img src={asset('/brand/av-logo-mark.png')} alt="AV Suite" className="h-full w-full object-contain" />
         </span>
         {isSidebarOpen && (
           <div className="min-w-0 flex-1">
@@ -170,6 +185,63 @@ export function SidebarNavigation() {
             </div>
           </div>
         ))}
+
+        {/* HUB-3: clinical tools. Granted ones open (same login); the rest
+            stay visible but disabled with the reason. */}
+        <div data-testid="hub-tools">
+          {isSidebarOpen && (
+            <p className="px-3 pb-2 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#7fb3b8]">
+              Tools
+            </p>
+          )}
+          <div className={cn('space-y-0.5', !isSidebarOpen && 'mt-3 border-t border-white/10 pt-3')}>
+            {TOOLS.map((tool) => {
+              const Icon = TOOL_ICONS[tool.key];
+              const state = toolState(tool, enabledProducts, capabilities);
+              if (state.kind === 'open') {
+                return (
+                  <a
+                    key={tool.key}
+                    href={state.href}
+                    data-tool={tool.key}
+                    className={cn(
+                      'relative flex items-center gap-3 rounded-[9px] px-3 py-2.5 text-sm font-medium text-[#c3c9e6] transition-colors hover:bg-white/[0.07] hover:text-white',
+                      !isSidebarOpen && 'justify-center px-0',
+                    )}
+                    title={!isSidebarOpen ? tool.label : undefined}
+                  >
+                    <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
+                    {isSidebarOpen && <span>{tool.label}</span>}
+                  </a>
+                );
+              }
+              const reason = TOOL_STATE_TEXT[state.kind];
+              return (
+                <div
+                  key={tool.key}
+                  data-tool={tool.key}
+                  aria-disabled="true"
+                  title={`${tool.label}: ${reason}`}
+                  className={cn(
+                    'flex cursor-not-allowed items-center gap-3 rounded-[9px] px-3 py-2 text-sm font-medium text-[#c3c9e6] opacity-50',
+                    !isSidebarOpen && 'justify-center px-0',
+                  )}
+                >
+                  <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
+                  {isSidebarOpen && (
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{tool.label}</span>
+                      <span className="flex items-center gap-1 text-[10.5px] font-normal text-[#aab2d6]">
+                        <Lock className="h-3 w-3" />
+                        {reason}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </nav>
 
       {/* Workspace + Logout */}
@@ -180,7 +252,7 @@ export function SidebarNavigation() {
           <button
             onClick={() => {
               logout();
-              window.location.replace('/login');
+              window.location.replace(asset('/login'));
             }}
             className="flex w-full cursor-pointer justify-center rounded-[9px] py-2.5 text-[#ffb4a8] transition-colors hover:bg-white/10"
             title="Logout"

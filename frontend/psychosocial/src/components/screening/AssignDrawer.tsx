@@ -14,6 +14,7 @@ import { Button, FieldLabel, inputClass } from '@/components/ui/brand';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { InfoNote } from './indicators';
 import { useMe } from '@/components/staff/session-context';
+import { BASE_PATH } from '@/lib/hub';
 
 const EXPIRY_OPTIONS = [3, 7, 14, 30];
 
@@ -26,7 +27,7 @@ export function LinkReady({
 }) {
   const me = useMe();
   const [copied, setCopied] = useState(false);
-  const url = typeof window === 'undefined' ? created.screener_path : `${window.location.origin}${created.screener_path}`;
+  const url = typeof window === 'undefined' ? created.screener_path : `${window.location.origin}${BASE_PATH}${created.screener_path}`;
   const minutes = created.assignment.sessions.reduce(
     (sum, s) => sum + (PATIENT_TITLES[s.instrument_id]?.minutes ?? 2),
     0,

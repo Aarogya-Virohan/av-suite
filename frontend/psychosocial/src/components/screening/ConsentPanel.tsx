@@ -12,6 +12,7 @@ import { Badge, type BadgeTone, Button, FieldLabel, inputClass } from '@/compone
 import { SlideOver } from '@/components/ui/SlideOver';
 import { useMe } from '@/components/staff/session-context';
 import { InfoNote } from './indicators';
+import { BASE_PATH } from '@/lib/hub';
 
 const REQUEST_STATE: Record<ConsentRequest['state'], { label: string; tone: BadgeTone }> = {
   pending: { label: 'Waiting for the patient', tone: 'active' },
@@ -24,7 +25,7 @@ const REQUEST_STATE: Record<ConsentRequest['state'], { label: string; tone: Badg
 function ConsentLinkReady({ patient, created }: { patient: Patient; created: ConsentRequestCreated }) {
   const me = useMe();
   const [copied, setCopied] = useState(false);
-  const url = typeof window === 'undefined' ? created.consent_path : `${window.location.origin}${created.consent_path}`;
+  const url = typeof window === 'undefined' ? created.consent_path : `${window.location.origin}${BASE_PATH}${created.consent_path}`;
   const message = reconsentMessage({
     firstName: patient.first_name,
     clinicName: me.active_workspace?.name ?? 'Your clinic',
