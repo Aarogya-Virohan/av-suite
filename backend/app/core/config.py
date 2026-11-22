@@ -16,19 +16,32 @@ print(settings.JWT_EXPIRE_MINUTES)
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, ValidationInfo, field_validator
-import ipaddress
-import re
 from typing import List
 import logging
 import base64
 
 logger = logging.getLogger(__name__)
 _TEST_JWT_SECRET = "c1f230d789abcec1f230d789abcec1f230d789abcec1f230d789abcec1f230d7"
+_JWT_TEST_SECRETS = {
+    _TEST_JWT_SECRET,
+    "ci-only-not-a-secret",
+    "test-secret-key-at-least-32-chars-long-123456",
+}
 _TEST_PLATFORM_MFA_KEY = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
-_JWT_PLACEHOLDERS = {"secret", "changeme", "change_me", "password", "your_secret_key", "test-secret-key"}
+_JWT_PLACEHOLDERS = {
+    "secret",
+    "changeme",
+    "change_me",
+    "password",
+    "your_secret_key",
+    "your_secret_key_here_minimum_32_characters_recommended",
+    "your_production_secret_key_minimum_32_characters_long",
+    "test-secret-key",
+    "generate_with_openssl_rand_hex_32",
+}
 
 
-def _is_predictable_hex_secret(value: str) -> bool:
+def _is_predictable_secret(value: str) -> bool:
     lowered = value.lower()
     if len(set(lowered)) == 1 or lowered in _JWT_PLACEHOLDERS:
         return True
@@ -90,12 +103,14 @@ class Settings(BaseSettings):
     # Security important: only trusted origins ko allow karo
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
 
-    # Comma-separated trusted reverse-proxy IPs/CIDRs. Empty means no proxy
-    # headers are trusted and request.client.host is always used.
-    TRUSTED_PROXY_IPS: str = ""
-    
     # Cloudflare Turnstile Configuration (Optional)
     TURNSTILE_SECRET_KEY: str | None = None
+
+    # Tool 03 public screener rate limiting. Name of a request header that
+    # the edge proxy always overwrites with the real client IP (on Railway:
+    # X-Real-IP). Unset means request.client.host, which uvicorn derives from
+    # X-Forwarded-For because the Dockerfile runs it with --proxy-headers.
+    SCREENER_CLIENT_IP_HEADER: str | None = None
 
     # Database Configuration
     # DATABASE_URL: PostgreSQL async connection string
@@ -147,12 +162,13 @@ class Settings(BaseSettings):
     @classmethod
     def validate_jwt_secret(cls, value: str, info: ValidationInfo) -> str:
         normalized = value.strip().lower()
-        if not re.fullmatch(r"[0-9a-f]{64}", normalized):
-            raise ValueError("JWT_SECRET_KEY must be exactly 32 bytes encoded as hexadecimal")
-        if _is_predictable_hex_secret(normalized):
+        if len(value.strip()) < 32:
+            raise ValueError("JWT_SECRET_KEY must be at least 32 characters")
+        if _is_predictable_secret(normalized):
             raise ValueError("JWT_SECRET_KEY must not be a placeholder or obvious pattern")
-        if info.data.get("ENVIRONMENT", "development").lower() == "production" and normalized == _TEST_JWT_SECRET:
-            raise ValueError("JWT_SECRET_KEY must be generated specifically for production")
+        if info.data.get("ENVIRONMENT", "development").strip().lower() == "production":
+            if normalized in _JWT_TEST_SECRETS:
+                raise ValueError("JWT_SECRET_KEY must be generated specifically for production")
         return value
 
     @field_validator("PLATFORM_MFA_KEY")
@@ -179,19 +195,6 @@ class Settings(BaseSettings):
         origins = [origin.strip() for origin in value.split(",") if origin.strip()]
         if not origins or "*" in origins:
             raise ValueError("CORS_ORIGINS must contain explicit origins; wildcard origins are not allowed")
-        return value
-
-    @field_validator("TRUSTED_PROXY_IPS")
-    @classmethod
-    def validate_trusted_proxy_ips(cls, value: str) -> str:
-        for proxy in (item.strip() for item in value.split(",")):
-            if proxy:
-                try:
-                    ipaddress.ip_network(proxy, strict=False)
-                except ValueError as exc:
-                    raise ValueError(
-                        "TRUSTED_PROXY_IPS must be comma-separated IP addresses or CIDR ranges"
-                    ) from exc
         return value
 
     @property

@@ -18,7 +18,7 @@
 ```bash
 # Backend (from backend/ directory)
 source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000 --no-proxy-headers
+uvicorn app.main:app --reload --port 8000
 
 # Frontend (from frontend/crm/ directory)
 npm run dev

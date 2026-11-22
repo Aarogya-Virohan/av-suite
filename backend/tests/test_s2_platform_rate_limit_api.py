@@ -44,12 +44,12 @@ async def post_login(
     return response.status_code, response.json()
 
 
-async def post_mfa(peer_ip: str, forwarded_ip: str) -> tuple[int, dict]:
+async def post_mfa(peer_ip: str, forwarded_ip: str | None = None) -> tuple[int, dict]:
     transport = ASGITransport(app=app, client=(peer_ip, 54321))
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             MFA_URL,
-            headers={"X-Forwarded-For": forwarded_ip},
+            headers={"X-Forwarded-For": forwarded_ip} if forwarded_ip else None,
             json={"challenge_token": "invalid-challenge", "code": "123456"},
         )
     return response.status_code, response.json()
@@ -82,11 +82,9 @@ async def test_login_limit_and_persistence_across_independent_session_factories(
     await create_operator(db_session, email)
     monkeypatch.setattr(platform_auth, "MAX_ACCOUNT_ATTEMPTS", 2)
     monkeypatch.setattr(platform_auth, "MAX_IP_ATTEMPTS", 100)
-    monkeypatch.setattr(settings, "TRUSTED_PROXY_IPS", "10.0.0.0/8")
-    proxy_peer = "10.0.0.1"
     client_ip = unique_ip()
 
-    first = await post_login(proxy_peer, email, forwarded_ip=client_ip)
+    first = await post_login(client_ip, email)
     assert first[0] == 200
     assert first[1]["data"]["challenge_token"]
 
@@ -99,8 +97,8 @@ async def test_login_limit_and_persistence_across_independent_session_factories(
         monkeypatch.setattr(
             platform_rate_limit, "AsyncSessionLocal", independent_sessions
         )
-        second = await post_login(proxy_peer, email, forwarded_ip=client_ip)
-        third = await post_login(proxy_peer, email, forwarded_ip=client_ip)
+        second = await post_login(client_ip, email)
+        third = await post_login(client_ip, email)
         assert second[0] == 200
         assert_rate_limited(third)
 
@@ -133,27 +131,46 @@ async def test_login_account_identifiers_are_isolated(
     assert (await post_login(peer_b, email_b))[0] == 200
 
 
-async def test_mfa_ip_limit_uses_resolved_client_ip_and_isolates_clients(
+async def test_mfa_ip_limit_uses_direct_peer_and_isolates_clients(
     client: AsyncClient, monkeypatch
 ):
     monkeypatch.setattr(platform_auth, "MAX_MFA_IP_ATTEMPTS", 1)
-    monkeypatch.setattr(settings, "TRUSTED_PROXY_IPS", "10.0.0.0/8")
     client_ip_a, client_ip_b = unique_ip(), unique_ip()
 
-    first = await post_mfa("10.0.0.8", client_ip_a)
-    same_client = await post_mfa("10.0.0.8", client_ip_a)
-    other_client = await post_mfa("10.0.0.8", client_ip_b)
+    first = await post_mfa(client_ip_a)
+    same_client = await post_mfa(client_ip_a)
+    other_client = await post_mfa(client_ip_b)
     assert first[0] == 401
     assert first[1]["meta"]["error"]["code"] == "UNAUTHORIZED"
     assert_rate_limited(same_client)
     assert other_client[0] == 401
     assert other_client[1]["meta"]["error"]["code"] == "UNAUTHORIZED"
 
-    untrusted_peer = unique_ip()
-    first_untrusted = await post_mfa(untrusted_peer, unique_ip())
-    second_untrusted = await post_mfa(untrusted_peer, unique_ip())
-    assert first_untrusted[0] == 401
-    assert_rate_limited(second_untrusted)
+    assert (await post_mfa(unique_ip()))[0] == 401
+
+
+async def test_login_ip_limit_ignores_forwarded_headers(
+    client: AsyncClient, db_session, monkeypatch
+):
+    email_a = f"rate-limit-ip-a-{uuid.uuid4()}@example.com"
+    email_b = f"rate-limit-ip-b-{uuid.uuid4()}@example.com"
+    await create_operator(db_session, email_a)
+    await create_operator(db_session, email_b)
+    monkeypatch.setattr(platform_auth, "MAX_ACCOUNT_ATTEMPTS", 100)
+    monkeypatch.setattr(platform_auth, "MAX_IP_ATTEMPTS", 1)
+    peer_ip = unique_ip()
+
+    assert (await post_login(peer_ip, email_a, forwarded_ip=unique_ip()))[0] == 200
+    assert_rate_limited(await post_login(peer_ip, email_b, forwarded_ip=unique_ip()))
+
+
+async def test_mfa_ip_limit_ignores_forwarded_headers(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr(platform_auth, "MAX_MFA_IP_ATTEMPTS", 1)
+    peer_ip = unique_ip()
+    first = await post_mfa(peer_ip, unique_ip())
+    second = await post_mfa(peer_ip, unique_ip())
+    assert first[0] == 401
+    assert_rate_limited(second)
 
 
 async def test_login_counter_expires_and_resets(

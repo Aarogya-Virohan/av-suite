@@ -57,7 +57,7 @@ Nothing here is optional for the first deploy. Work through it in order.
 
 | # | Point | Source | Owner |
 |---|---|---|---|
-| 1 | Set `TRUSTED_PROXY_IPS` to the actual immediate proxy peer IP/CIDR ranges on Railway; ensure the proxy sanitizes forwarded IP headers | S-D-018 | Onkar |
+| 1 | Set `SCREENER_CLIENT_IP_HEADER=X-Real-IP` on Railway | P-04, S-D-018 | Onkar |
 | 2 | Before migrating, check the target database: `alembic current` must show a revision from `dev`, and `\dt` and `\dT` must match it. A stale revision stamp on an empty database made a local upgrade fail on 22 Oct. Production needs no manual run: the Railway backend service runs `alembic upgrade head` as its pre-deploy command, so migrations run on every deploy (Onkar checked Settings > Deploy on 10 Nov 2026). For a local database, run `alembic upgrade head`; it must end at the single head of the merged branch (row 4). | PR #33 | Onkar |
 | 3 | Create the Vercel project for `frontend/psychosocial` and add its origin to `CORS_ORIGINS` | P-01, P-11 | Onkar |
 | 4 | Re-check the merge with the latest `dev`: the same 10 pre-existing failures and a single Alembic head. Once `release/crm-oct` reaches `dev`, merging `dev` into PR #33 gives two heads, `f2b6c8d0a134` (CRM) and `b8d4f0c6e3a1` (Tool 03), and `alembic upgrade head` fails with multiple heads, including in the Railway pre-deploy. Add a merge revision with both as `down_revision` in the same change. Expect one conflict, in the imports of `backend/app/api/v1/users.py` (trial merge of `release/crm-oct` 68adf0d on 10 Nov): keep both lines, `from app.screening.access import check_clinical_grant` and `from app.services.audit import log_event_safely`. | PR #33 | Us |

@@ -62,20 +62,8 @@ Production environment variables setup:
    - Do NOT include localhost in production
    - Only include trusted frontend domains
    - Comma-separated list no spaces
-
-6. Trusted reverse proxies (optional):
-   TRUSTED_PROXY_IPS=<immediate proxy IPs or CIDRs, comma-separated>
-
-   - Leave empty to use the direct connection peer and ignore forwarded IP headers.
-   - Only include proxy addresses that connect directly to this backend; never use `*`.
-   - Each trusted proxy must overwrite or sanitize incoming `CF-Connecting-IP` and
-     `X-Forwarded-For`; it must not blindly forward client-supplied values.
-   - The backend's Uvicorn command must keep proxy-header rewriting disabled so
-     `request.client.host` remains the immediate peer used for this trust check.
-   - Forwarded headers are honored only from these peers. X-Forwarded-For chains
-     are scanned right-to-left across configured trusted proxy ranges.
    
-7. Redis Configuration (Optional):
+6. Redis Configuration (Optional):
    REDIS_URL=redis://redis-server-host:6379
    
    - Use managed Redis service if possible
@@ -224,7 +212,7 @@ alembic current
 gunicorn app.main:app \\
   --bind 0.0.0.0:8000 \\
   --workers 4 \\
-  --worker-class app.uvicorn_worker.NoProxyHeadersUvicornWorker \\
+  --worker-class uvicorn.workers.UvicornWorker \\
   --timeout 120 \\
   --access-logfile - \\
   --error-logfile -
@@ -253,7 +241,7 @@ EnvironmentFile=/opt/av-suite/.env.production
 ExecStart=/opt/av-suite/venv/bin/gunicorn app.main:app \\
     --bind unix:/run/av-suite/sock \\
     --workers 4 \\
-    --worker-class app.uvicorn_worker.NoProxyHeadersUvicornWorker
+    --worker-class uvicorn.workers.UvicornWorker
 ExecReload=/bin/kill -s HUP $MAINPID
 KillMode=mixed
 KillSignal=SIGTERM
@@ -669,3 +657,7 @@ For more information:
 - Docker Documentation: https://docs.docker.com
 - Kubernetes Documentation: https://kubernetes.io/docs
 - Nginx Documentation: https://nginx.org/en/docs
+
+## Platform Auth deployment requirement
+
+`PLATFORM_MFA_KEY` is a required environment variable and must be configured in Railway before merging/deploying S2. Generate it securely with `Fernet.generate_key()` and store it in the Railway service environment. The service may fail to start if this variable is missing or invalid.

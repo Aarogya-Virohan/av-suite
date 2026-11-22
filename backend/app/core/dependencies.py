@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ipaddress
 from collections.abc import AsyncGenerator
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -12,62 +11,26 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.config import settings
-
-
-def _trusted_proxy_networks() -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
-    networks = []
-    for value in settings.TRUSTED_PROXY_IPS.split(","):
-        value = value.strip()
-        if value:
-            try:
-                networks.append(ipaddress.ip_network(value, strict=False))
-            except ValueError:
-                # Configuration is validated at startup; fail closed if mutated at runtime.
-                continue
-    return tuple(networks)
-
-
-def _is_trusted_proxy(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    return any(address in network for network in _trusted_proxy_networks())
-
-
 def get_client_ip(request: Request) -> str:
-    """Return the direct peer unless a configured trusted proxy supplied a valid IP."""
-    direct_ip = request.client.host if request.client and request.client.host else None
-    if direct_ip is None:
-        return "unknown"
-
-    try:
-        peer = ipaddress.ip_address(direct_ip)
-    except ValueError:
-        return direct_ip
-    if not _is_trusted_proxy(peer):
-        return direct_ip
-
+    """
+    Extract the real client IP address from Cloudflare or reverse proxy headers.
+    Checks:
+    1. CF-Connecting-IP (injected by Cloudflare edge)
+    2. X-Forwarded-For (first IP in proxy chain)
+    3. request.client.host (direct connection fallback)
+    """
     cf_ip = request.headers.get("CF-Connecting-IP")
-    if cf_ip is not None:
-        try:
-            return str(ipaddress.ip_address(cf_ip.strip()))
-        except ValueError:
-            return direct_ip
+    if cf_ip:
+        return cf_ip.strip()
 
     xff = request.headers.get("X-Forwarded-For")
-    if xff is None:
-        return direct_ip
-    try:
-        chain = [ipaddress.ip_address(value.strip()) for value in xff.split(",")]
-    except ValueError:
-        return direct_ip
-    if not chain:
-        return direct_ip
+    if xff:
+        return xff.split(",")[0].strip()
 
-    # The peer is trusted, so walk the supplied chain from the nearest hop
-    # outward, skipping trusted proxies until reaching the first untrusted IP.
-    for address in reversed(chain):
-        if not _is_trusted_proxy(address):
-            return str(address)
-    return direct_ip
+    if request.client and request.client.host:
+        return request.client.host
+
+    return "unknown"
 
 
 from sqlalchemy import select

@@ -263,7 +263,7 @@ Alembic manages database schema changes.
 
 /*
 1. Start development server:
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --no-proxy-headers
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
    Flags explained:
    --reload: Auto-restart on code changes
@@ -348,7 +348,7 @@ Alembic manages database schema changes.
                "type": "python",
                "request": "launch",
                "module": "uvicorn",
-               "args": ["app.main:app", "--reload", "--no-proxy-headers"],
+               "args": ["app.main:app", "--reload"],
                "console": "integratedTerminal"
            }
        ]
@@ -374,7 +374,7 @@ Alembic manages database schema changes.
    - Run > Edit Configurations
    - Add new > Python
    - Module: uvicorn
-   - Parameters: app.main:app --reload --no-proxy-headers
+   - Parameters: app.main:app --reload
    - Click OK
 
 4. Run project:
@@ -402,7 +402,7 @@ Daily development workflow:
    git pull origin main
 
 3. Start development server:
-   uvicorn app.main:app --reload --no-proxy-headers
+   uvicorn app.main:app --reload
 
 4. In another terminal:
    pytest tests/ -v
@@ -553,7 +553,7 @@ Solution:
 /*
 Solution:
 # Option 1: Use different port
-uvicorn app.main:app --port 8001 --no-proxy-headers
+uvicorn app.main:app --port 8001
 
 # Option 2: Kill process using port
 lsof -i :8000
@@ -602,7 +602,7 @@ pip install -e .
 pip install --upgrade -e .
 
 # Start development server
-uvicorn app.main:app --reload --no-proxy-headers
+uvicorn app.main:app --reload
 
 # Run tests
 pytest tests/ -v

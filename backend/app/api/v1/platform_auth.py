@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.dependencies import SessionDep, get_client_ip
+from app.core.dependencies import SessionDep
 from app.core.platform_security import (
     create_platform_access_token, create_platform_challenge, decode_platform_challenge, _login_marker,
     decrypt_mfa_secret, encrypt_mfa_secret, new_totp_secret, matching_totp_step,
@@ -60,7 +60,7 @@ async def login(body: LoginRequest, request: Request, db: SessionDep):
     email = body.email.lower()
     if not await consume_attempts([
         ("login-account", email, MAX_ACCOUNT_ATTEMPTS),
-        ("login-ip", get_client_ip(request), MAX_IP_ATTEMPTS),
+        ("login-ip", request.client.host if request.client else "unknown", MAX_IP_ATTEMPTS),
     ]):
         raise BaseAppException("Too many authentication attempts", "RATE_LIMITED", 429)
     operator = await db.scalar(select(PlatformOperator).where(func.lower(PlatformOperator.email) == email))
@@ -88,7 +88,7 @@ async def login(body: LoginRequest, request: Request, db: SessionDep):
 
 @router.post("/auth/mfa", response_model=ResponseEnvelope[dict])
 async def complete_mfa(body: MFARequest, request: Request, db: SessionDep):
-    client_ip = get_client_ip(request)
+    client_ip = request.client.host if request.client else "unknown"
     try:
         claims = decode_platform_challenge(body.challenge_token)
         operator_id = UUID(claims["sub"])

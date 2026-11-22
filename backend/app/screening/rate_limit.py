@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 
 from fastapi import HTTPException, Request, status
 
-from app.core.dependencies import get_client_ip
+from app.core.config import settings
 
 WINDOW_SECONDS = 15 * 60
 TOKEN_LIMIT = 200
@@ -75,8 +75,24 @@ ip_limiter = SlidingWindowLimiter(limit=IP_LIMIT, window_seconds=WINDOW_SECONDS)
 
 
 def screener_client_ip(request: Request) -> str:
-    """Use the shared direct-peer and explicitly trusted-proxy IP policy."""
-    return get_client_ip(request)
+    """Client IP for rate limiting.
+
+    The shared get_client_ip() in core/dependencies.py trusts
+    CF-Connecting-IP and the leftmost X-Forwarded-For entry from any caller,
+    so it is not used here. Only a header named in SCREENER_CLIENT_IP_HEADER
+    is read, and only because the deployment says the edge overwrites it.
+    Otherwise request.client.host is used: uvicorn sets it from
+    X-Forwarded-For (Dockerfile: --proxy-headers), and Railway's edge
+    replaces any client-sent X-Forwarded-For.
+    """
+    header = settings.SCREENER_CLIENT_IP_HEADER
+    if header:
+        value = request.headers.get(header, "").split(",")[0].strip()
+        if value:
+            return value
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
 
 
 def _too_many(retry_after: float) -> HTTPException:
