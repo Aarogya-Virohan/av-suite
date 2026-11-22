@@ -1,0 +1,12 @@
+{
+  "name": "av-suite-e2e",
+  "private": true,
+  "description": "AV Suite Playwright smoke suite (launch-plan EN-3). See README.md.",
+  "scripts": {
+    "smoke": "playwright test",
+    "pdf": "node scripts/make-pdf.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

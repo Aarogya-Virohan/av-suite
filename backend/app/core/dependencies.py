@@ -3,11 +3,13 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
+from jwt import PyJWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -40,14 +42,16 @@ from app.core.products import product_for_capability
 from app.core.rbac import resolve_capability_scope
 from app.core.security import decode_token
 from app.enums.permission import CapabilityScope
-from app.enums.product import EntitlementStatus
-from app.exceptions import ProductNotEntitledError
+from app.enums.organization import ClinicStatus, OrganizationStatus
+from app.exceptions import ProductNotEntitledError, WorkspaceSuspendedError
 from app.models.clinic import Clinic
 from app.enums.user import UserRole
 from app.models.membership import Membership
+from app.models.organization import Organization
 from app.models.product import WorkspaceProduct
 from app.models.user import User
 from app.models.user_permission import UserPermission
+from app.services.product_entitlements import active_entitlement_clause
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -123,9 +127,11 @@ async def get_authenticated_context(
 
     try:
         claims = decode_token(token)
-        user_id = UUID(claims["sub"])
-        clinic_id = UUID(claims["clinic_id"])
-    except (ValueError, KeyError) as exc:
+        user_id = UUID(str(claims["sub"]))
+        clinic_id = UUID(str(claims["clinic_id"]))
+    except (PyJWTError, ValueError, KeyError, TypeError) as exc:
+        # AUD-02 / L-47: expired, bad-signature or garbage tokens are 401,
+        # never 500, so the frontends can send the user back to login.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials clinic mismatch",
@@ -169,6 +175,12 @@ async def get_authenticated_context(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if clinic.status != ClinicStatus.ACTIVE:
+        raise WorkspaceSuspendedError("clinic")
+    organization = await session.get(Organization, clinic.organization_id)
+    if organization is None or organization.status != OrganizationStatus.ACTIVE:
+        raise WorkspaceSuspendedError("organization")
+
     return AuthenticatedContext(user=user, clinic=clinic, membership=membership)
 
 
@@ -194,7 +206,7 @@ async def get_permission_context(
 
     product_stmt = select(WorkspaceProduct).where(
         WorkspaceProduct.clinic_id == auth_context.clinic.id,
-        WorkspaceProduct.status == EntitlementStatus.ENABLED,
+        active_entitlement_clause(datetime.now(timezone.utc)),
     )
     product_result = await session.execute(product_stmt)
     enabled_product_ids = {

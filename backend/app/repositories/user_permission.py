@@ -54,7 +54,9 @@ class UserPermissionRepository(BaseRepository[UserPermission]):
             statement = statement.where(UserPermission.clinic_id == clinic_id)
 
         result = await self.session.scalars(statement)
-        return result.one_or_none()
+        # Without clinic_id a multi-clinic user can match several rows (AUD-07):
+        # return the first instead of raising MultipleResultsFound.
+        return result.first()
 
     async def set_override(
         self,

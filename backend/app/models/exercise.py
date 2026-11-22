@@ -14,7 +14,7 @@ Usage: Exercises ko store karte hain jo doctors prescribe karte hain patients ko
 
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Boolean, ForeignKey, Text
+from sqlalchemy import String, Boolean, ForeignKey, Text, text
 from typing import Optional
 from app.models.base import Base, TimestampMixin
 
@@ -118,6 +118,22 @@ class Exercise(Base, TimestampMixin):
     # Format: Typically CDN URL (AWS S3, Azure Blob, etc.)
     # Usage: Patient education aur demonstration ke liye
     video_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+
+    # How the exercise may go on a home prescription (EL-D-013, plan C1):
+    # PATIENT (normal), CAREGIVER (prints "Caregiver-assisted"), BLOCKED
+    # (therapist-applied or supervised in clinic; never on a home Rx),
+    # HIDDEN (EL-D-017: kept for old Rx, never listed, searched or prescribed).
+    rx_mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="PATIENT", server_default=text("'PATIENT'")
+    )
+    # The therapist must pick left or right before it goes on an Rx
+    # (Self-Epley, plan C2; EL-D-014).
+    requires_side: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    # Exercise ID in the founders' exercise bank workbook (e.g.
+    # "BAL-FAC-01072-v1") when the row came from or matched the bank.
+    bank_key: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
 
     # Relationships - Database connections
     # Yeh relationships SQLAlchemy lazy loading aur traversal enable karte hain

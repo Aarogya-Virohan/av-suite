@@ -1,0 +1,54 @@
+# Clinic setup (launch-plan EN-4). One file per clinic. No passwords here:
+# new users get a generated password written to ~/.av-setup/credentials.tsv.
+#
+#   cd backend
+#   python -m scripts.clinic_setup scripts/clinic.example.yaml --staging --dry-run
+#   python -m scripts.clinic_setup scripts/clinic.example.yaml --staging
+
+# Organization (chain owner). Kept in the schema for Phase 2; skipped with a
+# message until organizations land on dev (Sparsh S1).
+organization:
+  name: Example Physio Group
+
+clinic:
+  slug: example-physio-noida        # stable key, never change after first run
+  name: Example Physio Clinic
+  # logo: logos/example.png         # file path next to this YAML, or an https URL; PNG/JPEG/WebP, max 2 MB
+  branding_color: "#0d9488"
+  client_type: clinic               # clinic | hospital | home_care
+  address_line: "C-12, Sector 62"
+  city: Noida
+  state: Uttar Pradesh
+  pincode: "201309"
+  phone: "+91 98100 00000"
+  email: hello@example-physio.in
+  registration_number: ""
+  gstin: ""
+  authorised_person: Dr. Example Name
+
+# Products the clinic gets (workspace_products). crm is always on.
+# Known: crm, exercise-library, exercise-prescription, posture-tool,
+#        psycho-social-screening, clinical-decision-support
+tools:
+  - crm
+  - exercise-library
+  - exercise-prescription
+  - posture-tool
+  - psycho-social-screening
+
+users:
+  - email: owner@example-physio.in  # first admin = clinic owner
+    first_name: Example
+    last_name: Owner
+    role: admin
+  - email: therapist@example-physio.in
+    first_name: Asha
+    last_name: Verma
+    role: therapist                 # preset defaults to the role
+    tools: [exercise-library, posture-tool, psycho-social-screening]   # the 3 tool checkboxes
+  - email: desk@example-physio.in
+    first_name: Ravi
+    last_name: Kumar
+    role: front_desk
+    permissions:                    # optional overrides on top of the preset
+      invoices.edit: all

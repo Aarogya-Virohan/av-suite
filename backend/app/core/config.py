@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # Development mein debug logs aur detailed error messages milte hain
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    # AUD-04: public self-signup (POST /auth/register) is off for launch.
+    # Clinics are created only by scripts/clinic_setup (EN-4), which calls the
+    # service directly. Re-opening needs captcha + review (launch-plan Later).
+    SELF_SIGNUP_ENABLED: bool = False
+    # BE-3 / M-1 / AUD-12: marketplace install/enable/disable are closed;
+    # entitlements come from scripts/clinic_setup (and later the console).
+    MARKETPLACE_WRITES_ENABLED: bool = False
     
     # API Configuration
     # API_V1_PREFIX: Versioning ke liye routes structure ko define karta hai

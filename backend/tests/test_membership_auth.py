@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import create_access_token, decode_token, get_password_hash
 from app.enums.clinic import ClinicType
+from app.enums.organization import ClinicStatus
 from app.enums.user import UserRole
 from app.models.clinic import Clinic
 from app.models.membership import Membership
@@ -102,7 +103,7 @@ async def test_post_users_membership_login_and_me_are_membership_based(
     assert created["id"] == str(user.id)
 
 
-async def test_existing_email_joins_second_workspace_without_duplicate_user(
+async def test_second_workspace_membership_login_without_duplicate_user(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     clinic_a_id, admin_a = await register_workspace(client, "Workspace A")
@@ -113,14 +114,20 @@ async def test_existing_email_joins_second_workspace_without_duplicate_user(
     assert user_before is not None
     original_password_hash = user_before.password_hash
 
-    await create_staff(
-        client,
-        admin_b,
-        email=email,
-        role="front_desk",
-        password="IgnoredReplacementPassword123!",
+    # AUD-01: POST /users must never attach an existing account to another
+    # clinic. A second workspace is a platform action (console / script).
+    rejected = await client.post(
+        f"{settings.API_V1_PREFIX}/users",
+        headers=admin_b,
+        json={"name": "Test Staff", "email": email, "password": "IgnoredReplacementPassword123!",
+              "role": "front_desk", "is_active": True},
     )
-    await create_staff(client, admin_b, email=email, role="front_desk")
+    assert rejected.status_code == 409
+    assert "Test Staff" not in rejected.text
+    db_session.add(
+        Membership(user_id=user_before.id, clinic_id=clinic_b_id, role=UserRole.FRONT_DESK)
+    )
+    await db_session.commit()
 
     assert await db_session.scalar(
         select(func.count()).select_from(User).where(User.email == email)
@@ -233,15 +240,57 @@ async def test_workspace_switch_uses_membership_and_rejects_nonmember(
     assert still_b.json()["data"]["active_workspace"]["id"] == str(clinic_b.id)
 
 
+async def test_workspace_switch_rejects_suspended_target_without_issuing_token(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    clinic_a = Clinic(name="Switch Active")
+    clinic_b = Clinic(name="Switch Suspended")
+    user = User(
+        email=f"switch-suspended-{uuid.uuid4()}@avtest.com",
+        password_hash=get_password_hash("Password123!"),
+        role=UserRole.ADMIN,
+        first_name="Switch",
+        last_name="User",
+        is_active=True,
+    )
+    db_session.add_all([clinic_a, clinic_b, user])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            Membership(user_id=user.id, clinic_id=clinic_a.id, role=UserRole.ADMIN),
+            Membership(user_id=user.id, clinic_id=clinic_b.id, role=UserRole.THERAPIST),
+        ]
+    )
+    token_a = create_access_token(
+        subject=user.id, clinic_id=clinic_a.id, role=UserRole.ADMIN.value
+    )
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    clinic_b.status = ClinicStatus.SUSPENDED
+    await db_session.commit()
+
+    rejected = await client.post(
+        f"{settings.API_V1_PREFIX}/auth/switch-workspace",
+        headers=headers_a,
+        json={"clinic_id": str(clinic_b.id)},
+    )
+
+    assert rejected.status_code == 403
+    assert rejected.json()["meta"]["error"]["code"] == "WORKSPACE_SUSPENDED"
+    assert rejected.json().get("data") is None
+    assert "access_token" not in rejected.json()
+
+
 async def test_staff_removal_removes_only_active_workspace_membership(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     clinic_a_id, admin_a = await register_workspace(client, "Removal Workspace A")
     clinic_b_id, admin_b = await register_workspace(client, "Removal Workspace B")
     email = f"removable-{uuid.uuid4()}@avtest.com"
-    await create_staff(client, admin_a, email=email)
-    created = await create_staff(client, admin_b, email=email)
+    created = await create_staff(client, admin_a, email=email)
     user_id = uuid.UUID(created["id"])
+    # second workspace = platform action (AUD-01: POST /users no longer attaches)
+    db_session.add(Membership(user_id=user_id, clinic_id=clinic_b_id, role=UserRole.THERAPIST))
+    await db_session.commit()
 
     removed = await client.delete(
         f"{settings.API_V1_PREFIX}/users/{user_id}", headers=admin_a

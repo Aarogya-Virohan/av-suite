@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, case, or_, select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from app.models.product import (
     Product,
     WorkspaceProduct,
 )
+from app.services.product_entitlements import active_entitlement_clause
 
 
 def entitlement_response(
@@ -33,8 +34,13 @@ def entitlement_response(
 async def list_catalog(
     db: AsyncSession, clinic_id: UUID, workspace_type: str
 ) -> list[dict[str, object]]:
+    now = datetime.now(timezone.utc)
+    is_effective = case(
+        (active_entitlement_clause(now), True),
+        else_=False,
+    )
     statement = (
-        select(Product, WorkspaceProduct)
+        select(Product, WorkspaceProduct, is_effective)
         .outerjoin(
             WorkspaceProduct,
             and_(
@@ -54,10 +60,9 @@ async def list_catalog(
             "allowed_workspace_types": product.allowed_clinic_types,
             "workspace_eligible": workspace_type in product.allowed_clinic_types,
             "installed": entitlement is not None,
-            "enabled": entitlement is not None
-            and entitlement.status == EntitlementStatus.ENABLED,
+            "enabled": entitlement is not None and effective,
         }
-        for product, entitlement in rows
+        for product, entitlement, effective in rows
     ]
 
 

@@ -2,16 +2,24 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
+
+from sqlalchemy import select
+
+CLINIC_TZ = ZoneInfo("Asia/Kolkata")
 
 from app.enums.appointment import AppointmentSource, AppointmentStatus
 from app.enums.booking import AppointmentRequestStatus
 from app.enums.patient import PatientStatus
 from app.models.appointment import Appointment
 from app.models.booking import AppointmentRequest
+from app.models.membership import Membership
+from app.models.user import User
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.booking import AppointmentRequestRepository
 from app.repositories.clinic import ClinicRepository
 from app.repositories.patient import PatientRepository
+from app.services.clinic_status import is_clinic_active
 from app.schemas.booking import (
     AppointmentRequestApprovePayload,
     AppointmentRequestCreate,
@@ -60,6 +68,8 @@ class BookingService:
         clinic = await self.clinic_repository.get_by_slug_or_id(clinic_slug_or_id)
         if clinic is None:
             raise BookingNotFoundError(f"Clinic '{clinic_slug_or_id}' not found.")
+        if not await is_clinic_active(self.clinic_repository.session, clinic):
+            raise BookingNotFoundError(f"Clinic '{clinic_slug_or_id}' not found.")
 
         return PublicClinicBrandingResponse(
             clinic_id=clinic.id,
@@ -76,6 +86,8 @@ class BookingService:
 
         clinic = await self.clinic_repository.get_by_id(clinic_id)
         if clinic is None:
+            raise BookingNotFoundError(f"Clinic '{clinic_id}' does not exist.")
+        if not await is_clinic_active(self.clinic_repository.session, clinic):
             raise BookingNotFoundError(f"Clinic '{clinic_id}' does not exist.")
 
         req_data = payload.model_dump(exclude={"turnstile_token"})
@@ -96,6 +108,8 @@ class BookingService:
 
         clinic = await self.clinic_repository.get_by_slug_or_id(clinic_slug)
         if clinic is None:
+            raise BookingNotFoundError(f"Clinic with slug '{clinic_slug}' not found.")
+        if not await is_clinic_active(self.clinic_repository.session, clinic):
             raise BookingNotFoundError(f"Clinic with slug '{clinic_slug}' not found.")
 
         return await self.create_request(clinic.id, payload)
@@ -158,6 +172,29 @@ class BookingService:
                 f"Appointment request '{request_id}' has already been approved."
             )
 
+        # AUD-06: an appointment needs a real therapist of this clinic. Check
+        # before any write so a bad request leaves nothing behind (was: a
+        # placeholder UUID and a FK error = 500).
+        therapist_id = payload.therapist_id
+        if therapist_id is None:
+            raise BookingValidationError(
+                "Select a therapist to approve this appointment request."
+            )
+        session = self.request_repository.session
+        is_member = await session.scalar(
+            select(Membership.id)
+            .join(User, User.id == Membership.user_id)
+            .where(
+                Membership.user_id == therapist_id,
+                Membership.clinic_id == clinic_id,
+                User.is_active.is_(True),
+            )
+        )
+        if is_member is None:
+            raise BookingValidationError(
+                "Selected therapist is not an active member of this clinic."
+            )
+
         # Find or create patient record
         matching_patients = await self.patient_repository.search_by_phone(
             req.phone, clinic_id=clinic_id
@@ -177,7 +214,14 @@ class BookingService:
                 }
             )
 
-        sched_date = payload.scheduled_date or req.preferred_date or date.today()
+        # Clinic wall-clock time is IST: the default slot and any start_time the
+        # staff type are IST, stored as an aware datetime (was UTC: 09:00 showed
+        # as 14:30).
+        sched_date = (
+            payload.scheduled_date
+            or req.preferred_date
+            or datetime.now(CLINIC_TZ).date()
+        )
         start_t = time(hour=9, minute=0)
         if payload.start_time:
             try:
@@ -190,12 +234,7 @@ class BookingService:
             except (ValueError, IndexError):
                 start_t = time(hour=9, minute=0)
 
-        start_dt = datetime.combine(sched_date, start_t, tzinfo=timezone.utc)
-
-        therapist_id = payload.therapist_id
-        if therapist_id is None:
-            # Note: therapist_id is required on Appointment ORM model, fallback to placeholder if not supplied
-            therapist_id = UUID("00000000-0000-0000-0000-000000000000")
+        start_dt = datetime.combine(sched_date, start_t, tzinfo=CLINIC_TZ)
 
         appointment_data = {
             "clinic_id": clinic_id,

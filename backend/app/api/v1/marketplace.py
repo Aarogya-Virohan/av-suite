@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.v1.audit import AuditLogServiceDep
 from app.core.dependencies import (
@@ -8,6 +8,7 @@ from app.core.dependencies import (
     SessionDep,
     require_roles,
 )
+from app.core.config import settings
 from app.enums.user import UserRole
 from app.schemas.envelope import ResponseEnvelope
 from app.schemas.marketplace import (
@@ -19,6 +20,22 @@ from app.schemas.marketplace import (
 from app.services import marketplace as marketplace_service
 
 router = APIRouter()
+
+
+def _marketplace_writes_open() -> None:
+    """BE-3: the marketplace is switched off for launch (M-1, AUD-12).
+
+    Tool access is set per clinic by scripts/clinic_setup; a clinic admin can
+    no longer install, enable or disable products from the API.
+    """
+    if not settings.MARKETPLACE_WRITES_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "MARKETPLACE_CLOSED",
+                "message": "Tools are managed by AV Suite. Contact support to change your plan.",
+            },
+        )
 
 
 @router.get("/products", response_model=ResponseEnvelope[list[ProductCatalogItem]])
@@ -44,7 +61,7 @@ async def get_installed_products(
 @router.post(
     "/products/{product_key}/install",
     response_model=ResponseEnvelope[MarketplaceEntitlementResponse],
-    dependencies=[Depends(require_roles(UserRole.ADMIN))],
+    dependencies=[Depends(_marketplace_writes_open), Depends(require_roles(UserRole.ADMIN))],
 )
 async def install_product(
     product_key: str,
@@ -73,7 +90,7 @@ async def install_product(
 @router.post(
     "/products/{product_key}/enable",
     response_model=ResponseEnvelope[MarketplaceEntitlementResponse],
-    dependencies=[Depends(require_roles(UserRole.ADMIN))],
+    dependencies=[Depends(_marketplace_writes_open), Depends(require_roles(UserRole.ADMIN))],
 )
 async def enable_product(
     product_key: str,
@@ -99,7 +116,7 @@ async def enable_product(
 @router.post(
     "/products/{product_key}/disable",
     response_model=ResponseEnvelope[MarketplaceEntitlementResponse],
-    dependencies=[Depends(require_roles(UserRole.ADMIN))],
+    dependencies=[Depends(_marketplace_writes_open), Depends(require_roles(UserRole.ADMIN))],
 )
 async def disable_product(
     product_key: str,
@@ -125,7 +142,7 @@ async def disable_product(
 @router.post(
     "/bundles/{bundle_key}/install",
     response_model=ResponseEnvelope[BundleInstallResponse],
-    dependencies=[Depends(require_roles(UserRole.ADMIN))],
+    dependencies=[Depends(_marketplace_writes_open), Depends(require_roles(UserRole.ADMIN))],
 )
 async def install_bundle(
     bundle_key: str,

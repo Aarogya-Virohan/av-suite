@@ -2,18 +2,30 @@ import uuid
 import re
 import unicodedata
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Enum, Boolean, Text, event, CheckConstraint
+from sqlalchemy import String, Enum, Boolean, Text, event, CheckConstraint, ForeignKey, Index
 from app.enums.clinic import ClinicPlanTier, ClinicType
+from app.enums.organization import ClinicStatus
 from app.models.base import Base, TimestampMixin
 
 
 class Clinic(Base, TimestampMixin):
     __tablename__ = "clinics"
-    __table_args__ = (CheckConstraint("client_type IN ('clinic', 'hospital', 'home_care')", name="ck_clinics_client_type"),)
+    __table_args__ = (
+        CheckConstraint("client_type IN ('clinic', 'hospital', 'home_care')", name="ck_clinics_client_type"),
+        CheckConstraint("status IN ('active', 'suspended')", name="ck_clinics_status"),
+        Index("ix_clinics_organization_id", "organization_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organizations.id"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=ClinicStatus.ACTIVE,
+        server_default=ClinicStatus.ACTIVE.value,
+    )
     type: Mapped[ClinicType] = mapped_column(
         Enum(
             ClinicType,
@@ -54,6 +66,7 @@ class Clinic(Base, TimestampMixin):
     )
 
     users = relationship("User", back_populates="clinic", foreign_keys="User.clinic_id")
+    organization = relationship("Organization", back_populates="clinics")
     memberships = relationship(
         "Membership", back_populates="clinic", cascade="all, delete-orphan"
     )
