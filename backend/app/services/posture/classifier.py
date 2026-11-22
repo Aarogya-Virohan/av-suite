@@ -7,6 +7,7 @@ Severity = Literal[
     "severe",
     "insufficient_data",
     "not_available",
+    "under_review",
 ]
 
 
@@ -336,7 +337,26 @@ SEVERITY_LABELS: dict[str, str] = {
     "severe": "SEVERE DEVIATION",
     "insufficient_data": "INSUFFICIENT DATA \u2013 RETAKE PHOTO",
     "not_available": "PATIENT HEIGHT REQUIRED",
+    "under_review": "UNDER REVIEW",
 }
+
+
+# POS-4, 21 November 2026: bands with no published basis are not graded
+# until the founders answer F-2 (C3 head position, C4 shoulder level
+# asymmetry). The value is still measured and printed; the row reads
+# UNDER REVIEW, its range cell says so, and nothing downstream (synthesis,
+# signature, summary) treats it as a grade. The bands in THRESHOLDS stay
+# as they are. Remove an id from this set once its band is confirmed.
+BANDS_UNDER_REVIEW: frozenset[str] = frozenset({"PT-L01", "PT-A02", "PT-P02"})
+
+
+def grade(param_id: str, value: float, gender: str | None = None) -> Severity:
+    """classify(), except a band under review returns "under_review"."""
+    if param_id in BANDS_UNDER_REVIEW:
+        if param_id not in THRESHOLDS:
+            raise ValueError(f"Unknown parameter: {param_id}")
+        return "under_review"
+    return classify(param_id, value, gender=gender)
 
 
 def classify(

@@ -92,7 +92,7 @@ from app.services.posture.calculator import (
     RIGHT_ANKLE,
 )
 
-from app.services.posture.classifier import classify
+from app.services.posture.classifier import grade
 
 from app.services.posture.annotator import annotate_pose
 
@@ -329,7 +329,7 @@ def _report_from_points(
         check_visibility(side_landmarks, [NOSE, ear_idx, shoulder_idx_lat])
 
         cva = calc_cva(side_geo, side=lateral_side)
-        severity = classify("PT-L01", cva)
+        severity = grade("PT-L01", cva)
         findings["PT-L01"] = severity
 
         head_position = cva_head_position(side_geo, side=lateral_side)
@@ -355,7 +355,7 @@ def _report_from_points(
         check_visibility(side_landmarks, [NOSE, shoulder_idx_lat, hip_idx_lat])
 
         trunk_lean = calc_forward_trunk_lean(side_geo, side=lateral_side)
-        severity = classify("PT-L05", trunk_lean)
+        severity = grade("PT-L05", trunk_lean)
         # The synthesis entry for PT-L05 was written for a forward lean
         # (hip flexors likely hypertonic). A backward lean grades on the
         # same bands but must not pull in that mapping, so it is not passed
@@ -392,7 +392,7 @@ def _report_from_points(
         check_limb_order(side_landmarks, hip_idx_lat, knee_idx_lat, ankle_idx_lat)
 
         knee_sagittal = calc_knee_hyperextension(side_geo, side=lateral_side)
-        severity = classify("PT-L06", knee_sagittal)
+        severity = grade("PT-L06", knee_sagittal)
         # Since 11 October 2026 a bent knee grades too (founders, 5a). The
         # synthesis entry for PT-L06 is a hyperextension mapping, so only a
         # hyperextended knee is passed to it; a flexed knee shows its grade
@@ -471,7 +471,7 @@ def _report_from_points(
         image_left_eye, image_right_eye = front.iris
 
         head_tilt = calc_head_tilt_eye_line(image_left_eye, image_right_eye)
-        severity = classify("PT-A01", head_tilt)
+        severity = grade("PT-A01", head_tilt)
         findings["PT-A01"] = severity
 
         front_measurements.append(
@@ -495,7 +495,7 @@ def _report_from_points(
         check_visibility(front_landmarks, [LEFT_HIP, RIGHT_HIP])
 
         obliquity = calc_pelvic_obliquity(front_geo)
-        severity = classify("PT-A04", obliquity)
+        severity = grade("PT-A04", obliquity)
         findings["PT-A04"] = severity
 
         front_measurements.append(
@@ -542,7 +542,7 @@ def _report_from_points(
             deviation, direction = calc_knee_frontal_deviation(front_geo, side_key)
 
             param_id = direction_param[direction]
-            severity = classify(param_id, deviation, gender=gender)
+            severity = grade(param_id, deviation, gender=gender)
             findings[f"{param_id}_{side_key}"] = severity
 
             front_measurements.append(
@@ -650,7 +650,7 @@ def _report_from_points(
             )
         else:
             trunk_dev = calc_trunk_lateral_deviation_mm(back_landmarks, back_width_px, back_pixels_per_cm)
-            severity = classify("PT-P01", trunk_dev)
+            severity = grade("PT-P01", trunk_dev)
             findings["PT-P01"] = severity
 
             back_measurements.append(
@@ -684,7 +684,7 @@ def _report_from_points(
             )
         else:
             scapular = calc_scapular_height_asymmetry_mm(back_landmarks, back_height_px, back_pixels_per_cm)
-            severity = classify("PT-P02", scapular)
+            severity = grade("PT-P02", scapular)
             findings["PT-P02"] = severity
 
             back_measurements.append(

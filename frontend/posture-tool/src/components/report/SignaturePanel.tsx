@@ -49,7 +49,11 @@ export default function SignaturePanel({ data }: Props) {
               <SeverityBadge severity={r.worst} label={r.worstLabel} />
             ) : (
               <span className="text-[12px] text-[#5D6380]">
-                {r.parameters.length === 0 ? "No parameter" : "Not measured"}
+                {r.parameters.length === 0
+                  ? "No parameter"
+                  : r.parameters.some((p) => p.severity === "under_review")
+                    ? "Under review"
+                    : "Not measured"}
               </span>
             )}
           </li>
