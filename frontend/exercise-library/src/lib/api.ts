@@ -1,5 +1,6 @@
 import { Exercise, ExercisePhoto, Patient, PhotoAngle, RxMode, SavedPrescription, Side } from "@/types/exercise";
 import { BASE_PATH, redirectToHubLogin } from "@/lib/hub";
+import { SUSPENDED_CODE, reportSuspended } from "@/lib/suspended";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const API = `${BASE_URL}/api/v1`;
@@ -78,7 +79,7 @@ async function toApiError(response: Response): Promise<ApiError> {
   const b = body as {
     detail?: unknown;
     message?: unknown;
-    meta?: { error?: { message?: unknown; code?: unknown } };
+    meta?: { error?: { message?: unknown; code?: unknown; details?: unknown } };
   } | null;
   const detail = b?.detail;
 
@@ -107,6 +108,11 @@ async function toApiError(response: Response): Promise<ApiError> {
   if (!message && typeof b?.meta?.error?.message === "string") message = b.meta.error.message;
   if (!code && typeof b?.meta?.error?.code === "string") code = b.meta.error.code;
   if (!message && typeof b?.message === "string") message = b.message;
+
+  // U4: clinic or organization paused: clear the session, full-page screen.
+
+  if (response.status === 403 && code === SUSPENDED_CODE) reportSuspended(b?.meta?.error?.details);
+
 
   return new ApiError(message || friendlyStatus(response.status), response.status, code, workspaces);
 }

@@ -9,6 +9,7 @@ import { useTokenStatus } from '@/lib/use-token';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/brand';
 import { asset, BASE_PATH, HUB_MODE, hubLoginUrl } from '@/lib/hub';
+import { SUSPENDED_CODE, reportSuspended } from '@/lib/suspended';
 
 interface Workspace {
   clinic_id: string;
@@ -55,6 +56,11 @@ export default function LoginPage() {
       const detail = body?.detail;
       if (detail && typeof detail === 'object' && detail.code === 'WORKSPACE_SELECTION_REQUIRED' && Array.isArray(detail.workspaces)) {
         setWorkspaces(detail.workspaces as Workspace[]);
+        return;
+      }
+      // U4: a paused clinic gets the full-page screen.
+      if (res.status === 403 && body?.meta?.error?.code === SUSPENDED_CODE) {
+        reportSuspended(body.meta.error.details);
         return;
       }
       const message =

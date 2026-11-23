@@ -67,8 +67,11 @@ async def list_catalog(
 
 
 async def list_installed(db: AsyncSession, clinic_id: UUID) -> list[dict[str, object]]:
+    effective = case(
+        (active_entitlement_clause(datetime.now(timezone.utc)), True), else_=False
+    )
     statement = (
-        select(Product, WorkspaceProduct)
+        select(Product, WorkspaceProduct, effective)
         .join(WorkspaceProduct, WorkspaceProduct.product_id == Product.id)
         .where(WorkspaceProduct.clinic_id == clinic_id)
         .order_by(Product.name)
@@ -82,8 +85,9 @@ async def list_installed(db: AsyncSession, clinic_id: UUID) -> list[dict[str, ob
             "source": entitlement.source,
             "valid_from": entitlement.valid_from,
             "valid_until": entitlement.valid_until,
+            "is_effective": bool(is_effective),
         }
-        for product, entitlement in rows
+        for product, entitlement, is_effective in rows
     ]
 
 
