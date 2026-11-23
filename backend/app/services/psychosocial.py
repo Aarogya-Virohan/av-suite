@@ -19,7 +19,6 @@ from sqlalchemy import and_, delete, desc, false, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums.permission import CapabilityScope
-from app.enums.product import EntitlementStatus
 from app.models.clinic import Clinic
 from app.models.patient import Patient
 from app.models.product import WorkspaceProduct
@@ -41,6 +40,9 @@ from app.screening.registry import get_instrument
 from app.screening.scoring import ScoringError, score
 from app.screening.types import Instrument, Item
 from app.services.audit import AuditLogService
+from app.exceptions import ResourceNotFoundError, WorkspaceSuspendedError
+from app.services.clinic_status import ensure_clinic_active
+from app.services.product_entitlements import active_entitlement_clause
 from app.services.usage_events import record_usage
 
 LINK_TTL_DAYS_DEFAULT = 7  # F5 default, pending founder sign-off
@@ -54,8 +56,10 @@ RECENT_SEND_DAYS = 14
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
-def error(status_code: int, code: str, message: str) -> HTTPException:
-    return HTTPException(status_code=status_code, detail={"code": code, "message": message})
+def error(status_code: int, code: str, message: str, **extra: Any) -> HTTPException:
+    """Error in the {detail: {code, message}} shape. Extra keys (only ever
+    clinic_name on public link errors) are added to the detail."""
+    return HTTPException(status_code=status_code, detail={"code": code, "message": message, **extra})
 
 
 def utcnow() -> datetime:
@@ -847,12 +851,17 @@ async def resolve_consent_request(db: AsyncSession, token: str) -> PsychosocialC
     )
     if request is None:
         raise error(status.HTTP_404_NOT_FOUND, "LINK_NOT_FOUND", "This link is not valid.")
-    if not await screening_enabled(db, request.clinic_id):
-        raise error(status.HTTP_403_FORBIDDEN, "SCREENING_UNAVAILABLE", "This screening is not available right now.")
+    await ensure_public_link_available(db, request.clinic_id, "This screening is not available right now.")
     if request.status == "cancelled":
-        raise error(status.HTTP_410_GONE, "LINK_CANCELLED", "This link is no longer active.")
+        raise error(
+            status.HTTP_410_GONE, "LINK_CANCELLED", "This link is no longer active.",
+            clinic_name=await clinic_name(db, request.clinic_id),
+        )
     if consent_request_state(request) == "expired":
-        raise error(status.HTTP_410_GONE, "LINK_EXPIRED", "This link has expired.")
+        raise error(
+            status.HTTP_410_GONE, "LINK_EXPIRED", "This link has expired.",
+            clinic_name=await clinic_name(db, request.clinic_id),
+        )
     return request
 
 
@@ -1054,10 +1063,30 @@ async def screening_enabled(db: AsyncSession, clinic_id: uuid.UUID) -> bool:
             .where(
                 WorkspaceProduct.clinic_id == clinic_id,
                 WorkspaceProduct.product_id == PRODUCT_ID,
-                WorkspaceProduct.status == EntitlementStatus.ENABLED,
+                # Same validity rule as staff access: an expired or
+                # not-yet-valid entitlement counts as off (U3).
+                active_entitlement_clause(utcnow()),
             )
         )
     ) > 0
+
+
+async def ensure_public_link_available(db: AsyncSession, clinic_id: uuid.UUID, message: str) -> None:
+    """Gate for every public patient link (screener, re-consent, shared report).
+
+    Product off / expired / not yet valid, or a suspended clinic or
+    organisation: no provider would act on new answers, so nothing is
+    collected or shown. The patient always gets the same neutral
+    SCREENING_UNAVAILABLE message; suspension and organisation details are
+    never exposed (U3).
+    """
+    unavailable = error(status.HTTP_403_FORBIDDEN, "SCREENING_UNAVAILABLE", message)
+    if not await screening_enabled(db, clinic_id):
+        raise unavailable
+    try:
+        await ensure_clinic_active(db, clinic_id)
+    except (WorkspaceSuspendedError, ResourceNotFoundError):
+        raise unavailable from None
 
 
 # ---------------------------------------------------------------------------
@@ -1071,21 +1100,25 @@ async def resolve_token(
     )
     if assignment is None:
         raise error(status.HTTP_404_NOT_FOUND, "LINK_NOT_FOUND", "This link is not valid.")
-    if not await screening_enabled(db, assignment.clinic_id):
-        # Lapsed or uninstalled: no provider would see new answers, so a risk
-        # answer must not be collected (S-D-034). Checked before every other
-        # state so the patient gets one clear message.
-        raise error(
-            status.HTTP_403_FORBIDDEN,
-            "SCREENING_UNAVAILABLE",
-            "This screening is not available right now.",
-        )
+    # Lapsed, expired, uninstalled or suspended: no provider would see new
+    # answers, so a risk answer must not be collected (S-D-034, U3). Checked
+    # before every other state so the patient gets one clear message.
+    await ensure_public_link_available(db, assignment.clinic_id, "This screening is not available right now.")
     if assignment.status == "cancelled":
-        raise error(status.HTTP_410_GONE, "LINK_CANCELLED", "This link is no longer active.")
+        raise error(
+            status.HTTP_410_GONE, "LINK_CANCELLED", "This link is no longer active.",
+            clinic_name=await clinic_name(db, assignment.clinic_id),
+        )
     if assignment.status == "completed" and not allow_completed:
-        raise error(status.HTTP_409_CONFLICT, "ALREADY_COMPLETED", "These questions have already been answered.")
+        raise error(
+            status.HTTP_409_CONFLICT, "ALREADY_COMPLETED", "These questions have already been answered.",
+            clinic_name=await clinic_name(db, assignment.clinic_id),
+        )
     if assignment.status == "active" and aware(assignment.expires_at) <= utcnow():
-        raise error(status.HTTP_410_GONE, "LINK_EXPIRED", "This link has expired.")
+        raise error(
+            status.HTTP_410_GONE, "LINK_EXPIRED", "This link has expired.",
+            clinic_name=await clinic_name(db, assignment.clinic_id),
+        )
     return assignment
 
 
@@ -1245,7 +1278,10 @@ async def submit_session(db: AsyncSession, token: str, instrument_id: str) -> Ps
     if target.status == "completed":
         return assignment  # retry after a successful submit: same answer
     if assignment.status == "completed":
-        raise error(status.HTTP_409_CONFLICT, "ALREADY_COMPLETED", "These questions have already been answered.")
+        raise error(
+            status.HTTP_409_CONFLICT, "ALREADY_COMPLETED", "These questions have already been answered.",
+            clinic_name=await clinic_name(db, assignment.clinic_id),
+        )
     await require_consent(db, assignment)
     current = current_session(assignment)
     if current is None or current.id != target.id:

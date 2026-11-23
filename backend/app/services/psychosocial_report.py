@@ -472,7 +472,9 @@ def build_report_html(data: ReportData) -> str:
     .note {{ color: {MUTED}; }}
     .empty {{ color: {MUTED}; font-style: italic; }}
     .disclaimer {{ margin-top: 7mm; padding-top: 3mm; border-top: 0.3mm solid {RULE}; font-size: 7.4pt; color: {MUTED}; }}
-    .closing {{ page-break-inside: avoid; }}
+    /* T3-a #3: the closing never sits alone on a page; it pulls the end of
+       the last section (referral actions) with it. */
+    .closing {{ page-break-inside: avoid; break-inside: avoid; page-break-before: avoid; break-before: avoid; }}
     .sign {{ margin-top: 10mm; width: 100%; border-collapse: collapse; page-break-inside: avoid; }}
     .sign td {{ width: 45%; border-top: 0.3mm solid {INK}; padding-top: 1.5mm; font-size: 7.4pt; color: {MUTED}; }}
     .sign td.gap {{ width: 10%; border: none; }}
