@@ -7,6 +7,7 @@ from fastapi.responses import Response
 
 import asyncio
 import base64
+import logging
 import re
 import uuid
 
@@ -1136,6 +1137,49 @@ async def report_from_review(
 # report data as a document designed for paper instead.
 
 
+_logger = logging.getLogger(__name__)
+
+PDF_BAD_PAYLOAD = "Report data is not in the expected format."
+PDF_FAILED = "The PDF could not be generated. Please try again."
+
+_VIEW_KEYS = ("side", "front", "back")
+
+
+def _pdf_payload_ok(report: dict) -> bool:
+    """
+    Shape check for POST /report/pdf (AUD-10, 23 Nov 2026): the report the
+    frontend holds after /report. Only the parts the PDF reads are checked;
+    extra keys pass. `views` is required (may be empty), everything else is
+    optional but must have the right type when present.
+    """
+
+    def opt(value, kind) -> bool:
+        return value is None or isinstance(value, kind)
+
+    views = report.get("views")
+    if not isinstance(views, dict):
+        return False
+    for key in _VIEW_KEYS:
+        view = views.get(key)
+        if not opt(view, dict):
+            return False
+        if view and not opt(view.get("measurements"), list):
+            return False
+        if view and not all(isinstance(m, dict) for m in view.get("measurements") or []):
+            return False
+    if not opt(report.get("patient"), dict):
+        return False
+    if not opt(report.get("signature"), dict) or not opt(report.get("synthesis"), dict):
+        return False
+    regions = (report.get("signature") or {}).get("regions")
+    if not opt(regions, list) or not all(isinstance(r, dict) for r in regions or []):
+        return False
+    for key in ("reportId", "analysisVersion"):
+        if not opt(report.get(key), str):
+            return False
+    return True
+
+
 @router.post("/report/pdf", dependencies=_CAN_RUN)
 async def export_posture_pdf(perm_ctx: PermissionContextDep, report: dict = Body(...)):
     """
@@ -1145,17 +1189,20 @@ async def export_posture_pdf(perm_ctx: PermissionContextDep, report: dict = Body
     analysis is not re-run just to produce a document.
     """
 
+    # AUD-10: a malformed payload gets a fixed 422 message, and an unexpected
+    # failure a fixed 500 message; the exception text stays in the server log.
+    if not _pdf_payload_ok(report):
+        raise HTTPException(status_code=422, detail=PDF_BAD_PAYLOAD)
+
     # The clinic on the letterhead is the signed-in clinic, read from the
     # clinics row here; report["branding"] from the client is ignored.
     clinic = await clinic_letterhead(perm_ctx.clinic)
 
     try:
         pdf_bytes = await asyncio.to_thread(generate_posture_pdf, report, clinic)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"PDF generation failed: {str(e)}",
-        )
+    except Exception:
+        _logger.exception("Posture PDF generation failed")
+        raise HTTPException(status_code=500, detail=PDF_FAILED)
 
     patient_name = ""
     if isinstance(report.get("patient"), dict):
