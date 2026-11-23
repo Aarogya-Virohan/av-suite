@@ -8,11 +8,11 @@ import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import type { ReconsentState } from '@/lib/types';
 import { Button } from '@/components/ui/brand';
-import { ERROR_COPY, Shell } from '@/components/screening/public';
+import { ERROR_COPY, Shell, errorClinic } from '@/components/screening/public';
 
 type Phase =
   | { kind: 'loading' }
-  | { kind: 'error'; code: string | null; message: string }
+  | { kind: 'error'; code: string | null; message: string; clinic?: string }
   | { kind: 'ask' }
   | { kind: 'granted' }
   | { kind: 'declined' };
@@ -37,7 +37,7 @@ export default function ReconsentPage() {
   const fail = (err: unknown) =>
     setPhase(
       err instanceof ApiError
-        ? { kind: 'error', code: err.code, message: err.message }
+        ? { kind: 'error', code: err.code, message: err.message, clinic: errorClinic(err) }
         : { kind: 'error', code: null, message: 'Something went wrong.' },
     );
 
@@ -90,7 +90,7 @@ export default function ReconsentPage() {
         : (phase.code && ERROR_COPY[phase.code]) || { title: 'Something went wrong', body: phase.message };
     const done = phase.code === 'ALREADY_ANSWERED';
     return (
-      <Shell clinic={state?.clinic_name}>
+      <Shell clinic={state?.clinic_name || phase.clinic}>
         <div className="animate-rise rounded-2xl border border-line bg-card p-6 text-center shadow-card sm:p-8">
           <span className={cn('mx-auto grid h-12 w-12 place-items-center rounded-full', done ? 'bg-grove-wash text-grove' : 'bg-warn-wash text-warn')}>
             {done ? <CheckCircle2 className="h-6 w-6" /> : phase.code === 'NETWORK' ? <CloudOff className="h-6 w-6" /> : <Clock className="h-6 w-6" />}

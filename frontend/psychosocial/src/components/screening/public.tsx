@@ -2,6 +2,19 @@
 
 import { Lock } from 'lucide-react';
 import { asset } from '@/lib/hub';
+import { ApiError } from '@/lib/api';
+
+/**
+ * Clinic name the backend adds to a link error once the token matched
+ * (T3-a #4: already completed, expired, cancelled). Never set on
+ * LINK_NOT_FOUND or SCREENING_UNAVAILABLE; the header falls back to
+ * "Your clinic".
+ */
+export function errorClinic(err: unknown): string | undefined {
+  if (!(err instanceof ApiError)) return undefined;
+  const name = err.details?.clinic_name;
+  return typeof name === 'string' && name.trim() ? name : undefined;
+}
 
 /**
  * Pieces shared by the patient's public pages: the screener and the

@@ -14,7 +14,7 @@ import { ProgressionTab } from '../../../../features/patients/components/Progres
 import { PatientBillingTab } from '../../../../features/patients/components/PatientBillingTab';
 import { EditPatientSlideOver } from '../../../../features/patients/components/EditPatientSlideOver';
 import { WhatsAppButton } from '../../../../components/ui/WhatsAppButton';
-import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, Activity, FileCheck, Camera, Dumbbell, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, CreditCard, Clock, Stethoscope, MessageSquare, Activity, FileCheck, Camera, Dumbbell, ClipboardList, Edit2, Trash2 } from 'lucide-react';
 import { API_BASE_URL, apiErrorCode } from '../../../../lib/api-client';
 import { getStoredToken } from '../../../../lib/auth';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ import { usePrescriptions, useCreatePrescription, useGeneratePrescriptionPdf } f
 import { Avatar, Button, Card } from '../../../../components/ui/brand';
 import { cn } from '../../../../lib/cn';
 import { toolUrl } from '../../../../lib/hub';
+import { TOOLS, toolState, useEnabledProducts } from '../../../../features/hub/tools';
 
 type TabKey = 'timeline' | 'documents' | 'treatments' | 'soapNotes' | 'progression' | 'rx' | 'billing';
 
@@ -31,6 +32,19 @@ export default function PatientWorkspacePage() {
   const router = useRouter();
   const patientId = params?.id as string;
   const role = useAuthStore((s) => s.role);
+  const capabilities = useAuthStore((s) => s.capabilities);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { data: enabledProducts } = useEnabledProducts(isAuthenticated);
+  // T03-3: no localhost fallback; a tool without a URL is hidden.
+  const postureUrl = toolUrl('posture');
+  const exercisesUrl = toolUrl('exercises');
+  // Same rule as the sidebar Tools launcher (HUB-3), but only once the
+  // clinic's products are known, so the button never shows for a clinic
+  // without Tool 03.
+  const screeningTool = TOOLS.find((t) => t.key === 'screening');
+  const screeningState =
+    screeningTool && enabledProducts ? toolState(screeningTool, enabledProducts, capabilities ?? {}) : null;
+  const screeningUrl = screeningState?.kind === 'open' ? screeningState.href : null;
 
   // Nothing is fetched for roles that cannot open the workspace (L-29).
   const canOpenWorkspace = canAccessModule('patients');
@@ -239,25 +253,41 @@ export default function PatientWorkspacePage() {
               <span>WA Session Report</span>
             </button>
 
-            <a
-              href={`${toolUrl('posture') ?? 'http://localhost:3002'}/analyze?patient_id=${patient.id}`}
-              target="_blank"
-              rel="noreferrer"
-              className={ACTION_CLASS}
-            >
-              <Camera className="h-3.5 w-3.5 text-logo-teal" />
-              <span>AI Posture Analysis</span>
-            </a>
+            {postureUrl && (
+              <a
+                href={`${postureUrl}/analyze?patient_id=${patient.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className={ACTION_CLASS}
+              >
+                <Camera className="h-3.5 w-3.5 text-logo-teal" />
+                <span>AI Posture Analysis</span>
+              </a>
+            )}
 
-            <a
-              href={`${toolUrl('exercises') ?? 'http://localhost:3001'}/prescribe?patient_id=${patient.id}`}
-              target="_blank"
-              rel="noreferrer"
-              className={ACTION_CLASS}
-            >
-              <Dumbbell className="h-3.5 w-3.5 text-info" />
-              <span>Exercise Library</span>
-            </a>
+            {exercisesUrl && (
+              <a
+                href={`${exercisesUrl}/prescribe?patient_id=${patient.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className={ACTION_CLASS}
+              >
+                <Dumbbell className="h-3.5 w-3.5 text-info" />
+                <span>Exercise Library</span>
+              </a>
+            )}
+
+            {screeningUrl && (
+              <a
+                href={`${screeningUrl}/patients/${patient.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className={ACTION_CLASS}
+              >
+                <ClipboardList className="h-3.5 w-3.5 text-logo-teal" />
+                <span>Psychosocial screening</span>
+              </a>
+            )}
 
 {permissions.treatments && (
             <Button

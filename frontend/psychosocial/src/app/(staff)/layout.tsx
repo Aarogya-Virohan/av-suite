@@ -63,8 +63,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
           </span>
           <h1 className="mt-4 font-display text-xl font-bold text-ink">Screening is not enabled</h1>
           <p className="mt-2 text-sm text-muted">
-            Psycho-social screening is not active for {me.data.active_workspace?.name ?? 'this clinic'}. A clinic
-            admin can add it from the AV Suite marketplace.
+            Psycho-social screening is not active for {me.data.active_workspace?.name ?? 'this clinic'}. To use it,
+            ask AV support to enable it.
           </p>
           <Button
             variant="secondary"
