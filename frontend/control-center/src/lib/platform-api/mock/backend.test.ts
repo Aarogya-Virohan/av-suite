@@ -72,7 +72,7 @@ describe('mock platform backend', () => {
     await owner.suspendOrganization(org.id, { reason: 'Contract paused' });
     const after = await owner.listAuditLogs({ page_size: 1 });
     expect(after.meta.total).toBe(before + 1);
-    expect(after.data[0]).toMatchObject({ action: 'organization.suspend', organization_id: org.id, reason: 'Contract paused' });
+    expect(after.data[0]).toMatchObject({ action: 'organization.suspended', organization_id: org.id, reason: 'Contract paused' });
   });
 
   it('treats entitlements outside their window as not effective (acceptance 7)', async () => {
@@ -108,14 +108,14 @@ describe('mock platform backend', () => {
       const sup = await find('support@av-console.mock');
       await expectError(owner.updateOperator(daman.id, { role: 'support', reason: 'x' }), 403, 'FORBIDDEN');
       await expectError(owner.updateOperator(sup.id, { role: 'owner', reason: 'x' }), 403, 'FORBIDDEN');
-      expect((await owner.listAuditLogs({ action: 'operator.update' })).meta.total).toBe(0);
+      expect((await owner.listAuditLogs({ action: 'operator.deactivated' })).meta.total).toBe(0);
     });
 
     it('lets an Owner deactivate another Owner (kill switch), audited', async () => {
       const daman = await find('daman@av-console.mock');
       const res = await owner.updateOperator(daman.id, { is_active: false, reason: 'lost laptop' });
       expect(res.data.is_active).toBe(false);
-      const row = (await owner.listAuditLogs({ action: 'operator.update', page_size: 1 })).data[0];
+      const row = (await owner.listAuditLogs({ action: 'operator.deactivated', page_size: 1 })).data[0];
       expect(row).toMatchObject({ reason: 'lost laptop', details: { before: { is_active: true }, after: { is_active: false } } });
     });
 
@@ -159,8 +159,8 @@ describe('mock platform backend', () => {
     const rows = (await owner.listAuditLogs({ page_size: 10 })).data;
     expect(rows.map((r) => r.action).sort()).toEqual(
       [
-        'organization.create', 'organization.update', 'organization.suspend', 'organization.activate', 'clinic.create',
-        'clinic.suspend', 'clinic.activate', 'entitlement.update', 'organization.merge', 'operator.update',
+        'organization.created', 'organization.updated', 'organization.suspended', 'organization.active', 'clinic.created',
+        'clinic.suspended', 'clinic.active', 'entitlement.updated', 'organization.merged', 'operator.updated',
       ].sort(),
     );
     for (const row of rows) {
@@ -169,7 +169,7 @@ describe('mock platform backend', () => {
       expect(row.details.after, row.action).not.toBeNull();
       expect(row.target_name, row.action).toBeTruthy();
     }
-    const opRow = rows.find((r) => r.action === 'operator.update')!;
+    const opRow = rows.find((r) => r.action === 'operator.updated')!;
     expect(opRow.details).toMatchObject({ before: { name: supportOp.name }, after: { name: 'Renamed Support' } });
   });
 

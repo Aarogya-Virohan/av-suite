@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApi } from '@/lib/platform-api';
+import { refreshAfterWrite } from '@/lib/refresh-after-write';
 import type { OperatorUpdate, PaginationParams } from '@/lib/platform-api/types';
 
 export const operatorKeys = {
@@ -23,11 +24,6 @@ export function useUpdateOperator() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, body }: { id: string; body: OperatorUpdate }) => (await platformApi().updateOperator(id, body)).data,
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: operatorKeys.all }),
-        queryClient.invalidateQueries({ queryKey: ['audit-logs'] }),
-        queryClient.invalidateQueries({ queryKey: ['overview'] }),
-      ]),
+    onSuccess: () => refreshAfterWrite(queryClient, [operatorKeys.all, ['audit-logs'], ['overview']]),
   });
 }

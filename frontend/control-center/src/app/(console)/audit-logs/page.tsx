@@ -13,7 +13,7 @@ import { useAuditLogs } from '@/features/audit/hooks';
 import { productLabel, useProductCatalog } from '@/features/catalog/hooks';
 import { useOperators } from '@/features/operators/hooks';
 import { cn } from '@/lib/cn';
-import { AUDIT_ACTIONS, auditActionLabel, formatDateTime } from '@/lib/format';
+import { AUDIT_ACTIONS, auditActionLabel, auditProductKey, formatDateTime } from '@/lib/format';
 import { errorMessage } from '@/lib/platform-api/errors';
 import { PAGE_SIZE_MAX, UI_PAGE_SIZE, type AuditLog } from '@/lib/platform-api/types';
 import { useCan } from '@/store/session';
@@ -92,7 +92,7 @@ function AuditLogs() {
       render: (a) => (
         <div>
           <p className="font-semibold text-ink">{auditActionLabel(a.action)}</p>
-          {typeof a.details.product_key === 'string' ? <p className="text-xs text-muted">{productLabel(catalog.byKey, a.details.product_key)}</p> : null}
+          {auditProductKey(a.details) ? <p className="text-xs text-muted">{productLabel(catalog.byKey, auditProductKey(a.details) as string)}</p> : null}
         </div>
       ),
     },

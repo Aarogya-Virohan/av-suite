@@ -178,7 +178,14 @@ function ClinicDetail() {
       </Card>
 
       <Card className="p-5">
-        <CardHeader title="Usage by tool" action={<span className="text-xs text-muted">Event counts only, no patient data</span>} />
+        <CardHeader
+          title="Usage by tool"
+          action={
+            <Link href={`/usage?clinic_id=${clinic.id}`} className="text-xs font-semibold text-grove hover:text-grove-hover">
+              Daily usage
+            </Link>
+          }
+        />
         {clinic.usage.by_product.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">No usage in this period.</p>
         ) : (
