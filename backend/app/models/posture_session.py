@@ -17,6 +17,7 @@ Database Tables:
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey, String, Float, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from typing import Optional
 from app.models.base import Base, TimestampMixin
 
@@ -101,6 +102,17 @@ class PostureSession(Base, TimestampMixin):
     annotated_front_image: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     annotated_back_image: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     annotated_side_image: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+
+    # POS-2 / BE-2: the saved report. Rows made before 23 Nov 2026 have none.
+    # report_json is the report without the photographs (founders, 11 Oct 2026,
+    # answer 6a) and without the clinic branding, which is read again from the
+    # clinics row whenever the report is shown or printed.
+    report_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True, unique=True, index=True)
+    report_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    analysis_version: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Relationships - Database connections
     # Yeh relationships SQLAlchemy lazy loading aur traversal enable karte hain

@@ -11,7 +11,8 @@ PDF with a results table (the test pack Onkar reviews).
 | 03 | Add a patient, find it, open the record | CRM |
 | 04 | Create an invoice, open the invoice preview | CRM |
 | 05 | Build an Rx, save and download the PDF (checks `%PDF`) | Exercise Library |
-| 06 | Posture assessment with uploaded photos | Posture tool |
+| 06 | Posture from a CRM patient: locked patient, report, PDF, open it again, PDF again | CRM + Posture tool |
+| 06b | Posture opened directly: pick a patient, no free text | Posture tool |
 | 07 | Send a Tool 03 screener (PHQ-9 + GAD-7), link created, API confirms | Screening |
 
 Flows 04, 05 and 07 use one shared patient that the suite creates through the

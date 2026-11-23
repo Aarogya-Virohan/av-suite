@@ -289,10 +289,9 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
 interface ReportPayload {
   detection: DetectionResult
   review: LandmarkReviewSubmission
-  patientName: string
-  age: string
-  gender: string
-  caseRef: string
+  // The CRM patient (POS-2): name, age, sex and the case ID come from the
+  // patient record on the server, not from the form.
+  patientId: string
   patientHeightCm: string
   clinicianName: string
   frontSource: string
@@ -320,10 +319,7 @@ export async function generateReport(payload: ReportPayload): Promise<PostureRep
   formData.append("side_display", await dataUrlToBlob(detection.views.side.displayImage), "side.jpg")
   formData.append("back_display", await dataUrlToBlob(detection.views.back.displayImage), "back.jpg")
 
-  formData.append("patient_name", payload.patientName)
-  formData.append("age", payload.age)
-  formData.append("gender", payload.gender)
-  formData.append("case_ref", payload.caseRef)
+  formData.append("patient_id", payload.patientId)
   formData.append("patient_height_cm", payload.patientHeightCm)
   formData.append("clinician_name", payload.clinicianName)
   formData.append("front_source", payload.frontSource)
@@ -346,6 +342,26 @@ export async function generateReport(payload: ReportPayload): Promise<PostureRep
   return response.json()
 }
 
+function saveBlob(blob: Blob, patientName: string) {
+  const safeName =
+    patientName
+      .split("")
+      .filter((c) => /[a-zA-Z0-9\-_]/.test(c))
+      .join("") || "report"
+
+  const url = window.URL.createObjectURL(blob)
+
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `posture-assessment-${safeName}.pdf`
+
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+
+  window.URL.revokeObjectURL(url)
+}
+
 /**
  * Request the server-rendered clinical PDF for an already-computed report.
  *
@@ -365,26 +381,75 @@ export async function downloadPostureReportPdf(report: PostureReport): Promise<v
     },
     "Failed to generate report PDF",
   )
+  saveBlob(await response.blob(), report.patient?.name ?? "")
+}
 
-  const blob = await response.blob()
+// ------------------------------------------------------------------ patients
+// POS-2 (23 Nov 2026): a posture report belongs to a CRM patient of the
+// signed-in clinic. The picker shows name, age, sex and the CRM ID only.
 
-  const patientName = report.patient?.name ?? ""
+export interface PickerPatient {
+  id: string
+  displayNumber: number
+  /** CRM patient ID as the CRM shows it, for example "SPC-000123". */
+  caseId: string
+  name: string
+  age: number | null
+  gender: string
+}
 
-  const safeName =
-    patientName
-      .split("")
-      .filter((c) => /[a-zA-Z0-9\-_]/.test(c))
-      .join("") || "report"
+export interface SavedReportListing {
+  reportId: string
+  createdAt: string | null
+  assessmentDate: string | null
+  clinician: string
+  analysisVersion: string | null
+}
 
-  const url = window.URL.createObjectURL(blob)
+export async function searchPatients(term: string, signal?: AbortSignal): Promise<PickerPatient[]> {
+  const response = await request(
+    `/posture/patients?search=${encodeURIComponent(term)}`,
+    { signal },
+    "Could not load patients",
+  )
+  const body = (await response.json()) as { patients: PickerPatient[] }
+  return body.patients
+}
 
-  const link = document.createElement("a")
-  link.href = url
-  link.download = `posture-assessment-${safeName}.pdf`
+export async function fetchPatient(id: string): Promise<PickerPatient> {
+  const response = await request(
+    `/posture/patients/${encodeURIComponent(id)}`,
+    {},
+    "Could not load the patient",
+  )
+  return response.json()
+}
 
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+export async function listPatientReports(patientId: string): Promise<SavedReportListing[]> {
+  const response = await request(
+    `/posture/patients/${encodeURIComponent(patientId)}/reports`,
+    {},
+    "Could not load earlier reports",
+  )
+  const body = (await response.json()) as { reports: SavedReportListing[] }
+  return body.reports
+}
 
-  window.URL.revokeObjectURL(url)
+/** A saved report to open again. It has no photographs; they are not stored. */
+export async function fetchSavedReport(reportId: string): Promise<PostureReport> {
+  const response = await request(
+    `/posture/reports/${encodeURIComponent(reportId)}`,
+    {},
+    "Could not open the report",
+  )
+  return response.json()
+}
+
+export async function downloadSavedReportPdf(reportId: string, patientName: string): Promise<void> {
+  const response = await request(
+    `/posture/reports/${encodeURIComponent(reportId)}/pdf`,
+    {},
+    "Failed to generate report PDF",
+  )
+  saveBlob(await response.blob(), patientName)
 }
