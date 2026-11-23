@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { SuspendedScreen } from "@/components/SuspendedScreen";
 
 // Brand typefaces, 13 October 2026 (brand direction B, same as the PDF).
 // Served from the repo, not from Google, so a build needs no network and the
@@ -36,7 +37,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`h-full antialiased ${inter.variable} ${jakarta.variable}`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <SuspendedScreen />
+      </body>
     </html>
   );
 }

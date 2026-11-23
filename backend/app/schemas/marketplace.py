@@ -24,6 +24,7 @@ class InstalledProductItem(BaseModel):
     source: EntitlementSource
     valid_from: datetime | None
     valid_until: datetime | None
+    is_effective: bool = False
 
 
 class MarketplaceEntitlementResponse(BaseModel):

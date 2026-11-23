@@ -33,9 +33,19 @@ export type ToolState =
   | { kind: 'no-access' }
   | { kind: 'unavailable' };
 
-interface InstalledProduct {
+export interface InstalledProduct {
   product_key: string;
   status: string;
+  /** U4: enabled AND inside valid_from / valid_until (backend active_entitlement_clause). */
+  is_effective?: boolean;
+}
+
+/**
+ * Product keys the clinic can use right now. Only is_effective counts: a row
+ * that is "enabled" but expired or not yet valid is not in the plan.
+ */
+export function effectiveProductKeys(rows: InstalledProduct[]): Set<string> {
+  return new Set(rows.filter((r) => r.is_effective === true).map((r) => r.product_key));
 }
 
 /** Enabled product keys of the active clinic, or null while unknown. */
@@ -48,7 +58,7 @@ export function useEnabledProducts(enabled: boolean) {
     queryFn: async (): Promise<Set<string>> => {
       const res = await apiClient.get('/marketplace/installed');
       const rows = (res.data?.data ?? res.data ?? []) as InstalledProduct[];
-      return new Set(rows.filter((r) => r.status === 'enabled').map((r) => r.product_key));
+      return effectiveProductKeys(rows);
     },
   });
 }

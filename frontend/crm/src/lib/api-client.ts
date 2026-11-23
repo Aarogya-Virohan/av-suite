@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { getStoredToken, clearStoredTokens } from './auth';
 import { useAuthStore } from '../store';
 import { asset, redirectToHubLogin } from './hub';
+import { SUSPENDED_CODE, reportSuspended } from './suspended';
 
 const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const BASE_URL = rawBaseUrl.replace(/\/+$/, '');
@@ -44,7 +45,7 @@ apiClient.interceptors.response.use(
       | {
           detail?: string | Array<{ msg?: string }> | { code?: string; message?: string };
           message?: string;
-          meta?: { error?: { code?: string; message?: string } } | null;
+          meta?: { error?: { code?: string; message?: string; details?: unknown } } | null;
         }
       | undefined;
 
@@ -79,6 +80,13 @@ apiClient.interceptors.response.use(
       error.message = detailMessage;
     }
 
+    // U4: clinic or organization paused. Clear the session and show the
+    // full-page suspended screen (SuspendedScreen in AppProviders).
+    if (error.response?.status === 403 && error.apiErrorCode === SUSPENDED_CODE) {
+      reportSuspended(responseData?.meta?.error?.details);
+      useAuthStore.getState().logout();
+    }
+
     // On 401 Unauthorized: clear tokens, reset auth state, and redirect to login
     if (error.response?.status === 401) {
       clearStoredTokens();
@@ -92,7 +100,7 @@ apiClient.interceptors.response.use(
     // A 403 is an expected, handled outcome (the page shows a restricted or
     // "not enabled" state), so it is a warning, not an error. console.error
     // made the Next.js dev overlay report every one as an "Issue".
-    if (error.response?.status === 403) {
+    if (error.response?.status === 403 && error.apiErrorCode !== SUSPENDED_CODE) {
       console.warn('Permission denied (403):', detailMessage || error.response.data);
     }
 

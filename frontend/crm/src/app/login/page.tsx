@@ -9,7 +9,8 @@ import { toast } from 'sonner';
 import { useAuthStore } from '../../store';
 import { setStoredToken, setStoredEmail, getStoredToken, isTokenExpired } from '../../lib/auth';
 import { asset, HUB_MODE, safeHubNext } from '../../lib/hub';
-import { apiClient } from '../../lib/api-client';
+import { apiClient, apiErrorCode } from '../../lib/api-client';
+import { SUSPENDED_CODE } from '../../lib/suspended';
 import { Check, Lock, Mail, Loader2, Eye, EyeOff, Building2, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/ui/brand';
 import { cn } from '../../lib/cn';
@@ -96,6 +97,8 @@ export default function LoginPage() {
         setWorkspaces(options);
         return;
       }
+      // U4: a paused clinic gets the full-page screen, not a toast.
+      if (apiErrorCode(err) === SUSPENDED_CODE) return;
       console.error('Login error:', err);
       const errorMessage =
         err instanceof Error ? err.message : 'Login failed. Please check your credentials.';
@@ -110,6 +113,7 @@ export default function LoginPage() {
     try {
       await signIn(getValues(), clinicId);
     } catch (err: unknown) {
+      if (apiErrorCode(err) === SUSPENDED_CODE) return;
       console.error('Login error:', err);
       toast.error(err instanceof Error ? err.message : 'Could not open this workspace.');
     } finally {

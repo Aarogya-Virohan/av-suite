@@ -7,6 +7,7 @@ import type {
   PostureReport,
 } from "@/types/posture"
 import type { CaptureLevel } from "@/lib/tilt"
+import { SUSPENDED_CODE, reportSuspended } from "@/lib/suspended"
 
 // ------------------------------------------------------------------ session
 // Same storage keys as the Exercise Library. Each app runs on its own origin,
@@ -105,7 +106,7 @@ async function toApiError(response: Response, fallback?: string): Promise<ApiErr
   const b = body as {
     detail?: unknown
     message?: unknown
-    meta?: { error?: { message?: unknown; code?: unknown } }
+    meta?: { error?: { message?: unknown; code?: unknown; details?: unknown } }
   } | null
   const detail = b?.detail
 
@@ -147,6 +148,11 @@ async function toApiError(response: Response, fallback?: string): Promise<ApiErr
     message =
       "Your account is not allowed to run posture analyses. Ask your clinic admin to grant \"Run Posture Analysis\" in Permissions."
   }
+
+  // U4: clinic or organization paused: clear the session, full-page screen.
+
+  if (response.status === 403 && code === SUSPENDED_CODE) reportSuspended(b?.meta?.error?.details)
+
 
   return new ApiError(
     message || fallback || friendlyStatus(response.status),

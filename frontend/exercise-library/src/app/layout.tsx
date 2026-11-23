@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/plus-jakarta-sans";
 import "./globals.css";
+import { SuspendedScreen } from "@/components/SuspendedScreen";
 import { Toaster } from "@/components/ui/toaster";
 import { asset } from "@/lib/hub";
 
@@ -21,6 +22,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <Toaster />
+        <SuspendedScreen />
       </body>
     </html>
   );

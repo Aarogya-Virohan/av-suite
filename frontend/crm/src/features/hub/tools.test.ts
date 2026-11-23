@@ -45,3 +45,20 @@ describe('toolState (HUB-3)', () => {
     });
   });
 });
+
+describe('effectiveProductKeys (U4)', () => {
+  it('only is_effective true counts; enabled but not effective = not in your plan', async () => {
+    const { TOOLS, toolState, effectiveProductKeys } = await load({ NEXT_PUBLIC_BASE_PATH: '/crm' });
+    const keys = effectiveProductKeys([
+      { product_key: 'posture-tool', status: 'enabled', is_effective: false },
+      { product_key: 'exercise-library', status: 'enabled', is_effective: true },
+      { product_key: 'psycho-social-screening', status: 'disabled', is_effective: false },
+      { product_key: 'crm', status: 'enabled' },
+    ]);
+    expect([...keys]).toEqual(['exercise-library']);
+    const posture = TOOLS.find((t) => t.key === 'posture')!;
+    expect(toolState(posture, keys, { 'posture.view': 'all' }).kind).toBe('not-in-plan');
+    const ex = TOOLS.find((t) => t.key === 'exercises')!;
+    expect(toolState(ex, keys, { 'exercises.view': 'all' }).kind).toBe('open');
+  });
+});
