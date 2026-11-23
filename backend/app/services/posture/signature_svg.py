@@ -166,6 +166,7 @@ def render_signature_svg(
 
     points: list[tuple[float, float, dict[str, Any]]] = []
     angles: list[float] = []
+    label_boxes: list[tuple[float, float, float, float]] = []
     for i, p in enumerate(params):
         # Half a step off vertical, so no axis runs up the chart's vertical
         # centre line, where the ring names are printed.
@@ -205,6 +206,10 @@ def render_signature_svg(
             note = "under review" if p.get("severity") == "under_review" else "not measured"
             rows.append((note, LABEL_SIZE - 2))
         for k, (line, size) in enumerate(rows):
+            tw = _text_w(line, size)
+            bx0 = lx - tw if anchor == "end" else (lx - tw / 2 if anchor == "middle" else lx)
+            by = y0 + k * LABEL_SIZE * 1.05
+            label_boxes.append((bx0, by - size * 0.8, bx0 + tw, by + size * 0.25))
             parts.append(
                 f'<text x="{lx:.1f}" y="{y0 + k * LABEL_SIZE * 1.05:.1f}" font-size="{size}" '
                 f'text-anchor="{anchor}" fill="{"#1f2a44" if measured else GREY}" '
@@ -260,41 +265,73 @@ def render_signature_svg(
         px, py = cx + r_mid * math.cos(gap), cy + r_mid * math.sin(gap)
         return px - w / 2, py - h / 2, px + w / 2, py + h / 2
 
-    shifts = [0.0, -2.0, 2.0, -4.0, 4.0, -6.0, 6.0, -8.0, 8.0, -10.0, 10.0]
+    # 23 Nov 2026 (Posture fixes lane): the three names were placed one by
+    # one, so in a gap near the horizontal the 38 unit bands were narrower
+    # than the pills and Mild sat on top of Moderate ("M Mildoderate"), and
+    # a name moved to another gap could land on an axis name. Now every
+    # candidate spot is also checked against the pills already placed and
+    # against the axis names; when no bisector is clear, the name may sit
+    # anywhere along its band (every 5 degrees).
+    band = ring(1) - ring(0)
+    limit = max(0.0, band / 2 - (RING_LABEL_SIZE + 4) / 2 - 1)
+    shifts = [0.0] + [s * d for d in (2.0, 4.0, 6.0, 8.0, 10.0) if d <= limit + 4 for s in (-1, 1)]
+    placed: list[tuple[float, float, float, float]] = []
+    pad = 3.0
+
+    def _rects_hit(a, b) -> bool:
+        return a[0] < b[2] + pad and b[0] < a[2] + pad and a[1] < b[3] + pad and b[1] < a[3] + pad
 
     def hits(t: int, gap: float, shift: float) -> int:
-        x0, y0, x1, y1 = pill(t, gap, shift)
+        x0, y0, x1, y1 = rect = pill(t, gap, shift)
         box = (x0 - clear, y0 - clear, x1 + clear, y1 + clear)
         count = sum(_circle_hits_rect(x, y, dot_r, x0, y0, x1, y1) for x, y, _ in points)
         count += sum(_seg_hits_rect(*e, *box) for e in edges)
+        count += 3 * sum(_rects_hit(rect, b) for b in label_boxes)
+        count += 5 * sum(_rects_hit(rect, b) for b in placed)
         return count
 
     def place(t: int, gap: float) -> tuple[int, float]:
         """(touches, shift) of the clearest spot for ring name t in this gap."""
         return min((hits(t, gap, d), abs(d), d) for d in shifts)[0::2]
 
-    def cost(gap: float) -> float:
-        total = sum(place(t, gap)[0] for t in range(1, len(RING_LABELS)))
-        # Nearest the top as the tie-break, where the names used to be.
-        return 1000 * total + (1 - math.cos(gap + math.pi / 2))
-
     gaps = [math.radians(-90 + 360 * i / n) for i in range(n)]
-    best = min(gaps, key=cost)
+    sweep = [math.radians(-90 + 5 * k) for k in range(72)]
 
-    def own_spot(t: int) -> tuple[float, float]:
-        if t == 0:
-            return best, 0.0
-        touches, shift = place(t, best)
-        if touches:
-            near = sorted(gaps, key=lambda g: (1 - math.cos(g - best)))
-            for g in near:
-                k, d = place(t, g)
-                if k == 0:
-                    return g, d
-        return best, shift
+    def near_top(g: float) -> float:
+        return 1 - math.cos(g + math.pi / 2)
+
+    def try_gap(gap: float) -> list[tuple[float, float]] | None:
+        """All three names on this bisector, clear of everything, or None."""
+        spots = []
+        for t in range(1, len(RING_LABELS)):
+            k, d = place(t, gap)
+            if k:
+                del placed[len(placed) - len(spots):]
+                return None
+            spots.append((gap, d))
+            placed.append(pill(t, gap, d))
+        return spots
+
+    placed.append(pill(0, 0.0))
+    spots: list[tuple[float, float]] | None = None
+    for g in sorted(gaps, key=near_top):
+        spots = try_gap(g)
+        if spots:
+            break
+    if not spots:
+        # Each name on its own: a clear bisector first, then anywhere along
+        # its band, nearest the top; least touches when nothing is clear.
+        spots = []
+        for t in range(1, len(RING_LABELS)):
+            cands = sorted(gaps, key=near_top) + sorted(sweep, key=near_top)
+            scored = [(place(t, g), i, g) for i, g in enumerate(cands)]
+            (k, d), _, g = min(scored, key=lambda z: (z[0][0], z[1]))
+            spots.append((g, d))
+            placed.append(pill(t, g, d))
+    all_spots = [(0.0, 0.0)] + spots
 
     for t, name in enumerate(RING_LABELS):
-        x0, y0, x1, y1 = pill(t, *own_spot(t))
+        x0, y0, x1, y1 = pill(t, *all_spots[t])
         h = y1 - y0
         parts.append(
             f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{x1 - x0:.1f}" '

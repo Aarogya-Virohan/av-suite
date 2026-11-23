@@ -530,7 +530,7 @@ def _patient_box(report: dict) -> str:
     """
 
 
-def _sources_section(views: dict | None) -> str:
+def _sources_section(views: dict | None, closing: str = "") -> str:
     """
     Normal ranges: basis and sources, its own short section on page 3 above
     the sign-off and disclaimer (Onkar's review, 17 November 2026), one line
@@ -539,15 +539,20 @@ def _sources_section(views: dict | None) -> str:
     row's own label, the same text the table prints (escaped here as it is
     there), so a measure has one name on every page.
     """
-    rows = "".join(
+    # 23 Nov 2026 (Posture fixes lane): `closing` (sign-off and notes) is
+    # printed inside the last two source lines' keep-together block, so when
+    # page 3 is full the sign-off moves to the next page with those lines
+    # and never stands alone on the last page.
+    lines = [
         f'<p class="src"><strong>{_esc(name)}:</strong> {_esc(text)}</p>'
         for name, text in source_lines(views)
-    )
+    ]
+    head, tail = lines[:-2], lines[-2:]
     return (
         '<div class="sources-section">'
         f'<p class="sources-tag">{_esc(SOURCES_HEADING)}</p>'
         f'<p class="src lead">{_esc(SCREENING_NOTE)}</p>'
-        f"{rows}</div>"
+        f'{"".join(head)}<div class="keep-last">{"".join(tail)}{closing}</div></div>'
     )
 
 
@@ -600,6 +605,25 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
         if analysis_version
         else ""
     )
+
+    closing_html = f"""<div class="closing">
+<table class="sign-off">
+    <tr>
+        <td><div class="space"></div><div class="caption">Assessing physiotherapist, name and signature</div></td>
+        <td class="gap"></td>
+        <td><div class="space"></div><div class="caption">Date</div></td>
+    </tr>
+</table>
+
+<div class="notes">
+    <p class="disclaimer-tag">Disclaimer</p>
+    <p class="disclaimer">{DISCLAIMER}</p>
+    <p class="side-note">{SIDE_NOTE}</p>
+    {upload_note}
+    {version_line}
+</div>
+</div>
+"""
 
     return f"""
 <!DOCTYPE html>
@@ -1039,8 +1063,10 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     /* Sign-off and notes travel together. When a long report pushes them
        off page 2, both move to the next page as one closing block, instead
        of the disclaimer sitting alone on a page (seen 12 October 2026). */
-    .closing {{
+    .closing,
+    .keep-last {{
         page-break-inside: avoid;
+        break-inside: avoid;
     }}
     .sign-off {{
         margin-top: 8px;
@@ -1153,25 +1179,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
 
 {_synthesis_section(report.get("synthesis") or {})}
 
-{_sources_section(views)}
-
-<div class="closing">
-<table class="sign-off">
-    <tr>
-        <td><div class="space"></div><div class="caption">Assessing physiotherapist, name and signature</div></td>
-        <td class="gap"></td>
-        <td><div class="space"></div><div class="caption">Date</div></td>
-    </tr>
-</table>
-
-<div class="notes">
-    <p class="disclaimer-tag">Disclaimer</p>
-    <p class="disclaimer">{DISCLAIMER}</p>
-    <p class="side-note">{SIDE_NOTE}</p>
-    {upload_note}
-    {version_line}
-</div>
-</div>
+{_sources_section(views, closing_html)}
 </div>
 
 </body>
