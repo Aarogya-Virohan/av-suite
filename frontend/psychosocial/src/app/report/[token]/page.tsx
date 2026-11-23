@@ -8,11 +8,11 @@ import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
 import type { PatientReport, ReportGate } from '@/lib/types';
 import { Button, FieldLabel, inputClass } from '@/components/ui/brand';
-import { ERROR_COPY, Shell } from '@/components/screening/public';
+import { ERROR_COPY, Shell, errorClinic } from '@/components/screening/public';
 
 type Phase =
   | { kind: 'loading' }
-  | { kind: 'error'; code: string | null; message: string }
+  | { kind: 'error'; code: string | null; message: string; clinic?: string }
   | { kind: 'verify'; gate: ReportGate; attemptsLeft: number | null }
   | { kind: 'report'; report: PatientReport };
 
@@ -42,11 +42,11 @@ export default function SharedReportPage() {
   const [year, setYear] = useState('');
   const [busy, setBusy] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const clinic = phase.kind === 'verify' ? phase.gate.clinic_name : phase.kind === 'report' ? phase.report.clinic_name : undefined;
+  const clinic = phase.kind === 'verify' ? phase.gate.clinic_name : phase.kind === 'report' ? phase.report.clinic_name : phase.kind === 'error' ? phase.clinic : undefined;
 
   const fail = (e: unknown) =>
     setPhase(
-      e instanceof ApiError ? { kind: 'error', code: e.code, message: e.message } : { kind: 'error', code: null, message: 'Something went wrong.' },
+      e instanceof ApiError ? { kind: 'error', code: e.code, message: e.message, clinic: errorClinic(e) } : { kind: 'error', code: null, message: 'Something went wrong.' },
     );
 
   const open = async (birthYear: number | null, gate: ReportGate) => {

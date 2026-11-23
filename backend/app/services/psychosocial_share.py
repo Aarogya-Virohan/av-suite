@@ -207,13 +207,18 @@ async def resolve_share(db: AsyncSession, token: str) -> PsychosocialSharedRepor
     )
     if report is None:
         raise svc.error(status.HTTP_404_NOT_FOUND, "LINK_NOT_FOUND", "This link is not valid.")
-    if not await svc.screening_enabled(db, report.clinic_id):
-        raise svc.error(status.HTTP_403_FORBIDDEN, "SCREENING_UNAVAILABLE", "This report is not available right now.")
+    await svc.ensure_public_link_available(db, report.clinic_id, "This report is not available right now.")
     state = share_state(report)
     if state == "revoked":
-        raise svc.error(status.HTTP_410_GONE, "LINK_CANCELLED", "This link is no longer active.")
+        raise svc.error(
+            status.HTTP_410_GONE, "LINK_CANCELLED", "This link is no longer active.",
+            clinic_name=await svc.clinic_name(db, report.clinic_id),
+        )
     if state == "expired":
-        raise svc.error(status.HTTP_410_GONE, "LINK_EXPIRED", "This link has expired.")
+        raise svc.error(
+            status.HTTP_410_GONE, "LINK_EXPIRED", "This link has expired.",
+            clinic_name=await svc.clinic_name(db, report.clinic_id),
+        )
     if state == "locked":
         raise svc.error(status.HTTP_423_LOCKED, "LINK_LOCKED", "This link is locked.")
     return report
