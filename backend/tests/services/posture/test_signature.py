@@ -68,3 +68,60 @@ def test_pdf_section_is_omitted_for_reports_without_a_signature():
     assert _biomech_signature_section(None) == ""
     html = _biomech_signature_section(build_signature({}))
     assert "Biomechanical Signature" in html and "No parameter" in html
+
+
+def _radar_boxes(svg):
+    """Ring-name pills, points and axis-name boxes from the rendered SVG."""
+    import re
+
+    from app.services.posture.signature_svg import LABEL_SIZE, _text_w
+
+    pills = [tuple(float(v) for v in m) for m in re.findall(
+        r'<rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"', svg)]
+    pills = [(x, y, x + w, y + h) for x, y, w, h in pills]
+    dots = [(float(x), float(y)) for x, y in re.findall(r'<circle cx="([\d.-]+)" cy="([\d.-]+)" r="5.5"', svg)]
+    labels = []
+    for x, y, size, anchor, text in re.findall(
+        r'<text x="([\d.-]+)" y="([\d.-]+)" font-size="(\d+)" text-anchor="(\w+)" fill="#(?:1f2a44|94a3b8)"[^>]*>([^<]*)<', svg
+    ):
+        x, y, size = float(x), float(y), float(size)
+        tw = _text_w(text, size)
+        x0 = x - tw if anchor == "end" else (x - tw / 2 if anchor == "middle" else x)
+        labels.append((x0, y - size * 0.8, x0 + tw, y + size * 0.25))
+    assert LABEL_SIZE
+    return pills, dots, labels
+
+
+def test_ring_names_never_overlap_each_other_a_point_or_an_axis_name():
+    # 23 Nov 2026: "Mild" was printed over "Moderate" ("M Mildoderate").
+    import random
+
+    from app.services.posture.signature_svg import render_signature_svg
+
+    rows = [
+        ("side", "PT-L01", "Forward Head (CVA)"), ("side", "PT-L05", "Trunk Lean"),
+        ("side", "PT-L06", "Knee Sagittal Alignment"), ("front", "PT-A01", "Head Lateral Tilt"),
+        ("front", "PT-A04", "Pelvic Obliquity"), ("front", "PT-A05", "Shoulder Level Asymmetry"),
+        ("front", "PT-A06", "Knee Valgus"), ("back", "PT-P01", "Trunk Shift"),
+        ("back", "PT-P02", "Scapular Asymmetry"),
+    ]
+    grades = ["none", "mild", "moderate", "severe"]
+    rnd = random.Random(23)
+    sets = [[g] * 9 for g in grades] + [["none", "severe"] * 4 + ["none"]]
+    sets += [[rnd.choice(grades + ["insufficient_data"]) for _ in rows] for _ in range(300)]
+    for sevs in sets:
+        views = {}
+        for (view, pid, label), sev in zip(rows, sevs):
+            views.setdefault(view, {"measurements": []})["measurements"].append(m(pid, label, sev))
+        pills, dots, labels = _radar_boxes(render_signature_svg(build_signature(views)))
+        assert len(pills) == 4
+
+        def overlap(a, b):
+            return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+        for i, p in enumerate(pills):
+            assert not any(overlap(p, q) for q in pills[i + 1:]), sevs
+            assert not any(overlap(p, q) for q in labels), sevs
+            for x, y in dots:
+                nx, ny = min(max(x, p[0]), p[2]), min(max(y, p[1]), p[3])
+                assert (x - nx) ** 2 + (y - ny) ** 2 >= 7.0 ** 2, sevs
