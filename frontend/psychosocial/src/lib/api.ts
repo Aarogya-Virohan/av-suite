@@ -1,5 +1,6 @@
 import { clearStoredToken, getStoredToken } from './auth';
 import { BASE_PATH, redirectToHubLogin } from './hub';
+import { SUSPENDED_CODE, reportSuspended } from './suspended';
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
@@ -30,7 +31,7 @@ interface Envelope<T> {
 function readError(status: number, body: unknown): ApiError {
   const b = (body ?? {}) as {
     detail?: unknown;
-    meta?: { error?: { code?: string; message?: string } } | null;
+    meta?: { error?: { code?: string; message?: string; details?: Record<string, unknown> } } | null;
   };
   if (typeof b.detail === 'string') return new ApiError(status, b.detail, null);
   if (Array.isArray(b.detail)) {
@@ -42,7 +43,7 @@ function readError(status: number, body: unknown): ApiError {
     return new ApiError(status, d.message || 'Something went wrong.', d.code ?? null, d);
   }
   if (b.meta?.error) {
-    return new ApiError(status, b.meta.error.message || 'Something went wrong.', b.meta.error.code ?? null);
+    return new ApiError(status, b.meta.error.message || 'Something went wrong.', b.meta.error.code ?? null, b.meta.error.details);
   }
   return new ApiError(status, `Request failed (${status}).`, null);
 }
@@ -79,6 +80,12 @@ async function request<T>(
 
   if (!res.ok) {
     const err = readError(res.status, body);
+    // U4: clinic or organization paused (staff calls only; the patient
+    // screener is public): clear the session, full-page screen.
+    if (res.status === 403 && err.code === SUSPENDED_CODE && init.auth !== false) {
+      reportSuspended(err.details);
+      throw err;
+    }
     if (res.status === 401 && init.auth !== false) {
       clearStoredToken();
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith(`${BASE_PATH}/login`)) {
@@ -131,7 +138,9 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
     } catch {
       /* not JSON */
     }
-    throw readError(res.status, body);
+    const err = readError(res.status, body);
+    if (res.status === 403 && err.code === SUSPENDED_CODE) reportSuspended(err.details);
+    throw err;
   }
   const disposition = res.headers.get('Content-Disposition') ?? '';
   const match = /filename="([^"]+)"/.exec(disposition);

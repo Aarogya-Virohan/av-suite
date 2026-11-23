@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/brand';
 import { MeProvider, PRODUCT_KEY } from '@/components/staff/session-context';
 import { StaffShell } from '@/components/staff/StaffShell';
 import { redirectToHubLogin } from '@/lib/hub';
+import { getSuspended } from '@/lib/suspended';
 
 function FullScreen({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-screen items-center justify-center bg-canvas p-6">{children}</div>;
@@ -23,7 +24,8 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   const ready = tokenStatus === 'valid';
 
   useEffect(() => {
-    if (tokenStatus === 'missing') {
+    // U4: a paused clinic clears the token too; stay on the suspended screen.
+    if (tokenStatus === 'missing' && !getSuspended()) {
       clearStoredToken();
       if (!redirectToHubLogin()) router.replace('/login');
     }
