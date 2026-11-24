@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { clinicCode, formatPatientNumber, normalizePatientSearch, padPatientNumber } from './patientNumber';
+import {
+  clinicCode,
+  formatPatientNumber,
+  normalizeClinicCode,
+  normalizePatientSearch,
+  padPatientNumber,
+} from './patientNumber';
 
 describe('clinicCode', () => {
   it('uses initials of up to three words', () => {
@@ -24,6 +30,12 @@ describe('formatPatientNumber', () => {
   it('keeps numbers longer than six digits whole', () => {
     expect(padPatientNumber(1234567)).toBe('1234567');
   });
+  it('uses the stored clinic code when there is one, the name rule when not', () => {
+    expect(formatPatientNumber(123, 'SpineAct Physio Clinic', 'ADP')).toBe('ADP-000123');
+    expect(formatPatientNumber(123, 'SpineAct Physio Clinic', null)).toBe('SPC-000123');
+    expect(formatPatientNumber(123, 'SpineAct Physio Clinic', '  ')).toBe('SPC-000123');
+    expect(formatPatientNumber(123, 'SpineAct Physio Clinic', undefined)).toBe('SPC-000123');
+  });
   it('returns empty text for a missing number', () => {
     expect(formatPatientNumber(undefined, 'X')).toBe('');
   });
@@ -40,5 +52,18 @@ describe('normalizePatientSearch', () => {
     expect(normalizePatientSearch('9876543210')).toBe('9876543210');
     expect(normalizePatientSearch('ravi@x.in')).toBe('ravi@x.in');
     expect(normalizePatientSearch('Ravi Kumar')).toBe('Ravi Kumar');
+  });
+});
+
+describe('normalizeClinicCode', () => {
+  it('capitalises and trims a valid code', () => {
+    expect(normalizeClinicCode(' adp1 ')).toBe('ADP1');
+    expect(normalizeClinicCode('A')).toBe('A');
+    expect(normalizeClinicCode('ABCDEF')).toBe('ABCDEF');
+  });
+  it('rejects empty, long or non letter/digit codes', () => {
+    for (const bad of ['', '   ', 'ABCDEFG', 'AB-1', 'AB 1', 'A_B', 'ए']) {
+      expect(normalizeClinicCode(bad)).toBeNull();
+    }
   });
 });

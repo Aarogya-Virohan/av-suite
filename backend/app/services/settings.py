@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
+
 from app.models.clinic import Clinic
 from app.repositories.clinic import ClinicRepository
 from app.schemas.settings import ClinicSettingsUpdate
 from app.services.audit import AuditLogService
+
+
+CODE_TAKEN_MESSAGE = "This clinic code is already used by another clinic. Choose a different one."
 
 
 class SettingsValidationError(Exception):
@@ -54,7 +59,23 @@ class ClinicSettingsService:
         if not update_data:
             return clinic
 
-        updated_clinic = await self.clinic_repository.update(clinic, update_data)
+        new_code = update_data.get("code")
+        if new_code is not None and new_code != clinic.code:
+            if await self.clinic_repository.code_in_use(new_code, exclude_id=clinic.id):
+                raise SettingsValidationError(CODE_TAKEN_MESSAGE)
+        elif new_code is not None:
+            update_data.pop("code")
+            if not update_data:
+                return clinic
+
+        try:
+            updated_clinic = await self.clinic_repository.update(clinic, update_data)
+        except IntegrityError as exc:
+            # Two clinics saving the same new code at the same moment.
+            if "uq_clinics_code" in str(exc.orig):
+                await self.clinic_repository.session.rollback()
+                raise SettingsValidationError(CODE_TAKEN_MESSAGE) from exc
+            raise
 
         # Record audit log event safely
         await self.audit_service.log_event(

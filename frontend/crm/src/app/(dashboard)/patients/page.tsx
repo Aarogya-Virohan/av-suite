@@ -81,7 +81,7 @@ export default function PatientsPage() {
             <Phone className="h-3.5 w-3.5 text-slate-400" />
             {patient.phone}
           </span>
-          <WhatsAppButton phone={patient.phone} name={`${patient.first_name} ${patient.last_name}`} />
+          <WhatsAppButton phone={patient.phone} name={`${patient.first_name} ${patient.last_name}`} patientId={caseId(patient.display_number)} />
         </div>
       ),
     },

@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
 
 from app.enums.clinic import ClinicPlanTier
+from app.services.clinic_code import normalize_clinic_code
 
 
 class ClinicSettingsResponse(BaseModel):
@@ -17,6 +18,7 @@ class ClinicSettingsResponse(BaseModel):
     name: str = Field(..., description="Clinic organization name.")
     branding_logo_url: str | None = Field(default=None, description="URL of clinic logo image asset.")
     client_type: Literal["clinic", "hospital", "home_care"] = "clinic"
+    code: str = Field(..., description="Prefix of the Patient ID, e.g. ADP in ADP-000003.")
     branding_color: str | None = Field(default=None, description="Primary branding color hex code (e.g. #008080).")
     plan_tier: ClinicPlanTier = Field(..., description="Read-only subscription plan tier.")
     is_partner_clinic: bool = Field(..., description="Read-only partner clinic designation flag.")
@@ -42,6 +44,10 @@ class ClinicSettingsUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255, description="Updated clinic name.")
     branding_logo_url: str | None = Field(default=None, description="Updated branding logo URL.")
     client_type: Literal["clinic", "hospital", "home_care"] = "clinic"
+    code: str | None = Field(
+        default=None,
+        description="Prefix of the Patient ID: 1 to 6 capital letters or digits. Must be unused by other clinics.",
+    )
     branding_color: str | None = Field(default=None, max_length=32, description="Updated branding color hex string.")
     is_documents_enabled: bool | None = Field(default=None, description="Toggle document storage bucket on/off.")
     # Lengths match the database columns (models/clinic.py); longer values
@@ -56,6 +62,12 @@ class ClinicSettingsUpdate(BaseModel):
     registration_number: str | None = Field(default=None, max_length=120)
     gstin: str | None = None
     authorised_person: str | None = Field(default=None, max_length=255)
+
+    @field_validator("code", mode="before")
+    @classmethod
+    def valid_code(cls, value):
+        # Omitted = unchanged (exclude_unset). An explicit null or blank is an error.
+        return normalize_clinic_code(value if isinstance(value, str) else "")
 
     @field_validator("pincode")
     @classmethod

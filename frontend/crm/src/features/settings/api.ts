@@ -30,6 +30,8 @@ export const CLINIC_PROFILE_KEYS: (keyof ClinicProfile)[] = [
 export interface ClinicSettings extends Partial<ClinicProfile> {
   id: string;
   name: string;
+  /** Prefix of the Patient ID, e.g. "ADP" in ADP-000003. */
+  code: string;
   branding_logo_url: string | null;
   branding_color: string | null;
   plan_tier: string;
@@ -40,6 +42,7 @@ export interface ClinicSettings extends Partial<ClinicProfile> {
 
 export interface ClinicSettingsUpdate extends Partial<ClinicProfile> {
   name?: string | null;
+  code?: string;
   branding_logo_url?: string | null;
   branding_color?: string | null;
 }

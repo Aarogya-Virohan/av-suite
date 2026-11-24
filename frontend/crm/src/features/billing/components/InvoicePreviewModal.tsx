@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Invoice } from '../../../types/api';
-import { usePatient } from '../../patients/api';
+import { usePatient, usePatientCaseId } from '../../patients/api';
 import { useClinicSettings } from '../../settings/api';
 import { downloadInvoicePdf, invoicePdfFilename, useInvoicePayments } from '../api';
 import { hasCapability } from '../../../config/permissions';
@@ -73,6 +73,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
   // The phone (for WhatsApp and the "Billed To" block) is read from the one patient.
   const { data: patient } = usePatient(invoice?.patient_id ?? '', isOpen && hasCapability('patients.view'));
   const authClinic = useAuthStore((s) => s.clinic);
+  const caseId = usePatientCaseId();
   const { data: clinicSettings } = useClinicSettings(!authClinic && hasCapability('settings.view'));
   const clinic = authClinic || clinicSettings;
   const isReceipt = mode === 'receipt';
@@ -99,6 +100,8 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
     invoice.patient_name?.trim() ||
     (patient ? `${patient.first_name} ${patient.last_name}` : `Patient #${invoice.patient_id.slice(0, 8).toUpperCase()}`);
   const clinicName = clinic?.name || 'Clinic';
+  // "ADP-000003"; empty until the patient has loaded (then the line is left out).
+  const patientIdText = patient ? caseId(patient.display_number) : '';
   const filled = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
   // "12 MG Road, Sector 18, Noida, Uttar Pradesh 201301"
   const place = [filled(clinic?.city), filled(clinic?.state)].filter(Boolean).join(', ');
@@ -149,6 +152,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
   const sendOnWhatsApp = () => {
     const lines = [
       `Hi ${patientName},`,
+      ...(patientIdText ? [`Patient ID: ${patientIdText}`] : []),
       '',
       `${isReceipt ? 'Payment receipt' : 'Invoice'} ${invoice.invoice_number} from ${clinicName}`,
       `Total: ${money(invoice.total_amount)}`,
@@ -254,6 +258,11 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#767b93]">Billed To</p>
               <p className="mt-0.5 text-sm font-bold">{patientName}</p>
+              {patientIdText && (
+                <p className="text-[#5d6380]">
+                  Patient ID <span className="whitespace-nowrap font-mono font-semibold text-[#0b1238]">{patientIdText}</span>
+                </p>
+              )}
               {patient?.phone && <p className="text-[#5d6380]">{patient.phone}</p>}
             </div>
             <div className="space-y-1 text-right">

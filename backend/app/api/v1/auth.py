@@ -79,6 +79,7 @@ async def get_me(
         "id": perm_ctx.clinic.id,
         "name": perm_ctx.clinic.name,
         "slug": perm_ctx.clinic.slug,
+        "code": perm_ctx.clinic.code,
         "branding_logo_url": perm_ctx.clinic.branding_logo_url,
         "client_type": perm_ctx.clinic.client_type,
         "branding_color": perm_ctx.clinic.branding_color,

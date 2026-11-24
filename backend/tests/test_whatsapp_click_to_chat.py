@@ -58,6 +58,7 @@ class _BookingPatientRepo:
             id=uuid4(),
             full_name=payload["full_name"],
             phone=payload["phone"],
+            display_number=12,
         )
 
 
@@ -72,7 +73,7 @@ class _BookingAppointmentRepo:
 
 class _BookingClinicRepo:
     async def get_by_id(self, clinic_id: UUID) -> SimpleNamespace | None:
-        return SimpleNamespace(id=clinic_id)
+        return SimpleNamespace(id=clinic_id, code="GRV")
 
 
 async def test_booking_approval_includes_whatsapp_link() -> None:
@@ -109,11 +110,19 @@ async def test_booking_approval_includes_whatsapp_link() -> None:
     assert response["request"]["status"] == AppointmentRequestStatus.APPROVED.value
     assert response["whatsapp_link"].startswith("https://wa.me/919876543210?text=")
     assert "Hello%20Jane%20Doe" in response["whatsapp_link"]
+    # Delivery item 10: the prefilled text carries the Patient ID.
+    assert "Patient%20ID%3A%20GRV-000012" in response["whatsapp_link"]
+
+
+class _ClinicSession:
+    async def get(self, _model, clinic_id):
+        return SimpleNamespace(id=clinic_id, code="GRV")
 
 
 class _BillingInvoiceRepo:
     def __init__(self, invoice: SimpleNamespace) -> None:
         self.invoice = invoice
+        self.session = _ClinicSession()
 
     async def get_by_id_with_items(
         self, invoice_id: UUID, clinic_id: UUID | None = None
@@ -156,7 +165,9 @@ async def test_invoice_pdf_response_includes_whatsapp_link() -> None:
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
     )
-    patient = SimpleNamespace(id=patient_id, full_name="Jane Doe", phone="9876543210")
+    patient = SimpleNamespace(
+        id=patient_id, full_name="Jane Doe", phone="9876543210", display_number=12
+    )
 
     service = BillingService(
         package_repository=_NoopRepo(),
@@ -180,6 +191,7 @@ async def test_invoice_pdf_response_includes_whatsapp_link() -> None:
     assert (
         "You%20can%20download%20your%20invoice%20here%3A" in response["whatsapp_link"]
     )
+    assert "Patient%20ID%3A%20GRV-000012" in response["whatsapp_link"]
 
 
 async def test_prescription_pdf_response_includes_whatsapp_link(
@@ -187,10 +199,12 @@ async def test_prescription_pdf_response_includes_whatsapp_link(
 ) -> None:
     prescription_id = uuid4()
     clinic_id = uuid4()
-    patient = SimpleNamespace(first_name="Jane", last_name="Doe", phone="9876543210")
+    patient = SimpleNamespace(
+        first_name="Jane", last_name="Doe", phone="9876543210", display_number=12
+    )
     rx = SimpleNamespace(
         patient=patient,
-        clinic=SimpleNamespace(name="Grove Physio"),
+        clinic=SimpleNamespace(name="Grove Physio", code="GRV"),
         created_at=datetime(2026, 10, 19, 20, 0, tzinfo=timezone.utc),
     )
 
@@ -220,6 +234,7 @@ async def test_prescription_pdf_response_includes_whatsapp_link(
     link = response["whatsapp_link"]
     assert "Grove%20Physio" in link
     assert "attached%20as%20a%20PDF" in link
+    assert "Patient%20ID%3A%20GRV-000012" in link
     # No download path in the message: it needs a login and would be useless
     # to the patient (decided 20 October 2026).
     assert "%2Fapi%2Fv1" not in link and "/api/v1" not in link
