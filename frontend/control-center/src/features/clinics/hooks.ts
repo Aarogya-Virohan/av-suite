@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApi } from '@/lib/platform-api';
+import { refreshAfterWrite } from '@/lib/refresh-after-write';
 import type { EntitlementUpdate } from '@/lib/platform-api/types';
 
 export const clinicKeys = {
@@ -18,13 +19,7 @@ export function useClinic(id: string) {
 
 function useInvalidateAfterChange() {
   const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: clinicKeys.all }),
-      queryClient.invalidateQueries({ queryKey: ['organizations'] }),
-      queryClient.invalidateQueries({ queryKey: ['overview'] }),
-      queryClient.invalidateQueries({ queryKey: ['audit-logs'] }),
-    ]);
+  return () => refreshAfterWrite(queryClient, [clinicKeys.all, ['organizations'], ['overview'], ['audit-logs']]);
 }
 
 export function useSetClinicStatus(id: string) {

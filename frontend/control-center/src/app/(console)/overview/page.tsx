@@ -8,7 +8,7 @@ import { RequirePermission } from '@/components/auth/RequirePermission';
 import { Card, CardHeader, KpiCard, PageHeader } from '@/components/ui/brand';
 import { useOverview } from '@/features/overview/hooks';
 import { productLabel, useProductCatalog } from '@/features/catalog/hooks';
-import { auditActionLabel, formatNumber, formatRelative, ORGANIZATION_TYPE_LABEL } from '@/lib/format';
+import { auditActionLabel, auditProductKey, formatNumber, formatRelative, ORGANIZATION_TYPE_LABEL } from '@/lib/format';
 import { errorMessage } from '@/lib/platform-api/errors';
 import { ORGANIZATION_TYPES } from '@/lib/platform-api/types';
 
@@ -136,8 +136,8 @@ function Overview() {
                 <div className="min-w-0">
                   <p className="font-semibold text-ink">
                     {auditActionLabel(row.action)}
-                    {typeof row.details.product_key === 'string' ? (
-                      <span className="font-normal text-muted"> · {productLabel(catalog.byKey, row.details.product_key)}</span>
+                    {auditProductKey(row.details) ? (
+                      <span className="font-normal text-muted"> · {productLabel(catalog.byKey, auditProductKey(row.details) as string)}</span>
                     ) : null}
                   </p>
                   <p className="mt-0.5 text-xs text-muted">

@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { platformApi } from '@/lib/platform-api';
+import { refreshAfterWrite } from '@/lib/refresh-after-write';
 import type { ClinicCreate, OrganizationListParams } from '@/lib/platform-api/types';
 
 export const organizationKeys = {
@@ -28,13 +29,7 @@ export function useOrganization(id: string) {
 /** Anything that changes an organization also changes the overview, clinics and audit log. */
 function useInvalidateAfterChange() {
   const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: organizationKeys.all }),
-      queryClient.invalidateQueries({ queryKey: ['clinics'] }),
-      queryClient.invalidateQueries({ queryKey: ['overview'] }),
-      queryClient.invalidateQueries({ queryKey: ['audit-logs'] }),
-    ]);
+  return () => refreshAfterWrite(queryClient, [organizationKeys.all, ['clinics'], ['overview'], ['audit-logs']]);
 }
 
 export function useSetOrganizationStatus(id: string) {
