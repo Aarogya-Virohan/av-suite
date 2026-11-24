@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import SessionDep, get_client_ip, get_platform_operator
 from app.core.platform_rbac import require_platform_permission
+from app.core.timezone import CLINIC_TZ
 from app.enums.product import EntitlementSource, EntitlementStatus
 from app.enums.user import UserRole
 from app.exceptions import BaseAppException
@@ -27,6 +28,15 @@ from app.services.platform_audit import record_platform_audit
 from app.services.product_entitlements import active_entitlement_clause, ensure_canonical_products
 
 router = APIRouter()
+
+
+def _ist_day_start(day: date) -> datetime:
+    """Start (00:00 IST) of a calendar day, as an aware datetime.
+
+    date_from / date_to of the usage and audit filters are IST calendar days:
+    date_from = from 00:00 IST, date_to = up to and including 23:59:59 IST.
+    """
+    return datetime.combine(day, time.min, tzinfo=CLINIC_TZ)
 
 class ReasonBody(BaseModel):
     reason: str | None = None
@@ -325,9 +335,10 @@ async def usage(db:SessionDep,clinic_id:UUID|None=None,product_key:str|None=None
     cond=[]
     if clinic_id:cond.append(UsageEvent.clinic_id==clinic_id)
     if product_key:cond.append(UsageEvent.product_key==product_key)
-    if date_from:cond.append(UsageEvent.created_at>=datetime.combine(date_from,time.min,tzinfo=timezone.utc))
-    if date_to:cond.append(UsageEvent.created_at<datetime.combine(date_to+timedelta(days=1),time.min,tzinfo=timezone.utc))
-    day=func.date(UsageEvent.created_at)
+    if date_from:cond.append(UsageEvent.created_at>=_ist_day_start(date_from))
+    if date_to:cond.append(UsageEvent.created_at<_ist_day_start(date_to+timedelta(days=1)))
+    # Days are IST calendar days (clinics work in IST), also when grouping.
+    day=func.date(func.timezone('Asia/Kolkata',UsageEvent.created_at)) if db.get_bind().dialect.name=='postgresql' else func.date(UsageEvent.created_at)
     grouped=select(day.label("date"),UsageEvent.clinic_id,UsageEvent.product_key,UsageEvent.event_type,func.count().label("count")).where(*cond).group_by(day,UsageEvent.clinic_id,UsageEvent.product_key,UsageEvent.event_type).subquery()
     total=await db.scalar(select(func.count()).select_from(grouped)) or 0
     rows=(await db.execute(select(grouped).order_by(grouped.c.date.desc(),grouped.c.clinic_id,grouped.c.product_key,grouped.c.event_type).offset((page-1)*page_size).limit(page_size))).all()
@@ -340,8 +351,8 @@ async def audit_logs(db:SessionDep,operator_id:UUID|None=None,organization_id:UU
     if organization_id:cond.append(PlatformAuditLog.organization_id==organization_id)
     if clinic_id:cond.append(PlatformAuditLog.clinic_id==clinic_id)
     if action:cond.append(PlatformAuditLog.action==action)
-    if date_from:cond.append(PlatformAuditLog.created_at>=datetime.combine(date_from,time.min,tzinfo=timezone.utc))
-    if date_to:cond.append(PlatformAuditLog.created_at<datetime.combine(date_to+timedelta(days=1),time.min,tzinfo=timezone.utc))
+    if date_from:cond.append(PlatformAuditLog.created_at>=_ist_day_start(date_from))
+    if date_to:cond.append(PlatformAuditLog.created_at<_ist_day_start(date_to+timedelta(days=1)))
     total=await db.scalar(select(func.count(PlatformAuditLog.id)).where(*cond)) or 0
     rows=(await db.execute(select(PlatformAuditLog,PlatformOperator.name).outerjoin(PlatformOperator,PlatformOperator.id==PlatformAuditLog.operator_id).where(*cond).order_by(PlatformAuditLog.created_at.desc()).offset((page-1)*page_size).limit(page_size))).all()
     data=[]

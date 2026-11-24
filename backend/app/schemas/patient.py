@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, field_validator, ValidationInfo
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator, ValidationInfo
 import re
 import uuid
 from typing import Optional
@@ -62,6 +62,24 @@ class PatientBase(BaseModel):
 class PatientCreate(PatientBase):
     user_id: Optional[uuid.UUID] = None
 
+    @field_validator("age")
+    @classmethod
+    def validate_age(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return v
+        if v < 0 or v > 130:
+            raise ValueError("Age must be between 0 and 130")
+        return v
+
+    @model_validator(mode="after")
+    def require_age_or_dob(self) -> "PatientCreate":
+        # Posture reports need the patient's age. Patients created before this
+        # rule (no age, no date of birth) keep working; only new patients are
+        # checked here (see PATCH /patients/{id} for edits).
+        if self.age is None and self.date_of_birth is None:
+            raise ValueError("Age or date of birth is required")
+        return self
+
 class PatientUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -73,6 +91,15 @@ class PatientUpdate(BaseModel):
     referral_source: Optional[str] = None
     status: Optional[str] = None
     age: Optional[int] = None
+
+    @field_validator("age")
+    @classmethod
+    def validate_age(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return v
+        if v < 0 or v > 130:
+            raise ValueError("Age must be between 0 and 130")
+        return v
 
     @field_validator("first_name", "last_name")
     @classmethod

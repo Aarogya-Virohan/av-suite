@@ -119,6 +119,18 @@ class Settings(BaseSettings):
     # Yeh required field hai - .env mein must set hona chahiye
     DATABASE_URL: str
     TEST_DATABASE_URL: str | None = None
+
+    # Connection pool, PER uvicorn worker (Postgres only). Production runs 2
+    # workers against the Supabase session pooler (port 5432), where every
+    # client connection holds one Postgres connection and the pooler's pool
+    # size (15 by default) is shared by all workers. 2 x (4 + 3) = 14 stays
+    # under it. Raise these only together with the pooler's pool size.
+    # DB_POOL_TIMEOUT: seconds a request waits for a free connection before it
+    # gets a clear 503 "server busy" (was the 30 s default and then a 500).
+    DB_POOL_SIZE: int = 4
+    DB_MAX_OVERFLOW: int = 3
+    DB_POOL_TIMEOUT: int = 10
+    DB_POOL_RECYCLE: int = 1800
     
     # JWT (JSON Web Token) Configuration
     # JWT authentication stateless authentication provide karta hai

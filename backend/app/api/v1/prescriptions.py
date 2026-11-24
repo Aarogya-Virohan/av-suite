@@ -61,6 +61,11 @@ async def create_prescription(
             # so this returned 500 for every new prescription.
             db, uuid.UUID(str(clinic_id)), uuid.UUID(str(physio_id)), prescription_in
         )
+        # Ids and a count only. Never the physio notes or item notes.
+        await log_event_safely(
+            db, uuid.UUID(str(clinic_id)), user.id, "create", "prescription", prescription.id,
+            {"patient_id": str(prescription_in.patient_id), "item_count": len(prescription_in.items)},
+        )
         return ResponseEnvelope(data=prescription)
     except HTTPException:
         raise
@@ -195,6 +200,7 @@ async def update_prescription(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only edit your own prescriptions.",
             )
+        old_status = existing.status
         if patch_in.items is not None:
             # AUD-05: same exercise scope on edit.
             await rx_scope.check_exercises(
@@ -209,6 +215,17 @@ async def update_prescription(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Prescription not found or not in user's clinic",
             )
+        details: dict = {
+            "patient_id": str(prescription.patient_id),
+            "fields": sorted(patch_in.model_dump(exclude_unset=True)),
+        }
+        if patch_in.status is not None:
+            details["status"] = [old_status, prescription.status]
+        if patch_in.items is not None:
+            details["item_count"] = len(patch_in.items)
+        await log_event_safely(
+            db, uuid.UUID(str(clinic_id)), user.id, "update", "prescription", prescription.id, details,
+        )
         return ResponseEnvelope(data=prescription)
     except HTTPException:
         raise
@@ -240,6 +257,7 @@ async def delete_prescription(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only delete your own prescriptions.",
         )
+    patient_id = str(prescription.patient_id)
     deleted = await prescription_service.delete_prescription(
         db, uuid.UUID(clinic_id), id
     )
@@ -248,6 +266,10 @@ async def delete_prescription(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Prescription not found or not in user's clinic",
         )
+    await log_event_safely(
+        db, uuid.UUID(str(clinic_id)), user.id, "delete", "prescription", id,
+        {"patient_id": patient_id},
+    )
     return ResponseEnvelope(data={"message": "Prescription deleted successfully."})
 
 
@@ -277,6 +299,10 @@ async def generate_pdf(
             )
         response = await prescription_service.generate_prescription_pdf_response(
             db, uuid.UUID(clinic_id), id, user_id=user.id
+        )
+        await log_event_safely(
+            db, uuid.UUID(str(clinic_id)), user.id, "generate_pdf", "prescription", id,
+            {"patient_id": str(prescription.patient_id)},
         )
         return ResponseEnvelope(data=response)
     except ValueError as e:

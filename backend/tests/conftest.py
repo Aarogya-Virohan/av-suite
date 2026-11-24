@@ -186,6 +186,12 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
+    # Login / screener limiters count in the database and the whole suite logs
+    # in as the same users, so every test starts with empty counters.
+    from app.services.platform_rate_limit import clear_all_limits
+
+    await clear_all_limits()
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c

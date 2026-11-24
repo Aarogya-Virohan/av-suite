@@ -14,7 +14,7 @@ from app.models.patient import Patient
 from app.models.product import WorkspaceProduct
 from app.models.user import User
 from app.models.user_permission import UserPermission
-from app.screening import rate_limit
+from app.services.platform_rate_limit import clear_all_limits
 from app.services.product_entitlements import ensure_canonical_products
 
 API = settings.API_V1_PREFIX
@@ -26,12 +26,10 @@ TEST_SURNAME_PREFIX = "ScrTest"
 
 
 @pytest.fixture(autouse=True)
-def _reset_limiters():
-    rate_limit.token_limiter.reset()
-    rate_limit.ip_limiter.reset()
+async def _reset_limiters(setup_db):
+    await clear_all_limits()
     yield
-    rate_limit.token_limiter.reset()
-    rate_limit.ip_limiter.reset()
+    await clear_all_limits()
 
 
 async def entitle(db: AsyncSession, clinic_id: uuid.UUID) -> None:

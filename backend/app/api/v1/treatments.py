@@ -20,6 +20,7 @@ from app.core.dependencies import (
     get_current_user,
     require_capability,
 )
+from app.services.audit import log_event_safely
 from app.schemas.treatment import (
     TreatmentSessionCreate,
     TreatmentSessionListResponse,
@@ -73,6 +74,11 @@ async def create_treatment_session(
 
     try:
         session = await service.create_session(clinic.id, payload)
+        # Ids and flags only. Never the treatment, advice or notes text.
+        await log_event_safely(
+            service.repository.session, clinic.id, user.id, "create", "treatment_session", session.id,
+            {"patient_id": str(session.patient_id), "finalized": session.finalized},
+        )
         return TreatmentSessionResponse.model_validate(session)
     except TreatmentValidationError as exc:
         raise HTTPException(
@@ -180,7 +186,14 @@ async def update_treatment_session(
                 detail="You cannot reassign your treatment to another therapist.",
             )
 
+        was_finalized = session.finalized
         session = await service.update_session(clinic.id, id, payload)
+        await log_event_safely(
+            service.repository.session, clinic.id, user.id, "update", "treatment_session", session.id,
+            {"patient_id": str(session.patient_id),
+             "fields": sorted(payload.model_dump(exclude_unset=True)),
+             "finalized": [was_finalized, session.finalized]},
+        )
         return TreatmentSessionResponse.model_validate(session)
     except TreatmentNotFoundError as exc:
         raise HTTPException(
@@ -209,7 +222,12 @@ async def delete_treatment_session(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only delete your own treatments.",
             )
+        patient_id = str(session.patient_id)
         await service.delete_session(clinic.id, id)
+        await log_event_safely(
+            service.repository.session, clinic.id, user.id, "delete", "treatment_session", id,
+            {"patient_id": patient_id},
+        )
     except TreatmentNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)

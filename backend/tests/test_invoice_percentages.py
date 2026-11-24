@@ -5,7 +5,7 @@ from app.core.config import settings
 
 
 async def _patient(client, auth_headers):
-    result = await client.post(f"{settings.API_V1_PREFIX}/patients", json={"first_name": "Percent", "last_name": "Test", "phone": "9898765001"}, headers=auth_headers)
+    result = await client.post(f"{settings.API_V1_PREFIX}/patients", json={"first_name": "Percent", "last_name": "Test", "phone": "9898765001", "age": 35}, headers=auth_headers)
     assert result.status_code in (200, 201), result.text
     return result.json()["data"]["id"]
 

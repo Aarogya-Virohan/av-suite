@@ -16,7 +16,7 @@ from app.models.patient import Patient
 async def _create_patient(client, auth_headers):
     response = await client.post(
         f"{settings.API_V1_PREFIX}/patients",
-        json={"first_name": "Billing", "last_name": "Patient", "phone": "9876500101"},
+        json={"first_name": "Billing", "last_name": "Patient", "phone": "9876500101", "age": 35},
         headers=auth_headers,
     )
     assert response.status_code in (200, 201), response.text

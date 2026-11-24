@@ -389,6 +389,14 @@ async def update_patient(
         )
         if previous is None:
             raise HTTPException(status_code=404, detail="Patient not found")
+        changes_in = patient_in.model_dump(exclude_unset=True)
+        if "age" in changes_in or "date_of_birth" in changes_in:
+            # An edit may not leave the patient with neither (Posture needs it).
+            # Patients that already have neither can still change other fields.
+            new_age = changes_in.get("age", previous.age)
+            new_dob = changes_in.get("date_of_birth", previous.date_of_birth)
+            if new_age is None and new_dob is None:
+                raise HTTPException(status_code=422, detail="Age or date of birth is required")
         before = {
             key: getattr(previous, key)
             for key in patient_in.model_dump(exclude_unset=True)
