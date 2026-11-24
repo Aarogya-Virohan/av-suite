@@ -878,15 +878,19 @@ def _review_view_payload(view: str, detected: "DetectedView", lateral_side: str 
     return payload
 
 
-@router.post("/detect", dependencies=_CAN_RUN)
-async def detect_for_review(
-    front_image: UploadFile = File(...),
-    side_image: UploadFile = File(...),
-    back_image: UploadFile = File(...),
-):
-    side = _detect_view("Side", await side_image.read())
-    front = _detect_view("Front", await front_image.read(), with_iris=True)
-    back = _detect_view("Back", await back_image.read())
+def _detect_all(side_bytes: bytes, front_bytes: bytes, back_bytes: bytes) -> dict:
+    """
+    Everything /detect does after the files are read: three pose detections,
+    the iris search, the signed token and the display copies. CPU-bound
+    (MediaPipe, OpenCV), so the route runs it with asyncio.to_thread and the
+    event loop stays free for other requests (POS-10, 24 Nov 2026; the
+    pipeline report of the same day measured the loop blocked for the whole
+    detection). A 422 raised here crosses the thread boundary unchanged.
+    """
+
+    side = _detect_view("Side", side_bytes)
+    front = _detect_view("Front", front_bytes, with_iris=True)
+    back = _detect_view("Back", back_bytes)
 
     lateral_side = get_lateral_side(side.landmarks)
 
@@ -920,6 +924,18 @@ async def detect_for_review(
             "back": _review_view_payload("back", back, None),
         },
     }
+
+
+@router.post("/detect", dependencies=_CAN_RUN)
+async def detect_for_review(
+    front_image: UploadFile = File(...),
+    side_image: UploadFile = File(...),
+    back_image: UploadFile = File(...),
+):
+    side_bytes = await side_image.read()
+    front_bytes = await front_image.read()
+    back_bytes = await back_image.read()
+    return await asyncio.to_thread(_detect_all, side_bytes, front_bytes, back_bytes)
 
 
 # =============================================================================
@@ -1223,21 +1239,36 @@ async def _pdf_response(perm_ctx, db: AsyncSession, report: dict) -> Response:
 @router.post("/report/pdf", dependencies=_CAN_RUN)
 async def export_posture_pdf(
     perm_ctx: PermissionContextDep,
-    report: dict = Body(...),
+    body: dict = Body(...),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Render an already-computed posture report to a clinical PDF.
+    The clinical PDF of a saved report, by id.
 
-    Takes the report payload the frontend already holds, so the MediaPipe
-    analysis is not re-run just to produce a document.
+    Since POS-10 (24 Nov 2026) the PDF is made only from the report saved in
+    the database for this clinic (#86 saves every report); nothing the client
+    sends is rendered. The body carries the report id and nothing else is
+    read from it, so an old client that still sends the whole report gets the
+    stored copy, not its own. Same result as GET /reports/{id}/pdf.
     """
 
-    # AUD-10: a malformed payload gets a fixed 422 message, and an unexpected
+    # AUD-10: a malformed body gets a fixed 422 message, and an unexpected
     # failure a fixed 500 message; the exception text stays in the server log.
-    if not _pdf_payload_ok(report):
+    report_id = body.get("reportId")
+    if not isinstance(report_id, str) or not report_id.strip():
         raise HTTPException(status_code=422, detail=PDF_BAD_PAYLOAD)
 
+    return await _saved_report_pdf_response(perm_ctx, db, report_id.strip())
+
+
+async def _saved_report_pdf_response(perm_ctx, db: AsyncSession, report_id: str) -> Response:
+    # Looked up by the signed-in clinic's id: another clinic's report is a 404.
+    row = await store.get_saved_report(db, perm_ctx.clinic.id, report_id)
+    report = dict(row.report_json or {})
+    # The stored copy was checked when it was made; if it is unreadable now
+    # that is a server-side fault, not a bad request.
+    if not _pdf_payload_ok(report):
+        raise HTTPException(status_code=500, detail=PDF_FAILED)
     return await _pdf_response(perm_ctx, db, report)
 
 
@@ -1310,8 +1341,4 @@ async def saved_report_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     """The PDF of a saved report, made again from the saved data."""
-    row = await store.get_saved_report(db, perm_ctx.clinic.id, report_id)
-    report = dict(row.report_json or {})
-    if not _pdf_payload_ok(report):
-        raise HTTPException(status_code=500, detail=PDF_FAILED)
-    return await _pdf_response(perm_ctx, db, report)
+    return await _saved_report_pdf_response(perm_ctx, db, report_id)

@@ -298,7 +298,7 @@ async def _events(db: AsyncSession, clinic: Clinic):
 async def test_usage_events_for_report_and_pdf_carry_no_patient_data(client: AsyncClient, db_session: AsyncSession, ctx):
     headers, clinic, patient = ctx
     report = (await _post_report(client, headers, patient.id)).json()
-    assert (await client.post(f"{BASE}/report/pdf", headers=headers, json=report)).status_code == 200
+    assert (await client.post(f"{BASE}/report/pdf", headers=headers, json={"reportId": report["reportId"]})).status_code == 200
     assert (await client.get(f"{BASE}/reports/{report['reportId']}/pdf", headers=headers)).status_code == 200
 
     events = await _events(db_session, clinic)

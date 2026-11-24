@@ -111,14 +111,15 @@ def test_footer_has_document_number_and_page_but_no_patient_name():
 def test_patient_box_names_the_assessor_and_never_a_placeholder_clinic():
     html = _patient_box(REPORT)
     for text in ("Sample Patient", "21 Y / Male", "174&nbsp;cm", "SP-0142", "12 Oct 2026",
-                 "Dr. Karan Singh", "PT-20261012-ABCD1234"):
+                 "Dr. Karan Singh", "PT-20261012-ABCD1234", "Patient ID"):
         assert text in html, text
+    assert "Case ref." not in html  # POS-10: the label is "Patient ID" everywhere
     assert "AV Clinic" not in html
 
 
 def test_patient_box_leaves_out_empty_fields():
     html = _patient_box({"patient": {**PATIENT, "caseRef": "", "heightCm": None, "clinician": ""}})
-    assert "Case ref." not in html
+    assert "Patient ID" not in html
     assert "Height" not in html
     assert "Assessed by" not in html
 

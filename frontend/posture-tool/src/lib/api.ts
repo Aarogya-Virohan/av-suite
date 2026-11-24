@@ -363,13 +363,13 @@ function saveBlob(blob: Blob, patientName: string) {
 }
 
 /**
- * Request the server-rendered clinical PDF for an already-computed report.
+ * Request the server-rendered clinical PDF of a report.
  *
- * The report used to be "exported" with window.print(), which printed the
- * on-screen dashboard: the browser stamped its own URL and timestamp on every
- * page, interactive buttons appeared in the patient's copy, and measurements
- * landed on a different page from the image they were derived from. The PDF
- * is now rendered server-side from a layout designed for paper.
+ * Since POS-10 (24 Nov 2026) the server renders only the copy it saved when
+ * the report was made, found by report ID and the signed-in clinic. Nothing
+ * from the screen is sent back, so what is printed cannot differ from what
+ * was saved. The PDF is rendered server-side from a layout designed for
+ * paper (the browser's print view stamped its own URL and buttons on it).
  */
 export async function downloadPostureReportPdf(report: PostureReport): Promise<void> {
   const response = await request(
@@ -377,7 +377,7 @@ export async function downloadPostureReportPdf(report: PostureReport): Promise<v
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(report),
+      body: JSON.stringify({ reportId: report.reportId }),
     },
     "Failed to generate report PDF",
   )
