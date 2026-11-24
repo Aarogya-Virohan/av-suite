@@ -498,7 +498,7 @@ def _patient_box(report: dict) -> str:
         ("Patient name", f'<span class="pname">{name}</span>' if _present(name) else ""),
         ("Age / Sex", age_sex),
         ("Height", height_text),
-        ("Case ref.", _esc(patient.get("caseRef"))),
+        ("Patient ID", _esc(patient.get("caseRef"))),
     ]
     right = [
         ("Report ID", f'<span class="nowrap">{_esc(report_id)}</span>' if report_id else ""),

@@ -108,7 +108,7 @@ export function PatientBox({ patient, reportId }: Props) {
     ["Patient name", patient.name],
     ["Age / Sex", ageSex],
     ["Height", height],
-    ["Case ref.", patient.caseRef],
+    ["Patient ID", patient.caseRef],
   ]
   // The assessing physiotherapist, always; the clinic is in the letterhead.
   // Never a placeholder clinic name (17 November 2026). Same as the PDF.
