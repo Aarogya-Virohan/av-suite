@@ -15,7 +15,7 @@ from app.models.document import PatientDocument
 async def test_patient_delete_attribution_recycle_bin_and_restore(client, auth_headers):
     created = await client.post(
         f"{settings.API_V1_PREFIX}/patients",
-        json={"first_name": "Recycle", "last_name": "Patient", "phone": "9876501234"},
+        json={"first_name": "Recycle", "last_name": "Patient", "phone": "9876501234", "age": 35},
         headers=auth_headers,
     )
     assert created.status_code in (200, 201), created.text
@@ -85,7 +85,7 @@ async def test_other_soft_delete_flows_record_authenticated_user(
 
     patient_response = await client.post(
         f"{settings.API_V1_PREFIX}/patients",
-        json={"first_name": "Soft", "last_name": "Delete", "phone": "9876504321"},
+        json={"first_name": "Soft", "last_name": "Delete", "phone": "9876504321", "age": 35},
         headers=auth_headers,
     )
     assert patient_response.status_code in (200, 201), patient_response.text
@@ -187,7 +187,7 @@ async def test_recycle_bin_list_and_restore_are_clinic_scoped(client, auth_heade
     }
     patient = await client.post(
         f"{settings.API_V1_PREFIX}/patients",
-        json={"first_name": "Other", "last_name": "Clinic", "phone": "9876509876"},
+        json={"first_name": "Other", "last_name": "Clinic", "phone": "9876509876", "age": 35},
         headers=other_headers,
     )
     assert patient.status_code in (200, 201), patient.text

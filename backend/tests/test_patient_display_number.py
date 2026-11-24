@@ -34,7 +34,7 @@ from app.services.patient_service import create_patient, search_patients
 async def test_patient_display_number_api_search_and_no_reuse(client, auth_headers):
     base = f"{settings.API_V1_PREFIX}/patients"
     created = await client.post(
-        base, json={"first_name": "Number", "last_name": "Patient"}, headers=auth_headers
+        base, json={"first_name": "Number", "last_name": "Patient", "age": 35}, headers=auth_headers
     )
     assert created.status_code in (200, 201), created.text
     patient = created.json()["data"]
@@ -54,7 +54,7 @@ async def test_patient_display_number_api_search_and_no_reuse(client, auth_heade
     deleted = await client.delete(f"{base}/{patient['id']}", headers=auth_headers)
     assert deleted.status_code == 200
     next_patient = await client.post(
-        base, json={"first_name": "Next", "last_name": "Patient"}, headers=auth_headers
+        base, json={"first_name": "Next", "last_name": "Patient", "age": 35}, headers=auth_headers
     )
     assert next_patient.json()["data"]["display_number"] > patient["display_number"]
 
@@ -71,9 +71,9 @@ async def test_display_number_sequences_are_clinic_scoped(db_session):
     db_session.add_all(clinics)
     await db_session.commit()
 
-    first = await create_patient(db_session, str(clinics[0].id), PatientCreate(first_name="A", last_name="One"))
-    second = await create_patient(db_session, str(clinics[0].id), PatientCreate(first_name="A", last_name="Two"))
-    other = await create_patient(db_session, str(clinics[1].id), PatientCreate(first_name="B", last_name="One"))
+    first = await create_patient(db_session, str(clinics[0].id), PatientCreate(first_name="A", last_name="One", age=35))
+    second = await create_patient(db_session, str(clinics[0].id), PatientCreate(first_name="A", last_name="Two", age=35))
+    other = await create_patient(db_session, str(clinics[1].id), PatientCreate(first_name="B", last_name="One", age=35))
     assert (first.display_number, second.display_number, other.display_number) == (1, 2, 1)
 
 
@@ -85,7 +85,7 @@ async def test_lead_conversion_uses_next_clinic_display_number(db_session):
     for index in range(3):
         await create_patient(
             db_session, str(clinic.id),
-            PatientCreate(first_name="Existing", last_name=str(index)),
+            PatientCreate(first_name="Existing", last_name=str(index), age=35),
         )
     lead = Lead(clinic_id=clinic.id, name="Converted", phone=f"{uuid.uuid4().int % 10**10:010d}")
     db_session.add(lead)
@@ -113,7 +113,7 @@ async def test_booking_approval_uses_next_clinic_display_number(db_session):
     for index in range(2):
         await create_patient(
             db_session, str(clinic.id),
-            PatientCreate(first_name="Existing", last_name=str(index)),
+            PatientCreate(first_name="Existing", last_name=str(index), age=35),
         )
     request = AppointmentRequest(
         clinic_id=clinic.id, name="Booking patient",
@@ -143,7 +143,7 @@ async def test_search_matches_123_and_zero_padded_000123(db_session):
     await db_session.commit()
 
     patient = await create_patient(
-        db_session, str(clinic.id), PatientCreate(first_name="Search", last_name="Target")
+        db_session, str(clinic.id), PatientCreate(first_name="Search", last_name="Target", age=35)
     )
     assert patient.display_number == 123
     for term in ("123", "000123"):
@@ -170,7 +170,7 @@ async def test_parallel_patient_creates_allocate_unique_numbers(sessionmaker, se
         async with sessionmaker() as session:
             return await create_patient(
                 session, clinic_id,
-                PatientCreate(first_name="Concurrent", last_name=f"{index}"),
+                PatientCreate(first_name="Concurrent", last_name=f"{index}", age=35),
             )
 
     patients = await asyncio.gather(*(create(i) for i in range(12)))

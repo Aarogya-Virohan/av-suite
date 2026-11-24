@@ -114,7 +114,7 @@ class AuditLogService:
                 "action": action,
                 "entity_type": entity_type,
                 "entity_id": entity_id,
-                "details": details or {},
+                "details": serialize_audit_value(details) if details else {},
             }
             log_entry = await self.audit_repository.create(log_data)
             await self.audit_repository.session.commit()

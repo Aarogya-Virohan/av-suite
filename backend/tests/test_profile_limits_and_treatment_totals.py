@@ -53,7 +53,7 @@ async def test_treatment_total_counts_all_pages_and_uses_india_days(client, db_s
     headers, user_id, clinic_id = await _clinic(client, "treatments")
     patient = await client.post(
         f"{API}/patients",
-        json={"first_name": "Total", "last_name": "Count", "phone": "9898700201"},
+        json={"first_name": "Total", "last_name": "Count", "phone": "9898700201", "age": 35},
         headers=headers,
     )
     assert patient.status_code in (200, 201), patient.text

@@ -15,23 +15,53 @@ export const documentCategorySchema = z.enum(['medical_report', 'prescription', 
 export const genderSchema = z.enum(['male', 'female', 'other']);
 
 // Patient Form Schema
-export const patientFormSchema = z.object({
-  first_name: z.string().min(1, 'First name is required'),
-  last_name: z.string().min(1, 'Last name is required'),
-  date_of_birth: z.string().nullable().optional(),
-  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
-  // Optional, as in the backend. Blank ('') means "not recorded"; forms send it
-  // as null via toPatientPayload(). The forms used to default to 'male' and
-  // 'Direct Walk-in', which stored invented values (and overwrote blanks on edit).
-  gender: z.union([genderSchema, z.literal('')]).nullable(),
-  chief_complaint: z.string().min(1, 'Chief complaint is required'),
-  referral_source: z.string().nullable(),
-  status: patientStatusSchema,
-});
+//
+// Age or date of birth is required (Posture reports need the age). The backend
+// enforces the same rule on create and on edit (422 "Age or date of birth is
+// required"). Existing patients without either keep working everywhere else;
+// editing one asks for it here.
+export const MAX_PATIENT_AGE = 130;
+
+export const patientFormSchema = z
+  .object({
+    first_name: z.string().min(1, 'First name is required'),
+    last_name: z.string().min(1, 'Last name is required'),
+    date_of_birth: z.string().nullable().optional(),
+    // Typed in a text/number input, so kept as a string until the payload is built.
+    age: z.string().nullable().optional(),
+    phone: z.string().min(10, 'Phone number must be at least 10 digits'),
+    // Optional, as in the backend. Blank ('') means "not recorded"; forms send it
+    // as null via toPatientPayload(). The forms used to default to 'male' and
+    // 'Direct Walk-in', which stored invented values (and overwrote blanks on edit).
+    gender: z.union([genderSchema, z.literal('')]).nullable(),
+    chief_complaint: z.string().min(1, 'Chief complaint is required'),
+    referral_source: z.string().nullable(),
+    status: patientStatusSchema,
+  })
+  .superRefine((values, ctx) => {
+    const age = (values.age ?? '').trim();
+    if (age) {
+      const n = Number(age);
+      if (!/^\d+$/.test(age) || n > MAX_PATIENT_AGE) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['age'],
+          message: `Age must be a whole number from 0 to ${MAX_PATIENT_AGE}`,
+        });
+      }
+    } else if (!values.date_of_birth) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['age'],
+        message: 'Enter the age or the date of birth',
+      });
+    }
+  });
 export type PatientFormValues = z.infer<typeof patientFormSchema>;
 
 /** Form values to API payload: blanks become null so nothing is invented. */
 export function toPatientPayload(values: PatientFormValues) {
+  const age = (values.age ?? '').trim();
   return {
     ...values,
     first_name: values.first_name.trim(),
@@ -40,6 +70,7 @@ export function toPatientPayload(values: PatientFormValues) {
     gender: values.gender ? values.gender : null,
     referral_source: values.referral_source?.trim() ? values.referral_source.trim() : null,
     date_of_birth: values.date_of_birth ? values.date_of_birth : null,
+    age: age ? Number(age) : null,
   };
 }
 

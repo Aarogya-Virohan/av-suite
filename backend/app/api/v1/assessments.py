@@ -19,6 +19,7 @@ from app.repositories.appointment import AppointmentRepository
 from app.repositories.patient import PatientRepository
 from app.repositories.treatment import SoapAssessmentRepository
 from app.repositories.user import UserRepository
+from app.services.audit import log_event_safely
 from app.schemas.treatment import (
     SoapAssessmentCreate,
     SoapAssessmentListResponse,
@@ -73,6 +74,12 @@ async def create_soap_assessment(
 
     try:
         assessment = await service.create_assessment(clinic.id, payload)
+        # Ids and flags only. Never diagnosis, form answers or any note text.
+        await log_event_safely(
+            service.repository.session, clinic.id, user.id, "create", "soap_assessment", assessment.id,
+            {"patient_id": str(assessment.patient_id), "specialty": assessment.specialty,
+             "is_reassessment": assessment.is_reassessment, "finalized": assessment.finalized},
+        )
         return SoapAssessmentResponse.model_validate(assessment)
     except TreatmentValidationError as exc:
         raise HTTPException(
@@ -180,7 +187,15 @@ async def update_soap_assessment(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You cannot reassign an assessment to another therapist.",
             )
+        was_finalized = assessment.finalized
         assessment = await service.update_assessment(clinic.id, id, payload)
+        # Field names (and the finalized flag) only, never the text itself.
+        await log_event_safely(
+            service.repository.session, clinic.id, user.id, "update", "soap_assessment", assessment.id,
+            {"patient_id": str(assessment.patient_id),
+             "fields": sorted(payload.model_dump(exclude_unset=True)),
+             "finalized": [was_finalized, assessment.finalized]},
+        )
         return SoapAssessmentResponse.model_validate(assessment)
     except TreatmentNotFoundError as exc:
         raise HTTPException(

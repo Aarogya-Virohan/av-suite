@@ -3,7 +3,7 @@
 import React from 'react';
 import type { Control, FieldErrors, UseFormRegister } from 'react-hook-form';
 import { ReferralSourceField } from './ReferralSourceField';
-import type { PatientFormValues } from '../../../lib/schemas';
+import { MAX_PATIENT_AGE, type PatientFormValues } from '../../../lib/schemas';
 import { FieldLabel, inputClass } from '../../../components/ui/brand';
 import { localToday } from '../../../lib/datetime';
 import { cn } from '../../../lib/cn';
@@ -43,9 +43,32 @@ export function PatientFormFields({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
+            <FieldLabel htmlFor={id('age')}>Age (years) *</FieldLabel>
+            <input
+              id={id('age')}
+              {...register('age')}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={MAX_PATIENT_AGE}
+              step={1}
+              placeholder="e.g. 42"
+              aria-describedby={id('age-hint')}
+              className={cn(inputClass, errors.age && 'border-danger')}
+            />
+            {errors.age ? (
+              <p id={id('age-hint')} className={errorText}>{errors.age.message}</p>
+            ) : (
+              <p id={id('age-hint')} className="mt-1.5 text-xs text-slate-500">Age or date of birth is needed for Posture reports.</p>
+            )}
+          </div>
+          <div>
             <FieldLabel htmlFor={id('dob')}>Date of Birth</FieldLabel>
             <input id={id('dob')} {...register('date_of_birth')} type="date" max={localToday()} className={inputClass} />
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <FieldLabel htmlFor={id('gender')}>Gender</FieldLabel>
             <select id={id('gender')} {...register('gender')} className={inputClass}>

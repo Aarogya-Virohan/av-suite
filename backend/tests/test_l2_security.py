@@ -349,7 +349,7 @@ async def test_approve_default_and_given_time_are_ist(client: AsyncClient, db_se
 # --- AUD-05: prescriptions are clinic scoped ----------------------------------
 
 async def _patient(client, headers, name="Rx"):
-    res = await client.post(f"{API}/patients", json={"first_name": name, "last_name": "Patient",
+    res = await client.post(f"{API}/patients", json={"first_name": name, "last_name": "Patient", "age": 35,
                                                      "phone": f"9{uuid.uuid4().int % 10**9:09d}"}, headers=headers)
     assert res.status_code == 201, res.text
     return res.json()["data"]["id"]

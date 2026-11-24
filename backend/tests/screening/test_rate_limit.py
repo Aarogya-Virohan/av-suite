@@ -1,29 +1,46 @@
-from app.screening.rate_limit import SlidingWindowLimiter
+"""Screener limiter: counters live in the database, not in process memory."""
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from app.services.platform_rate_limit import clear_all_limits, consume_limits
+
+WINDOW = timedelta(seconds=60)
+T0 = datetime(2026, 11, 24, 10, 0, 0, tzinfo=timezone.utc)
 
 
-def test_window_allows_up_to_limit_then_blocks_then_recovers():
-    limiter = SlidingWindowLimiter(limit=3, window_seconds=60)
-    assert [limiter.hit("k", now=t) for t in (0, 1, 2)] == [0, 0, 0]
-    wait = limiter.hit("k", now=3)
-    assert wait == 57  # oldest hit at t=0 leaves the window at t=60
-    assert limiter.hit("k", now=60.5) == 0
+@pytest.fixture(autouse=True)
+async def _clean(setup_db):
+    await clear_all_limits()
+    yield
+    await clear_all_limits()
 
 
-def test_keys_are_independent():
-    limiter = SlidingWindowLimiter(limit=1, window_seconds=60)
-    assert limiter.hit("a", now=0) == 0
-    assert limiter.hit("b", now=0) == 0
-    assert limiter.hit("a", now=1) > 0
+async def hit(key, limit=3, at=0):
+    return await consume_limits([("t", key, limit, WINDOW)], now=T0 + timedelta(seconds=at))
 
 
-def test_memory_stays_bounded():
-    limiter = SlidingWindowLimiter(limit=5, window_seconds=60, max_keys=100)
-    for i in range(1000):
-        limiter.hit(f"k{i}", now=float(i) / 1000)
-    assert len(limiter._hits) <= 100
+async def test_window_allows_up_to_limit_then_blocks_then_recovers():
+    assert [(await hit("k", at=t)).allowed for t in (0, 1, 2)] == [True, True, True]
+    blocked = await hit("k", at=3)
+    assert not blocked.allowed
+    assert blocked.retry_after == 57  # the window opened at t=0 and ends at t=60
+    assert (await hit("k", at=60.5)).allowed
 
 
-def test_genuine_patient_volume_fits():
+async def test_keys_are_independent():
+    assert (await hit("a", limit=1, at=0)).allowed
+    assert (await hit("b", limit=1, at=0)).allowed
+    assert not (await hit("a", limit=1, at=1)).allowed
+
+
+async def test_one_blocked_key_blocks_the_request_but_counts_both():
+    both = [("t", "x", 1, WINDOW), ("t", "y", 5, WINDOW)]
+    assert (await consume_limits(both, now=T0)).allowed
+    assert not (await consume_limits(both, now=T0 + timedelta(seconds=1))).allowed
+
+
+async def test_genuine_patient_volume_fits():
     # All three instruments on one link: 37 answers + 3 submits + consent +
     # a page load per answer, doubled for retries. Still under the limit.
     from app.screening.rate_limit import TOKEN_LIMIT

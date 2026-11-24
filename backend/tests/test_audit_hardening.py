@@ -37,7 +37,7 @@ async def cleanup_patients_created_by_audit_tests(db_session):
 async def _patient(client, headers):
     response = await client.post(
         f"{API}/patients",
-        json={"first_name": "Audit", "last_name": "Subject"},
+        json={"first_name": "Audit", "last_name": "Subject", "age": 35},
         headers=headers,
     )
     assert response.status_code == 201, response.text

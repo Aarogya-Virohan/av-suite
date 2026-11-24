@@ -414,25 +414,29 @@ async def search_patients(
                 if display_number <= 9223372036854775807:
                     matches.append(Patient.display_number == display_number)
             query = select(Patient).where(or_(*matches), Patient.clinic_id == c_id)
-        elif '@' in search:
-            query = select(Patient).where(Patient.email.ilike(f"%{term}%"), Patient.clinic_id == c_id)
         else:
-            query = select(Patient).where(Patient.full_name.ilike(f"%{term}%"), Patient.clinic_id == c_id)
-            
+            # Patients have no email column (the old '@' branch read
+            # Patient.email and crashed with a 500). Any other text, '@'
+            # included, is a plain name search and finds nothing when no name
+            # contains it.
+            query = select(Patient).where(
+                Patient.full_name.ilike(f"%{term}%"), Patient.clinic_id == c_id
+            )
+
         query = query.where(Patient.deleted_at.is_(None))
         if status:
             query = query.where(Patient.status == status)
         if scope:
             query = apply_patient_scope(query, scope, user_id)
-            
-        query = query.offset(offset).limit(limit)
+
+        total = (
+            await db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
+        ) or 0
+        # Stable order, so pages never repeat or skip a patient.
+        query = query.order_by(Patient.display_number, Patient.id).offset(offset).limit(limit)
         result = await db.execute(query)
         patients = list(result.scalars().all())
-            
-        # Since repository search methods don't return total count efficiently in the same way,
-        # we can just return len(patients) as total for now, or we'd need to add count methods to the repo.
-        # But this is a simple search, so we'll just return the length of the fetched results as total.
-        return patients, len(patients)
+        return patients, int(total)
         
     except Exception as e:
         logger.error(f"Search patients error: {str(e)}")

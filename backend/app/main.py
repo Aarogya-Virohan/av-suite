@@ -22,11 +22,14 @@ Configuration Sources:
 - API version: settings.API_V1_PREFIX
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import TimeoutError as SATimeoutError
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.rbac import validate_role_templates
 from app.middleware.clinic_gate import ClinicGateMiddleware
+from app.middleware.commit_before_response import CommitBeforeResponseMiddleware
 from app.api.v1.router import api_router
 import logging
 
@@ -58,6 +61,25 @@ app = FastAPI(
 # Register central exception handler for custom application errors
 app.add_exception_handler(BaseAppException, app_exception_handler)
 
+
+async def _pool_busy_handler(request: Request, exc: SATimeoutError) -> JSONResponse:
+    """No database connection became free within DB_POOL_TIMEOUT seconds."""
+    logger.warning("Database pool exhausted: %s", exc)
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": {
+                "code": "SERVER_BUSY",
+                "message": "The server is busy right now. Please try again in a few seconds.",
+            }
+        },
+        headers={"Retry-After": "5"},
+    )
+
+
+# SQLAlchemy raises this TimeoutError when the pool has no free connection.
+app.add_exception_handler(SATimeoutError, _pool_busy_handler)
+
 import os
 
 # NOTE: removed public StaticFiles mount for /static -- prescription PDFs
@@ -71,6 +93,7 @@ import os
 # add_middleware method se priority order define karte hain
 # Middleware order bottom-up hai (last added = first executed)
 # ClinicGateMiddleware protected routes par token check karta hai
+app.add_middleware(CommitBeforeResponseMiddleware)
 app.add_middleware(ClinicGateMiddleware)
 logger.info("ClinicGateMiddleware registered")
 

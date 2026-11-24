@@ -67,6 +67,22 @@ async def test_audit_helper_persists_safe_event_fields():
         ("billing.py", "record_payment_for_invoice", "create", "payment"),
         ("billing.py", "void_payment", "void", "payment"),
         ("users.py", "create_user", "create", "user"),
+        # BE fixes (report D3): the clinical record, Rx, documents and fee list.
+        ("prescriptions.py", "create_prescription", "create", "prescription"),
+        ("prescriptions.py", "update_prescription", "update", "prescription"),
+        ("prescriptions.py", "delete_prescription", "delete", "prescription"),
+        ("prescriptions.py", "generate_pdf", "generate_pdf", "prescription"),
+        ("documents.py", "upload_patient_document", "upload", "document"),
+        ("documents.py", "create_document", "upload", "document"),
+        ("documents.py", "delete_document", "delete", "document"),
+        ("assessments.py", "create_soap_assessment", "create", "soap_assessment"),
+        ("assessments.py", "update_soap_assessment", "update", "soap_assessment"),
+        ("treatments.py", "create_treatment_session", "create", "treatment_session"),
+        ("treatments.py", "update_treatment_session", "update", "treatment_session"),
+        ("treatments.py", "delete_treatment_session", "delete", "treatment_session"),
+        ("settings.py", "create_fee_item", "create", "fee_item"),
+        ("settings.py", "update_fee_item", "update", "fee_item"),
+        ("settings.py", "deactivate_fee_item", "delete", "fee_item"),
     ],
 )
 def test_required_handlers_emit_audit_event(filename, handler, action, entity):
