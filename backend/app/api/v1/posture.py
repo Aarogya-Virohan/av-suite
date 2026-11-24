@@ -1005,7 +1005,7 @@ async def report_from_review(
         )
     patient_name = patient_row.full_name
     gender = store.gender_label(patient_row)
-    case_ref = store.format_case_id(patient_row.display_number, clinic.name)
+    case_ref = store.format_case_id(patient_row.display_number, clinic.code, clinic.name)
 
     try:
         token_views = read_detection_token(detection_token)
@@ -1289,7 +1289,7 @@ async def pick_patients(
     clinic = perm_ctx.clinic
     rows = await store.search_clinic_patients(db, clinic.id, search)
     today = datetime.now(IST).date()
-    return {"patients": [store.patient_summary(p, clinic.name, today) for p in rows]}
+    return {"patients": [store.patient_summary(p, clinic, today) for p in rows]}
 
 
 @router.get("/patients/{patient_id}", dependencies=_CAN_RUN)
@@ -1301,7 +1301,7 @@ async def pick_one_patient(
     """One patient of the clinic, for the screen opened from the CRM patient page (404 otherwise)."""
     clinic = perm_ctx.clinic
     patient = await store.get_clinic_patient(db, clinic.id, patient_id)
-    return store.patient_summary(patient, clinic.name, datetime.now(IST).date())
+    return store.patient_summary(patient, clinic, datetime.now(IST).date())
 
 
 @router.get("/patients/{patient_id}/reports", dependencies=_CAN_RUN)
