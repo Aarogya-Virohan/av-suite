@@ -115,22 +115,105 @@ test("05 rx: build a prescription and download the PDF", async ({ page }, info) 
   await shot(page, info, "rx", `Rx PDF downloaded: ${file.suggestedFilename()}`);
 });
 
-test("06 posture: start an assessment with uploaded photos", async ({ page }, info) => {
-  await login(page, T.posture);
-  await shot(page, info, "posture", "Posture tool: new assessment");
-  const form = page.locator("main");
-  await form.getByLabel(/name/i).first().fill(`Smoke Patient ${RUN}`);
-  await form.getByLabel(/age/i).first().fill("34");
-  await form.getByLabel(/height/i).first().fill("170");
-  await shot(page, info, "posture", "Patient details filled");
+test("06 posture: CRM patient -> report -> PDF -> open it again", async ({ page, context }, info) => {
+  // POS-2: a posture report belongs to a CRM patient. The patient is created
+  // through the API with an age (a patient without one cannot be assessed).
+  const token = await apiToken();
+  const created = await fetch(`${T.api}/api/v1/patients`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      first_name: "Posture",
+      last_name: `Smoke ${RUN}`,
+      phone: phone(6),
+      age: 34,
+      gender: "female",
+      chief_complaint: "Posture smoke test patient",
+    }),
+  });
+  expect(created.status).toBeLessThan(300);
+  const patient = ((await created.json()) as { data?: { id: string }; id?: string });
+  const patientId = (patient.data ?? patient).id as string;
+  const fullName = `Posture Smoke ${RUN}`;
+
+  await login(page, T.crm);
+  await page.goto(`${T.crm}/patients/${patientId}`);
+  await shot(page, info, "posture", "CRM patient page with the AI Posture Analysis button");
+
+  const [tool] = await Promise.all([
+    context.waitForEvent("page"),
+    page.getByRole("link", { name: /AI Posture Analysis/i }).click(),
+  ]);
+  await tool.locator('input[type="email"], [data-testid="patient-name"]').first().waitFor();
+  if (await tool.locator('input[type="email"]').isVisible()) {
+    // The posture tool is its own origin outside hub mode: sign in once.
+    await tool.locator('input[type="email"]').fill(T.email);
+    await tool.locator('input[type="password"]').fill(T.password);
+    await tool.locator('button[type="submit"]').click();
+  }
+  await expect(tool.getByTestId("patient-name")).toHaveText(fullName);
+  await expect(tool.getByTestId("patient-locked")).toBeVisible();
+  await expect(tool.getByTestId("patient-case-id")).toHaveText(/^[A-Z]{1,3}-\d{6}$/);
+  const caseId = (await tool.getByTestId("patient-case-id").textContent()) ?? "";
+  await expect(tool.getByTestId("patient-search")).toHaveCount(0);
+  await shot(tool, info, "posture", "Posture opened from the CRM: patient filled and locked, CRM ID shown");
+
+  await tool.getByLabel(/height/i).first().fill("170");
   const images = T.postureImages ? readdirSync(T.postureImages).filter((f) => /\.(jpe?g|png)$/i.test(f)).sort() : [];
-  test.skip(images.length < 3, "Set E2E_POSTURE_IMAGES to a folder with front / side / back photos of a standing person (sorted names) to run the analysis; without real photos only the form is checked.");
-  const inputs = page.locator('input[type="file"]');
+  test.skip(images.length < 3, "Set E2E_POSTURE_IMAGES to a folder with front / side / back photos of a standing person (sorted names) to run the analysis; without real photos only the patient step is checked.");
+  const inputs = tool.locator('input[type="file"]');
   for (let i = 0; i < 3; i++) await inputs.nth(i).setInputFiles(join(T.postureImages, images[i]));
-  await shot(page, info, "posture", "Three photos uploaded");
-  await page.getByRole("button", { name: /continue to landmark check/i }).click();
-  await expect(page.getByText(/landmark/i).first()).toBeVisible({ timeout: 90_000 });
-  await shot(page, info, "posture", "Landmark check");
+  await shot(tool, info, "posture", "Three photos uploaded");
+  await tool.getByRole("button", { name: /continue to landmark check/i }).click();
+  await expect(tool.getByText(/landmark/i).first()).toBeVisible({ timeout: 90_000 });
+  await shot(tool, info, "posture", "Landmark check");
+  // Walk through the three views, then "Confirm Alignment" builds the report.
+  const primary = tool.getByRole("button", { name: /^(Next: .* view|Review and confirm|Confirm Alignment)$/ });
+  for (let i = 0; i < 8; i++) {
+    const label = (await primary.textContent()) ?? "";
+    await primary.click();
+    if (/Confirm Alignment/.test(label)) break;
+  }
+  await expect(tool.getByText(/^PT-\d{8}-[0-9A-F]{8}$/).first()).toBeVisible({ timeout: 90_000 });
+  await expect(tool.getByText(caseId).first()).toBeVisible();
+  await shot(tool, info, "posture", "Report: CRM patient ID shown as the case ID");
+
+  const pdf = tool.waitForEvent("download", { timeout: 60_000 });
+  await tool.getByRole("button", { name: /download pdf/i }).click();
+  const file = await pdf;
+  const saved = join(__dirname, "..", "out", "artifacts", `${info.project.name}-posture-${file.suggestedFilename()}`);
+  await file.saveAs(saved);
+  expect(readFileSync(saved).subarray(0, 4).toString()).toBe("%PDF");
+
+  // Back to the first step: the report is listed and opens again.
+  await tool.getByRole("button", { name: /new assessment/i }).click();
+  await expect(tool.getByTestId("previous-reports")).toBeVisible();
+  await shot(tool, info, "posture", "Earlier reports of this patient");
+  await tool.getByTestId("open-report").first().click();
+  await expect(tool.getByTestId("saved-note")).toBeVisible();
+  await expect(tool.getByText(caseId).first()).toBeVisible();
+  await shot(tool, info, "posture", "Saved report opened again");
+  const again = tool.waitForEvent("download", { timeout: 60_000 });
+  await tool.getByRole("button", { name: /download pdf/i }).click();
+  const second = await again;
+  const saved2 = join(__dirname, "..", "out", "artifacts", `${info.project.name}-posture-again-${second.suggestedFilename()}`);
+  await second.saveAs(saved2);
+  expect(readFileSync(saved2).subarray(0, 4).toString()).toBe("%PDF");
+});
+
+test("06b posture: opened directly, a patient is picked, no free text", async ({ page }, info) => {
+  await login(page, T.posture);
+  await page.goto(`${T.posture}/`);
+  await expect(page.getByTestId("patient-search")).toBeVisible();
+  await expect(page.getByLabel(/^name/i)).toHaveCount(0);
+  await expect(page.getByLabel(/case reference/i)).toHaveCount(0);
+  await shot(page, info, "posture", "Posture opened directly: pick a patient of the clinic");
+  await page.getByTestId("patient-search").fill(SHARED_PATIENT.last);
+  await page.getByTestId("patient-option").first().click();
+  await expect(page.getByTestId("patient-card")).toBeVisible();
+  await expect(page.getByTestId("patient-locked")).toHaveCount(0);
+  await expect(page.getByTestId("patient-change")).toBeVisible();
+  await shot(page, info, "posture", "Patient picked (can be changed)");
 });
 
 test("07 screening: assign Tool 03 to a patient", async ({ page }, info) => {

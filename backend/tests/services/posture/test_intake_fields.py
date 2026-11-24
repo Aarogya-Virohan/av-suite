@@ -17,15 +17,11 @@ def test_real_values_are_kept():
     assert blank_if_placeholder("Nandini") == "Nandini"
 
 
-def test_case_ref_is_optional_on_the_report_route():
-    # Required here meant every report with a blank case reference failed
-    # at the last step with "case_ref: Field required".
-    default = inspect.signature(posture.report_from_review).parameters["case_ref"].default
-    assert getattr(default, "default", None) == ""
-
-
-def test_gender_is_optional_on_the_report_route():
-    # The intake offers "Not given"; required here failed those reports at
-    # the last step with "gender: Field required" (found 14 November 2026).
-    default = inspect.signature(posture.report_from_review).parameters["gender"].default
-    assert getattr(default, "default", None) == ""
+def test_report_route_takes_no_free_text_identity():
+    # POS-2 (23 Nov 2026): name, age, sex and case reference come from the CRM
+    # patient (patient_id), so the old optional-field problems (blank case
+    # reference, "Not given" gender) cannot happen at the last step any more.
+    params = inspect.signature(posture.report_from_review).parameters
+    for gone in ("patient_name", "age", "gender", "case_ref"):
+        assert gone not in params, gone
+    assert "patient_id" in params

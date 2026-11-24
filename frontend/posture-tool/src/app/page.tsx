@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import type { CaptureLevel } from "@/lib/tilt"
 
 import UploadZone from "@/components/posture/UploadZone"
@@ -12,7 +13,19 @@ import LandmarkReview from "@/components/review/LandmarkReview"
 
 import AuthGate, { useSession } from "@/components/auth/AuthGate"
 
-import { detectLandmarks, downloadPostureReportPdf, generateReport } from "@/lib/api"
+import PatientPicker, { ageSex } from "@/components/patient/PatientPicker"
+import PreviousReports from "@/components/patient/PreviousReports"
+
+import {
+  ApiError,
+  detectLandmarks,
+  downloadPostureReportPdf,
+  downloadSavedReportPdf,
+  fetchPatient,
+  fetchSavedReport,
+  generateReport,
+  type PickerPatient,
+} from "@/lib/api"
 
 import type { DetectionResult, LandmarkReviewSubmission, PostureReport } from "@/types/posture"
 import { asset, toolUrl } from "@/lib/hub"
@@ -198,23 +211,71 @@ useState<CaptureLevel | null>(null)
 const [backLevel, setBackLevel] =
 useState<CaptureLevel | null>(null)
 
-const [patientName, setPatientName] =
-useState("")
+// The CRM patient (POS-2). Opened from the CRM patient page (?patient_id=...)
+// the patient is loaded and locked; opened directly, one is picked from the
+// clinic's patients. There is no free-text patient.
+const searchParams = useSearchParams()
+const crmPatientId = searchParams.get("patient_id")
 
-const [age, setAge] =
-useState("")
+const [patient, setPatient] =
+useState<PickerPatient | null>(null)
 
-const [gender, setGender] =
-useState("")
+const [patientLocked, setPatientLocked] =
+useState(false)
 
-const [caseRef, setCaseRef] =
-useState("")
+const [patientLoading, setPatientLoading] =
+useState(Boolean(crmPatientId))
+
+const [patientError, setPatientError] =
+useState<string | null>(null)
+
+useEffect(() => {
+  if (!crmPatientId) return
+  let cancelled = false
+  fetchPatient(crmPatientId)
+    .then((p) => {
+      if (cancelled) return
+      setPatient(p)
+      setPatientLocked(true)
+      setPatientError(null)
+    })
+    .catch((e) => {
+      if (cancelled) return
+      const notFound = e instanceof ApiError && (e.status === 404 || e.status === 422)
+      setPatient(null)
+      setPatientLocked(false)
+      setPatientError(
+        notFound
+          ? "This patient was not found in your clinic. Choose a patient below."
+          : e instanceof Error
+            ? e.message
+            : "Could not load the patient.",
+      )
+    })
+    .finally(() => {
+      if (!cancelled) setPatientLoading(false)
+    })
+  return () => {
+    cancelled = true
+  }
+}, [crmPatientId])
 
 const [patientHeightCm, setPatientHeightCm] =
 useState("")
 
 const [clinicianName, setClinicianName] =
 useState("")
+
+// A report opened from the list of earlier reports: saved data, no photographs.
+const [savedView, setSavedView] =
+useState(false)
+
+const [openingId, setOpeningId] =
+useState<string | null>(null)
+
+// Bumped after a report is saved, so the list of earlier reports reloads.
+const [reportsVersion, setReportsVersion] =
+useState(0)
 
 const [report, setReport] =
 useState<PostureReport | null>(null)
@@ -243,29 +304,20 @@ Number.isFinite(heightNumber) &&
 heightNumber >= 50 &&
 heightNumber <= 250
 
-// Age goes to the report as an integer, and the report endpoint refuses an
-// empty one (FastAPI 0.115, checked 11 October 2026). Before this check the
-// refusal came only after the clinician had finished the whole landmark
-// review, and going back to fix the form threw that review away.
-const ageNumber = Number(age)
-
-const isAgeValid =
-age.trim() !== "" &&
-Number.isInteger(ageNumber) &&
-ageNumber >= 1 &&
-ageNumber <= 120
+// Name, age and sex come from the CRM record. A patient with no age there
+// cannot be assessed; the clinician is told to add it in the CRM.
+const patientAgeMissing = patient !== null && patient.age === null
 
 // Set when the clinician presses Continue with something missing; until
 // then no field is marked, so an empty form does not open full of errors.
 const [showErrors, setShowErrors] =
 useState(false)
 
-const nameError = showErrors && patientName.trim() === "" ? "Name is required" : null
-const ageError =
-  age.trim() !== "" && !isAgeValid
-    ? "Enter a whole number between 1 and 120."
-    : showErrors && age.trim() === ""
-      ? "Age is required"
+const patientFieldError =
+  showErrors && patient === null
+    ? "Choose a patient"
+    : patientAgeMissing
+      ? "This patient has no age in the CRM. Add the date of birth or age in the CRM, then open Posture again."
       : null
 const heightError =
   patientHeightCm.trim() !== "" && !isHeightValid
@@ -285,8 +337,7 @@ detectError.photos[2] === backImage
   : null
 
 const missing = [
-  patientName.trim() === "" ? "name" : null,
-  !isAgeValid ? "age" : null,
+  patient === null || patientAgeMissing ? "patient" : null,
   !isHeightValid ? "height" : null,
   !frontImage ? "front photo" : null,
   !sideImage ? "side photo" : null,
@@ -370,10 +421,9 @@ const resetAll = () => {
                 setSideLevel(null)
                 setBackLevel(null)
 
-                setPatientName("")
-                setAge("")
-                setGender("")
-                setCaseRef("")
+                // A patient opened from the CRM stays; a picked one is cleared.
+                if (!patientLocked) setPatient(null)
+                setSavedView(false)
                 setPatientHeightCm("")
                 setClinicianName("")
                 setShowErrors(false)
@@ -391,8 +441,22 @@ const resetAll = () => {
                 )
               }
 
+const openSaved = async (reportId: string) => {
+  setOpeningId(reportId)
+  try {
+    const saved = await fetchSavedReport(reportId)
+    setReport(saved)
+    setSavedView(true)
+    setStep("report")
+  } catch (error) {
+    alert("Could not open the report: " + (error instanceof Error ? error.message : String(error)))
+  } finally {
+    setOpeningId(null)
+  }
+}
+
 const handleConfirm = async (review: LandmarkReviewSubmission) => {
-if (!detection) return
+if (!detection || !patient) return
 
 try {
   setLoading(true)
@@ -400,10 +464,7 @@ try {
   const result = await generateReport({
     detection,
     review,
-    patientName,
-    age,
-    gender,
-    caseRef,
+    patientId: patient?.id ?? "",
     patientHeightCm,
     clinicianName,
     frontSource,
@@ -415,6 +476,8 @@ try {
   })
 
   setReport(result)
+  setSavedView(false)
+  setReportsVersion((v) => v + 1)
 
   setStep("report")
 
@@ -456,32 +519,61 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
 
         <div className="mt-6 rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-5 sm:p-6">
           <h2 className="font-display text-[17px] font-bold text-[#141A33]">Patient</h2>
+
+          {patientLoading ? (
+            <p className="mt-4 text-[14px] text-[#5D6380]" data-testid="patient-loading">Loading patient...</p>
+          ) : patient ? (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E3DCCB] bg-[#F8F4EA] px-4 py-3" data-testid="patient-card">
+              <div className="min-w-0">
+                <p className="truncate text-[16px] font-semibold text-[#141A33]" data-testid="patient-name">{patient.name}</p>
+                <p className="mt-0.5 text-[13px] text-[#5D6380]">
+                  Patient ID <span className="font-mono font-semibold text-[#141A33]" data-testid="patient-case-id">{patient.caseId}</span>
+                  {" · "}
+                  {ageSex(patient)}
+                </p>
+              </div>
+              {patientLocked ? (
+                <span className="rounded-full bg-[#E4EFEF] px-2.5 py-1 text-[11.5px] font-semibold text-[#2F5A60]" data-testid="patient-locked">
+                  From the CRM
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPatient(null)}
+                  className="h-9 rounded-lg border border-[#E3DCCB] bg-[#FFFDF7] px-3 text-[13px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2]"
+                  data-testid="patient-change"
+                >
+                  Change patient
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="mt-4">
+              {patientError && (
+                <p role="alert" className="mb-3 rounded-xl border border-[#F2C9C5] bg-[#FDF1F0] px-3 py-2 text-[13px] text-[#8C1D18]">
+                  {patientError}
+                </p>
+              )}
+              <PatientPicker onSelect={(p) => { setPatient(p); setPatientError(null) }} error={patientFieldError} />
+            </div>
+          )}
+          {patient && patientFieldError && (
+            <p role="alert" className="mt-2 text-[12px] font-medium text-[#B4231B]">{patientFieldError}</p>
+          )}
+
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Name" required error={nameError}>
-              <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} className={INPUT_CLASS} autoComplete="off" />
-            </Field>
-            <Field label="Age" required error={ageError}>
-              <input type="number" inputMode="numeric" value={age} onChange={(e) => setAge(e.target.value)} className={INPUT_CLASS} />
-            </Field>
             <Field label="Height (cm)" required hint={<HeightHint />} error={heightError}>
               <input type="number" inputMode="decimal" value={patientHeightCm} onChange={(e) => setPatientHeightCm(e.target.value)} className={INPUT_CLASS} />
-            </Field>
-            <Field label="Gender">
-              <select value={gender} onChange={(e) => setGender(e.target.value)} className={INPUT_CLASS}>
-                <option value="">Not given</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </Field>
-            <Field label="Case reference">
-              <input type="text" value={caseRef} onChange={(e) => setCaseRef(e.target.value)} className={INPUT_CLASS} autoComplete="off" />
             </Field>
             <Field label="Clinician">
               <input type="text" value={clinicianName} onChange={(e) => setClinicianName(e.target.value)} className={INPUT_CLASS} />
             </Field>
           </div>
         </div>
+
+        {patient && (
+          <PreviousReports patientId={patient.id} version={reportsVersion} onOpen={openSaved} busyId={openingId} />
+        )}
 
         <div className="mt-4 rounded-2xl border border-[#E3DCCB] bg-[#FFFDF7] p-5 sm:p-6">
           <h2 className="font-display text-[17px] font-bold text-[#141A33]">Photographs</h2>
@@ -557,6 +649,12 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
       report && (
         <section className="mx-auto w-full max-w-4xl space-y-4">
 
+          {savedView && (
+            <p className="no-print rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] px-4 py-2.5 text-[13px] text-[#5D6380]" data-testid="saved-note">
+              Saved report. Photographs are not stored with saved reports; the measurements and findings are as they were on the day.
+            </p>
+          )}
+
           <ReportCard
             data={report}
           />
@@ -573,7 +671,7 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
                 onClick={resetAll}
                 className="h-11 flex-1 rounded-xl border border-[#E3DCCB] bg-[#FFFDF7] whitespace-nowrap px-2 text-[13px] sm:px-4 sm:text-[14px] font-semibold text-[#141A33] transition hover:bg-[#F3EEE2] sm:flex-none"
               >
-                New assessment
+                {savedView ? "Back" : "New assessment"}
               </button>
               <WhatsAppShare report={report} />
               <button
@@ -582,7 +680,11 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
                 onClick={async () => {
                   setPdfBusy(true)
                   try {
-                    await downloadPostureReportPdf(report)
+                    if (savedView && report.reportId) {
+                      await downloadSavedReportPdf(report.reportId, report.patient?.name ?? "")
+                    } else {
+                      await downloadPostureReportPdf(report)
+                    }
                   } catch {
                     alert("Could not generate the report PDF. Please try again.")
                   } finally {
@@ -610,7 +712,9 @@ return ( <div className="min-h-screen bg-[#F8F4EA]">
 export default function Page() {
   return (
     <AuthGate>
-      <Assessment />
+      <Suspense fallback={null}>
+        <Assessment />
+      </Suspense>
     </AuthGate>
   )
 }
