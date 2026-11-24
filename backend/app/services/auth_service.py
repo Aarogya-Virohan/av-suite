@@ -26,7 +26,12 @@ from app.enums.organization import OrganizationRole
 from app.models.organization import OrganizationMembership
 from app.enums.user import UserRole
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
-from app.core.security import get_password_hash, verify_password, create_access_token
+from app.core.security import (
+    create_access_token,
+    get_password_hash_async,
+    verify_password_async,
+)
+from app.services.login_guard import record_failed_login
 from app.services.product_entitlements import ensure_crm_entitlement
 from app.services.clinic_status import ensure_clinic_active
 from app.services.usage_events import record_usage
@@ -118,7 +123,7 @@ async def register_user(db: AsyncSession, request: RegisterRequest) -> TokenResp
         new_user = User(
             clinic_id=new_clinic.id,
             email=request.email,
-            password_hash=get_password_hash(
+            password_hash=await get_password_hash_async(
                 request.password
             ),  # Hash karte hain, plain nahi store
             role=UserRole.ADMIN,  # First user = admin
@@ -228,8 +233,20 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> TokenResponse:
         # Password verification aur user existence check
         # Dono checks combined error message se (no info leakage)
         # verify_password: Bcrypt constant-time comparison
-        if not user or not verify_password(request.password, user.password_hash):
+        # Off the event loop: bcrypt takes ~0.3 s of CPU (report E2).
+        if not user or not await verify_password_async(request.password, user.password_hash):
             logger.warning(f"Failed login attempt for email: {request.email}")
+            if user is not None:
+                clinic_ids = list(
+                    (
+                        await db.scalars(
+                            select(Membership.clinic_id)
+                            .where(Membership.user_id == user.id)
+                            .order_by(Membership.created_at, Membership.clinic_id)
+                        )
+                    ).all()
+                )
+                await record_failed_login(user.id, request.email, clinic_ids)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password",  # Generic message - no specificity

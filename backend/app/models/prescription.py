@@ -1,11 +1,17 @@
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, ForeignKey, Integer, Text
+from sqlalchemy import Index, String, ForeignKey, Integer, Text
 from typing import Optional
 from app.models.base import Base, TimestampMixin
 
 class Prescription(Base, TimestampMixin):
     __tablename__ = "prescriptions"
+    # Hot lists (report E4): clinic list newest first, per patient, per physio.
+    __table_args__ = (
+        Index("ix_prescriptions_clinic_created", "clinic_id", "created_at"),
+        Index("ix_prescriptions_patient_id", "patient_id"),
+        Index("ix_prescriptions_physio_id", "physio_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     clinic_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clinics.id", ondelete="CASCADE"))
@@ -23,6 +29,7 @@ class Prescription(Base, TimestampMixin):
 
 class PrescriptionItem(Base, TimestampMixin):
     __tablename__ = "prescription_items"
+    __table_args__ = (Index("ix_prescription_items_prescription_id", "prescription_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     prescription_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("prescriptions.id", ondelete="CASCADE"))

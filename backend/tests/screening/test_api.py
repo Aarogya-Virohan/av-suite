@@ -22,6 +22,7 @@ from app.models.psychosocial import (
     PsychosocialSession,
 )
 from app.screening import rate_limit, registry
+from app.services.platform_rate_limit import clear_all_limits
 from app.screening.consent import CONSENT_TEXT_VERSION
 from app.services.psychosocial import hash_token, utcnow
 from tests.screening.conftest import API, entitle, make_patient, set_overrides
@@ -474,7 +475,7 @@ async def test_clinic_isolation(client, db_session, env, therapist_auth_headers)
 async def test_rate_limit_per_token(client, db_session, env, therapist_auth_headers, monkeypatch):
     patient = await make_patient(db_session, env["clinic"].id)
     token = token_of(await assign(client, therapist_auth_headers, patient.id, ["phq9"]))
-    monkeypatch.setattr(rate_limit.token_limiter, "limit", 3)
+    monkeypatch.setattr(rate_limit, "TOKEN_LIMIT", 3)
     for _ in range(3):
         assert (await client.get(f"{API}/screener/{token}")).status_code == 200
     blocked = await client.get(f"{API}/screener/{token}")
@@ -483,12 +484,12 @@ async def test_rate_limit_per_token(client, db_session, env, therapist_auth_head
 
 
 async def test_rate_limit_per_ip_and_trusted_header(client, monkeypatch):
-    monkeypatch.setattr(rate_limit.ip_limiter, "limit", 2)
+    monkeypatch.setattr(rate_limit, "IP_LIMIT", 2)
     for _ in range(2):
         assert (await client.get(f"{API}/screener/{'a' * 43}")).status_code == 404
     assert (await client.get(f"{API}/screener/{'b' * 43}")).status_code == 429
 
-    rate_limit.ip_limiter.reset()
+    await clear_all_limits()
     monkeypatch.setattr(settings, "SCREENER_CLIENT_IP_HEADER", "X-Real-IP")
     for ip in ("1.1.1.1", "1.1.1.1", "2.2.2.2", "2.2.2.2"):
         res = await client.get(f"{API}/screener/{'c' * 43}", headers={"X-Real-IP": ip})

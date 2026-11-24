@@ -18,11 +18,11 @@ from app.core.platform_security import (
     decrypt_mfa_secret, encrypt_mfa_secret, new_totp_secret, matching_totp_step,
 )
 from app.core.platform_rbac import require_platform_permission
-from app.core.security import get_password_hash, verify_password
+from app.core.security import get_password_hash, verify_password_async
 from app.exceptions import BaseAppException
 from app.models.platform import PlatformOperator
 from app.schemas.envelope import ResponseEnvelope
-from app.services.platform_audit import record_platform_audit
+from app.services.platform_audit import record_platform_audit, record_platform_audit_isolated
 from app.services.platform_operator_lifecycle import lock_operator_lifecycle, ensure_another_active_owner_remains
 from app.services.platform_rate_limit import (
     consume_attempts, MAX_ACCOUNT_ATTEMPTS, MAX_IP_ATTEMPTS,
@@ -65,10 +65,13 @@ async def login(body: LoginRequest, request: Request, db: SessionDep):
         raise BaseAppException("Too many authentication attempts", "RATE_LIMITED", 429)
     operator = await db.scalar(select(PlatformOperator).where(func.lower(PlatformOperator.email) == email))
     # Verify against a fixed dummy hash on unknown emails to reduce timing differences.
+    ip = request.client.host if request.client else None
     if operator is None:
-        verify_password(body.password, "$2b$12$C6UzMDM.H6dfI/f/IKcEe.3F7fHR6hW3J7kO1Kzt3l2R8uXJkmz3e")
+        await verify_password_async(body.password, "$2b$12$C6UzMDM.H6dfI/f/IKcEe.3F7fHR6hW3J7kO1Kzt3l2R8uXJkmz3e")
+        await record_platform_audit_isolated(action="auth.login_failed", target_type="operator", ip=ip, user_agent=request.headers.get("user-agent"), details={"email": email, "reason": "unknown_account"})
         raise _unauthorized()
-    if not operator.is_active or not verify_password(body.password, operator.password_hash):
+    if not operator.is_active or not await verify_password_async(body.password, operator.password_hash):
+        await record_platform_audit_isolated(action="auth.login_failed", target_type="operator", target_id=operator.id, ip=ip, user_agent=request.headers.get("user-agent"), details={"email": email, "reason": "inactive" if not operator.is_active else "bad_password"})
         raise _unauthorized()
 
     enrollment_required = not operator.mfa_enabled
@@ -116,6 +119,7 @@ async def complete_mfa(body: MFARequest, request: Request, db: SessionDep):
     if accepted_step is None or (
         operator.last_totp_step is not None and accepted_step <= operator.last_totp_step
     ):
+        await record_platform_audit_isolated(action="auth.mfa_failed", target_type="operator", target_id=operator.id, ip=request.client.host if request.client else None, user_agent=request.headers.get("user-agent"), details={"email": operator.email})
         raise BaseAppException("Invalid verification code", "MFA_INVALID", 401)
 
     operator.mfa_enabled = True

@@ -27,6 +27,7 @@ const fromPatient = (patient: Patient): PatientFormValues => ({
   first_name: patient.first_name,
   last_name: patient.last_name,
   date_of_birth: patient.date_of_birth || '',
+  age: patient.age != null ? String(patient.age) : '',
   phone: patient.phone || '',
   gender: (patient.gender as PatientFormValues['gender']) ?? null,
   chief_complaint: patient.chief_complaint || '',

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Building2, ChevronLeft, ChevronRight, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, LayoutDashboard, LogOut, Menu, ScrollText, ShieldCheck, BarChart3 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Avatar } from '@/components/ui/brand';
@@ -26,6 +26,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [
       { label: 'Overview', href: '/overview', icon: LayoutDashboard, permission: 'platform.usage.read' },
       { label: 'Organizations', href: '/organizations', icon: Building2, permission: 'platform.organizations.read' },
+      { label: 'Usage', href: '/usage', icon: BarChart3, permission: 'platform.usage.read' },
     ],
   },
   {

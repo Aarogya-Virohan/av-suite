@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn';
 import { errorMessage } from '@/lib/platform-api/errors';
 import type { LoginChallenge } from '@/lib/platform-api/types';
 import { useLogin, useVerifyMfa } from '@/features/auth/hooks';
+import { EnrolmentQr } from '@/features/auth/EnrolmentQr';
 import { useSession } from '@/store/session';
 import { MockModeBadge } from '@/components/layout/MockModeBadge';
 
@@ -259,17 +260,7 @@ function MfaStep({
               <p className="mt-1">Scan the QR code with Google Authenticator, 1Password or similar, then enter the code it shows.</p>
             </div>
           </div>
-          <div className="mt-4 grid h-40 place-items-center rounded-xl border border-dashed border-line bg-canvas text-center text-xs text-muted">
-            {challenge.otpauth_uri ? (
-              // U5: render the QR from otpauth_uri here (S2 returns it).
-              <span>QR code</span>
-            ) : (
-              <span className="flex flex-col items-center gap-1.5 px-6">
-                <KeyRound className="h-5 w-5 text-slate-400" />
-                QR code appears here once platform sign-in (S2) is live.
-              </span>
-            )}
-          </div>
+          <EnrolmentQr otpauthUri={challenge.otpauth_uri} />
         </div>
       ) : (
         <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-4 text-xs text-ink-2 shadow-card">

@@ -257,7 +257,7 @@ export class MockPlatformBackend {
           updated_at: ts,
         };
         this.organizations.push(org);
-        this.audit(op, 'organization.create', 'organization', org.id, { organization_id: org.id }, reason, {
+        this.audit(op, 'organization.created', 'organization', org.id, { organization_id: org.id }, reason, {
           before: null,
           after: { name, slug, type, status: 'active', contact_email: org.contact_email, contact_phone: org.contact_phone },
         });
@@ -278,7 +278,7 @@ export class MockPlatformBackend {
         if (body.contact_phone !== undefined) org.contact_phone = body.contact_phone?.trim() || null;
         org.updated_at = this.now().toISOString();
         const after = { name: org.name, type: org.type, contact_email: org.contact_email, contact_phone: org.contact_phone };
-        this.audit(op, 'organization.update', 'organization', org.id, { organization_id: org.id }, reason, { before, after });
+        this.audit(op, 'organization.updated', 'organization', org.id, { organization_id: org.id }, reason, { before, after });
         return item(this.toOrganization(org));
       },
       suspendOrganization: async (id, body) => item(this.setOrganizationStatus(auth('platform.organizations.manage'), id, 'suspended', body.reason)),
@@ -302,7 +302,7 @@ export class MockPlatformBackend {
           created_at: this.now().toISOString(),
         };
         this.clinics.push(clinic);
-        this.audit(op, 'clinic.create', 'clinic', clinic.id, { organization_id: org.id, clinic_id: clinic.id }, reason, {
+        this.audit(op, 'clinic.created', 'clinic', clinic.id, { organization_id: org.id, clinic_id: clinic.id }, reason, {
           before: null,
           after: { name, slug, type, status: 'active', organization_id: org.id },
         });
@@ -319,7 +319,7 @@ export class MockPlatformBackend {
         moved.forEach((c) => {
           c.organization_id = target.id;
         });
-        this.audit(op, 'organization.merge', 'organization', target.id, { organization_id: target.id }, reason, {
+        this.audit(op, 'organization.merged', 'organization', target.id, { organization_id: target.id }, reason, {
           source_organization_id: source.id,
           moved_clinic_ids: movedIds,
           before: { organization_id: source.id },
@@ -357,10 +357,10 @@ export class MockPlatformBackend {
         row.valid_from = fromMs === null ? null : new Date(fromMs).toISOString();
         row.valid_until = untilMs === null ? null : new Date(untilMs).toISOString();
         row.updated_at = ts;
-        this.audit(op, 'entitlement.update', 'entitlement', `${clinic.id}:${productKey}`, {
+        this.audit(op, 'entitlement.updated', 'entitlement', `${clinic.id}:${productKey}`, {
           organization_id: clinic.organization_id,
           clinic_id: clinic.id,
-        }, reason, { product_key: productKey, before, after: { status: row.status, valid_from: row.valid_from, valid_until: row.valid_until } });
+        }, reason, { before: before ? { product_key: productKey, ...before } : null, after: { product_key: productKey, status: row.status, valid_from: row.valid_from, valid_until: row.valid_until } });
         return item(this.toEntitlement(row));
       },
 
@@ -410,7 +410,7 @@ export class MockPlatformBackend {
           updated_at: ts,
         };
         this.operators.push(created);
-        this.audit(op, 'operator.create', 'operator', created.id, {}, reason, {
+        this.audit(op, 'cli.operator.created', 'operator', created.id, {}, reason, {
           before: null,
           after: { email, name, role, is_active: true, mfa_enabled: false },
         });
@@ -448,7 +448,7 @@ export class MockPlatformBackend {
           this.tokenVersions.set(target.id, (this.tokenVersions.get(target.id) ?? 0) + 1);
         }
         this.operators = this.operators.map((o) => (o.id === id ? next : o));
-        this.audit(op, 'operator.update', 'operator', target.id, {}, reason, {
+        this.audit(op, before.is_active === next.is_active ? 'operator.updated' : next.is_active ? 'operator.reactivated' : 'operator.deactivated', 'operator', target.id, {}, reason, {
           before,
           after: { name: next.name, role: next.role, is_active: next.is_active },
         });
@@ -652,7 +652,7 @@ export class MockPlatformBackend {
     const before = { status: org.status };
     org.status = status;
     org.updated_at = this.now().toISOString();
-    this.audit(op, status === 'suspended' ? 'organization.suspend' : 'organization.activate', 'organization', org.id, { organization_id: org.id }, reason, {
+    this.audit(op, status === 'suspended' ? 'organization.suspended' : 'organization.active', 'organization', org.id, { organization_id: org.id }, reason, {
       before,
       after: { status },
     });
@@ -665,7 +665,7 @@ export class MockPlatformBackend {
     if (clinic.status === status) fail(409, PLATFORM_ERROR_CODES.CONFLICT, `Clinic is already ${status}.`);
     const before = { status: clinic.status };
     clinic.status = status;
-    this.audit(op, status === 'suspended' ? 'clinic.suspend' : 'clinic.activate', 'clinic', clinic.id, {
+    this.audit(op, status === 'suspended' ? 'clinic.suspended' : 'clinic.active', 'clinic', clinic.id, {
       organization_id: clinic.organization_id,
       clinic_id: clinic.id,
     }, reason, { before, after: { status } });
@@ -733,22 +733,21 @@ export class MockPlatformBackend {
     this.organizations
       .filter((o) => o.status === 'suspended')
       .forEach((o, i) => {
-        this.audit(owners[i % owners.length], 'organization.suspend', 'organization', o.id, { organization_id: o.id }, 'Payment overdue, contract on hold', { before: { status: 'active' }, after: { status: 'suspended' } }, new Date(nowMs - (3 + i) * DAY).toISOString());
+        this.audit(owners[i % owners.length], 'organization.suspended', 'organization', o.id, { organization_id: o.id }, 'Payment overdue, contract on hold', { before: { status: 'active' }, after: { status: 'suspended' } }, new Date(nowMs - (3 + i) * DAY).toISOString());
       });
     this.clinics
       .filter((c) => c.status === 'suspended')
       .forEach((c, i) => {
-        this.audit(owners[(i + 1) % owners.length], 'clinic.suspend', 'clinic', c.id, { organization_id: c.organization_id, clinic_id: c.id }, 'Branch closed for renovation', { before: { status: 'active' }, after: { status: 'suspended' } }, new Date(nowMs - (2 + i) * DAY).toISOString());
+        this.audit(owners[(i + 1) % owners.length], 'clinic.suspended', 'clinic', c.id, { organization_id: c.organization_id, clinic_id: c.id }, 'Branch closed for renovation', { before: { status: 'active' }, after: { status: 'suspended' } }, new Date(nowMs - (2 + i) * DAY).toISOString());
       });
     this.entitlements.slice(0, 12).forEach((e, i) => {
       const clinic = this.clinics.find((c) => c.id === e.clinic_id)!;
-      this.audit(owners[i % owners.length], 'entitlement.update', 'entitlement', `${e.clinic_id}:${e.product_key}`, {
+      this.audit(owners[i % owners.length], 'entitlement.updated', 'entitlement', `${e.clinic_id}:${e.product_key}`, {
         organization_id: clinic.organization_id,
         clinic_id: clinic.id,
       }, 'Onboarding: tools as per signed order form', {
-        product_key: e.product_key,
         before: null,
-        after: { status: e.status, valid_from: e.valid_from, valid_until: e.valid_until },
+        after: { product_key: e.product_key, status: e.status, valid_from: e.valid_from, valid_until: e.valid_until },
       }, new Date(nowMs - Math.floor(5 + rnd() * 20) * DAY).toISOString());
     });
   }

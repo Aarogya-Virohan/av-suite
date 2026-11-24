@@ -196,7 +196,9 @@ async def test_organization_clinic_entitlement_usage_and_merge_flow(client, db_s
     clinic_row = await db_session.get(Clinic, uuid.UUID(clinic_id))
     await record_usage(db_session, clinic_row, None, "crm", "appointment_created")
     await db_session.flush()
-    today = date.today().isoformat()
+    from app.core.timezone import CLINIC_TZ
+    from datetime import datetime
+    today = datetime.now(CLINIC_TZ).date().isoformat()
     usage = await client.get(f"{API}/usage?clinic_id={clinic_id}&product_key=crm&date_from={today}&date_to={today}", headers=headers)
     assert usage.status_code == 200, usage.text
     assert usage.json()["meta"] == {"total": 1, "page": 1, "page_size": 20}

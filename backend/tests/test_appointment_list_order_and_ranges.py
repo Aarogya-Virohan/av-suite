@@ -37,7 +37,7 @@ async def _setup(client, name):
     user_id = body.get("id") or body["user"]["id"]
     patient = await client.post(
         f"{API}/patients",
-        json={"first_name": "Order", "last_name": "Range", "phone": "9898700101"},
+        json={"first_name": "Order", "last_name": "Range", "phone": "9898700101", "age": 35},
         headers=headers,
     )
     assert patient.status_code in (200, 201), patient.text

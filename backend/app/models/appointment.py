@@ -37,6 +37,7 @@ class Appointment(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         Index("ix_appointments_therapist_id", "therapist_id"),
         Index("ix_appointments_scheduled_at", "scheduled_at"),
         Index("ix_appointments_status", "status"),
+        Index("ix_appointments_clinic_scheduled", "clinic_id", "scheduled_at"),
     )
 
     clinic_id: Mapped[UUID] = mapped_column(

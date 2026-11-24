@@ -27,7 +27,8 @@ from app.schemas.settings import (
 from app.repositories.audit import AuditLogRepository
 from app.repositories.clinic import ClinicRepository
 from app.schemas.settings import ClinicSettingsResponse, ClinicSettingsUpdate
-from app.services.audit import AuditLogService
+from app.core.upload_limits import check_logo_size
+from app.services.audit import AuditLogService, changed_fields, log_event_safely
 from app.services.settings import (
     ClinicSettingsService,
     SettingsNotFoundError,
@@ -69,6 +70,11 @@ async def create_fee_item(
     session.add(item)
     await session.commit()
     await session.refresh(item)
+    await log_event_safely(
+        session, clinic.id, _admin.id, "create", "fee_item", item.id,
+        {"name": item.name, "category": item.category, "default_price": item.default_price,
+         "price_editable": item.price_editable},
+    )
     return item
 
 
@@ -89,10 +95,16 @@ async def update_fee_item(
     )
     if item is None:
         raise HTTPException(status_code=404, detail="Fee item not found.")
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    changes_in = payload.model_dump(exclude_unset=True)
+    before = {key: getattr(item, key) for key in changes_in}
+    for key, value in changes_in.items():
         setattr(item, key, value)
     await session.commit()
     await session.refresh(item)
+    await log_event_safely(
+        session, clinic.id, _admin.id, "update", "fee_item", item.id,
+        {"name": item.name, "changes": changed_fields(before, {key: getattr(item, key) for key in before})},
+    )
     return item
 
 
@@ -114,6 +126,9 @@ async def deactivate_fee_item(
         raise HTTPException(status_code=404, detail="Fee item not found.")
     item.active = False
     await session.commit()
+    await log_event_safely(
+        session, clinic.id, _admin.id, "delete", "fee_item", item.id, {"name": item.name},
+    )
 
 
 async def get_settings_service(
@@ -161,6 +176,7 @@ async def update_clinic_settings(
 ) -> ClinicSettingsResponse:
     """Update clinic branding settings (admin only)."""
 
+    check_logo_size(payload.branding_logo_url)
     try:
         updated_clinic = await service.update_settings(clinic.id, user.id, payload)
         return ClinicSettingsResponse.model_validate(updated_clinic)

@@ -52,7 +52,7 @@ async def _setup(client, auth_headers):
     assert profile.status_code == 200, profile.text
     patient = await client.post(
         f"{API}/patients",
-        json={"first_name": "Kavya", "last_name": "Nair", "phone": "9898765011"},
+        json={"first_name": "Kavya", "last_name": "Nair", "phone": "9898765011", "age": 35},
         headers=auth_headers,
     )
     assert patient.status_code in (200, 201), patient.text

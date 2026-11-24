@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, UploadFile, File, Form
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -30,6 +32,7 @@ from app.services.document import (
     DocumentService,
     DocumentValidationError,
 )
+from app.core.upload_limits import MAX_DOCUMENT_BYTES, read_capped, reject_oversized_request
 from app.services.audit import log_event_safely
 
 
@@ -70,8 +73,10 @@ CurrentUserDep = Annotated[User, Depends(get_current_user)]
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_patient_document(
+    request: Request,
     patient_id: UUID,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: DocumentServiceDep,
     label: Annotated[str, Form(min_length=1, max_length=255)],
     category: Annotated[DocumentCategory, Form()],
@@ -86,7 +91,8 @@ async def upload_patient_document(
         from app.core.storage import StorageUnavailableError, storage_client
         import uuid
 
-        file_bytes = await file.read()
+        reject_oversized_request(request, MAX_DOCUMENT_BYTES, "The file")
+        file_bytes = await read_capped(file, MAX_DOCUMENT_BYTES, "The file")
         file_ext = (
             file.filename.split(".")[-1]
             if file.filename and "." in file.filename
@@ -94,8 +100,10 @@ async def upload_patient_document(
         )
         path = f"{clinic.id}/{patient_id}/{uuid.uuid4()}.{file_ext}"
 
-        storage_client.upload_file(
-            path, file_bytes, file.content_type or "application/octet-stream"
+        # Blocking Supabase client: run it in a thread, not on the event loop.
+        await asyncio.to_thread(
+            storage_client.upload_file,
+            path, file_bytes, file.content_type or "application/octet-stream",
         )
 
         payload = PatientDocumentCreate(
@@ -110,6 +118,17 @@ async def upload_patient_document(
         )
 
         document = await service.create_document(clinic.id, payload)
+        # Ids, category and size only: never the label, notes or file content.
+        await log_event_safely(
+            service.document_repository.session, clinic.id, user.id,
+            "upload", "document", document.id,
+            {
+                "patient_id": str(patient_id),
+                "category": category.value,
+                "file_type": payload.file_type,
+                "file_size": payload.file_size,
+            },
+        )
         return PatientDocumentResponse.model_validate(document)
     except DocumentValidationError as exc:
         raise HTTPException(
@@ -130,6 +149,7 @@ async def upload_patient_document(
 async def create_document(
     payload: PatientDocumentCreate,
     clinic: CurrentClinicDep,
+    user: CurrentUserDep,
     service: DocumentServiceDep,
     scope: CapabilityScope = Depends(require_capability("documents.upload")),
 ) -> PatientDocumentResponse:
@@ -137,6 +157,16 @@ async def create_document(
 
     try:
         document = await service.create_document(clinic.id, payload)
+        await log_event_safely(
+            service.document_repository.session, clinic.id, user.id,
+            "upload", "document", document.id,
+            {
+                "patient_id": str(payload.patient_id),
+                "category": payload.category.value,
+                "file_type": payload.file_type,
+                "file_size": payload.file_size,
+            },
+        )
         return PatientDocumentResponse.model_validate(document)
     except DocumentValidationError as exc:
         raise HTTPException(
@@ -254,7 +284,7 @@ async def download_document(
         else:
             from app.core.storage import storage_client
 
-            file_bytes = storage_client.download_file(document.file_url)
+            file_bytes = await asyncio.to_thread(storage_client.download_file, document.file_url)
 
             await log_event_safely(
                 service.document_repository.session, clinic.id, user.id,
@@ -317,7 +347,16 @@ async def delete_document(
     """Delete a patient document record."""
 
     try:
+        document = await service.get_document(clinic.id, id)
+        details = {
+            "patient_id": str(document.patient_id),
+            "category": getattr(document.category, "value", str(document.category)),
+        }
         await service.delete_document(clinic.id, id, deleted_by=user.id)
+        await log_event_safely(
+            service.document_repository.session, clinic.id, user.id,
+            "delete", "document", id, details,
+        )
     except DocumentNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)

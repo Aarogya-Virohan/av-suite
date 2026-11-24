@@ -33,4 +33,10 @@ COPY . .
 # Install the application package
 RUN pip install --no-deps -e .
 
+# Two worker processes (Railway Hobby, 8 GB; one worker is about 620 MB). uvicorn
+# reads the count from WEB_CONCURRENCY, so a Railway variable can change it
+# without a rebuild. Nothing correctness-relevant lives in process memory: the
+# login, platform login and public screener limiters count in the database.
+ENV WEB_CONCURRENCY=2
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]

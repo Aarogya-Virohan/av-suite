@@ -12,7 +12,7 @@ Response Format:
 All responses ResponseEnvelope mein wrapped hote hain consistency ke liye.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -35,6 +35,7 @@ from app.schemas.auth import (
 from app.schemas.envelope import ResponseEnvelope
 from app.services import auth_service
 from app.services.clinic_status import ensure_clinic_active
+from app.services.login_guard import client_ip, enforce_login_limit
 from app.models.membership import Membership
 import logging
 from app.core.config import settings
@@ -186,7 +187,11 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
 @router.post(
     "/login", response_model=ResponseEnvelope[TokenResponse], tags=["Authentication"]
 )
-async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    request: LoginRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Endpoint ka purpose: Existing user ko authenticate karna login flow mein
     Yeh endpoint login process handle karta hai jo:
@@ -252,6 +257,9 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
 
     logger.info(f"Login request received for email: {request.email}")
+
+    # Shared limiter first: before any password work (429 with a clear message).
+    await enforce_login_limit(request.email, client_ip(http_request))
 
     try:
         # Service layer ko call karte hain authentication logic ke liye

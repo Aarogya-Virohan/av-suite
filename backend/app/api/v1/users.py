@@ -25,7 +25,7 @@ from app.core.tool_access import (
     tools_state,
     validate_tool_keys,
 )
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash_async
 from app.schemas.envelope import ResponseEnvelope
 from app.repositories.user_permission import UserPermissionRepository
 from app.schemas.user_permission import UserPermissionRead, UserPermissionCreate
@@ -127,7 +127,7 @@ async def create_user(
         new_user = User(
             clinic_id=clinic_id,
             email=email,
-            password_hash=get_password_hash(payload.password),
+            password_hash=await get_password_hash_async(payload.password),
             first_name=fname or "",
             last_name=lname or "",
             phone=payload.phone,

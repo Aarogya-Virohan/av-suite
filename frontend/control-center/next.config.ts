@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next';
 
-const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+const isProduction = process.env.NODE_ENV === 'production';
+// A production build never falls back to a local backend: no URL, no extra origin.
+const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || (isProduction ? '' : 'http://localhost:8000')).replace(/\/+$/, '');
+const devSocket = isProduction ? '' : 'ws://localhost:3006 wss://localhost:3006';
 
 const cspHeader = `
   default-src 'self';
@@ -12,11 +15,18 @@ const cspHeader = `
   base-uri 'self';
   form-action 'self';
   frame-ancestors 'none';
-  connect-src 'self' ${apiOrigin} ws://localhost:3006 wss://localhost:3006;
+  connect-src 'self' ${apiOrigin} ${devSocket};
 `.replace(/\n/g, '');
+
+// Same rule as resolveApiMode() in src/lib/platform-api/index.ts. Setting it here
+// means the value always exists at build time, so a production build without it
+// compiles the mock adapter out of the bundle (scripts/check-bundle.mjs proves it).
+const requestedMode = process.env.NEXT_PUBLIC_PLATFORM_API_MODE;
+const platformApiMode = requestedMode === 'mock' || requestedMode === 'http' ? requestedMode : isProduction ? 'http' : 'mock';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  env: { NEXT_PUBLIC_PLATFORM_API_MODE: platformApiMode },
   async headers() {
     return [
       {

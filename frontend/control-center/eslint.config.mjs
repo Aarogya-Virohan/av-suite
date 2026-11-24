@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Playwright run against a local stack (needs its own @playwright/test, not part of the app).
+    "e2e/**",
   ]),
 ]);
 

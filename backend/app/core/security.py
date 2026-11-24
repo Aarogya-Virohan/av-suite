@@ -16,6 +16,7 @@ Security Considerations:
 - Timezone-aware datetime use karte hain (UTC) taaki daylight saving na affect kare
 """
 
+import asyncio
 import bcrypt
 from datetime import datetime, timedelta, timezone
 import jwt
@@ -137,6 +138,35 @@ def get_password_hash(password: str) -> str:
         # Sensitive operation hai to security important
         logger.error(f"Password hashing error: {str(e)}")
         raise
+
+
+# bcrypt (12 rounds) takes about 0.3 s of CPU. Called directly inside an async
+# route it freezes the whole event loop of that worker for that time, so every
+# other request waits (pipeline report E2, P0). These wrappers run it in a
+# thread (bcrypt releases the GIL). A small semaphore keeps one worker from
+# starting more concurrent hashes than it has cores; the rest wait without
+# blocking the loop.
+_BCRYPT_CONCURRENCY = 2
+_bcrypt_slots: asyncio.Semaphore | None = None
+
+
+def _slots() -> asyncio.Semaphore:
+    global _bcrypt_slots
+    if _bcrypt_slots is None:
+        _bcrypt_slots = asyncio.Semaphore(_BCRYPT_CONCURRENCY)
+    return _bcrypt_slots
+
+
+async def verify_password_async(plain_password: str, hashed_password: str) -> bool:
+    """verify_password off the event loop. Use this in every async route."""
+    async with _slots():
+        return await asyncio.to_thread(verify_password, plain_password, hashed_password)
+
+
+async def get_password_hash_async(password: str) -> str:
+    """get_password_hash off the event loop. Use this in every async route."""
+    async with _slots():
+        return await asyncio.to_thread(get_password_hash, password)
 
 
 def create_access_token(

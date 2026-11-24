@@ -20,6 +20,7 @@ const EMPTY: PatientFormValues = {
   first_name: '',
   last_name: '',
   date_of_birth: '',
+  age: '',
   phone: '',
   gender: null,
   chief_complaint: '',
