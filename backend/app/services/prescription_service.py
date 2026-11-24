@@ -9,6 +9,7 @@ from app.models.clinic import Clinic
 from app.services.usage_events import record_usage
 from app.schemas.prescription import PrescriptionCreate, PrescriptionPatch
 from app.repositories.prescription import PrescriptionRepository
+from app.services.patient_number import format_patient_id
 from app.utils.whatsapp import build_whatsapp_link
 from app.services import exercise_media, exercise_photos
 from app.services.prescription_pdf import (
@@ -215,6 +216,9 @@ def _rx_doc(rx: Prescription) -> RxDoc:
         ),
         patient_phone=(patient.phone if patient else None),
         patient_dob=(patient.date_of_birth if patient else None),
+        patient_id=format_patient_id(
+            rx.clinic.code if rx.clinic else None, patient.display_number if patient else None
+        ),
         prescribed_on=rx.created_at,
         physio_notes=rx.physio_notes,
         items=items,
@@ -353,15 +357,17 @@ async def load_prescription_pdf(
     raise ValueError("PDF could not be generated")
 
 
-def _build_prescription_message(patient_name: str, clinic_name: str) -> str:
+def _build_prescription_message(patient_name: str, clinic_name: str, patient_id: str = "") -> str:
     """
     WhatsApp text that goes with the prescription. It carries no link: the
     download path needs a login, and a public link would put health data on
     an open URL. The physiotherapist attaches the PDF in WhatsApp
     (decided by Onkar, 20 October 2026).
     """
+    id_line = f"Patient ID: {patient_id}\n\n" if patient_id else ""
     return (
         f"Hello {patient_name},\n\n"
+        f"{id_line}"
         f"Your home exercise programme from {clinic_name} is attached as a PDF. "
         "Please follow the sets and reps as prescribed and contact us if anything hurts."
     )
@@ -384,8 +390,11 @@ async def generate_prescription_pdf_response(
         f"{rx.patient.first_name} {rx.patient.last_name}".strip() or "Patient"
     )
     clinic_name = rx.clinic.name if rx.clinic else "your clinic"
+    patient_id = format_patient_id(
+        rx.clinic.code if rx.clinic else None, rx.patient.display_number
+    )
     whatsapp_link = build_whatsapp_link(
-        rx.patient.phone or "", _build_prescription_message(patient_name, clinic_name)
+        rx.patient.phone or "", _build_prescription_message(patient_name, clinic_name, patient_id)
     )
 
     return {

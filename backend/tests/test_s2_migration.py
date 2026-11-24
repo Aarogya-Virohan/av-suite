@@ -89,7 +89,7 @@ async def test_s2_migration_round_trip_and_schema(test_database_url_safety_check
         _alembic(database_url, "upgrade", S2_REVISION)
         assert S2_REVISION in _alembic(database_url, "current")
         _alembic(database_url, "upgrade", "head")
-        assert "be1fixes20261124" in _alembic(database_url, "current")
+        assert "crm10code20261124" in _alembic(database_url, "current")
         assert _alembic(database_url, "heads").count("(head)") == 1
     finally:
         admin = await asyncpg.connect(admin_dsn)

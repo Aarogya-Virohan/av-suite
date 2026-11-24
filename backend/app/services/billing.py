@@ -38,6 +38,7 @@ from app.schemas.billing import (
     PatientPackageUpdate,
     PaymentCreate,
 )
+from app.services.patient_number import format_patient_id
 from app.utils.whatsapp import build_whatsapp_link
 
 
@@ -823,6 +824,9 @@ class BillingService:
             authorised_person=clinic.authorised_person if clinic else None,
             patient_name=patient_name,
             patient_phone=patient.phone if patient else None,
+            patient_id=format_patient_id(
+                clinic.code if clinic else None, patient.display_number if patient else None
+            ),
             subtotal=invoice.subtotal,
             discount_amount=invoice.discount_amount,
             discount_percent=invoice.discount_percent,
@@ -847,11 +851,13 @@ class BillingService:
         return pdf, pdf_filename(doc.kind, doc.invoice_number)
 
     @staticmethod
-    def _build_invoice_message(patient_name: str, pdf_url: str) -> str:
+    def _build_invoice_message(patient_name: str, pdf_url: str, patient_id: str = "") -> str:
         """Format the WhatsApp message that accompanies an invoice download."""
 
+        id_line = f"Patient ID: {patient_id}\n\n" if patient_id else ""
         return (
             f"Hello {patient_name},\n\n"
+            f"{id_line}"
             "Thank you for visiting.\n\n"
             "You can download your invoice here:\n\n"
             f"{pdf_url}"
@@ -878,8 +884,12 @@ class BillingService:
         pdf_url = f"/api/v1/invoices/{invoice_id}/pdf/download"
 
         patient_name = getattr(patient, "full_name", "Patient")
+        clinic = await self.invoice_repository.session.get(Clinic, clinic_id)
+        patient_id = format_patient_id(
+            clinic.code if clinic else None, getattr(patient, "display_number", None)
+        )
         whatsapp_link = build_whatsapp_link(
-            patient.phone or "", self._build_invoice_message(patient_name, pdf_url)
+            patient.phone or "", self._build_invoice_message(patient_name, pdf_url, patient_id)
         )
 
         return {

@@ -91,6 +91,8 @@ class InvoiceDoc:
     clinic_name: str
     patient_name: str
     patient_phone: str | None = None
+    # "ADP-000003"; empty = line left out. Label on the PDF is "Patient ID".
+    patient_id: str | None = None
     clinic_logo: str | None = None
     clinic_logo_src: str = ""
     address_line: str | None = None
@@ -265,6 +267,11 @@ def build_invoice_html(doc: InvoiceDoc) -> str:
     title = "Payment Receipt" if doc.kind == "receipt" else "Invoice"
     word = "receipt" if doc.kind == "receipt" else "invoice"
     phone = f'<p class="p-line">{_esc(doc.patient_phone)}</p>' if _filled(doc.patient_phone) else ""
+    patient_id = (
+        f'<p class="p-line"><span class="muted">Patient ID</span> <span class="nowrap">{_esc(doc.patient_id)}</span></p>'
+        if _filled(doc.patient_id)
+        else ""
+    )
     notes = (
         f'<div class="block"><p class="tag">Notes</p><p>{_esc(doc.notes)}</p></div>'
         if _filled(doc.notes)
@@ -328,6 +335,7 @@ p {{ margin: 0; }}
   color: {MUTED}; margin-bottom: 1.2mm !important; }}
 .p-name {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 700; font-size: 10.5pt; }}
 .p-line {{ font-size: 8.6pt; color: {MUTED}; }}
+.p-line .nowrap {{ white-space: nowrap; color: {INK}; font-weight: 600; }}
 .items {{ width: 100%; border-collapse: collapse; }}
 .items th {{ text-align: left; font-size: 7pt; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
   color: {MUTED}; border-bottom: 1.2px solid {MIDNIGHT}; padding: 1.6mm 2mm; }}
@@ -351,7 +359,7 @@ p {{ margin: 0; }}
 {footer_html(('Receipt ' if doc.kind == 'receipt' else 'Invoice ') + doc.invoice_number)}
 
 <table class="head"><tr>
-  <td class="bill"><p class="tag">Billed to</p><p class="p-name">{_esc(doc.patient_name)}</p>{phone}</td>
+  <td class="bill"><p class="tag">Billed to</p><p class="p-name">{_esc(doc.patient_name)}</p>{patient_id}{phone}</td>
   <td class="gap"></td>
   <td class="doc"><p class="t">{_esc(title)}</p><table class="meta-t">{_meta_rows(doc)}</table></td>
 </tr></table>

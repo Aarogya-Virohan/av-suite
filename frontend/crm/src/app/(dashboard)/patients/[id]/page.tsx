@@ -189,7 +189,7 @@ export default function PatientWorkspacePage() {
                   <h1 className="font-display text-2xl font-bold tracking-tight text-ink">
                     {patient.first_name} {patient.last_name}
                   </h1>
-                  <WhatsAppButton phone={patient.phone} name={`${patient.first_name} ${patient.last_name}`} />
+                  <WhatsAppButton phone={patient.phone} name={`${patient.first_name} ${patient.last_name}`} patientId={caseId(patient.display_number)} />
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                   <span>

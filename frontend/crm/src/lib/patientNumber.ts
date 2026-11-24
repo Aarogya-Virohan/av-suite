@@ -5,10 +5,21 @@
  * searches it as digits. The CRM shows it as a case ID: a short clinic code,
  * then the number padded to 6 digits, e.g. "SPC-000123".
  *
- * There is no clinic code column yet, so the code is taken from the clinic
- * name: the first letter of up to 3 words, or the first 3 letters of a
- * one-word name. It is only for display; search sends the digits.
+ * The code is clinics.code (editable in Settings). Where the backend does not
+ * send it yet, it is worked out from the clinic name the way it always was:
+ * the first letter of up to 3 words, or the first 3 letters of a one-word
+ * name; the migration filled the column with exactly that. Search sends the
+ * digits.
  */
+
+/** 1 to 6 capital letters or digits (same rule as the API). */
+export const CLINIC_CODE_PATTERN = /^[A-Z0-9]{1,6}$/;
+
+/** Trim and capitalise what was typed; returns null when it is not a valid code. */
+export function normalizeClinicCode(value: string): string | null {
+  const code = value.trim().toUpperCase();
+  return CLINIC_CODE_PATTERN.test(code) ? code : null;
+}
 
 const WORD = /[A-Za-z][A-Za-z0-9]*/g;
 
@@ -31,9 +42,11 @@ export function padPatientNumber(displayNumber: number | null | undefined): stri
 export function formatPatientNumber(
   displayNumber: number | null | undefined,
   clinicName: string | null | undefined,
+  storedCode?: string | null,
 ): string {
   const padded = padPatientNumber(displayNumber);
-  return padded ? `${clinicCode(clinicName)}-${padded}` : '';
+  const code = storedCode?.trim() || clinicCode(clinicName);
+  return padded ? `${code}-${padded}` : '';
 }
 
 /**

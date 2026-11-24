@@ -20,6 +20,7 @@ from app.repositories.booking import AppointmentRequestRepository
 from app.repositories.clinic import ClinicRepository
 from app.repositories.patient import PatientRepository
 from app.services.clinic_status import is_clinic_active
+from app.services.patient_number import format_patient_id
 from app.schemas.booking import (
     AppointmentRequestApprovePayload,
     AppointmentRequestCreate,
@@ -147,11 +148,15 @@ class BookingService:
         )
 
     @staticmethod
-    def _build_approval_message(patient_name: str, scheduled_at: datetime) -> str:
+    def _build_approval_message(
+        patient_name: str, scheduled_at: datetime, patient_id: str = ""
+    ) -> str:
         """Format the WhatsApp confirmation message for an approved appointment."""
 
+        id_line = f"Patient ID: {patient_id}\n\n" if patient_id else ""
         return (
             f"Hello {patient_name},\n\n"
+            f"{id_line}"
             "Your appointment has been confirmed.\n\n"
             f"Date: {scheduled_at.strftime('%d %b %Y')}\n"
             f"Time: {scheduled_at.strftime('%I:%M %p')}\n\n"
@@ -254,9 +259,13 @@ class BookingService:
         await self.request_repository.session.commit()
 
         patient_name = getattr(patient, "full_name", req.name)
+        clinic = await self.clinic_repository.get_by_id(clinic_id)
+        patient_id = format_patient_id(
+            clinic.code if clinic else None, getattr(patient, "display_number", None)
+        )
         whatsapp_link = build_whatsapp_link(
             req.phone,
-            self._build_approval_message(patient_name, appointment.scheduled_at),
+            self._build_approval_message(patient_name, appointment.scheduled_at, patient_id),
         )
 
         return {
