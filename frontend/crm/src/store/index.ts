@@ -8,6 +8,8 @@ export interface ClinicBranding {
   name: string;
   /** Public booking slug (from /auth/me). Older backends do not send it. */
   slug?: string | null;
+  /** Prefix of the Patient ID (clinics.code), e.g. "ADP". Older backends do not send it. */
+  code?: string | null;
   branding_logo_url: string | null;
   branding_color: string | null;
   /* Clinic profile for invoice headers (D-026). Older backends do not send them. */

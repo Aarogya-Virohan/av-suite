@@ -27,3 +27,11 @@ class ClinicRepository(BaseRepository[Clinic]):
             pass
         statement = select(Clinic).where(Clinic.slug == identifier)
         return await self.session.scalar(statement)
+
+    async def code_in_use(self, code: str, exclude_id: UUID | None = None) -> bool:
+        """True when another clinic already has this Patient ID prefix."""
+
+        statement = select(Clinic.id).where(Clinic.code == code)
+        if exclude_id is not None:
+            statement = statement.where(Clinic.id != exclude_id)
+        return (await self.session.scalar(statement.limit(1))) is not None

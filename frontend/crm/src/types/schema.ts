@@ -2821,6 +2821,11 @@ export interface components {
              */
             name: string;
             /**
+             * Code
+             * @description Prefix of the Patient ID, e.g. ADP in ADP-000003.
+             */
+            code: string;
+            /**
              * Branding Logo Url
              * @description URL of clinic logo image asset.
              */
@@ -2887,6 +2892,11 @@ export interface components {
              * @description Updated clinic name.
              */
             name?: string | null;
+            /**
+             * Code
+             * @description Prefix of the Patient ID: 1 to 6 capital letters or digits. Must be unused by other clinics.
+             */
+            code?: string | null;
             /**
              * Branding Logo Url
              * @description Updated branding logo URL.

@@ -23,6 +23,7 @@ import {
   type ProfileForm,
   clinicProfileErrors,
 } from '../../../features/settings/profile';
+import { CLINIC_CODE_PATTERN, formatPatientNumber, normalizeClinicCode } from '../../../lib/patientNumber';
 import { FeeListPanel } from '../../../features/settings/components/FeeListPanel';
 import { AddUserSlideOver } from '../../../features/users/components/AddUserSlideOver';
 import { UserToolsSlideOver } from '../../../features/users/components/UserToolsSlideOver';
@@ -104,6 +105,8 @@ export default function SettingsPage() {
     selectedTab && visibleTabs.some((t) => t.key === selectedTab) ? selectedTab : visibleTabs[0]?.key ?? null;
 
   const [clinicName, setClinicName] = useState('');
+  const [patientCode, setPatientCode] = useState('');
+  const [patientCodeError, setPatientCodeError] = useState<string | null>(null);
   // null = no clinic colour, the AV Suite theme applies.
   const [brandColor, setBrandColor] = useState<string | null>(null);
   const [colorDirty, setColorDirty] = useState(false);
@@ -126,6 +129,8 @@ export default function SettingsPage() {
   React.useEffect(() => {
     if (clinicSettings) {
       setClinicName(clinicSettings.name || '');
+      setPatientCode(clinicSettings.code || '');
+      setPatientCodeError(null);
       setBrandColor(clinicSettings.branding_color ?? null);
       setColorDirty(false);
       setLogoBase64(clinicSettings.branding_logo_url ?? null);
@@ -195,7 +200,10 @@ export default function SettingsPage() {
     }
     const problems = clinicProfileErrors(profile);
     setProfileErrors(problems);
-    if (Object.keys(problems).length > 0) {
+    const typedCode = normalizeClinicCode(patientCode);
+    const codeProblem = typedCode ? null : 'Use 1 to 6 capital letters or digits (A-Z, 0-9).';
+    setPatientCodeError(codeProblem);
+    if (Object.keys(problems).length > 0 || codeProblem) {
       toast.error('Check the clinic details');
       return;
     }
@@ -208,6 +216,8 @@ export default function SettingsPage() {
     try {
       await updateSettings.mutateAsync({
         name: clinicName,
+        // Only sent when it was changed.
+        ...(typedCode && typedCode !== clinicSettings?.code ? { code: typedCode } : {}),
         ...profilePayload,
         // Only send the colour when it was changed, so saving the name never
         // writes a default colour over the theme (null resets to the theme).
@@ -216,7 +226,9 @@ export default function SettingsPage() {
       });
       toast.success('Clinic settings saved');
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to save clinic settings');
+      const message: string = err?.message || 'Failed to save clinic settings';
+      if (/clinic code/i.test(message)) setPatientCodeError(message);
+      toast.error(message);
     }
   };
 
@@ -431,6 +443,36 @@ export default function SettingsPage() {
                       disabled={!canEditClinic}
                       className={inputClass}
                     />
+                  </div>
+
+                  <div>
+                    <FieldLabel htmlFor="clinic-code">Patient ID code</FieldLabel>
+                    <input
+                      id="clinic-code"
+                      type="text"
+                      value={patientCode}
+                      maxLength={6}
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      spellCheck={false}
+                      aria-invalid={patientCodeError ? true : undefined}
+                      aria-describedby="clinic-code-help"
+                      onChange={(e) => {
+                        setPatientCode(e.target.value.toUpperCase());
+                        setPatientCodeError(null);
+                      }}
+                      disabled={!canEditClinic}
+                      className={`${inputClass} max-w-[10rem] font-mono uppercase${patientCodeError ? ' border-danger' : ''}`}
+                    />
+                    {patientCodeError && <p className="mt-1.5 text-xs font-medium text-danger">{patientCodeError}</p>}
+                    <p id="clinic-code-help" className="mt-1.5 text-xs text-muted">
+                      Starts every Patient ID, for example{' '}
+                      <span className="font-mono font-semibold text-ink-2">
+                        {formatPatientNumber(123, clinicName, CLINIC_CODE_PATTERN.test(patientCode.trim().toUpperCase()) ? patientCode.trim().toUpperCase() : clinicSettings?.code)}
+                      </span>
+                      . 1 to 6 capital letters or digits. Changing it changes the Patient ID of every patient on screen,
+                      in new PDFs and in WhatsApp messages. PDFs and messages already sent keep the old one.
+                    </p>
                   </div>
 
                   <div>

@@ -55,6 +55,7 @@ class ClinicInfoResponse(BaseModel):
     id: UUID
     name: str
     slug: Optional[str] = None
+    code: Optional[str] = None
     branding_logo_url: Optional[str] = None
     client_type: Literal["clinic", "hospital", "home_care"] = "clinic"
     branding_color: Optional[str] = None

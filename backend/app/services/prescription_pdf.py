@@ -121,6 +121,8 @@ class RxDoc:
     prescribed_on: datetime | None
     physio_notes: str | None
     items: list[RxItem] = field(default_factory=list)
+    # "ADP-000003"; empty = row left out. Label on the PDF is "Patient ID".
+    patient_id: str | None = None
     # Raw clinics.branding_logo_url; resolved into clinic_logo_src at render.
     clinic_logo: str | None = None
     clinic_logo_src: str = ""
@@ -310,6 +312,7 @@ def _patient_box(doc: RxDoc, on: date) -> str:
         age = f"{age_on(doc.patient_dob, on)} Y"
     left = [
         ("Patient name", f'<span class="pname">{_esc(doc.patient_name)}</span>'),
+        ("Patient ID", f'<span class="nowrap">{_esc(doc.patient_id)}</span>' if doc.patient_id else ""),
         ("Age", age),
         ("Phone", _esc(doc.patient_phone)),
     ]

@@ -28,3 +28,13 @@ async def allocate_patient_display_number(session: AsyncSession, clinic_id: UUID
         .returning(PatientCounter.last_number)
     )
     return int((await session.execute(statement)).scalar_one())
+
+
+def format_patient_id(clinic_code: str | None, display_number: int | None) -> str:
+    """The Patient ID shown to people: clinic code, then the number padded to 6
+    digits ("ADP-000003"). Same text as the CRM screens. Empty when either part
+    is missing, so a document leaves the line out instead of printing half of it."""
+
+    if not clinic_code or display_number is None or display_number < 0:
+        return ""
+    return f"{clinic_code}-{int(display_number):06d}"

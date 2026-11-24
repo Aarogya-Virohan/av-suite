@@ -115,5 +115,6 @@ export function useUploadPatientDocument() {
 /** Case ID formatter for this clinic: display_number -> "SPC-000123" (CRM-1). */
 export function usePatientCaseId() {
   const clinicName = useAuthStore((s) => s.clinic?.name);
-  return (displayNumber: number | null | undefined) => formatPatientNumber(displayNumber, clinicName);
+  const code = useAuthStore((s) => s.clinic?.code);
+  return (displayNumber: number | null | undefined) => formatPatientNumber(displayNumber, clinicName, code);
 }

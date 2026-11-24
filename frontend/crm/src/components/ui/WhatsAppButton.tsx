@@ -10,6 +10,8 @@ interface WhatsAppButtonProps {
   phone?: string | null;
   name: string;
   message?: string;
+  /** Shown as "Patient ID: ADP-000003" in the prefilled text. */
+  patientId?: string | null;
   className?: string;
 }
 
@@ -18,6 +20,7 @@ export function openWhatsApp(
   name: string,
   message?: string,
   clinicName?: string | null,
+  patientId?: string | null,
 ) {
   if (!phone) return;
   const cleanPhone = phone.replace(/\D/g, '');
@@ -25,12 +28,13 @@ export function openWhatsApp(
   // Neutral greeting from the user's own clinic. It used to say "reminder for
   // your appointment with Aarogya Virohan Clinic" for every clinic, even where
   // no appointment existed. The text opens in WhatsApp for staff to edit.
-  const defaultText = message || (clinicName ? `Hi ${name}, greetings from ${clinicName}.` : `Hi ${name},`);
+  const greeting = clinicName ? `Hi ${name}, greetings from ${clinicName}.` : `Hi ${name},`;
+  const defaultText = message || (patientId ? `${greeting}\nPatient ID: ${patientId}` : greeting);
   const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(defaultText)}`;
   window.open(url, '_blank');
 }
 
-export function WhatsAppButton({ phone, name, message, className = '' }: WhatsAppButtonProps) {
+export function WhatsAppButton({ phone, name, message, patientId, className = '' }: WhatsAppButtonProps) {
   const authClinic = useAuthStore((s) => s.clinic);
   const { data: clinicSettings } = useClinicSettings(!authClinic?.name && hasCapability('settings.view'));
   const clinicName = authClinic?.name || clinicSettings?.name || null;
@@ -39,7 +43,7 @@ export function WhatsAppButton({ phone, name, message, className = '' }: WhatsAp
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        openWhatsApp(phone, name, message, clinicName);
+        openWhatsApp(phone, name, message, clinicName, patientId);
       }}
       className={`px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs ${className}`}
       title={`Send WhatsApp message to ${name}`}

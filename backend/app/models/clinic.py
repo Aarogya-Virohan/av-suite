@@ -1,8 +1,8 @@
 import uuid
 import re
 import unicodedata
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Enum, Boolean, Text, event, CheckConstraint, ForeignKey, Index
+from sqlalchemy.orm import Mapped, mapped_column, relationship, object_session
+from sqlalchemy import String, Enum, Boolean, Text, event, CheckConstraint, ForeignKey, Index, UniqueConstraint, select
 from app.enums.clinic import ClinicPlanTier, ClinicType
 from app.enums.organization import ClinicStatus
 from app.models.base import Base, TimestampMixin
@@ -13,12 +13,17 @@ class Clinic(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint("client_type IN ('clinic', 'hospital', 'home_care')", name="ck_clinics_client_type"),
         CheckConstraint("status IN ('active', 'suspended')", name="ck_clinics_status"),
+        CheckConstraint("length(code) BETWEEN 1 AND 6", name="ck_clinics_code_length"),
+        UniqueConstraint("code", name="uq_clinics_code"),
         Index("ix_clinics_organization_id", "organization_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    # Prefix of the Patient ID (ADP-000003). Set automatically on insert from
+    # the name when not given; the clinic admin can change it in Settings.
+    code: Mapped[str] = mapped_column(String(6), nullable=False)
     organization_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("organizations.id"), nullable=False
     )
@@ -93,3 +98,21 @@ def _set_default_clinic_slug(target, args, kwargs) -> None:
     normalized = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode()
     base = re.sub(r"[^a-z0-9]+", "-", normalized.lower()).strip("-") or "clinic"
     kwargs["slug"] = f"{base[:107].rstrip('-')}-{str(clinic_id).replace('-', '')[:12]}"
+
+
+@event.listens_for(Clinic, "before_insert")
+def _set_default_clinic_code(mapper, connection, target) -> None:
+    """A clinic created without a code gets the one derived from its name, or
+    that with a number added if another clinic already uses it."""
+    if target.code:
+        return
+    from app.services.clinic_code import derive_clinic_code, next_free_code
+
+    base = derive_clinic_code(target.name)
+    rows = connection.execute(select(Clinic.code).where(Clinic.code.like(f"{base[:5]}%")))
+    taken = {r[0] for r in rows}
+    # Clinics added in the same flush are not in the table yet.
+    session = object_session(target)
+    if session is not None:
+        taken |= {c.code for c in session.new if isinstance(c, Clinic) and c.code}
+    target.code = next_free_code(base, taken)
