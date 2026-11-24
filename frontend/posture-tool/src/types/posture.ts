@@ -62,7 +62,11 @@ export interface PostureReport {
     name: string
     age: number
     gender?: string
+    // The CRM patient ID (for example "SPC-000123") since 23 November 2026;
+    // free text before then.
     caseRef: string
+    // The CRM patient the report belongs to, since 23 November 2026.
+    patientId?: string
     assessmentDate: string
     clinician: string
     // Since 13 October 2026. Optional because earlier reports do not carry it.

@@ -4,6 +4,7 @@ from fastapi import File
 from fastapi import Form
 from fastapi import UploadFile
 from fastapi.responses import Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import asyncio
 import base64
@@ -16,12 +17,14 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from pathlib import Path
 from types import SimpleNamespace
 
 from mediapipe.framework.formats import landmark_pb2
 
+from app.core.database import get_db
 from app.core.dependencies import PermissionContextDep, require_capability
+from app.services import posture_report_store as store
+from app.services.usage_events import record_usage
 from app.services.posture.decoder import decode_image_bytes
 from app.services.posture.schemas import Landmark
 from app.services.posture.review import (
@@ -167,6 +170,7 @@ def _rearfoot_label(value: float, side_label: str) -> str:
 router = APIRouter()
 IST = ZoneInfo("Asia/Kolkata")
 _CAN_RUN = [Depends(require_capability("posture.create"))]
+POSTURE_PRODUCT_KEY = "posture-tool"
 
 
 
@@ -295,6 +299,7 @@ def _report_from_points(
     side_source: str,
     back_source: str,
     landmark_review: dict | None = None,
+    patient_id: str = "",
 ) -> dict:
     """
     Everything after detection: measurements, grades, synthesis, report.
@@ -758,6 +763,9 @@ def _report_from_points(
         "age": age,
         "gender": gender,
         "caseRef": case_ref,
+        # The CRM patient behind the report (POS-2); empty only for callers
+        # that build a report without one.
+        **({"patientId": patient_id} if patient_id else {}),
         # IST, not the server's date (17 November 2026): Railway runs in UTC,
         # so a report made between 00:00 and 05:30 IST printed the previous
         # day, and the report ID below carried the same wrong date. Same rule
@@ -785,9 +793,8 @@ def _report_from_points(
     if landmark_review is not None:
         report["landmarkReview"] = landmark_review
 
-    # A printed identifier, 11 October 2026, so a paper report can be traced
-    # back to its saved file: the same random suffix ends the file name.
-    saved_at = datetime.now(timezone.utc)
+    # A printed identifier (11 October 2026), so a paper report can be traced
+    # back to its saved copy (posture_sessions.report_id since 23 Nov 2026).
     suffix = uuid.uuid4().hex[:8]
     # The date part is the assessment date printed on the report (local
     # date), not the UTC date of the file: after 18:30 IST the two differ,
@@ -795,35 +802,9 @@ def _report_from_points(
     # like an error.
     report["reportId"] = f"PT-{patient['assessmentDate'].replace('-', '')}-{suffix.upper()}"
 
-    reports_dir = Path("data/reports")
-
-    reports_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    # Founders, 11 October 2026, answer 6a: the saved copy keeps the points,
-    # angles and review audit but not the photographs. The annotated photo
-    # in each view is dropped from the file; the response to the clinician
-    # still carries it, for the report on screen and the PDF.
-    saved = {
-        **report,
-        "views": {
-            name: {k: v for k, v in view.items() if k != "photoUrl"}
-            for name, view in report["views"].items()
-        },
-    }
-
-    with open(
-        reports_dir / report_filename(case_ref, saved_at, suffix),
-        "w",
-    ) as file:
-
-        json.dump(
-            saved,
-            file,
-            indent=2,
-        )
+    # Not written to disk any more (23 Nov 2026, POS-2): Railway wipes the
+    # container disk on every deploy. POST /report saves the report in
+    # posture_sessions; files already under data/reports are left alone.
 
     return report
 
@@ -959,20 +940,16 @@ _ASPECT_TOLERANCE = 0.01
 @router.post("/report", dependencies=_CAN_RUN)
 async def report_from_review(
     perm_ctx: PermissionContextDep,
+    db: AsyncSession = Depends(get_db),
     detection_token: str = Form(...),
     review: str = Form(...),
     front_display: UploadFile = File(...),
     side_display: UploadFile = File(...),
     back_display: UploadFile = File(...),
-    patient_name: str = Form(...),
-    age: int = Form(...),
-    # Optional, as on the intake screen ("Not given"). Required here failed
-    # every report with no gender at the last step.
-    gender: str = Form(""),
-    # Optional on the intake screen. FastAPI treats an empty form value as
-    # missing, so a required field here failed every report where it was
-    # left blank, only at the very last step (phone test, 27 October 2026).
-    case_ref: str = Form(""),
+    # POS-2 (23 Nov 2026): the CRM patient of the signed-in clinic. Name, age,
+    # sex and the case ID printed on the report come from that record, not
+    # from the form.
+    patient_id: uuid.UUID = Form(...),
     patient_height_cm: float = Form(...),
     clinician_name: str = Form(""),
     front_source: str = Form("unknown"),
@@ -997,8 +974,22 @@ async def report_from_review(
             ),
         )
 
-    case_ref = blank_if_placeholder(case_ref)
     clinician_name = blank_if_placeholder(clinician_name)
+
+    # AUD-05 style: a patient of another clinic, a deleted one or an unknown
+    # id is the same 404. Checked before any analysis work.
+    clinic = perm_ctx.clinic
+    patient_row = await store.get_clinic_patient(db, clinic.id, patient_id)
+    today = datetime.now(IST).date()
+    age = store.patient_age(patient_row, today)
+    if age is None or not 1 <= age <= 120:
+        raise HTTPException(
+            status_code=422,
+            detail="This patient has no valid age in the CRM. Add the date of birth or age to the patient record, then try again.",
+        )
+    patient_name = patient_row.full_name
+    gender = store.gender_label(patient_row)
+    case_ref = store.format_case_id(patient_row.display_number, clinic.name)
 
     try:
         token_views = read_detection_token(detection_token)
@@ -1099,6 +1090,7 @@ async def report_from_review(
         front_source=front_source,
         side_source=side_source,
         back_source=back_source,
+        patient_id=str(patient_row.id),
         landmark_review={
             "confirmedAt": datetime.now(timezone.utc).isoformat(),
             "confirmedBy": clinician_name,
@@ -1116,11 +1108,23 @@ async def report_from_review(
             else {"degrees": round(levels[name], 2), "calibrated": bool(calibrated[name])}
         )
 
+    # Saved in the database, linked to the patient (POS-2 / BE-2). The saved
+    # copy has no photographs and no branding; see report_for_storage.
+    await store.save_report(
+        db,
+        clinic_id=clinic.id,
+        patient_id=patient_row.id,
+        user_id=perm_ctx.user.id,
+        report=report,
+    )
+    # Product and event only: no patient data in usage events.
+    await record_usage(db, clinic, perm_ctx.user.id, POSTURE_PRODUCT_KEY, "posture_report")
+    await db.commit()
+
     # The signed-in clinic for the web report's letterhead (17 November
-    # 2026). Added after the report file is saved, so the saved copy does not
-    # carry the logo; the PDF route reads the clinic again itself.
-    clinic = await clinic_letterhead(perm_ctx.clinic)
-    branding = web_branding(perm_ctx.clinic, clinic.get("logoSrc", ""))
+    # 2026). Not part of the saved copy; the PDF route reads the clinic again.
+    letterhead = await clinic_letterhead(clinic)
+    branding = web_branding(clinic, letterhead.get("logoSrc", ""))
     if branding:
         report["branding"] = branding
 
@@ -1180,19 +1184,8 @@ def _pdf_payload_ok(report: dict) -> bool:
     return True
 
 
-@router.post("/report/pdf", dependencies=_CAN_RUN)
-async def export_posture_pdf(perm_ctx: PermissionContextDep, report: dict = Body(...)):
-    """
-    Render an already-computed posture report to a clinical PDF.
-
-    Takes the report payload the frontend already holds, so the MediaPipe
-    analysis is not re-run just to produce a document.
-    """
-
-    # AUD-10: a malformed payload gets a fixed 422 message, and an unexpected
-    # failure a fixed 500 message; the exception text stays in the server log.
-    if not _pdf_payload_ok(report):
-        raise HTTPException(status_code=422, detail=PDF_BAD_PAYLOAD)
+async def _pdf_response(perm_ctx, db: AsyncSession, report: dict) -> Response:
+    """Render a report dict to the PDF download and count it (posture_pdf)."""
 
     # The clinic on the letterhead is the signed-in clinic, read from the
     # clinics row here; report["branding"] from the client is ignored.
@@ -1203,6 +1196,10 @@ async def export_posture_pdf(perm_ctx: PermissionContextDep, report: dict = Body
     except Exception:
         _logger.exception("Posture PDF generation failed")
         raise HTTPException(status_code=500, detail=PDF_FAILED)
+
+    # Counted only once the PDF exists. Product and event only, no patient data.
+    await record_usage(db, perm_ctx.clinic, perm_ctx.user.id, POSTURE_PRODUCT_KEY, "posture_pdf")
+    await db.commit()
 
     patient_name = ""
     if isinstance(report.get("patient"), dict):
@@ -1221,3 +1218,100 @@ async def export_posture_pdf(perm_ctx: PermissionContextDep, report: dict = Body
             "Content-Disposition": f'attachment; filename="{filename}"'
         },
     )
+
+
+@router.post("/report/pdf", dependencies=_CAN_RUN)
+async def export_posture_pdf(
+    perm_ctx: PermissionContextDep,
+    report: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Render an already-computed posture report to a clinical PDF.
+
+    Takes the report payload the frontend already holds, so the MediaPipe
+    analysis is not re-run just to produce a document.
+    """
+
+    # AUD-10: a malformed payload gets a fixed 422 message, and an unexpected
+    # failure a fixed 500 message; the exception text stays in the server log.
+    if not _pdf_payload_ok(report):
+        raise HTTPException(status_code=422, detail=PDF_BAD_PAYLOAD)
+
+    return await _pdf_response(perm_ctx, db, report)
+
+
+# =============================================================================
+# CRM PATIENTS AND SAVED REPORTS (POS-2 / BE-2, 23 Nov 2026)
+# =============================================================================
+# The posture tool no longer takes a free-text patient: it picks one of the
+# clinic's CRM patients, and every report is saved against that patient.
+
+
+@router.get("/patients", dependencies=_CAN_RUN)
+async def pick_patients(
+    perm_ctx: PermissionContextDep,
+    search: str = "",
+    db: AsyncSession = Depends(get_db),
+):
+    """Patients of the signed-in clinic for the picker: name, age, sex and CRM ID only."""
+    clinic = perm_ctx.clinic
+    rows = await store.search_clinic_patients(db, clinic.id, search)
+    today = datetime.now(IST).date()
+    return {"patients": [store.patient_summary(p, clinic.name, today) for p in rows]}
+
+
+@router.get("/patients/{patient_id}", dependencies=_CAN_RUN)
+async def pick_one_patient(
+    perm_ctx: PermissionContextDep,
+    patient_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """One patient of the clinic, for the screen opened from the CRM patient page (404 otherwise)."""
+    clinic = perm_ctx.clinic
+    patient = await store.get_clinic_patient(db, clinic.id, patient_id)
+    return store.patient_summary(patient, clinic.name, datetime.now(IST).date())
+
+
+@router.get("/patients/{patient_id}/reports", dependencies=_CAN_RUN)
+async def patient_reports(
+    perm_ctx: PermissionContextDep,
+    patient_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Saved posture reports of one patient of the clinic, newest first."""
+    clinic = perm_ctx.clinic
+    await store.get_clinic_patient(db, clinic.id, patient_id)
+    rows = await store.list_saved_reports(db, clinic.id, patient_id)
+    return {"reports": [store.report_listing(r) for r in rows]}
+
+
+@router.get("/reports/{report_id}", dependencies=_CAN_RUN)
+async def open_saved_report(
+    perm_ctx: PermissionContextDep,
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """A saved report to open again: as it was made, without photographs."""
+    clinic = perm_ctx.clinic
+    row = await store.get_saved_report(db, clinic.id, report_id)
+    report = dict(row.report_json or {})
+    letterhead = await clinic_letterhead(clinic)
+    branding = web_branding(clinic, letterhead.get("logoSrc", ""))
+    if branding:
+        report["branding"] = branding
+    return report
+
+
+@router.get("/reports/{report_id}/pdf", dependencies=_CAN_RUN)
+async def saved_report_pdf(
+    perm_ctx: PermissionContextDep,
+    report_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """The PDF of a saved report, made again from the saved data."""
+    row = await store.get_saved_report(db, perm_ctx.clinic.id, report_id)
+    report = dict(row.report_json or {})
+    if not _pdf_payload_ok(report):
+        raise HTTPException(status_code=500, detail=PDF_FAILED)
+    return await _pdf_response(perm_ctx, db, report)
