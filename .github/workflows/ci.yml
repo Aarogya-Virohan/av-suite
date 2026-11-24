@@ -84,6 +84,15 @@ jobs:
           fi
       - name: Build
         run: npx next build
+      - name: Bundle check
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['check:bundle'] ? 0 : 1)"; then
+            npm run check:bundle
+          else
+            echo "No check:bundle script in frontend/${{ matrix.app }}."
+          fi
+              
+      
 
   backend:
     name: Backend
