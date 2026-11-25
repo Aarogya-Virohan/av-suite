@@ -12,7 +12,9 @@ import { canAccessModule, hasCapability, usePermissionSubscription } from '../..
 import { Settings as SettingsIcon, IndianRupee, Wrench, Users, FileText, Save, Plus, Loader2, Trash2, Info, RotateCcw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
+  CLIENT_TYPE_OPTIONS,
   CLINIC_PROFILE_KEYS,
+  type ClientType,
   type ClinicProfile,
   useClinicSettings,
   useUpdateClinicSettings,
@@ -107,6 +109,7 @@ export default function SettingsPage() {
   const [clinicName, setClinicName] = useState('');
   const [patientCode, setPatientCode] = useState('');
   const [patientCodeError, setPatientCodeError] = useState<string | null>(null);
+  const [clientType, setClientType] = useState<ClientType>('clinic');
   // null = no clinic colour, the AV Suite theme applies.
   const [brandColor, setBrandColor] = useState<string | null>(null);
   const [colorDirty, setColorDirty] = useState(false);
@@ -131,6 +134,7 @@ export default function SettingsPage() {
       setClinicName(clinicSettings.name || '');
       setPatientCode(clinicSettings.code || '');
       setPatientCodeError(null);
+      setClientType(clinicSettings.client_type ?? 'clinic');
       setBrandColor(clinicSettings.branding_color ?? null);
       setColorDirty(false);
       setLogoBase64(clinicSettings.branding_logo_url ?? null);
@@ -218,6 +222,8 @@ export default function SettingsPage() {
         name: clinicName,
         // Only sent when it was changed.
         ...(typedCode && typedCode !== clinicSettings?.code ? { code: typedCode } : {}),
+        // Only sent when it was changed (the API treats a missing value as unchanged).
+        ...(clientType !== (clinicSettings?.client_type ?? 'clinic') ? { client_type: clientType } : {}),
         ...profilePayload,
         // Only send the colour when it was changed, so saving the name never
         // writes a default colour over the theme (null resets to the theme).
@@ -473,6 +479,24 @@ export default function SettingsPage() {
                       . 1 to 6 capital letters or digits. Changing it changes the Patient ID of every patient on screen,
                       in new PDFs and in WhatsApp messages. PDFs and messages already sent keep the old one.
                     </p>
+                  </div>
+
+                  <div>
+                    <FieldLabel htmlFor="client-type">Client type</FieldLabel>
+                    <select
+                      id="client-type"
+                      value={clientType}
+                      onChange={(e) => setClientType(e.target.value as ClientType)}
+                      disabled={!canEditClinic}
+                      className={`${inputClass} max-w-[14rem]`}
+                    >
+                      {CLIENT_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1.5 text-xs text-muted">Clinic, hospital or home care service.</p>
                   </div>
 
                   <div>

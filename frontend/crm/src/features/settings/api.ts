@@ -27,11 +27,21 @@ export const CLINIC_PROFILE_KEYS: (keyof ClinicProfile)[] = [
   'authorised_person',
 ];
 
+/** Kind of client; set in Settings, sent back by /settings/clinic and /auth/me. */
+export type ClientType = 'clinic' | 'hospital' | 'home_care';
+
+export const CLIENT_TYPE_OPTIONS: { value: ClientType; label: string }[] = [
+  { value: 'clinic', label: 'Clinic' },
+  { value: 'hospital', label: 'Hospital' },
+  { value: 'home_care', label: 'Home care' },
+];
+
 export interface ClinicSettings extends Partial<ClinicProfile> {
   id: string;
   name: string;
   /** Prefix of the Patient ID, e.g. "ADP" in ADP-000003. */
   code: string;
+  client_type?: ClientType;
   branding_logo_url: string | null;
   branding_color: string | null;
   plan_tier: string;
@@ -43,6 +53,7 @@ export interface ClinicSettings extends Partial<ClinicProfile> {
 export interface ClinicSettingsUpdate extends Partial<ClinicProfile> {
   name?: string | null;
   code?: string;
+  client_type?: ClientType;
   branding_logo_url?: string | null;
   branding_color?: string | null;
 }

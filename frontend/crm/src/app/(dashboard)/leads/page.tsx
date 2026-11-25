@@ -222,7 +222,7 @@ export default function LeadsPage() {
                 </SegmentTab>
               </SegmentGroup>
               {canCreateLead && (
-                <Button onClick={() => setIsAddOpen(true)}>
+                <Button onClick={() => setIsAddOpen(true)} aria-label="Add lead">
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Add Lead</span>
                 </Button>
