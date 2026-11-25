@@ -50,16 +50,33 @@ export function formatPatientNumber(
 }
 
 /**
- * A search term typed as a case ID ("SPC-000123", "#123", "spc 123") becomes
- * the digits the API matches on. Anything else (names, phones, emails) is
- * returned unchanged.
+ * A search term typed as a case ID ("SPC-000123", "ASC2-000004", "#123",
+ * "spc 123", "asc2 4") becomes the digits the API matches on. Anything else
+ * (names, phones, emails) is returned unchanged.
+ *
+ * Clinic codes are 1 to 6 capital letters or digits (CLINIC_CODE_PATTERN):
+ * - a code of letters only keeps the old rule: separator optional up to 4
+ *   letters ("spc12"), 5 or 6 letters need one;
+ * - a code with a digit in it needs a separator (- # or space) and at least
+ *   one letter, so a phone number typed with a space ("98765 43210") is never
+ *   read as a case ID;
+ * - plain digits without "#" stay as typed (phone search).
  */
-const CASE_ID = /^\s*#?\s*([A-Za-z]{1,4})?\s*[-#\s]?\s*(\d{1,19})\s*$/;
+const CASE_ID_LETTERS = /^\s*#?\s*([A-Za-z]{1,6})(\s*[-#]\s*|\s+|)(\d{1,19})\s*$/;
+const CASE_ID_ALNUM = /^\s*#?\s*([A-Za-z0-9]{1,6})\s*[-#\s]\s*(\d{1,19})\s*$/;
+const HASH_NUMBER = /^\s*#\s*(\d{1,19})\s*$/;
 
 export function normalizePatientSearch(term: string): string {
-  const match = CASE_ID.exec(term);
-  if (!match) return term;
-  // Plain digits stay as typed: they may be a phone number or part of one.
-  if (!match[1] && !term.includes('#')) return term;
-  return match[2];
+  const hash = HASH_NUMBER.exec(term);
+  if (hash) return hash[1];
+
+  const letters = CASE_ID_LETTERS.exec(term);
+  if (letters && (letters[1].length <= 4 || letters[2] !== '')) {
+    return letters[3];
+  }
+
+  const alnum = CASE_ID_ALNUM.exec(term);
+  if (alnum && /[A-Za-z]/.test(alnum[1])) return alnum[2];
+
+  return term;
 }
