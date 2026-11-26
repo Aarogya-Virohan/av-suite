@@ -37,6 +37,7 @@ from app.services.report_letterhead import (
     age_sex_text,
     clinical_band_html,
     clinical_footer_html,
+    clinical_page_margins_mm,
     clinical_page_css,
     patient_box_html,
 )
@@ -96,6 +97,12 @@ def clinic_brand(clinic: dict | None) -> ClinicBrand:
     logo = clinic.get("logoSrc") or ""
     logo = logo if isinstance(logo, str) and logo.startswith("data:image/png;base64,") else ""
     return ClinicBrand(name=str(clinic.get("name") or "").strip(), logo_src=logo)
+
+
+def report_number(report: dict) -> str:
+    """The printed report number: the D-043 number given when the report was
+    saved (POS), else the older PT-... reference of a report saved before."""
+    return str(report.get("reportNumber") or report.get("reportId") or "")
 
 
 def footer_reference(report_id: str) -> str:
@@ -497,7 +504,7 @@ def _patient_box(report: dict) -> str:
             age_sex=age_sex_text(age, patient.get("gender")),
             date=html.unescape(_display_date(patient.get("assessmentDate"))),
             therapist=str(patient.get("clinician") or ""),
-            report_no=str(report.get("reportId") or ""),
+            report_no=report_number(report),
         )
     )
     return f"""
@@ -533,6 +540,21 @@ def _sources_section(views: dict | None, closing: str = "") -> str:
     )
 
 
+# Front and back planes share page 2 (as before Round 4). Their photographs
+# take the height that is left once the band, the footer block and each
+# plane's heading and gap are taken off, capped at the 108 mm the founders
+# asked for (19 Oct 2026). A clinic with a longer footer block gets slightly
+# smaller photographs instead of a page per plane.
+PAIR_PHOTO_MAX_MM = 108.0
+PLANE_CHROME_MM = 17.0  # plane heading, its gap and the space under the plane
+
+
+def paired_plane_photo_mm(brand: ClinicBrand) -> float:
+    top, bottom = clinical_page_margins_mm(brand)
+    available = 297.0 - top - bottom
+    return round(min(PAIR_PHOTO_MAX_MM, available / 2 - PLANE_CHROME_MM), 1)
+
+
 def build_report_html(report: dict, clinic: dict | None = None) -> str:
     """
     Assemble the full clinical report document. `clinic` is the signed-in
@@ -540,7 +562,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     """
 
     views = report.get("views") or {}
-    report_id = report.get("reportId") or ""
+    report_id = report_number(report)
 
     # Stamped so two reports for the same patient are only compared when
     # they came from the same analysis code. Grades move when thresholds,
@@ -554,6 +576,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     # Biomechanical Signature below.
 
     brand = clinic_brand(clinic)
+    pair_photo_mm = paired_plane_photo_mm(brand)
 
     any_upload = any(
         (views.get(k) or {}).get("captureSource") == "upload" for k in ("side", "front", "back")
@@ -662,7 +685,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
        and back share page 2 at 108 mm; the side plane is alone on page 1
        under the patient box, so it gets the room that is left there. */
     .plane-photo {{
-        height: 108mm;
+        height: {pair_photo_mm}mm;
         width: auto;
         max-width: 57mm;
         object-fit: contain;

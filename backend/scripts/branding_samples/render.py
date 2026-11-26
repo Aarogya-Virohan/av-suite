@@ -101,7 +101,8 @@ def posture_report():
     patient = {"name": "Anil Kapoor", "age": 52, "gender": "Male", "heightCm": 171, "caseRef": "SPC-000119",
                "assessmentDate": "2026-11-26", "clinician": "Dr. Arjun Mehta (PT)"}
     r = rb.build_report_response(patient, v(side, "side"), v(front, "front"), v(back, "back"), generate_synthesis(findings))
-    r["reportId"] = "SPC-POS-000017"
+    r["reportId"] = "PT-20261126-ABCD1234"
+    r["reportNumber"] = "SPC-POS-000017"
     return r
 
 def render_posture():

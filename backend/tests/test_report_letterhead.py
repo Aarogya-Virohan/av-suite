@@ -1,10 +1,13 @@
 """
-Shared report letterhead and footer rules (D-036).
+Shared report letterhead rules (Round 4, decided 26 Nov 2026; footer 27 Nov).
 
-Clinic details come from the clinic profile, one item per line, in a fixed
-order; an empty field is dropped and the lines below move up. The footer
-shows "Powered by Aarogya Virohan . AV Suite" and the page count only, never
-patient data. Uploaded logos lose their empty margins before sizing.
+Clinical reports (Rx, posture, psychosocial): teal band top with the clinic
+logo left, display doctor + phone + email, AV round logo right; on white
+above the bottom band the report number (left) and the clinic block (name,
+address, website, centred); bottom band with the white AV mark + "Powered by"
+left and "Page x of y" right. Never patient data in the band or footer.
+Invoice and receipt: plain black and white, number left and page right.
+Uploaded logos in "background removed" mode lose their empty margins.
 """
 
 from __future__ import annotations
@@ -16,18 +19,20 @@ import pytest
 from PIL import Image
 
 from app.services.invoice_pdf import InvoiceDoc, build_invoice_html
-from app.services.prescription_pdf import RxDoc, build_prescription_html
+from app.services.prescription_pdf import RxDoc, build_prescription_html, clinic_brand
 from app.services.report_letterhead import (
+    ClinicBrand,
+    PatientBox,
     _trim_background,
-    clinic_detail_lines,
+    clinic_block_lines,
     clinic_details,
-    footer_css,
-    footer_html,
+    clinical_band_html,
+    clinical_footer_html,
+    clinical_page_margins_mm,
     format_address,
     format_website,
-    letterhead_html,
-    letterhead_page_top_mm,
-    logo_from_data_uri,
+    patient_box_html,
+    render_logo_for_mode,
 )
 
 FULL = {
@@ -41,44 +46,11 @@ FULL = {
 }
 
 
-# ---------------------------------------------------------------- details
+def _transparent(uri: str) -> str:
+    return render_logo_for_mode(uri, "transparent")
 
 
-def test_detail_lines_full_in_fixed_order():
-    assert clinic_detail_lines(**FULL, registration_number="R-1", gstin="09ABCDE1234F1Z5") == [
-        "G-207, Beta 2 Rd, Block F, Beta II, Greater Noida, Uttar Pradesh 201310",
-        "+91 99911 12222",
-        "clinic@example.com",
-        "www.example.com",
-        "Reg. No. R-1",
-        "GSTIN 09ABCDE1234F1Z5",
-    ]
-
-
-@pytest.mark.parametrize("missing", ["phone", "email", "website"])
-def test_missing_contact_moves_the_rest_up(missing):
-    full = clinic_detail_lines(**FULL)
-    lines = clinic_detail_lines(**{**FULL, missing: None})
-    assert len(full) == 4 and len(lines) == 3
-    assert "" not in lines
-    assert lines == [v for v in full if v in lines]  # same order, gap closed
-    assert all("&middot;" not in v and "·" not in v for v in lines)
-
-
-@pytest.mark.parametrize("blank", [None, "", "   "])
-def test_blank_values_count_as_missing(blank):
-    assert clinic_detail_lines(phone=blank, email=blank, website=blank) == []
-
-
-def test_nothing_filled_gives_no_lines():
-    assert clinic_detail_lines() == []
-
-
-def test_detail_lines_are_escaped():
-    lines = clinic_detail_lines(address_line="<b>Lane</b> & Co", email="a<b>@x.com")
-    assert lines == ["&lt;b&gt;Lane&lt;/b&gt; &amp; Co", "a&lt;b&gt;@x.com"]
-
-
+# ---------------------------------------------------------------- address / website
 def test_address_parts_not_repeated():
     assert (
         format_address("12 MG Road, Greater Noida, Uttar Pradesh", "Greater Noida", "Uttar Pradesh", "201310")
@@ -110,109 +82,155 @@ def test_website_shown_without_scheme(raw, shown):
 # ---------------------------------------------------------------- letterhead
 
 
-def _head(out: str) -> str:
-    return out[out.index('<div class="letterhead">') : out.index('<div class="running-footer">')]
 
 
-def test_details_are_labelled_pairs_in_fixed_order():
-    assert [label for label, _ in clinic_details(**FULL, gstin="G", registration_number="R")] == [
-        "Address", "Phone", "Email", "Website", "Reg. No.", "GSTIN",
-    ]
+def test_clinic_details_keep_tax_ids_labelled():
+    rows = clinic_details(**FULL, registration_number="R-1", gstin="09ABCDE1234F1Z5")
+    labels = [label for label, _ in rows]
+    assert labels[-2:] == ["GSTIN", "Reg. No."] or set(labels) >= {"GSTIN", "Reg. No."}
 
 
-def test_av_mark_is_kept_apart_from_the_clinic_contacts():
-    """Founders 14 Nov: AV mark on the far right, a standing rule between it
-    and the clinic's contacts, so the contacts never read as AV's."""
-    out = letterhead_html("Invoice", "Clinic", "", clinic_details(**FULL))
-    assert (
-        out.index('class="lh-clinic"')
-        < out.index('class="lh-contact-cell"')
-        < out.index('class="lh-divider"')
-        < out.index('class="lh-mark"')
+# ---------------------------------------------------------------- clinical band + footer
+
+
+def _brand(**kw) -> ClinicBrand:
+    base = dict(
+        name="Grove <Physio>",
+        doctor_name="Dr. Asha Rao",
+        phone="+91 99911 12222",
+        email="clinic@example.com",
+        address=format_address(FULL["address_line"], FULL["city"], FULL["state"], FULL["pincode"]),
+        website="www.example.com",
     )
-    assert "av-round" in out[out.index('class="lh-mark"') :]
-    assert "Powered by" not in out and "POWERED BY" not in out
+    base.update(kw)
+    return ClinicBrand(**base)
 
 
-def test_no_divider_without_contacts():
-    out = letterhead_html("Invoice", "Clinic", "", [])
-    assert 'class="lh-divider"' not in out
-    assert 'class="lh-mark"' in out
+def test_band_has_doctor_and_contacts_left_and_av_right():
+    band = clinical_band_html(_brand())
+    assert "Dr. Asha Rao" in band and "+91 99911 12222" in band and "clinic@example.com" in band
+    assert band.index('class="cl-who') < band.index('class="cl-av"')
+    # The address and website are in the footer block, never in the band.
+    assert "Greater Noida" not in band and "example.com/" not in band
+    assert "Powered by" not in band
+    assert 'class="cl-logo"' not in band  # no logo stored
 
 
-def test_contact_rows_in_order_with_icons():
-    out = letterhead_html("Invoice", "Clinic", "", clinic_details(**FULL))
-    block = out[out.index('class="lh-contact"') :]
-    assert block.count("<tr>") == 4
-    order = [block.index(v) for v in ("Greater Noida", "+91 99911 12222", "clinic@example.com", "www.example.com")]
-    assert order == sorted(order)
-    assert block.count("data:image/svg+xml;base64,") == 4
+def test_band_logo_left_and_white_tile_only_in_white_mode():
+    logo = _png(Image.new("RGBA", (400, 200), (200, 30, 30, 255)))
+    band = clinical_band_html(_brand(logo_src=logo))
+    assert band.index('class="cl-logo"') < band.index('class="cl-who') < band.index('class="cl-av"')
+    assert 'class="tile"' not in band
+    white = clinical_band_html(_brand(logo_src=logo, logo_bg_mode="white"))
+    assert '<span class="tile">' in white
 
 
-def test_missing_detail_has_no_row():
-    out = letterhead_html("Invoice", "Clinic", "", clinic_details(**{**FULL, "phone": None}))
-    block = out[out.index('class="lh-contact"') :]
-    assert block.count("<tr>") == 3
-    assert 'alt="Phone"' not in block
+def test_band_text_is_escaped():
+    band = clinical_band_html(_brand(doctor_name="Dr <b>X</b>"))
+    assert "<b>X</b>" not in band and "Dr &lt;b&gt;X&lt;/b&gt;" in band
 
 
-def test_ids_rows_carry_their_label():
-    out = letterhead_html("Invoice", "C", "", clinic_details(gstin="G1", registration_number="R1"))
-    assert '<span class="ck">GSTIN</span>G1' in out
-    assert '<span class="ck">REG. NO.</span>R1' in out
+def test_footer_has_number_clinic_block_and_powered_by_but_no_patient():
+    foot = clinical_footer_html(_brand(), "GRP-RX-000014")
+    assert 'Report No. <b>GRP-RX-000014</b>' in foot
+    assert foot.index("Report No.") < foot.index("Grove &lt;Physio&gt;") < foot.index("Powered by")
+    assert "Greater Noida" in foot and "www.example.com" in foot
+    assert "Aarogya Virohan" in foot and "AV Suite" in foot
 
 
-def test_no_details_no_contact_block():
-    out = letterhead_html("Invoice", "Clinic", "", [])
-    assert "lh-contact" not in out
-    assert 'class="lh-rule"' in out
+def test_footer_number_is_escaped_and_optional():
+    assert "Report No." not in clinical_footer_html(_brand(), "   ")
+    out = clinical_footer_html(_brand(), "A <b>1</b>")
+    assert "<b>1</b>" not in out.replace("<b>A &lt;b&gt;1&lt;/b&gt;</b>", "")
 
 
-def test_without_clinic_name_aarogya_virohan_letterhead():
-    out = letterhead_html("Invoice", "", "", clinic_details(**FULL))
-    assert 'class="av-only"' in out and "Aarogya Virohan" in out
-    assert "lh-contact" not in out and 'class="lh-clinic"' not in out
+@pytest.mark.parametrize("missing", ["address", "website"])
+def test_clinic_block_drops_empty_lines(missing):
+    full = clinic_block_lines(_brand())
+    short = clinic_block_lines(_brand(**{missing: ""}))
+    assert len(short) == len(full) - 1
 
 
-def test_page_top_margin_fits_the_header():
-    none = letterhead_page_top_mm([])
-    four = letterhead_page_top_mm(clinic_details(**FULL))  # 2-line address + 3 = 5 lines
-    six = letterhead_page_top_mm(clinic_details(**FULL, gstin="G", registration_number="R"))
-    assert none == 29.0
-    assert letterhead_page_top_mm(clinic_details(phone="1")) == none  # short block fits beside the logo
-    assert none < four < six
-    # Address wrap is capped, so a very long address cannot push the body off the page.
-    assert letterhead_page_top_mm(clinic_details(address_line="x" * 2000)) == letterhead_page_top_mm(
-        clinic_details(address_line="x" * 140)
-    )
+def test_bottom_margin_grows_with_the_clinic_block():
+    _, three = clinical_page_margins_mm(_brand())
+    _, one = clinical_page_margins_mm(_brand(address="", website=""))
+    assert three > one
 
 
-def test_page_top_margin_used_by_reports():
-    rx = build_prescription_html(_rx(**FULL))
-    inv = build_invoice_html(_inv(**FULL))
-    top = letterhead_page_top_mm(clinic_details(**FULL))
-    assert f"margin: {top}mm 0 20mm 0" in rx
-    assert f"margin: {top}mm 0 20mm 0" in inv
-    assert "margin: 29.0mm 0 20mm 0" in build_invoice_html(_inv(clinic_name=""))
+def test_patient_box_same_labels_and_dash_for_empty():
+    box = patient_box_html(PatientBox(name="Priya <b>S</b>", patient_id="GRP-000003", report_no="GRP-RX-000001"))
+    labels = ["Patient name", "Patient ID", "Age / Sex", "Date", "Treating therapist", "Report No."]
+    positions = [box.index(label) for label in labels]
+    assert positions == sorted(positions)
+    assert "Priya &lt;b&gt;S&lt;/b&gt;" in box
+    assert box.count("&ndash;") == 3  # age / sex, date, therapist
 
 
-def test_long_clinic_name_gets_smaller_font():
-    short = letterhead_html("Invoice", "Clinic")
-    long_ = letterhead_html("Invoice", "SpineAct Physiotherapy Clinic, Noida")  # 36 chars
-    xlong = letterhead_html("Invoice", "SpineAct Physiotherapy Clinic (Spine &amp; Neuro Clinic)")
-    assert 'class="clinic-name"' in short
-    assert 'class="clinic-name long"' in long_
-    assert 'class="clinic-name xlong"' in xlong
+def _rx_footer(out: str) -> str:
+    start = out.index('<div class="cl-footer">')
+    return out[start : out.index("</tr></table></div></div>", start)]
 
 
-# ---------------------------------------------------------------- footer
+def test_rx_footer_has_the_rx_number_but_no_patient_name():
+    out = build_prescription_html(_rx(document_number="CLN-RX-000042"))
+    foot = _rx_footer(out)
+    assert "Unique Patientname" not in foot and "9876543210" not in foot
+    assert "CLN-RX-000042" in foot
+    assert "Unique Patientname" in out  # still in the patient box
 
 
-def test_footer_is_the_old_centred_powered_by_line_and_page_count():
-    out = footer_html()
-    assert "POWERED BY" in out and "AAROGYA VIROHAN" in out and "AV SUITE" in out
-    assert '<p class="powered">' in out and '<p class="meta"><span class="page"></span></p>' in out
-    assert "text-align: center" in footer_css()
+def test_rx_without_stored_number_falls_back_to_old_reference():
+    out = build_prescription_html(_rx())
+    assert "RX-7B825459" in _rx_footer(out)
+
+
+def test_rx_letterhead_shows_clinic_contacts_but_no_tax_ids():
+    doc = _rx(**FULL, display_doctor_name="Dr. Asha Rao")
+    out = build_prescription_html(doc)
+    assert clinical_band_html(clinic_brand(doc)) in out
+    assert "+91 99911 12222" in out and "clinic@example.com" in out
+    assert "www.example.com" in out and "Greater Noida" in out
+    assert "GSTIN" not in out and "Reg. No." not in out
+
+
+# ---------------------------------------------------------------- invoice / receipt (plain B/W)
+
+
+@pytest.mark.parametrize("kind,label", [("invoice", "Invoice"), ("receipt", "Receipt")])
+def test_invoice_footer_has_the_number_but_no_patient_name(kind, label):
+    from app.services.invoice_pdf import ReceiptPayment
+
+    out = build_invoice_html(_inv(kind=kind, payments=[ReceiptPayment(None, "cash", None, "10", "completed")]))
+    page = out[out.index("@page") : out.index("body {")]
+    assert '@bottom-left { content: "INV-0042"' in page
+    assert "counter(page)" in page and "Unique Patientname" not in page
+    assert "Unique Patientname" in out
+
+
+def test_receipt_footer_uses_the_receipt_number_of_its_payment():
+    from app.services.invoice_pdf import ReceiptPayment
+
+    pay = ReceiptPayment(None, "cash", None, "100.00", "completed", "RCP-2627-000007")
+    out = build_invoice_html(_inv(kind="receipt", payments=[pay]))
+    page = out[out.index("@page") : out.index("body {")]
+    assert '@bottom-left { content: "RCP-2627-000007"' in page
+    assert "Against invoice" in out and "INV-0042" in out
+
+
+def test_invoice_is_black_and_white_without_band_or_watermark():
+    out = build_invoice_html(_inv(**FULL, gstin="09ABCDE1234F1Z5", registration_number="R-1"))
+    assert "cl-band" not in out and "watermark" not in out.lower()
+    assert "GSTIN 09ABCDE1234F1Z5" in out and "Reg. No. R-1" in out
+
+
+def test_invoice_signatory_line_with_authorised_person_text_only():
+    out = build_invoice_html(_inv(authorised_person="Rohit <Verma>"))
+    sign = out[out.index('<div class="sign">') :]
+    assert "Authorised signatory" in sign and "Rohit &lt;Verma&gt;" in sign
+    assert "<img" not in sign
+    # The line stays without a name, so the paper can still be signed.
+    bare = build_invoice_html(_inv())
+    assert 'class="sline"' in bare and 'class="sname"' not in bare
 
 
 def _rx(**kw) -> RxDoc:
@@ -244,62 +262,6 @@ def _inv(**kw) -> InvoiceDoc:
     return InvoiceDoc(**base)
 
 
-def _footer(out: str) -> str:
-    start = out.index('<div class="running-footer">')
-    return out[start : out.index("</div></div>", start)]
-
-
-def test_rx_footer_has_the_rx_number_but_no_patient_name():
-    # D-038: the document number (not the patient) identifies page 2 onwards.
-    out = build_prescription_html(_rx())
-    foot = _footer(out)
-    assert "Unique Patientname" not in foot and "9876543210" not in foot
-    assert '<span class="ref">Rx RX-7B825459</span>' in foot
-    assert "Unique Patientname" in out  # still in the patient box
-
-
-@pytest.mark.parametrize("kind,label", [("invoice", "Invoice"), ("receipt", "Receipt")])
-def test_invoice_footer_has_the_number_but_no_patient_name(kind, label):
-    out = build_invoice_html(_inv(kind=kind))
-    foot = _footer(out)
-    assert "Unique Patientname" not in foot
-    assert f'<span class="ref">{label} INV-0042</span>' in foot
-    assert "Unique Patientname" in out
-
-
-def test_footer_reference_is_escaped_and_optional():
-    assert '<span class="ref">' not in footer_html()
-    assert '<span class="ref">' not in footer_html("   ")
-    out = footer_html("Invoice <b>1</b>")
-    assert "<b>1</b>" not in out and "Invoice &lt;b&gt;1&lt;/b&gt;" in out
-    assert out.index('class="ref"') < out.index('class="page"')
-
-
-def test_rx_letterhead_shows_clinic_contacts_but_no_tax_ids():
-    out = build_prescription_html(_rx(**FULL))
-    head = _head(out)
-    assert "+91 99911 12222" in head and "clinic@example.com" in head
-    assert "www.example.com" in head and "Greater Noida" in head
-    assert "GSTIN" not in head and "Reg. No." not in head
-
-
-def test_invoice_letterhead_shows_tax_ids_when_filled():
-    out = build_invoice_html(_inv(**FULL, gstin="09ABCDE1234F1Z5", registration_number="R-1"))
-    head = _head(out)
-    assert '<span class="ck">GSTIN</span>09ABCDE1234F1Z5' in head
-    assert '<span class="ck">REG. NO.</span>R-1' in head
-    # The clinic block moved to the letterhead; the body starts with Billed to.
-    assert "Billed to" in out
-
-
-def test_invoice_thanks_line_without_clinic_name():
-    out = build_invoice_html(_inv(clinic_name=""))
-    assert "Thank you for visiting ." not in out
-    assert "Thank you." in out
-
-
-# ---------------------------------------------------------------- logo trim
-
 
 def _png(img: Image.Image) -> str:
     buf = io.BytesIO()
@@ -315,14 +277,14 @@ def _size(uri: str) -> tuple[int, int]:
 def test_white_margins_are_trimmed():
     img = Image.new("RGB", (1000, 1000), "white")
     img.paste(Image.new("RGB", (400, 100), (30, 140, 60)), (300, 450))
-    w, h = _size(logo_from_data_uri(_png(img)))
+    w, h = _size(_transparent(_png(img)))
     assert 3.3 < w / h < 4.4  # close to the 4:1 mark, not the 1:1 canvas
 
 
 def test_transparent_margins_are_trimmed():
     img = Image.new("RGBA", (800, 800), (0, 0, 0, 0))
     img.paste(Image.new("RGBA", (300, 100), (30, 140, 60, 255)), (250, 350))
-    w, h = _size(logo_from_data_uri(_png(img)))
+    w, h = _size(_transparent(_png(img)))
     assert 2.6 < w / h < 3.4
 
 

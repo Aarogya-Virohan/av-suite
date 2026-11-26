@@ -241,7 +241,10 @@ async def test_saved_report_can_be_listed_reopened_and_downloaded(client: AsyncC
     pdf = await client.get(f"{BASE}/reports/{rid}/pdf", headers=headers)
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages)
-    assert "Asha Rao" in text and f"{clinic.code}-000007" in text and rid in text
+    # D-043: the printed number is the server-given POS number, not the PT id.
+    assert report["reportNumber"] == f"{clinic.code}-POS-000001"
+    assert listing[0]["reportNumber"] == report["reportNumber"]
+    assert "Asha Rao" in text and f"{clinic.code}-000007" in text and report["reportNumber"] in text
 
 
 async def test_saved_report_of_another_clinic_is_404(client: AsyncClient, db_session: AsyncSession, ctx):

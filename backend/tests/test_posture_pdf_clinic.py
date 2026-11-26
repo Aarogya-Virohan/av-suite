@@ -54,6 +54,6 @@ async def test_pdf_uses_the_signed_in_clinic_not_the_posted_branding(
     assert "+91 99911 12222" in text
     assert "Spoofed Clinic" not in text
     assert "AV Clinic" not in text
-    assert "Report PT-20261117-ABCD1234" in text
+    assert f"Report No. {clinic.code}-POS-000001" in text
     # Patient name only in the patient box, once per document, not per page footer.
     assert text.count("Zed Patientname") == 1

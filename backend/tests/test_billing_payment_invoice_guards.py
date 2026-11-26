@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -122,8 +123,10 @@ async def test_invoice_numbers_are_backend_generated_and_clinic_unique(
 
     assert first["invoice_number"] != "CLIENT-CONTROLLED"
     assert first["invoice_number"].startswith("INV-")
-    assert first["invoice_number"][4:].isdigit()
-    assert second["invoice_number"] == f"INV-{int(first['invoice_number'][4:]) + 1:04d}"
+    # D-043: INV-<FY>-<6 digits>, at most 16 characters (GST).
+    assert re.fullmatch(r"INV-\d{4}-\d{6}", first["invoice_number"])
+    prefix, last = first["invoice_number"].rsplit("-", 1)
+    assert second["invoice_number"] == f"{prefix}-{int(last) + 1:06d}"
     assert first["invoice_number"] != second["invoice_number"]
 
     stored = await db_session.get(Invoice, UUID(first["id"]))
