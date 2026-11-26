@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Index, String, ForeignKey, Integer, Text
+from sqlalchemy import Index, String, ForeignKey, Integer, Text, UniqueConstraint
 from typing import Optional
 from app.models.base import Base, TimestampMixin
 
@@ -11,6 +11,7 @@ class Prescription(Base, TimestampMixin):
         Index("ix_prescriptions_clinic_created", "clinic_id", "created_at"),
         Index("ix_prescriptions_patient_id", "patient_id"),
         Index("ix_prescriptions_physio_id", "physio_id"),
+        UniqueConstraint("clinic_id", "number", name="uq_prescriptions_clinic_number"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -20,6 +21,8 @@ class Prescription(Base, TimestampMixin):
     physio_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="active")
     pdf_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # D-043: <clinic code>-RX-<6 digits>, given by the server on create.
+    number: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
 
     clinic = relationship("Clinic", back_populates="prescriptions")
     patient = relationship("Patient", back_populates="prescriptions")

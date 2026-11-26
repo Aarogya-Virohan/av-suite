@@ -12,6 +12,8 @@ export const EMPTY_PROFILE: ProfileForm = {
   registration_number: '',
   gstin: '',
   authorised_person: '',
+  display_doctor_name: '',
+  website: '',
 };
 
 /* Printed on invoices and receipts (D-026). Lengths match the database columns. */
@@ -25,7 +27,12 @@ export const PROFILE_FIELDS: { key: keyof ClinicProfile; label: string; max: num
   { key: 'registration_number', label: 'Registration number', max: 120 },
   { key: 'gstin', label: 'GSTIN', max: 15, placeholder: '15 characters' },
   { key: 'authorised_person', label: 'Authorised person', max: 255, placeholder: 'Name printed on invoices' },
+  { key: 'display_doctor_name', label: 'Doctor name on reports', max: 255, placeholder: 'Empty = clinic owner admin' },
+  { key: 'website', label: 'Website', max: 255, placeholder: 'www.yourclinic.in' },
 ];
+
+/** Same rule as the API (schemas/settings.py clean_website). */
+export const WEBSITE_PATTERN = /^(https?:\/\/)?([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(:[0-9]{1,5})?(\/\S*)?$/i;
 
 /** Same checks as the API: PIN code 6 digits, GSTIN 15 characters, email format. */
 export function clinicProfileErrors(form: ProfileForm): Partial<Record<keyof ClinicProfile, string>> {
@@ -36,5 +43,7 @@ export function clinicProfileErrors(form: ProfileForm): Partial<Record<keyof Cli
   if (pin && !/^\d{6}$/.test(pin)) errors.pincode = 'PIN code must be 6 digits';
   if (gstin && gstin.length !== 15) errors.gstin = 'GSTIN must be 15 characters';
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email';
+  const website = form.website.trim();
+  if (website && !WEBSITE_PATTERN.test(website)) errors.website = 'Enter a website like www.yourclinic.in';
   return errors;
 }

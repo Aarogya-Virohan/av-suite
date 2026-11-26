@@ -24,6 +24,7 @@ from mediapipe.framework.formats import landmark_pb2
 from app.core.database import get_db
 from app.core.dependencies import PermissionContextDep, require_capability
 from app.services import posture_report_store as store
+from app.services.clinic_brand import display_doctor_name
 from app.services.usage_events import record_usage
 from app.services.posture.decoder import decode_image_bytes
 from app.services.posture.schemas import Landmark
@@ -1132,6 +1133,7 @@ async def report_from_review(
         patient_id=patient_row.id,
         user_id=perm_ctx.user.id,
         report=report,
+        clinic_code=clinic.code,
     )
     # Product and event only: no patient data in usage events.
     await record_usage(db, clinic, perm_ctx.user.id, POSTURE_PRODUCT_KEY, "posture_report")
@@ -1205,7 +1207,9 @@ async def _pdf_response(perm_ctx, db: AsyncSession, report: dict) -> Response:
 
     # The clinic on the letterhead is the signed-in clinic, read from the
     # clinics row here; report["branding"] from the client is ignored.
-    clinic = await clinic_letterhead(perm_ctx.clinic)
+    clinic = await clinic_letterhead(
+        perm_ctx.clinic, await display_doctor_name(db, perm_ctx.clinic)
+    )
 
     try:
         pdf_bytes = await asyncio.to_thread(generate_posture_pdf, report, clinic)
@@ -1265,6 +1269,8 @@ async def _saved_report_pdf_response(perm_ctx, db: AsyncSession, report_id: str)
     # Looked up by the signed-in clinic's id: another clinic's report is a 404.
     row = await store.get_saved_report(db, perm_ctx.clinic.id, report_id)
     report = dict(row.report_json or {})
+    if row.number:
+        report["reportNumber"] = row.number
     # The stored copy was checked when it was made; if it is unreadable now
     # that is a server-side fault, not a bad request.
     if not _pdf_payload_ok(report):

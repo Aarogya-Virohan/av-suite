@@ -249,6 +249,8 @@ class PaymentResponse(PaymentBase):
     status: PaymentStatus
     void_reason: str | None = None
     voided_by: UUID | None = None
+    # D-043 RCP-<FY>-<6 digits>; null for payments recorded before 27 Nov 2026.
+    receipt_number: str | None = None
 
 
 class PaymentVoidRequest(BaseModel):

@@ -39,8 +39,11 @@ from app.models.psychosocial import (
     PsychosocialSharedReport,
 )
 from app.models.clinic_fee_item import ClinicFeeItem
+from app.models.document_numbering import DocumentCounter, PsychosocialReport
 
 __all__ = [
+    "DocumentCounter",
+    "PsychosocialReport",
     "Base",
     "TimestampMixin",
     "UUIDMixin",

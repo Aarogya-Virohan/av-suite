@@ -497,20 +497,26 @@ async def download_invoice_pdf_endpoint(
     user: CurrentUserDep,
     service: BillingServiceDep,
     kind: Annotated[Literal["invoice", "receipt"], Query()] = "invoice",
+    payment_id: Annotated[UUID | None, Query()] = None,
     scope: CapabilityScope = Depends(require_capability("invoices.view")),
 ) -> Response:
     """Download the invoice, or with `kind=receipt` the payment receipt, as a
-    PDF (authenticated, clinic-scoped). Decisions.md L-41."""
+    PDF (authenticated, clinic-scoped). Decisions.md L-41.
+
+    D-043: a receipt is per payment. `payment_id` picks the payment (404 when
+    it is not a payment of this invoice); without it the receipt is for the
+    latest completed payment, as before."""
 
     try:
-        pdf_bytes, filename = await service.generate_invoice_pdf(clinic.id, id, kind)
+        pdf_bytes, filename = await service.generate_invoice_pdf(clinic.id, id, kind, payment_id)
     except BillingNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
     await log_event_safely(
         service.invoice_repository.session, clinic.id, user.id,
-        "download", "invoice", id, {"kind": kind},
+        "download", "invoice", id,
+        {"kind": kind, **({"payment_id": str(payment_id)} if payment_id and kind == "receipt" else {})},
     )
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',

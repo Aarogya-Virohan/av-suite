@@ -38,6 +38,8 @@ from app.services.brand import (
     font_faces as _font_faces,
 )
 from app.services.clinic_brand import clinic_brand
+from app.services.document_numbers import PSY, next_clinical_number
+from app.models.document_numbering import PsychosocialReport
 from app.services.patient_number import format_patient_id
 from app.services.prescription_pdf import fetch_logo
 from app.services.report_letterhead import (
@@ -151,6 +153,19 @@ def report_filename(patient_name: str, on: datetime) -> str:
     return f"screening-summary-{slug}-{ist(on).strftime('%Y-%m-%d')}.pdf"
 
 
+async def _new_report_number(db: AsyncSession, clinic, patient_id: uuid.UUID, user_id: uuid.UUID) -> str:
+    """D-043: every export is one psychosocial_reports row with its own
+    <clinic code>-PSY-<6 digits> number, given by the server."""
+    number = await next_clinical_number(db, clinic.id, clinic.code, PSY)
+    db.add(
+        PsychosocialReport(
+            clinic_id=clinic.id, patient_id=patient_id, number=number, created_by_user_id=user_id
+        )
+    )
+    await db.flush()
+    return number
+
+
 async def build_report_data(
     db: AsyncSession,
     *,
@@ -224,7 +239,7 @@ async def build_report_data(
 
     now = svc.utcnow()
     return ReportData(
-        report_id=f"PS-{ist(now).strftime('%Y%m%d')}-{str(patient.id)[:8].upper()}",
+        report_id=await _new_report_number(db, clinic, patient.id, user_id),
         clinic_name=clinic.name if clinic else "",
         patient_name=f"{patient.first_name} {patient.last_name}".strip(),
         patient_details=details,

@@ -48,6 +48,8 @@ class PrescriptionRead(BaseModel):
     physio_notes: Optional[str]
     status: str
     pdf_key: Optional[str]
+    # D-043 <clinic code>-RX-<6 digits>, given by the server.
+    number: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     items: List[PrescriptionItemRead]

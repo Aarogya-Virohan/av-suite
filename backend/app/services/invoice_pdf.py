@@ -323,7 +323,12 @@ def receipt_payment(doc: InvoiceDoc) -> ReceiptPayment | None:
     if doc.payment is not None:
         return doc.payment
     done = [p for p in doc.payments if (p.status or "completed") == "completed"]
-    return max(done, key=lambda p: p.paid_on or datetime.min.replace(tzinfo=IST)) if done else None
+    # Same date: the one recorded later (higher receipt number) wins.
+    return (
+        max(done, key=lambda p: (p.paid_on or datetime.min.replace(tzinfo=IST), p.receipt_number or ""))
+        if done
+        else None
+    )
 
 
 def document_number(doc: InvoiceDoc) -> str:
@@ -390,6 +395,16 @@ def _receipt_body(doc: InvoiceDoc) -> str:
 <table class="kv receipt">{rows}</table>"""
 
 
+def _signatory(doc: InvoiceDoc) -> str:
+    """Round 4 (27 Nov 2026): a signature line with the clinic's authorised
+    person, text only (no signature image). The line stays even when no name
+    is set, so the paper can still be signed."""
+    name = _filled(doc.authorised_person)
+    who = f'<p class="sname">{_esc(name)}</p>' if name else ""
+    clinic = f'<p class="sfor">For {_esc(doc.clinic_name)}</p>' if _filled(doc.clinic_name) else ""
+    return f'<div class="sign">{clinic}<div class="sline"></div>{who}<p class="slabel">Authorised signatory</p></div>'
+
+
 def build_invoice_html(doc: InvoiceDoc) -> str:
     title = "Receipt" if doc.kind == "receipt" else "Invoice"
     body = _receipt_body(doc) if doc.kind == "receipt" else _invoice_body(doc)
@@ -449,10 +464,16 @@ p {{ margin: 0; }}
 .totals .num {{ text-align: right; white-space: nowrap; }}
 .totals tr.grand td {{ border-top: 0.4mm solid #000; border-bottom: 0.4mm solid #000; font-weight: 700; font-size: 10.5pt; }}
 .totals tr.bal td {{ font-weight: 700; }}
+.sign {{ width: 62mm; margin: 16mm 0 0 auto; text-align: center; page-break-inside: avoid; font-size: 8.5pt; }}
+.sign .sfor {{ color: #222; margin-bottom: 12mm; }}
+.sign .sline {{ border-top: 0.3mm solid #000; }}
+.sign .sname {{ font-weight: 700; margin-top: 1.2mm; }}
+.sign .slabel {{ color: {GREY}; font-size: 7.5pt; margin-top: 0.6mm; }}
 </style></head>
 <body>
 {_clinic_header(doc)}
 {body}
+{_signatory(doc)}
 </body></html>
 """
 

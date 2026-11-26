@@ -15,6 +15,7 @@ Database Tables:
 """
 
 import uuid
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import ForeignKey, String, Float, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
@@ -77,6 +78,9 @@ class PostureSession(Base, TimestampMixin):
     """
     
     __tablename__ = "posture_sessions"
+    __table_args__ = (
+        UniqueConstraint("clinic_id", "number", name="uq_posture_sessions_clinic_number"),
+    )
 
     # Primary Key - Unique identifier
     # UUID generate hota hai automatically har new session ke liye
@@ -109,6 +113,9 @@ class PostureSession(Base, TimestampMixin):
     # clinics row whenever the report is shown or printed.
     report_id: Mapped[Optional[str]] = mapped_column(String(40), nullable=True, unique=True, index=True)
     report_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    # D-043: <clinic code>-POS-<6 digits>, given by the server when the report
+    # is saved. report_id stays the lookup key of the saved report.
+    number: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
     analysis_version: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

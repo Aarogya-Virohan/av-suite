@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.patient import Patient
 from app.models.posture_session import PostureSession
 from app.services.clinic_code import derive_clinic_code
+from app.services.document_numbers import POS, next_clinical_number
 from app.services.patient_number import format_patient_id
 
 PATIENT_NOT_FOUND = "Patient not found or not in caller's clinic"
@@ -137,8 +138,19 @@ async def save_report(
     patient_id: uuid.UUID,
     user_id: uuid.UUID | None,
     report: dict,
+    clinic_code: str = "",
 ) -> PostureSession:
+    # D-043: the printed number is given here, by the server, and written into
+    # the report itself so the web report and the PDF show the same one.
+    if not (clinic_code or "").strip():
+        from app.models.clinic import Clinic
+
+        clinic = await db.get(Clinic, clinic_id)
+        clinic_code = clinic.code if clinic else ""
+    number = await next_clinical_number(db, clinic_id, clinic_code, POS)
+    report["reportNumber"] = number
     row = PostureSession(
+        number=number,
         clinic_id=clinic_id,
         patient_id=patient_id,
         report_id=str(report["reportId"]),
@@ -185,6 +197,7 @@ async def list_saved_reports(
 def report_listing(row: PostureSession) -> dict[str, Any]:
     return {
         "reportId": row.report_id,
+        "reportNumber": row.number,
         "createdAt": row.created_at.isoformat() if row.created_at else None,
         "assessmentDate": ((row.report_json or {}).get("patient") or {}).get("assessmentDate"),
         "clinician": ((row.report_json or {}).get("patient") or {}).get("clinician") or "",
