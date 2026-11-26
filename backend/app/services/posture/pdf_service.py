@@ -32,11 +32,13 @@ from weasyprint import HTML
 
 from app.services.posture.classifier import SEVERITY_LABELS
 from app.services.report_letterhead import (
-    footer_css,
-    footer_html,
-    letterhead_css,
-    letterhead_html,
-    letterhead_page_top_mm,
+    ClinicBrand,
+    PatientBox,
+    age_sex_text,
+    clinical_band_html,
+    clinical_footer_html,
+    clinical_page_css,
+    patient_box_html,
 )
 from app.services.posture.reference_ranges import (
     RANGE_HEADING,
@@ -67,6 +69,8 @@ from app.services.brand import (  # noqa: F401
     POWERED_BY_PRODUCT,
     RULE,
     ZEBRA,
+    BAND_TINT,
+    RULE_SOFT,
     brand_data_uri as _brand_data_uri,
     font_faces as _font_faces,
 )
@@ -83,26 +87,20 @@ REPORT_TITLE = "Posture Assessment Report"
 LETTERHEAD_SUBTITLE = REPORT_TITLE
 
 
-def _clinic_parts(clinic: dict | None) -> tuple[str, str, list]:
-    """(escaped name, logo data URI, details) from the route's clinic dict."""
+def clinic_brand(clinic: dict | None) -> ClinicBrand:
+    """The letterhead from the route's clinic dict (posture/clinic_letterhead.py)."""
     clinic = clinic if isinstance(clinic, dict) else {}
-    name = str(clinic.get("name") or "").strip()
-    if not name:
-        return "", "", []
+    brand = clinic.get("brand")
+    if isinstance(brand, ClinicBrand):
+        return brand
     logo = clinic.get("logoSrc") or ""
     logo = logo if isinstance(logo, str) and logo.startswith("data:image/png;base64,") else ""
-    details = clinic.get("details") or []
-    return _esc(name), logo, list(details)
-
-
-def _letterhead(clinic: dict | None) -> str:
-    name, logo, details = _clinic_parts(clinic)
-    return letterhead_html(_esc(LETTERHEAD_SUBTITLE), name, logo, details)
+    return ClinicBrand(name=str(clinic.get("name") or "").strip(), logo_src=logo)
 
 
 def footer_reference(report_id: str) -> str:
-    """Document number before the page count (D-036, D-038). No patient data."""
-    return f"Report {report_id}" if report_id else ""
+    """Document number in the bottom band (D-043). No patient data."""
+    return report_id or ""
 
 
 # Severity -> (text colour, background). Deliberately sober: this is printed
@@ -475,58 +473,37 @@ def _synthesis_section(synthesis: dict) -> str:
 
 def _patient_box(report: dict) -> str:
     """
-    Every intake field, in a rounded box under the letterhead, two columns
-    of label and value. A field left empty at intake is left out rather
-    than printed as a blank label: an empty "Assessed by" on a clinical
-    document reads as an omission, not as "not given".
+    BR-l: the patient box every clinical report shares (same labels, same
+    order). Height, which only the posture report records, follows on its
+    own line under the box.
     """
 
     patient = report.get("patient") or {}
-    report_id = report.get("reportId") or ""
-
     age = patient.get("age")
-    age_text = f"{_esc(age)} Y" if _present(age) else ""
-    age_sex = " / ".join(v for v in (age_text, _esc(patient.get("gender"))) if _present(v))
-
+    try:
+        age = int(age) if _present(age) else None
+    except (TypeError, ValueError):
+        age = None
     height = patient.get("heightCm")
-    height_text = (
-        f"{height:g}&nbsp;cm" if isinstance(height, (int, float)) and not isinstance(height, bool) else ""
+    height_line = (
+        f'<p class="pb-extra"><span>Height</span> {height:g}&nbsp;cm</p>'
+        if isinstance(height, (int, float)) and not isinstance(height, bool)
+        else ""
     )
-
-    name = _esc(patient.get("name"))
-    left = [
-        ("Patient name", f'<span class="pname">{name}</span>' if _present(name) else ""),
-        ("Age / Sex", age_sex),
-        ("Height", height_text),
-        ("Patient ID", _esc(patient.get("caseRef"))),
-    ]
-    right = [
-        ("Report ID", f'<span class="nowrap">{_esc(report_id)}</span>' if report_id else ""),
-        ("Assessed on", _display_date(patient.get("assessmentDate"))),
-        # The clinic is in the letterhead; the assessing physiotherapist is
-        # here (17 November 2026, shared letterhead).
-        ("Assessed by", _esc(patient.get("clinician"))),
-    ]
-
-    def half(rows: list[tuple[str, str]]) -> str:
-        body = "".join(
-            f'<tr><td class="pb-label">{label}</td><td class="pb-value">{value}</td></tr>'
-            for label, value in rows
-            if value
+    box = patient_box_html(
+        PatientBox(
+            name=str(patient.get("name") or ""),
+            patient_id=str(patient.get("caseRef") or ""),
+            age_sex=age_sex_text(age, patient.get("gender")),
+            date=html.unescape(_display_date(patient.get("assessmentDate"))),
+            therapist=str(patient.get("clinician") or ""),
+            report_no=str(report.get("reportId") or ""),
         )
-        return f'<table class="pb-half">{body}</table>'
-
+    )
     return f"""
-    <table class="patient-box">
-        <tr>
-            <td class="pb-col">{half(left)}</td>
-            <td class="pb-divider"></td>
-            <td class="pb-col">{half(right)}</td>
-        </tr>
-    </table>
-    <div class="doc-title">
-        <p class="t">{REPORT_TITLE.upper()}</p>
-    </div>
+    <p class="doc-title">{_esc(REPORT_TITLE)}</p>
+    {box}
+    {height_line}
     """
 
 
@@ -576,22 +553,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     # stays in scoring.py with nothing calling it. Its replacement is the
     # Biomechanical Signature below.
 
-    # Footer (D-036): document number and page only, no patient name.
-    _, _, details = _clinic_parts(clinic)
-    page_top = letterhead_page_top_mm(details)
-
-    # The logo mark, already faded in the file itself, centred behind every
-    # page. WeasyPrint has no background opacity, so the fading is baked
-    # into the PNG: 5.5 percent since 13 October 2026, darker on Onkar's
-    # word (2.5 could not be seen on the cream page). Boxes and table rows
-    # are opaque, so it shows only between them.
-    watermark = _brand_data_uri("av_watermark.png")
-    watermark_css = (
-        f'background-image: url("{watermark}"); background-repeat: no-repeat; '
-        f"background-position: center 55%; background-size: 95mm auto;"
-        if watermark
-        else ""
-    )
+    brand = clinic_brand(clinic)
 
     any_upload = any(
         (views.get(k) or {}).get("captureSource") == "upload" for k in ("side", "front", "back")
@@ -633,114 +595,10 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
 <style>
     {_font_faces()}
 
-    /* Side margins are zero so the letterhead runs edge to edge; the body
-       carries the 14 mm side margins instead. */
-    @page {{
-        size: A4;
-        margin: {page_top}mm 0 20mm 0;
-        background-color: {PAGE};
-        {watermark_css}
-
-        @top-center {{
-            content: element(letterhead);
-            width: 100%;
-            vertical-align: top;
-        }}
-        @bottom-center {{
-            content: element(runningFooter);
-            width: 100%;
-            vertical-align: top;
-        }}
-    }}
-
-    body {{
-        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        color: {INK};
-        margin: 0;
-        padding: 0 14mm;
-        line-height: 1.45;
-        font-size: 9.3pt;
-    }}
-
-    {letterhead_css()}
-    {footer_css()}
-    /* The shared letterhead and footer are written for pages that zero every
-       paragraph margin (prescription, invoice). This page keeps browser
-       paragraph margins in the body, so they are zeroed here for the two
-       running elements only. */
-    .letterhead p, .running-footer p {{
-        margin: 0;
-    }}
-
-    /* Patient box. */
-    .patient-box {{
-        width: 100%;
-        border-collapse: separate;
-        border: 1.3px solid #d9d1bf;
-        border-radius: 4mm;
-        background: {PAPER};
-        margin: 0 0 3.4mm 0;
-    }}
-    .patient-box .pb-col {{
-        width: 50%;
-        vertical-align: top;
-        padding: 2.6mm 5mm;
-    }}
-    .patient-box .pb-divider {{
-        width: 0.3mm;
-        background: {RULE};
-        padding: 0;
-    }}
-    .pb-half {{
-        border-collapse: collapse;
-        width: 100%;
-    }}
-    .pb-half td {{
-        padding: 0.7mm 0;
-        vertical-align: baseline;
-    }}
-    .pb-label {{
-        width: 27mm;
-        font-size: 6.6pt;
-        font-weight: 700;
-        letter-spacing: 0.9px;
-        text-transform: uppercase;
-        color: {MUTED};
-        white-space: nowrap;
-    }}
-    .pb-value {{
-        font-size: 9pt;
-        font-weight: 600;
-        color: {INK};
-    }}
-    .pb-value .pname {{
-        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-        font-weight: 700;
-        font-size: 10.5pt;
-    }}
-    .nowrap {{
-        white-space: nowrap;
-    }}
-
-    .doc-title {{
-        text-align: center;
-        margin: 0 0 3.6mm 0;
-    }}
-    .doc-title p {{
-        margin: 0;
-    }}
-    .doc-title .t {{
-        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-        font-weight: 800;
-        font-size: 12.5pt;
-        letter-spacing: 2.2px;
-        color: {MIDNIGHT};
-    }}
-    .doc-title .s {{
-        font-size: 7.8pt;
-        color: {MUTED};
-        margin-top: 0.8mm;
-    }}
+    {clinical_page_css(brand)}
+    body {{ font-size: 9.3pt; }}
+    .pb-extra {{ margin: -2mm 0 4mm 0; font-size: 8.6pt; }}
+    .pb-extra span {{ color: {MUTED}; font-weight: 600; margin-right: 2mm; }}
 
     /* Section headings, one style throughout: a Grove dot, Midnight text. */
     h2 {{
@@ -858,16 +716,17 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.9px;
-        color: {MUTED};
-        padding: 0 2.5mm 1.8mm 2.5mm;
+        color: {INK};
+        background: {BAND_TINT};
+        padding: 1.6mm 2.5mm;
     }}
     .measurements td {{
         padding: 2.2mm 2.5mm;
         font-size: 9pt;
         vertical-align: middle;
     }}
-    .measurements tbody tr:nth-child(even) td {{
-        background: {ZEBRA};
+    .measurements tbody tr + tr td {{
+        border-top: 0.2mm solid {RULE_SOFT};
     }}
     .measurements .param {{
         color: {INK};
@@ -911,7 +770,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     .interpretation {{
         margin: 3mm 0 0 0;
         padding: 2.4mm 3.2mm;
-        background: {PAPER};
+        background: #ffffff;
         border: 1px solid {RULE};
         border-radius: 2.5mm;
     }}
@@ -1103,7 +962,7 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
     .notes {{
         margin-top: 6px;
         border: 1px solid {RULE};
-        background: {PAPER};
+        background: #ffffff;
         border-radius: 2.5mm;
         padding: 2.4mm 3.4mm;
         page-break-inside: avoid;
@@ -1165,8 +1024,8 @@ def build_report_html(report: dict, clinic: dict | None = None) -> str:
 </head>
 <body>
 
-{_letterhead(clinic)}
-{footer_html(footer_reference(report_id))}
+{clinical_band_html(brand)}
+{clinical_footer_html(brand, footer_reference(report_id))}
 
 {_patient_box(report)}
 

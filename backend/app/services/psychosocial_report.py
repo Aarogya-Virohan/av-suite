@@ -30,23 +30,24 @@ from app.models.clinic import Clinic
 from app.screening.registry import get_instrument
 from app.screening.trend import TrendSeries, build_series
 from app.services import psychosocial as svc
-from app.services.posture.pdf_service import (
-    BRAND_DARK,
-    DEEP_TEAL,
-    GROVE,
+from app.services.brand import (
     INK,
-    LIME,
     MIDNIGHT,
-    MIDNIGHT_2,
     MUTED,
-    ON_DARK,
-    PAGE,
-    PAPER,
-    POWERED_BY_COMPANY,
-    POWERED_BY_PRODUCT,
-    RULE,
-    _brand_data_uri,
-    _font_faces,
+    RULE_SOFT,
+    font_faces as _font_faces,
+)
+from app.services.clinic_brand import clinic_brand
+from app.services.patient_number import format_patient_id
+from app.services.prescription_pdf import fetch_logo
+from app.services.report_letterhead import (
+    ClinicBrand,
+    PatientBox,
+    age_sex_text,
+    clinical_band_html,
+    clinical_footer_html,
+    clinical_page_css,
+    patient_box_html,
 )
 
 try:
@@ -116,6 +117,10 @@ class ReportData:
     series: list[TrendSeries]
     sessions: list[SessionRow] = field(default_factory=list)
     referrals: list[ReferralRow] = field(default_factory=list)
+    # Round 4 (BR-c, BR-l): shared letterhead and patient box.
+    brand: ClinicBrand | None = None
+    patient_code: str = ""  # "SPC-000128", label "Patient ID"
+    age_sex: str = ""
 
 
 def _esc(value: object) -> str:
@@ -161,6 +166,13 @@ async def build_report_data(
     actions = await svc.referral_actions_for_sessions(db, clinic_id, [s.id for s in sessions])
     names = await svc.user_names(db, {user_id} | {a.recorded_by for a in actions if a.recorded_by})
     clinic = await db.get(Clinic, clinic_id)
+    brand = await clinic_brand(db, clinic, fetch_logo)
+    age = patient.age
+    if age is None and patient.date_of_birth:
+        today = ist(svc.utcnow()).date()
+        dob = patient.date_of_birth
+        age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    sex = str(getattr(patient.gender, "value", patient.gender) or "").replace("_", " ")
 
     details = []
     if patient.age:
@@ -222,6 +234,9 @@ async def build_report_data(
         series=build_series(sessions),
         sessions=rows,
         referrals=referrals,
+        brand=brand,
+        patient_code=format_patient_id(clinic.code, patient.display_number) if clinic else "",
+        age_sex=age_sex_text(age, sex),
     )
 
 
@@ -259,7 +274,7 @@ def trend_svg(series: TrendSeries, width: float = 500, height: float = 132) -> s
         tint = BAND_TINTS[min(band.level, len(BAND_TINTS) - 1)]
         parts.append(
             f'<rect x="{left}" y="{y_top:.2f}" width="{plot_w}" height="{y_bottom - y_top:.2f}" '
-            f'fill="{tint}" stroke="{RULE}" stroke-width="0.4"/>'
+            f'fill="{tint}" stroke="{RULE_SOFT}" stroke-width="0.4"/>'
         )
         mid = (y_top + y_bottom) / 2 + 2.4
         parts.append(
@@ -387,21 +402,23 @@ def _trend_sections(series: list[TrendSeries]) -> str:
 
 
 def build_report_html(data: ReportData) -> str:
-    wordmark = _brand_data_uri("av_logo_wordmark_white.png")
-    mark = _brand_data_uri("av_mark.png")
-    brand = (
-        f'<img class="wordmark" src="{wordmark}" alt="{POWERED_BY_COMPANY}" />'
-        if wordmark
-        else f'<span class="clinic">{POWERED_BY_COMPANY}</span>'
-    )
-    footer_mark = f'<img class="footer-mark" src="{mark}" alt="" />' if mark else ""
+    brand = data.brand or ClinicBrand(name=data.clinic_name)
     scope_note = (
         '<p class="scope">This summary includes only the screenings sent by '
         f"{_esc(data.generated_by)}.</p>"
         if data.own_scope
         else ""
     )
-    details = " &middot; ".join(_esc(d) for d in data.patient_details)
+    box = patient_box_html(
+        PatientBox(
+            name=data.patient_name,
+            patient_id=data.patient_code,
+            age_sex=data.age_sex,
+            date=display_date(data.generated_at),
+            therapist=data.generated_by,
+            report_no=data.report_id,
+        )
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -409,119 +426,47 @@ def build_report_html(data: ReportData) -> str:
 <title>{_esc(REPORT_TITLE)}</title>
 <style>
     {_font_faces()}
-    @page {{
-        size: A4;
-        margin: 27mm 0 18mm 0;
-        background-color: {PAGE};
-        @top-center {{ content: element(letterhead); width: 100%; vertical-align: top; }}
-        @bottom-center {{ content: element(runningFooter); width: 100%; vertical-align: top; }}
-    }}
-    body {{
-        font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        color: {INK}; margin: 0; padding: 0 14mm; font-size: 9pt; line-height: 1.45;
-    }}
-    .letterhead {{
-        position: running(letterhead); width: 100%;
-        background: linear-gradient(115deg, {MIDNIGHT} 0%, {MIDNIGHT_2} 55%, {DEEP_TEAL} 100%);
-        padding: 5mm 14mm 4.5mm 14mm; color: #ffffff; box-sizing: border-box;
-    }}
-    .letterhead table {{ width: 100%; border-collapse: collapse; }}
-    .letterhead td {{ vertical-align: middle; padding: 0; }}
-    .letterhead p {{ margin: 0; }}
-    .wordmark {{ height: 9mm; }}
-    .clinic {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 13pt; }}
-    .lh-right {{ text-align: right; }}
-    .lh-title {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 11.5pt; color: #ffffff; }}
-    .lh-sub {{ font-size: 7.6pt; color: {ON_DARK}; }}
-    .lh-accent {{ color: {LIME}; font-weight: 700; }}
-    .running-footer {{ position: running(runningFooter); width: 100%; padding: 0 14mm; box-sizing: border-box; }}
-    .running-footer table {{ width: 100%; border-top: 0.3mm solid {RULE}; border-collapse: collapse; }}
-    .running-footer td {{ padding-top: 2.5mm; font-size: 6.6pt; color: {MUTED}; }}
-    .footer-mark {{ height: 3.4mm; vertical-align: middle; margin-right: 1.5mm; }}
-    .powered {{ letter-spacing: 0.06em; font-weight: 600; }}
-    .page::after {{ content: "Page " counter(page) " of " counter(pages); }}
-    .patient {{
-        background: {PAPER}; border: 0.3mm solid {RULE}; border-radius: 2.5mm;
-        padding: 4mm 5mm; margin-top: 2mm;
-    }}
-    .patient table {{ width: 100%; border-collapse: collapse; }}
-    .patient td {{ vertical-align: top; padding: 0; }}
-    .patient .name {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 13pt; margin: 0; }}
-    .patient .meta {{ margin: 1mm 0 0 0; color: {MUTED}; }}
-    .patient .right {{ text-align: right; font-size: 7.8pt; color: {MUTED}; }}
-    .patient .right strong {{ color: {INK}; }}
-    .scope {{ margin: 2.5mm 0 0 0; font-size: 7.8pt; color: {BRAND_DARK}; }}
-    h2 {{
-        font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 10.5pt;
-        margin: 6mm 0 2.5mm 0; padding-left: 2.5mm; border-left: 0.9mm solid {GROVE};
-    }}
-    .trend {{ background: {PAPER}; border: 0.3mm solid {RULE}; border-radius: 2.5mm; padding: 3mm 4mm 2mm 4mm; margin-bottom: 3mm; page-break-inside: avoid; }}
+    {clinical_page_css(brand)}
+    p {{ margin: 0; }}
+    .confidential {{ font-size: 8pt; font-weight: 600; color: {MUTED}; margin: -2mm 0 4mm 0; }}
+    .scope {{ margin: -2mm 0 4mm 0; font-size: 8.4pt; color: {MUTED}; }}
+    h2.strip {{ margin: 6mm 0 3mm 0; }}
+    .trend {{ border: 0.3mm solid {RULE_SOFT}; border-radius: 2.5mm; padding: 3mm 4mm 2mm 4mm; margin-bottom: 3mm; page-break-inside: avoid; }}
     .trend-title {{ margin: 0 0 1.5mm 0; font-weight: 700; }}
-    .muted {{ color: {MUTED}; font-weight: 400; font-size: 7.6pt; }}
-    .hint {{ margin: 1mm 0 0 0; font-size: 7.4pt; color: {MUTED}; }}
-    table.grid {{ width: 100%; border-collapse: collapse; background: {PAPER}; font-size: 8.4pt; }}
-    table.grid th {{
-        text-align: left; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.05em;
-        color: {MUTED}; border-bottom: 0.4mm solid {RULE}; padding: 2mm 2.5mm;
-    }}
-    table.grid td {{ border-bottom: 0.25mm solid {RULE}; padding: 2mm 2.5mm; vertical-align: top; }}
+    .muted {{ color: {MUTED}; font-weight: 400; font-size: 8pt; }}
+    .hint {{ margin: 1mm 0 0 0; font-size: 8pt; color: {MUTED}; }}
+    table.grid {{ width: 100%; border-collapse: collapse; font-size: 9pt; }}
+    table.grid th {{ padding: 2mm 2.5mm; border-bottom: 0.3mm solid {RULE_SOFT}; }}
+    table.grid td {{ border-bottom: 0.2mm solid {RULE_SOFT}; padding: 2mm 2.5mm; vertical-align: top; }}
     table.grid tr {{ page-break-inside: avoid; }}
-    .flag {{ display: inline-block; font-size: 7pt; font-weight: 700; color: {FLAG}; border: 0.3mm solid {FLAG}; border-radius: 1.5mm; padding: 0.3mm 1.6mm; margin: 0 1mm 0.8mm 0; }}
+    .flag {{ display: inline-block; font-size: 7.6pt; font-weight: 700; color: {FLAG}; border: 0.3mm solid {FLAG}; border-radius: 1.5mm; padding: 0.3mm 1.6mm; margin: 0 1mm 0.8mm 0; }}
     .flag.risk {{ background: {FLAG}; color: #ffffff; }}
-    .none {{ color: {MUTED}; }}
-    .note {{ color: {MUTED}; }}
-    .empty {{ color: {MUTED}; font-style: italic; }}
-    .disclaimer {{ margin-top: 7mm; padding-top: 3mm; border-top: 0.3mm solid {RULE}; font-size: 7.4pt; color: {MUTED}; }}
-    /* T3-a #3: the closing never sits alone on a page; it pulls the end of
-       the last section (referral actions) with it. */
+    .none, .note, .empty {{ color: {MUTED}; }}
+    .empty {{ font-style: italic; }}
+    .disclaimer {{ margin-top: 7mm; padding-top: 3mm; border-top: 0.3mm solid {RULE_SOFT}; font-size: 8pt; color: {MUTED}; }}
+    /* T3-a #3: the closing never sits alone on a page. */
     .closing {{ page-break-inside: avoid; break-inside: avoid; page-break-before: avoid; break-before: avoid; }}
-    .sign {{ margin-top: 10mm; width: 100%; border-collapse: collapse; page-break-inside: avoid; }}
-    .sign td {{ width: 45%; border-top: 0.3mm solid {INK}; padding-top: 1.5mm; font-size: 7.4pt; color: {MUTED}; }}
-    .sign td.gap {{ width: 10%; border: none; }}
 </style>
 </head>
 <body>
-<div class="letterhead"><table><tr>
-    <td>{brand}</td>
-    <td class="lh-right">
-        <p class="lh-title">{_esc(REPORT_TITLE)}</p>
-        <p class="lh-sub">{_esc(data.clinic_name)} &middot; <span class="lh-accent">Confidential clinical record</span></p>
-    </td>
-</tr></table></div>
-
-<div class="running-footer"><table><tr>
-    <td>{footer_mark}<span class="powered">POWERED BY {POWERED_BY_COMPANY} &bull; {POWERED_BY_PRODUCT}</span></td>
-    <td style="text-align:right">{_esc(data.report_id)} &middot; <span class="page"></span></td>
-</tr></table></div>
-
-<div class="patient"><table><tr>
-    <td>
-        <p class="name">{_esc(data.patient_name)}</p>
-        <p class="meta">{details}</p>
-    </td>
-    <td class="right">
-        Generated <strong>{_esc(display_datetime(data.generated_at))}</strong><br/>
-        By <strong>{_esc(data.generated_by)}</strong><br/>
-        Report ID {_esc(data.report_id)}
-    </td>
-</tr></table>
+{clinical_band_html(brand)}
+{clinical_footer_html(brand, data.report_id)}
+<p class="doc-title">{_esc(REPORT_TITLE)}</p>
+{box}
+<p class="confidential">Confidential clinical record</p>
 {scope_note}
-</div>
 
-<h2>Score trend</h2>
+<h2 class="strip">Score trend</h2>
 {_trend_sections(data.series)}
 
-<h2>Completed screenings</h2>
+<h2 class="strip">Completed screenings</h2>
 {_sessions_table(data.sessions)}
 
-<h2>Referral actions</h2>
+<h2 class="strip">Referral actions</h2>
 {_referrals_table(data.referrals)}
 
 <div class="closing">
 <p class="disclaimer">{_esc(DISCLAIMER)}</p>
-<table class="sign"><tr>
-    <td>Treating physiotherapist, name and signature</td><td class="gap"></td><td>Date</td>
-</tr></table>
 </div>
 </body>
 </html>
