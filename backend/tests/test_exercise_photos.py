@@ -348,5 +348,7 @@ async def test_pdf_uses_clinic_photos(
     # Library picture fetched only for the exercise without clinic photos.
     assert asked == [["https://blogger.googleusercontent.com/img/b"]]
     html_out = seen[0]
-    assert html_out.count('<img class="photo" src="data:image/jpeg;base64,') == 2
-    assert 'class="ex-img two"' in html_out
+    # BR-j: the two clinic photos sit side by side in the left half of the card.
+    pair = html_out[html_out.index('<table class="pair">') :]
+    pair = pair[: pair.index("</table>")]
+    assert pair.count('<img src="data:image/jpeg;base64,') == 2

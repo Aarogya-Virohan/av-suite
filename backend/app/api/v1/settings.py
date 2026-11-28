@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from typing import Annotated
 
@@ -26,8 +27,19 @@ from app.schemas.settings import (
 )
 from app.repositories.audit import AuditLogRepository
 from app.repositories.clinic import ClinicRepository
-from app.schemas.settings import ClinicSettingsResponse, ClinicSettingsUpdate
-from app.core.upload_limits import check_logo_size
+from app.schemas.settings import (
+    ClinicSettingsResponse,
+    ClinicSettingsUpdate,
+    LogoPreviewRequest,
+    LogoPreviewResponse,
+)
+from app.core.upload_limits import MAX_LOGO_BYTES, check_logo_size
+from app.services.report_letterhead import (
+    LogoRejected,
+    logo_needs_contrast_warning,
+    prepare_uploaded_logo,
+    render_logo_for_mode,
+)
 from app.services.audit import AuditLogService, changed_fields, log_event_safely
 from app.services.settings import (
     ClinicSettingsService,
@@ -36,6 +48,10 @@ from app.services.settings import (
 )
 
 router = APIRouter()
+
+# A 2 MB file as base64 plus the data-URI header; anything longer is refused
+# before it is decoded.
+MAX_LOGO_UPLOAD_CHARS = (2 * 1024 * 1024 * 4) // 3 + 200
 
 
 @router.get("/settings/fee-items", response_model=list[ClinicFeeItemResponse])
@@ -144,6 +160,33 @@ async def get_settings_service(
 
 
 SettingsServiceDep = Annotated[ClinicSettingsService, Depends(get_settings_service)]
+
+
+def _logo_low_contrast(stored: str | None, mode: str) -> bool:
+    """BR-g warning: the logo as the band shows it is hard to see. Only for
+    logos stored as data URIs (all uploads since Round 4); an old https logo
+    is not downloaded for this."""
+    if not stored or not stored.strip().lower().startswith("data:"):
+        return False
+    return logo_needs_contrast_warning(render_logo_for_mode(stored, mode), mode)
+
+
+async def _settings_response(clinic: Clinic) -> ClinicSettingsResponse:
+    out = ClinicSettingsResponse.model_validate(clinic)
+    out.logo_low_contrast = await asyncio.to_thread(
+        _logo_low_contrast, clinic.branding_logo_url, clinic.logo_bg_mode or "as_is"
+    )
+    return out
+
+
+def _logo_rejected(exc: LogoRejected) -> HTTPException:
+    # A file over the size limit stays a 413, as before Round 4 (#87).
+    code = (
+        status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+        if exc.code == "LOGO_TOO_LARGE"
+        else status.HTTP_422_UNPROCESSABLE_ENTITY
+    )
+    return HTTPException(status_code=code, detail={"code": exc.code, "message": exc.message})
 CurrentClinicDep = Annotated[Clinic, Depends(get_current_clinic)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
 
@@ -159,11 +202,42 @@ async def get_clinic_settings(
 
     try:
         clinic_record = await service.get_settings(clinic.id)
-        return ClinicSettingsResponse.model_validate(clinic_record)
+        return await _settings_response(clinic_record)
     except SettingsNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+
+
+@router.post("/settings/clinic/logo-preview", response_model=LogoPreviewResponse)
+async def preview_clinic_logo(
+    payload: LogoPreviewRequest,
+    clinic: CurrentClinicDep,
+    scope: CapabilityScope = Depends(require_capability("settings.edit")),
+) -> LogoPreviewResponse:
+    """Check a picked logo and show it as the report band would, without
+    saving anything (live letterhead preview in Settings, BR-g)."""
+
+    def work() -> LogoPreviewResponse:
+        stored = prepare_uploaded_logo(payload.logo, MAX_LOGO_BYTES)
+        shown = render_logo_for_mode(stored, payload.logo_bg_mode)
+        from app.services.report_letterhead import _png_size
+
+        w, h = _png_size(shown) or (0, 0)
+        return LogoPreviewResponse(
+            logo=stored,
+            letterhead_logo=shown,
+            width=w,
+            height=h,
+            low_contrast=logo_needs_contrast_warning(shown, payload.logo_bg_mode),
+        )
+
+    if len(payload.logo) > (MAX_LOGO_UPLOAD_CHARS):
+        raise _logo_rejected(LogoRejected("LOGO_TOO_LARGE", "The logo file is larger than 2 MB. Please choose a smaller file."))
+    try:
+        return await asyncio.to_thread(work)
+    except LogoRejected as exc:
+        raise _logo_rejected(exc) from exc
 
 
 @router.patch("/settings/clinic", response_model=ClinicSettingsResponse)
@@ -176,10 +250,21 @@ async def update_clinic_settings(
 ) -> ClinicSettingsResponse:
     """Update clinic branding settings (admin only)."""
 
+    # BR-g: an uploaded logo (data URI) is checked against the upload rules
+    # (PNG / JPG / WebP, up to 2 MB, at least 200 px on the shorter side,
+    # 1:4 to 4:1) and stored as a resized copy of at most MAX_LOGO_BYTES.
+    logo = payload.branding_logo_url
+    if isinstance(logo, str) and logo.strip().lower().startswith("data:"):
+        try:
+            payload.branding_logo_url = await asyncio.to_thread(
+                prepare_uploaded_logo, logo, MAX_LOGO_BYTES
+            )
+        except LogoRejected as exc:
+            raise _logo_rejected(exc) from exc
     check_logo_size(payload.branding_logo_url)
     try:
         updated_clinic = await service.update_settings(clinic.id, user.id, payload)
-        return ClinicSettingsResponse.model_validate(updated_clinic)
+        return await _settings_response(updated_clinic)
     except SettingsNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)

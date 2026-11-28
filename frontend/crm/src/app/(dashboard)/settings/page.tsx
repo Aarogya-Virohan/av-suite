@@ -12,7 +12,10 @@ import { canAccessModule, hasCapability, usePermissionSubscription } from '../..
 import { Settings as SettingsIcon, IndianRupee, Wrench, Users, FileText, Save, Plus, Loader2, Trash2, Info, RotateCcw, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import {
+  CLIENT_TYPE_OPTIONS,
   CLINIC_PROFILE_KEYS,
+  type ClientType,
+  type LogoBgMode,
   type ClinicProfile,
   useClinicSettings,
   useUpdateClinicSettings,
@@ -44,6 +47,7 @@ import {
 } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
 import { asset } from '../../../lib/hub';
+import { LogoLetterheadField } from '../../../features/settings/components/LogoLetterheadField';
 
 type TabKey = 'clinic' | 'fees' | 'users' | 'audit';
 
@@ -107,10 +111,12 @@ export default function SettingsPage() {
   const [clinicName, setClinicName] = useState('');
   const [patientCode, setPatientCode] = useState('');
   const [patientCodeError, setPatientCodeError] = useState<string | null>(null);
+  const [clientType, setClientType] = useState<ClientType>('clinic');
   // null = no clinic colour, the AV Suite theme applies.
   const [brandColor, setBrandColor] = useState<string | null>(null);
   const [colorDirty, setColorDirty] = useState(false);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [logoMode, setLogoMode] = useState<LogoBgMode>('as_is');
   const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
   const [profileErrors, setProfileErrors] = useState<Partial<Record<keyof ClinicProfile, string>>>({});
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -131,9 +137,11 @@ export default function SettingsPage() {
       setClinicName(clinicSettings.name || '');
       setPatientCode(clinicSettings.code || '');
       setPatientCodeError(null);
+      setClientType(clinicSettings.client_type ?? 'clinic');
       setBrandColor(clinicSettings.branding_color ?? null);
       setColorDirty(false);
       setLogoBase64(clinicSettings.branding_logo_url ?? null);
+      setLogoMode(clinicSettings.logo_bg_mode ?? 'as_is');
       const loaded = { ...EMPTY_PROFILE };
       for (const key of CLINIC_PROFILE_KEYS) loaded[key] = clinicSettings[key] ?? '';
       setProfile(loaded);
@@ -175,23 +183,6 @@ export default function SettingsPage() {
     return u ? `${u.first_name} ${u.last_name}` : `User #${id.slice(0, 8).toUpperCase()}`;
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 200 * 1024) {
-      toast.error('Logo file size must be under 200KB');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setLogoBase64(reader.result as string);
-      toast.success('Logo ready. Save to apply it.');
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleSaveClinic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canEditClinic) {
@@ -218,11 +209,15 @@ export default function SettingsPage() {
         name: clinicName,
         // Only sent when it was changed.
         ...(typedCode && typedCode !== clinicSettings?.code ? { code: typedCode } : {}),
+        // Only sent when it was changed (the API treats a missing value as unchanged).
+        ...(clientType !== (clinicSettings?.client_type ?? 'clinic') ? { client_type: clientType } : {}),
         ...profilePayload,
         // Only send the colour when it was changed, so saving the name never
         // writes a default colour over the theme (null resets to the theme).
         ...(colorDirty ? { branding_color: brandColor } : {}),
-        branding_logo_url: logoBase64,
+        // Unchanged logo is not sent again (it is checked and resized on upload).
+        ...(logoBase64 !== (clinicSettings?.branding_logo_url ?? null) ? { branding_logo_url: logoBase64 } : {}),
+        ...(logoMode !== (clinicSettings?.logo_bg_mode ?? 'as_is') ? { logo_bg_mode: logoMode } : {}),
       });
       toast.success('Clinic settings saved');
     } catch (err: any) {
@@ -476,6 +471,24 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
+                    <FieldLabel htmlFor="client-type">Client type</FieldLabel>
+                    <select
+                      id="client-type"
+                      value={clientType}
+                      onChange={(e) => setClientType(e.target.value as ClientType)}
+                      disabled={!canEditClinic}
+                      className={`${inputClass} max-w-[14rem]`}
+                    >
+                      {CLIENT_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1.5 text-xs text-muted">Clinic, hospital or home care service.</p>
+                  </div>
+
+                  <div>
                     <FieldLabel htmlFor="brand-color">Brand Accent Colour</FieldLabel>
                     <div className="flex flex-wrap items-center gap-3">
                       <input
@@ -508,41 +521,27 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <FieldLabel htmlFor="clinic-logo">Clinic Logo (max 200KB)</FieldLabel>
-                    {canEditClinic && (
-                      <input
-                        id="clinic-logo"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                        className="w-full cursor-pointer text-xs text-muted file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-grove-wash file:px-4 file:py-2 file:text-xs file:font-semibold file:text-grove hover:file:bg-[#d3eedc]"
-                      />
-                    )}
-                    {logoBase64 && (
-                      <div className="mt-3 flex items-center gap-3">
-                        <div className="w-fit rounded-xl border border-line bg-canvas p-2">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={logoBase64} alt="Clinic logo preview" className="h-12 rounded object-contain" />
-                        </div>
-                        {canEditClinic && (
-                          <button
-                            type="button"
-                            onClick={() => setLogoBase64(null)}
-                            className="cursor-pointer text-xs font-semibold text-danger hover:underline"
-                          >
-                            Remove logo
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <LogoLetterheadField
+                    logo={logoBase64}
+                    mode={logoMode}
+                    canEdit={canEditClinic}
+                    savedLowContrast={!!clinicSettings?.logo_low_contrast}
+                    isSaved={
+                      logoBase64 === (clinicSettings?.branding_logo_url ?? null) &&
+                      logoMode === (clinicSettings?.logo_bg_mode ?? 'as_is')
+                    }
+                    doctorName={profile.display_doctor_name}
+                    phone={profile.phone}
+                    email={profile.email}
+                    onLogoChange={setLogoBase64}
+                    onModeChange={setLogoMode}
+                  />
 
                   <div className="space-y-4 border-t border-line pt-5">
                     <div>
-                      <h3 className="font-display text-sm font-bold text-ink">Clinic details for invoices</h3>
+                      <h3 className="font-display text-sm font-bold text-ink">Clinic details for invoices and reports</h3>
                       <p className="mt-0.5 text-xs text-muted">
-                        Printed in the header of invoices and receipts. Leave a field empty to keep it off the invoice.
+                        Printed on invoices, receipts and clinical reports. Leave a field empty to keep it off.
                       </p>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">

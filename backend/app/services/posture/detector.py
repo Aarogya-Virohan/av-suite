@@ -1,3 +1,5 @@
+import threading
+
 import cv2
 import mediapipe as mp
 from mediapipe import solutions as mp_solutions
@@ -24,6 +26,13 @@ pose = mp_pose.Pose(static_image_mode=True, model_complexity=1)
 face_mesh = mp_solutions.face_mesh.FaceMesh(  # type: ignore
     static_image_mode=True, refine_landmarks=True, max_num_faces=1
 )
+
+# MediaPipe's solution graphs keep state between calls and are not safe to
+# run from two threads at once. /detect runs in a worker thread (POS-10, 24
+# Nov 2026) so it no longer blocks the event loop, which means two requests
+# can reach these models together; this lock makes them take turns. One
+# process holds one lock; each Railway worker has its own models and lock.
+_MODEL_LOCK = threading.Lock()
 
 # Pose indices used to find the head: nose, both eyes, both ears.
 _HEAD_POINTS = (0, 2, 5, 7, 8)
@@ -56,7 +65,8 @@ def detect_pose_full(image_bytes: bytes):
 
     rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    results = pose.process(rgb)
+    with _MODEL_LOCK:
+        results = pose.process(rgb)
 
     if not results.pose_landmarks:
         raise ValueError("No person detected")
@@ -107,7 +117,8 @@ def detect_iris_centres(
     x1, y1 = min(width, int(cx + half)), min(height, int(cy + half))
     crop = image[y0:y1, x0:x1]
 
-    results = face_mesh.process(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
+    with _MODEL_LOCK:
+        results = face_mesh.process(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
     if not results.multi_face_landmarks:
         raise InsufficientVisibilityError("Face not found for iris landmarks")
 

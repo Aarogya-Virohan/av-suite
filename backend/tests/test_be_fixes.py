@@ -722,12 +722,32 @@ async def test_oversized_clinic_logo_is_refused_with_413(client, db_session):
     def uri(size: int) -> str:
         return "data:image/png;base64," + base64.b64encode(b"\x89PNG" + b"0" * (size - 4)).decode()
 
-    res = await client.patch(f"{API}/settings/clinic", headers=headers, json={"branding_logo_url": uri(MAX_LOGO_BYTES + 3000)})
+    # Round 4 (BR-g): the upload may be up to 2 MB; the server stores a
+    # resized copy of at most MAX_LOGO_BYTES. Over 2 MB stays a 413.
+    from app.services.report_letterhead import LOGO_UPLOAD_MAX_BYTES
+
+    assert MAX_LOGO_BYTES == 256 * 1024
+    res = await client.patch(
+        f"{API}/settings/clinic", headers=headers, json={"branding_logo_url": uri(LOGO_UPLOAD_MAX_BYTES + 3000)}
+    )
     assert res.status_code == 413
-    assert res.json()["detail"]["code"] == "FILE_TOO_LARGE"
-    assert "256 KB" in res.json()["detail"]["message"]
-    ok = await client.patch(f"{API}/settings/clinic", headers=headers, json={"branding_logo_url": uri(MAX_LOGO_BYTES - 100)})
+    assert res.json()["detail"]["code"] == "LOGO_TOO_LARGE"
+    assert "2 MB" in res.json()["detail"]["message"]
+    # Not a picture at all: 422 with a plain message, nothing saved.
+    bad = await client.patch(f"{API}/settings/clinic", headers=headers, json={"branding_logo_url": uri(MAX_LOGO_BYTES + 3000)})
+    assert bad.status_code == 422
+    assert bad.json()["detail"]["code"] == "LOGO_UNREADABLE"
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (1200, 600), (20, 90, 160)).save(buf, format="PNG")
+    good = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    ok = await client.patch(f"{API}/settings/clinic", headers=headers, json={"branding_logo_url": good})
     assert ok.status_code == 200, ok.text
+    stored = ok.json()["branding_logo_url"]
+    assert len(base64.b64decode(stored.split(",", 1)[1])) <= MAX_LOGO_BYTES
     # A normal https logo URL and clearing the logo still work.
     link = await client.patch(f"{API}/settings/clinic", headers=headers, json={"branding_logo_url": "https://example.com/logo.png"})
     assert link.status_code == 200

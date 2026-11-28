@@ -186,6 +186,13 @@ async def test_patient_id_on_invoice_and_receipt_pdf_and_whatsapp(client, auth_h
     )
     assert created.status_code == 201, created.text
     invoice = created.json()
+    paid = await client.post(
+        f"{API}/invoices/{invoice['id']}/payments",
+        json={"invoice_id": invoice["id"], "patient_id": patient["id"], "amount": "200.00",
+              "payment_method": "cash", "payment_date": "2026-10-21T06:00:00Z"},
+        headers=auth_headers,
+    )
+    assert paid.status_code == 201, paid.text
     for kind in ("invoice", "receipt"):
         res = await client.get(
             f"{API}/invoices/{invoice['id']}/pdf/download", params={"kind": kind}, headers=auth_headers
@@ -213,7 +220,10 @@ def _invoice(**kw):
 
 @pytest.mark.parametrize("kind", ["invoice", "receipt"])
 def test_invoice_html_shows_patient_id_label_and_value(kind):
-    html = build_invoice_html(_invoice(kind=kind, patient_id="ADP-000003"))
+    from app.services.invoice_pdf import ReceiptPayment
+
+    paid = [ReceiptPayment(None, "cash", None, "500.00", "completed", "RCP-2627-000001")]
+    html = build_invoice_html(_invoice(kind=kind, patient_id="ADP-000003", payments=paid))
     assert "Patient ID" in html and "ADP-000003" in html
     assert html.index("Jane Doe") < html.index("Patient ID") < html.index("ADP-000003")
 
@@ -239,8 +249,10 @@ def test_rx_html_shows_patient_id_label_and_value():
     assert html.index("Patient name") < html.index("Patient ID")
 
 
-def test_rx_html_without_patient_id_leaves_the_row_out():
-    assert "Patient ID" not in build_prescription_html(_rx())
+def test_rx_html_without_patient_id_shows_a_dash():
+    # BR-l (26 Nov): the patient box keeps the same grid on every report.
+    html = build_prescription_html(_rx())
+    assert '<span class="k">Patient ID</span><span class="v">&ndash;</span>' in html
 
 
 def test_prescription_whatsapp_text():

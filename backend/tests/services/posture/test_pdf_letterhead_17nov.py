@@ -100,27 +100,34 @@ def test_remote_or_unusable_logo_is_dropped_without_failing():
 
 def test_footer_has_document_number_and_page_but_no_patient_name():
     html = build_report_html(REPORT, asyncio.run(clinic_letterhead(_clinic())))
-    footer = html[html.index('class="running-footer"'):]
-    footer = footer[: footer.index("</div></div>")]
-    assert "Report PT-20261012-ABCD1234" in footer
+    footer = html[html.index('<div class="cl-footer">'):]
+    footer = footer[: footer.index("</tr></table></div></div>")]
+    assert "Report No. <b>PT-20261012-ABCD1234</b>" in footer
     assert "Sample Patient" not in footer
-    assert 'class="page"' in footer
+    assert 'class="pages"' in footer
     assert footer_reference("") == ""
+    # D-043: a report saved since 27 Nov prints its POS number instead.
+    numbered = build_report_html({**REPORT, "reportNumber": "SPC-POS-000012"}, asyncio.run(clinic_letterhead(_clinic())))
+    assert "Report No. <b>SPC-POS-000012</b>" in numbered
 
 
 def test_patient_box_names_the_assessor_and_never_a_placeholder_clinic():
     html = _patient_box(REPORT)
     for text in ("Sample Patient", "21 Y / Male", "174&nbsp;cm", "SP-0142", "12 Oct 2026",
-                 "Dr. Karan Singh", "PT-20261012-ABCD1234"):
+                 "Dr. Karan Singh", "PT-20261012-ABCD1234", "Patient ID"):
         assert text in html, text
+    assert "Case ref." not in html  # POS-10: the label is "Patient ID" everywhere
     assert "AV Clinic" not in html
 
 
-def test_patient_box_leaves_out_empty_fields():
+def test_patient_box_keeps_its_grid_and_drops_only_the_height_line():
     html = _patient_box({"patient": {**PATIENT, "caseRef": "", "heightCm": None, "clinician": ""}})
-    assert "Case ref." not in html
+    # BR-l: same labels on every report; an empty value is a dash.
+    assert '<span class="k">Patient ID</span><span class="v">&ndash;</span>' in html
+    assert '<span class="k">Treating therapist</span><span class="v">&ndash;</span>' in html
+    # Height is posture-only, on its own line under the box (Q3), and left out when unknown.
     assert "Height" not in html
-    assert "Assessed by" not in html
+    assert "Height" in _patient_box(REPORT)
 
 
 def test_web_branding_is_plain_text_and_drops_empty_fields():

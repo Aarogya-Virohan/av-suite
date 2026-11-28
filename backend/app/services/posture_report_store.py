@@ -21,30 +21,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.patient import Patient
 from app.models.posture_session import PostureSession
+from app.services.clinic_code import derive_clinic_code
+from app.services.document_numbers import POS, next_clinical_number
+from app.services.patient_number import format_patient_id
 
 PATIENT_NOT_FOUND = "Patient not found or not in caller's clinic"
 REPORT_NOT_FOUND = "Report not found"
 
-# The CRM shows "SPC-000123": a clinic code from the clinic name, then the
-# display number padded to 6 digits (frontend/crm/src/lib/patientNumber.ts).
-# There is no clinic code column, so the same rule is applied here; keep the
-# two in step.
-_WORD = re.compile(r"[A-Za-z][A-Za-z0-9]*")
+def clinic_code(code: str | None, clinic_name: str | None = None) -> str:
+    """The clinic's own code (clinics.code, set in Settings; unique, 1 to 6
+    letters or digits). Only when it is empty is the name rule used, which is
+    what the code was first derived from (services/clinic_code.py)."""
+    stored = (code or "").strip().upper()
+    return stored or derive_clinic_code(clinic_name)
 
 
-def clinic_code(clinic_name: str | None) -> str:
-    words = _WORD.findall(clinic_name or "")
-    if not words:
-        return "PT"
-    if len(words) == 1:
-        return words[0][:3].upper()
-    return "".join(w[0] for w in words[:3]).upper()
-
-
-def format_case_id(display_number: int | None, clinic_name: str | None) -> str:
+def format_case_id(display_number: int | None, code: str | None, clinic_name: str | None = None) -> str:
+    """The Patient ID the CRM shows ("ASC2-000004"): clinic code, then the
+    display number padded to 6 digits. Empty without a number."""
     if display_number is None or display_number < 0:
         return ""
-    return f"{clinic_code(clinic_name)}-{int(display_number):06d}"
+    return format_patient_id(clinic_code(code, clinic_name), display_number)
 
 
 def patient_age(patient: Patient, today: date) -> int | None:
@@ -61,12 +58,12 @@ def gender_label(patient: Patient) -> str:
     return str(value).capitalize() if value else ""
 
 
-def patient_summary(patient: Patient, clinic_name: str | None, today: date) -> dict[str, Any]:
+def patient_summary(patient: Patient, clinic: Any, today: date) -> dict[str, Any]:
     """What the picker shows. No phone, no clinical data."""
     return {
         "id": str(patient.id),
         "displayNumber": int(patient.display_number),
-        "caseId": format_case_id(patient.display_number, clinic_name),
+        "caseId": format_case_id(patient.display_number, clinic.code, clinic.name),
         "name": patient.full_name,
         "age": patient_age(patient, today),
         "gender": gender_label(patient),
@@ -105,8 +102,11 @@ async def search_clinic_patients(
     query = select(Patient).where(Patient.clinic_id == clinic_id, Patient.deleted_at.is_(None))
     term = (term or "").strip()
     if term:
-        # "SPC-000123", "#123" or "123" all find CRM ID 123; anything else is a name.
-        digits = re.fullmatch(r"\s*#?\s*(?:[A-Za-z]{1,4}\s*[-#\s]?\s*)?(\d{1,18})\s*", term)
+        # "SPC-000123", "ASC2-000123" (codes can hold digits), "#123" or "123" all find
+        # CRM ID 123; anything else is a name.
+        digits = re.fullmatch(
+            r"\s*#?\s*(?:[A-Za-z0-9]{1,6}\s*[-#\s]\s*|[A-Za-z]{1,6})?(\d{1,18})\s*", term
+        )
         matches = [Patient.full_name.ilike(f"%{term}%")]
         if digits:
             matches.append(Patient.display_number == int(digits.group(1)))
@@ -138,8 +138,19 @@ async def save_report(
     patient_id: uuid.UUID,
     user_id: uuid.UUID | None,
     report: dict,
+    clinic_code: str = "",
 ) -> PostureSession:
+    # D-043: the printed number is given here, by the server, and written into
+    # the report itself so the web report and the PDF show the same one.
+    if not (clinic_code or "").strip():
+        from app.models.clinic import Clinic
+
+        clinic = await db.get(Clinic, clinic_id)
+        clinic_code = clinic.code if clinic else ""
+    number = await next_clinical_number(db, clinic_id, clinic_code, POS)
+    report["reportNumber"] = number
     row = PostureSession(
+        number=number,
         clinic_id=clinic_id,
         patient_id=patient_id,
         report_id=str(report["reportId"]),
@@ -186,6 +197,7 @@ async def list_saved_reports(
 def report_listing(row: PostureSession) -> dict[str, Any]:
     return {
         "reportId": row.report_id,
+        "reportNumber": row.number,
         "createdAt": row.created_at.isoformat() if row.created_at else None,
         "assessmentDate": ((row.report_json or {}).get("patient") or {}).get("assessmentDate"),
         "clinician": ((row.report_json or {}).get("patient") or {}).get("clinician") or "",

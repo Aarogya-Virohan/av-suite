@@ -110,9 +110,16 @@ export function invoicePdfFilename(kind: InvoicePdfKind, invoiceNumber: string):
  * Fetch the server-rendered PDF (GET /invoices/{id}/pdf/download) and save it.
  * The name is built here because CORS does not expose Content-Disposition.
  */
-export async function downloadInvoicePdf(invoiceId: string, invoiceNumber: string, kind: InvoicePdfKind) {
+export async function downloadInvoicePdf(
+  invoiceId: string,
+  invoiceNumber: string,
+  kind: InvoicePdfKind,
+  /** D-043: the payment a receipt is for; without it the latest completed payment. */
+  paymentId?: string,
+) {
+  const params = kind === 'receipt' ? { kind, ...(paymentId ? { payment_id: paymentId } : {}) } : undefined;
   const res = await apiClient.get(`/invoices/${invoiceId}/pdf/download`, {
-    params: kind === 'receipt' ? { kind } : undefined,
+    params,
     responseType: 'blob',
   });
   const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: 'application/pdf' });

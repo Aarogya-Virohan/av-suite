@@ -14,14 +14,17 @@ export function normalisePhone(phone: string | null | undefined): string | null 
 }
 
 // No grades or findings in the chat bubble (same rule as the Psychosocial
-// report message): only who, which clinic, which date, and that a PDF follows.
+// report message): only who, which clinic, which date, the Patient ID (the
+// clinic's CRM ID, POS-10) and that a PDF follows.
 export function reportMessage(report: PostureReport): string {
   const first = (report.patient?.name ?? "").trim().split(/\s+/)[0] ?? ""
   const clinic = report.branding?.clinicName?.trim()
   const date = formatReportDate(report.patient?.assessmentDate)
+  const patientId = report.patient?.caseRef?.trim()
   return [
     first ? `Hi ${first},` : "Hi,",
     `Your posture assessment report${clinic ? ` from ${clinic}` : ""}${date ? ` dated ${date}` : ""} is attached as a PDF.`,
+    ...(patientId ? [`Patient ID: ${patientId}`] : []),
     "Please go through it and bring any questions to your next session.",
   ].join("\n\n")
 }

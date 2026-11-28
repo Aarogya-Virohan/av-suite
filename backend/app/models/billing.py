@@ -305,10 +305,11 @@ class Payment(UUIDMixin, TimestampMixin, Base):
     """Payment transaction recorded against an invoice."""
 
     __tablename__: str = "payments"
-    __table_args__: tuple[Index, ...] = (
+    __table_args__: tuple = (
         Index("ix_payments_clinic_id", "clinic_id"),
         Index("ix_payments_invoice_id", "invoice_id"),
         Index("ix_payments_patient_id", "patient_id"),
+        UniqueConstraint("clinic_id", "receipt_number", name="uq_payments_clinic_receipt_number"),
     )
 
     clinic_id: Mapped[UUID] = mapped_column(
@@ -357,6 +358,9 @@ class Payment(UUIDMixin, TimestampMixin, Base):
         default=PaymentStatus.COMPLETED,
         server_default=text("'completed'"),
     )
+    # D-043: RCP-<FY>-<6 digits>, one per payment. Payments recorded before
+    # 27 Nov 2026 have none; their receipt keeps the invoice number it had.
+    receipt_number: Mapped[str | None] = mapped_column(String(16), nullable=True)
     payment_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

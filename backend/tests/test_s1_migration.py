@@ -17,7 +17,7 @@ from app.models import Clinic, OrganizationMembership
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 S1_REVISION = "s1fnd20261120"
-EXPECTED_ALEMBIC_HEAD = "crm10code20261124"
+EXPECTED_ALEMBIC_HEAD = "brnum20261127"
 S1_PARENT = "6ab832834814"
 S1_MERGE_REVISION = "1912c0f3f42f"
 

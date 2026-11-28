@@ -115,9 +115,10 @@ async def test_invoice_pdf_is_real_and_has_the_printed_content(client, auth_head
         inv["invoice_number"],
         "21 Oct 2026",  # 20:30 UTC is the next day in India
         "Pay at front desk",
-        "Due 30 Oct 2026",
-        "Authorised by Dr Meera Rao",
-        "does not need a signature",
+        "Due date 30 Oct 2026",
+        # Round 4: signatory line with the authorised person, text only.
+        "Dr Meera Rao",
+        "Authorised signatory",
     ):
         assert _has(text, expected), expected
     assert not _has(text, "Payments received")
@@ -144,10 +145,13 @@ async def test_receipt_pdf_lists_payments_and_balance(client, auth_headers):
         f"{API}/invoices/{inv['id']}/pdf/download", params={"kind": "receipt"}, headers=auth_headers
     )
     assert res.status_code == 200, res.text
-    assert f'filename="Receipt-{inv["invoice_number"]}.pdf"' in res.headers["content-disposition"]
+    # D-043: one receipt per payment, with its own RCP number.
+    receipt_number = paid.json()["receipt_number"]
+    assert re.fullmatch(r"RCP-2627-\d{6}", receipt_number)
+    assert f'filename="Receipt-{receipt_number}.pdf"' in res.headers["content-disposition"]
     text = _text(res.content)
-    for expected in ("Payment Receipt", "Payments received", "UPI", "UPI-REF-4411", "22 Oct 2026",
-                     "Rs. 1,000.00", "Balance due", "Rs. 1,124.00"):
+    for expected in ("RECEIPT", receipt_number, inv["invoice_number"], "UPI", "UPI-REF-4411", "22 Oct 2026",
+                     "Rs. 1,000.00", "Balance due", "Rs. 1,124.00", "Authorised signatory"):
         assert _has(text, expected), expected
     assert "Due " not in text  # no due date on a receipt
 
@@ -205,20 +209,21 @@ def _letterhead_doc(**kw) -> InvoiceDoc:
 
 
 @pytest.mark.parametrize("kind", ["invoice", "receipt"])
-def test_letterhead_clinic_left_av_right(kind):
-    """Clinic logo and name lead the header; Aarogya Virohan mark on the far right (D-036)."""
+def test_header_is_plain_clinic_left_without_band(kind):
+    """BR-m (26 Nov): invoice and receipt are plain black and white; clinic
+    logo and name lead the header, no band, no AV mark, no watermark."""
     out = build_invoice_html(
         _letterhead_doc(kind=kind, clinic_logo_src="data:image/png;base64,iVBORw0KGgo=")
     )
-    head = out[out.index('<div class="letterhead">') :]
-    head = head[: head.index('<div class="running-footer">')]
-    assert head.index('class="lh-logo"') < head.index('class="lh-clinic"')
-    assert head.index('class="lh-clinic"') < head.index('class="lh-mark"')  # AV on the far right
+    head = out[out.index('<table class="clinic">') :]
+    head = head[: head.index("</table>")]
+    assert head.index('class="logo"') < head.index('class="cname"')
     assert "SpineAct &lt;Physio&gt;" in head
-    assert ("Payment Receipt" if kind == "receipt" else "Invoice") in head
+    assert "cl-band" not in out and "watermark" not in out.lower()
+    assert ("RECEIPT" if kind == "receipt" else "INVOICE") in out
 
 
-def test_letterhead_without_clinic_logo_keeps_name_left():
+def test_header_without_clinic_logo_keeps_name_left():
     out = build_invoice_html(_letterhead_doc())
-    assert 'class="lh-logo"' not in out
-    assert 'class="lh-clinic"' in out
+    assert 'class="logo"' not in out
+    assert '<p class="cname">SpineAct &lt;Physio&gt;</p>' in out

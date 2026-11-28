@@ -38,6 +38,25 @@ PAPER = "#fffdf7"          # boxes on the page
 RULE = "#e3dccb"           # hairlines
 ZEBRA = "#f3eee2"          # alternate table rows
 
+def mix_with_white(hex_colour: str, share: float) -> str:
+    """`hex_colour` laid at `share` (0..1) over white, as a hex colour."""
+    value = hex_colour.lstrip("#")
+    rgb = [int(value[i : i + 2], 16) for i in (0, 2, 4)]
+    return "#" + "".join(f"{round(255 - (255 - c) * share):02x}" for c in rgb)
+
+
+# Clinical report band, Round 4 (Shivank sir 26 Nov 2026, BR-e / BR-n): the
+# AV Midnight to Deep Teal band of the letterhead, top and bottom of every
+# page of the Rx, posture and psychosocial reports. Only existing tokens; the
+# tint and rules are those tokens laid thin over white.
+BAND_START = MIDNIGHT
+BAND_END = DEEP_TEAL
+BAND_TINT = mix_with_white(DEEP_TEAL, 0.04)   # table headers and section strips only
+ON_DARK_STRONG = "#ffffff"                     # primary text on the band
+RULE_STRONG = mix_with_white(INK, 0.22)        # patient box outline
+RULE_SOFT = mix_with_white(INK, 0.10)          # rules inside boxes and tables
+
+
 # Footer, Onkar 13 October 2026: the Aarogya Virohan mark, then "POWERED BY
 # AAROGYA VIROHAN . AV SUITE". The bracketed tagline "(A Clinical Exercise
 # Prescription Tool)" removed on his word; this report prescribes no
@@ -102,6 +121,32 @@ def font_faces() -> str:
 WATERMARK_FILE = "av_logo_round.png"
 WATERMARK_OPACITY = 0.06
 WATERMARK_WHITE = 235  # luminance at or above this counts as the white background
+
+
+@lru_cache(maxsize=None)
+def av_mark_white_data_uri() -> str:
+    """
+    The Aarogya Virohan round mark in white for the teal footer band: the
+    artwork of av_logo_round.png (everything not near white) turned white,
+    the white disc dropped. Empty when the file is missing.
+    """
+    path = BRAND_DIR / "av_logo_round.png"
+    if not path.is_file():
+        return ""
+    from PIL import Image
+
+    with Image.open(path) as source:
+        image = source.convert("RGBA")
+    red, green, blue, alpha = image.split()
+    ink = Image.merge("RGB", (red, green, blue)).convert("L").point(lambda v: 0 if v >= WATERMARK_WHITE else 255)
+    alpha = Image.composite(alpha, Image.new("L", image.size, 0), ink)
+    white = Image.new("RGBA", image.size, (255, 255, 255, 0))
+    white.putalpha(alpha)
+    white = white.crop(white.getbbox() or (0, 0, *image.size))
+    white.thumbnail((160, 160), Image.LANCZOS)
+    buffer = io.BytesIO()
+    white.save(buffer, format="PNG", optimize=True)
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
 @lru_cache(maxsize=None)

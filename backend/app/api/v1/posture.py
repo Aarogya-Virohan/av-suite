@@ -24,6 +24,7 @@ from mediapipe.framework.formats import landmark_pb2
 from app.core.database import get_db
 from app.core.dependencies import PermissionContextDep, require_capability
 from app.services import posture_report_store as store
+from app.services.clinic_brand import display_doctor_name
 from app.services.usage_events import record_usage
 from app.services.posture.decoder import decode_image_bytes
 from app.services.posture.schemas import Landmark
@@ -878,15 +879,19 @@ def _review_view_payload(view: str, detected: "DetectedView", lateral_side: str 
     return payload
 
 
-@router.post("/detect", dependencies=_CAN_RUN)
-async def detect_for_review(
-    front_image: UploadFile = File(...),
-    side_image: UploadFile = File(...),
-    back_image: UploadFile = File(...),
-):
-    side = _detect_view("Side", await side_image.read())
-    front = _detect_view("Front", await front_image.read(), with_iris=True)
-    back = _detect_view("Back", await back_image.read())
+def _detect_all(side_bytes: bytes, front_bytes: bytes, back_bytes: bytes) -> dict:
+    """
+    Everything /detect does after the files are read: three pose detections,
+    the iris search, the signed token and the display copies. CPU-bound
+    (MediaPipe, OpenCV), so the route runs it with asyncio.to_thread and the
+    event loop stays free for other requests (POS-10, 24 Nov 2026; the
+    pipeline report of the same day measured the loop blocked for the whole
+    detection). A 422 raised here crosses the thread boundary unchanged.
+    """
+
+    side = _detect_view("Side", side_bytes)
+    front = _detect_view("Front", front_bytes, with_iris=True)
+    back = _detect_view("Back", back_bytes)
 
     lateral_side = get_lateral_side(side.landmarks)
 
@@ -920,6 +925,18 @@ async def detect_for_review(
             "back": _review_view_payload("back", back, None),
         },
     }
+
+
+@router.post("/detect", dependencies=_CAN_RUN)
+async def detect_for_review(
+    front_image: UploadFile = File(...),
+    side_image: UploadFile = File(...),
+    back_image: UploadFile = File(...),
+):
+    side_bytes = await side_image.read()
+    front_bytes = await front_image.read()
+    back_bytes = await back_image.read()
+    return await asyncio.to_thread(_detect_all, side_bytes, front_bytes, back_bytes)
 
 
 # =============================================================================
@@ -989,7 +1006,7 @@ async def report_from_review(
         )
     patient_name = patient_row.full_name
     gender = store.gender_label(patient_row)
-    case_ref = store.format_case_id(patient_row.display_number, clinic.name)
+    case_ref = store.format_case_id(patient_row.display_number, clinic.code, clinic.name)
 
     try:
         token_views = read_detection_token(detection_token)
@@ -1116,6 +1133,7 @@ async def report_from_review(
         patient_id=patient_row.id,
         user_id=perm_ctx.user.id,
         report=report,
+        clinic_code=clinic.code,
     )
     # Product and event only: no patient data in usage events.
     await record_usage(db, clinic, perm_ctx.user.id, POSTURE_PRODUCT_KEY, "posture_report")
@@ -1189,7 +1207,9 @@ async def _pdf_response(perm_ctx, db: AsyncSession, report: dict) -> Response:
 
     # The clinic on the letterhead is the signed-in clinic, read from the
     # clinics row here; report["branding"] from the client is ignored.
-    clinic = await clinic_letterhead(perm_ctx.clinic)
+    clinic = await clinic_letterhead(
+        perm_ctx.clinic, await display_doctor_name(db, perm_ctx.clinic)
+    )
 
     try:
         pdf_bytes = await asyncio.to_thread(generate_posture_pdf, report, clinic)
@@ -1223,21 +1243,38 @@ async def _pdf_response(perm_ctx, db: AsyncSession, report: dict) -> Response:
 @router.post("/report/pdf", dependencies=_CAN_RUN)
 async def export_posture_pdf(
     perm_ctx: PermissionContextDep,
-    report: dict = Body(...),
+    body: dict = Body(...),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Render an already-computed posture report to a clinical PDF.
+    The clinical PDF of a saved report, by id.
 
-    Takes the report payload the frontend already holds, so the MediaPipe
-    analysis is not re-run just to produce a document.
+    Since POS-10 (24 Nov 2026) the PDF is made only from the report saved in
+    the database for this clinic (#86 saves every report); nothing the client
+    sends is rendered. The body carries the report id and nothing else is
+    read from it, so an old client that still sends the whole report gets the
+    stored copy, not its own. Same result as GET /reports/{id}/pdf.
     """
 
-    # AUD-10: a malformed payload gets a fixed 422 message, and an unexpected
+    # AUD-10: a malformed body gets a fixed 422 message, and an unexpected
     # failure a fixed 500 message; the exception text stays in the server log.
-    if not _pdf_payload_ok(report):
+    report_id = body.get("reportId")
+    if not isinstance(report_id, str) or not report_id.strip():
         raise HTTPException(status_code=422, detail=PDF_BAD_PAYLOAD)
 
+    return await _saved_report_pdf_response(perm_ctx, db, report_id.strip())
+
+
+async def _saved_report_pdf_response(perm_ctx, db: AsyncSession, report_id: str) -> Response:
+    # Looked up by the signed-in clinic's id: another clinic's report is a 404.
+    row = await store.get_saved_report(db, perm_ctx.clinic.id, report_id)
+    report = dict(row.report_json or {})
+    if row.number:
+        report["reportNumber"] = row.number
+    # The stored copy was checked when it was made; if it is unreadable now
+    # that is a server-side fault, not a bad request.
+    if not _pdf_payload_ok(report):
+        raise HTTPException(status_code=500, detail=PDF_FAILED)
     return await _pdf_response(perm_ctx, db, report)
 
 
@@ -1258,7 +1295,7 @@ async def pick_patients(
     clinic = perm_ctx.clinic
     rows = await store.search_clinic_patients(db, clinic.id, search)
     today = datetime.now(IST).date()
-    return {"patients": [store.patient_summary(p, clinic.name, today) for p in rows]}
+    return {"patients": [store.patient_summary(p, clinic, today) for p in rows]}
 
 
 @router.get("/patients/{patient_id}", dependencies=_CAN_RUN)
@@ -1270,7 +1307,7 @@ async def pick_one_patient(
     """One patient of the clinic, for the screen opened from the CRM patient page (404 otherwise)."""
     clinic = perm_ctx.clinic
     patient = await store.get_clinic_patient(db, clinic.id, patient_id)
-    return store.patient_summary(patient, clinic.name, datetime.now(IST).date())
+    return store.patient_summary(patient, clinic, datetime.now(IST).date())
 
 
 @router.get("/patients/{patient_id}/reports", dependencies=_CAN_RUN)
@@ -1310,8 +1347,4 @@ async def saved_report_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     """The PDF of a saved report, made again from the saved data."""
-    row = await store.get_saved_report(db, perm_ctx.clinic.id, report_id)
-    report = dict(row.report_json or {})
-    if not _pdf_payload_ok(report):
-        raise HTTPException(status_code=500, detail=PDF_FAILED)
-    return await _pdf_response(perm_ctx, db, report)
+    return await _saved_report_pdf_response(perm_ctx, db, report_id)

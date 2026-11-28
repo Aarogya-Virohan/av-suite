@@ -10,8 +10,8 @@ patient or the clinic profile; empty fields are left out and nothing is made
 up (D-008, D-018). Clinics have no digital signature, so there is no
 signature line (C-19).
 
-The look is the exercise prescription PDF: shared letterhead
-(app/services/report_letterhead.py), brand fonts, footer. Amounts use "Rs."
+Round 4 (26 Nov 2026, BR-m): plain black and white, no band, no watermark,
+no tint; one receipt per payment (D-043). Amounts use "Rs."
 because the embedded fonts are a Latin subset without the rupee sign, and
 the server may have no font that has it.
 """
@@ -26,22 +26,11 @@ from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from app.services.brand import (
-    INK,
-    MIDNIGHT,
-    MUTED,
-    PAPER,
-    RULE,
-    font_faces,
-)
+from app.services.brand import font_faces
 from app.services.report_letterhead import (
-    clinic_details,
-    footer_css,
-    footer_html,
-    letterhead_css,
-    letterhead_html,
-    letterhead_page_top_mm,
-    resolve_clinic_logo,
+    LOGO_BG_AS_IS,
+    format_address,
+    letterhead_logo,
 )
 
 try:
@@ -79,6 +68,7 @@ class ReceiptPayment:
     reference: str | None
     amount: Decimal | str | None
     status: str = "completed"
+    receipt_number: str | None = None  # D-043, RCP-<FY>-<6 digits>
 
 
 @dataclass
@@ -115,6 +105,8 @@ class InvoiceDoc:
     notes: str | None = None
     items: list[InvoiceLine] = field(default_factory=list)
     payments: list[ReceiptPayment] = field(default_factory=list)
+    # The payment a receipt is for; None = the latest completed payment.
+    payment: ReceiptPayment | None = None
 
 
 # --------------------------------------------------------------------------
@@ -193,17 +185,103 @@ def pdf_filename(kind: DocKind, invoice_number: str) -> str:
 
 
 # --------------------------------------------------------------------------
-# Template
+# Amount in words, Indian system (lakh, crore)
 # --------------------------------------------------------------------------
+_ONES = (
+    "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+    "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen",
+)
+_TENS = ("", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety")
 
 
-def _meta_rows(doc: InvoiceDoc) -> str:
-    rows = [("Ref", _esc(doc.invoice_number)), ("Date", _esc(display_date(doc.issue_date)))]
-    # A due date means nothing on a receipt for money already received.
-    if doc.due_date and doc.kind == "invoice":
-        rows.append(("Due", _esc(display_date(doc.due_date))))
-    rows.append(("Status", f'<span class="status">{_esc(str(doc.status).replace("_", " "))}</span>'))
-    return "".join(f'<tr><td class="k">{k}</td><td class="v">{v}</td></tr>' for k, v in rows if v)
+def _below_hundred(n: int) -> str:
+    if n < 20:
+        return _ONES[n]
+    return (_TENS[n // 10] + (" " + _ONES[n % 10] if n % 10 else "")).strip()
+
+
+def _below_thousand(n: int) -> str:
+    hundred, rest = divmod(n, 100)
+    parts = []
+    if hundred:
+        parts.append(f"{_ONES[hundred]} Hundred")
+    if rest:
+        parts.append(_below_hundred(rest))
+    return " ".join(parts)
+
+
+def _indian_words(n: int) -> str:
+    if n == 0:
+        return "Zero"
+    parts = []
+    crore, n = divmod(n, 10_000_000)
+    lakh, n = divmod(n, 100_000)
+    thousand, n = divmod(n, 1000)
+    if crore:
+        parts.append(f"{_indian_words(crore)} Crore")
+    if lakh:
+        parts.append(f"{_below_hundred(lakh)} Lakh")
+    if thousand:
+        parts.append(f"{_below_hundred(thousand)} Thousand")
+    if n:
+        parts.append(_below_thousand(n))
+    return " ".join(parts)
+
+
+def amount_in_words(value: Decimal | str | int | float | None) -> str:
+    """'Rupees Two Thousand Five Hundred and Fifty Paise Only' (Indian grouping)."""
+    amount = abs(_dec(value).quantize(Decimal("0.01")))
+    rupees = int(amount)
+    paise = int((amount - rupees) * 100)
+    text = f"Rupees {_indian_words(rupees)}"
+    if paise:
+        text += f" and {_below_hundred(paise)} Paise"
+    return text + " Only"
+
+
+# --------------------------------------------------------------------------
+# Template, Round 4 (BR-m): plain black and white, no band, no watermark,
+# no tint. Only what the document needs.
+# --------------------------------------------------------------------------
+GREY = "#555555"   # small print on white: 7.5:1
+LINE = "#bbbbbb"
+
+
+def _clinic_header(doc: InvoiceDoc) -> str:
+    logo = (
+        f'<td class="logo"><img src="{doc.clinic_logo_src}" alt="" '
+        f'style="width: {_logo_mm(doc.clinic_logo_src)[0]}mm; height: {_logo_mm(doc.clinic_logo_src)[1]}mm" /></td>'
+        if doc.clinic_logo_src
+        else ""
+    )
+    lines = []
+    address = format_address(doc.address_line, doc.city, doc.state, doc.pincode)
+    if address:
+        lines.append(_esc(address))
+    contact = " &middot; ".join(_esc(v) for v in (_filled(doc.phone), _filled(doc.email)) if v)
+    if contact:
+        lines.append(contact)
+    ids = " &middot; ".join(
+        f"{label} {_esc(v)}" for label, v in (("GSTIN", _filled(doc.gstin)), ("Reg. No.", _filled(doc.registration_number))) if v
+    )
+    if ids:
+        lines.append(ids)
+    body = "".join(f"<p>{line}</p>" for line in lines)
+    return (
+        f'<table class="clinic"><tr>{logo}<td><p class="cname">{_esc(doc.clinic_name)}</p>{body}</td></tr></table>'
+    )
+
+
+def _logo_mm(src: str) -> tuple[float, float]:
+    from app.services.report_letterhead import _fit_box
+
+    return _fit_box(src, 30.0, 16.0)
+
+
+def _kv(rows: list[tuple[str, str]]) -> str:
+    return "".join(
+        f'<tr><td class="k">{k}</td><td class="v">{v}</td></tr>' for k, v in rows if v
+    )
 
 
 def _items_table(doc: InvoiceDoc) -> str:
@@ -215,163 +293,187 @@ def _items_table(doc: InvoiceDoc) -> str:
         )
     else:
         body = '<tr><td colspan="4" class="empty">No line items recorded on this invoice.</td></tr>'
-
-    totals = [("Subtotal", money(doc.subtotal), "")]
-    if _dec(doc.discount_amount) > 0:
-        pct = percent_text(doc.discount_percent)
-        totals.append((f"Discount{f' ({pct})' if pct else ''}", f"- {money(doc.discount_amount)}", ""))
-    if _dec(doc.tax_amount) > 0:
-        pct = percent_text(doc.tax_percent)
-        totals.append((f"Tax{f' ({pct})' if pct else ''}", money(doc.tax_amount), ""))
-    totals.append(("Total", money(doc.total_amount), "grand"))
-    if doc.kind == "receipt" or _dec(doc.paid_amount) > 0:
-        totals.append(("Paid", money(doc.paid_amount), ""))
-        balance = _dec(doc.total_amount) - _dec(doc.paid_amount)
-        if balance > 0:
-            totals.append(("Balance due", money(balance), "due"))
-    foot = "".join(
-        f'<tr class="t {cls}"><td colspan="3" class="lbl">{_esc(label)}</td><td class="num">{_esc(val)}</td></tr>'
-        for label, val, cls in totals
-    )
     return f"""
 <table class="items">
   <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
   <tbody>{body}</tbody>
-  <tbody class="totals">{foot}</tbody>
 </table>"""
 
 
-def _payments_table(doc: InvoiceDoc) -> str:
-    if doc.kind != "receipt":
-        return ""
-    if not doc.payments:
-        return '<div class="block"><p class="tag">Payments received</p><p class="muted">No payments recorded against this invoice.</p></div>'
-    rows = []
-    for p in sorted(doc.payments, key=lambda p: (ist_date(p.paid_on) or date.min)):
-        mode = METHOD_LABEL.get(str(p.method), str(p.method))
-        if p.status and p.status != "completed":
-            mode = f"{mode} ({p.status})"
-        rows.append(
-            f"<tr><td>{_esc(display_date(p.paid_on))}</td><td>{_esc(mode)}</td>"
-            f"<td>{_esc(p.reference) or '-'}</td><td class='num'>{money(p.amount)}</td></tr>"
-        )
+def _totals(doc: InvoiceDoc) -> str:
+    rows = [("Subtotal", money(doc.subtotal), "")]
+    if _dec(doc.discount_amount) > 0:
+        pct = percent_text(doc.discount_percent)
+        rows.append((f"Discount{f' ({pct})' if pct else ''}", f"- {money(doc.discount_amount)}", ""))
+    if _dec(doc.tax_amount) > 0:
+        pct = percent_text(doc.tax_percent)
+        rows.append((f"Tax{f' ({pct})' if pct else ''}", money(doc.tax_amount), ""))
+    rows.append(("Total", money(doc.total_amount), "grand"))
+    rows.append(("Paid", money(doc.paid_amount), ""))
+    balance = max(Decimal("0"), _dec(doc.total_amount) - _dec(doc.paid_amount))
+    rows.append(("Balance", money(balance), "bal"))
+    body = "".join(
+        f'<tr class="{cls}"><td class="k">{_esc(k)}</td><td class="num">{_esc(v)}</td></tr>' for k, v, cls in rows
+    )
+    return f'<table class="totals">{body}</table>'
+
+
+def receipt_payment(doc: InvoiceDoc) -> ReceiptPayment | None:
+    """The payment this receipt is for (D-043: one receipt per payment)."""
+    if doc.payment is not None:
+        return doc.payment
+    done = [p for p in doc.payments if (p.status or "completed") == "completed"]
+    # Same date: the one recorded later (higher receipt number) wins.
+    return (
+        max(done, key=lambda p: (p.paid_on or datetime.min.replace(tzinfo=IST), p.receipt_number or ""))
+        if done
+        else None
+    )
+
+
+def document_number(doc: InvoiceDoc) -> str:
+    if doc.kind == "receipt":
+        pay = receipt_payment(doc)
+        return (pay.receipt_number if pay and pay.receipt_number else "") or doc.invoice_number
+    return doc.invoice_number
+
+
+def _invoice_body(doc: InvoiceDoc) -> str:
+    bill = _kv(
+        [
+            ("Name", f"<b>{_esc(doc.patient_name)}</b>"),
+            ("Patient ID", _esc(doc.patient_id) if _filled(doc.patient_id) else ""),
+            ("Phone", _esc(doc.patient_phone) if _filled(doc.patient_phone) else ""),
+        ]
+    )
+    meta = _kv(
+        [
+            ("Invoice No.", f"<b>{_esc(doc.invoice_number)}</b>"),
+            ("Date", _esc(display_date(doc.issue_date))),
+            ("Due date", _esc(display_date(doc.due_date))),
+        ]
+    )
+    notes = f'<p class="notes"><b>Notes</b> {_esc(doc.notes)}</p>' if _filled(doc.notes) else ""
     return f"""
-<div class="block"><p class="tag">Payments received</p>
-<table class="items pay">
-  <thead><tr><th>Date</th><th>Mode</th><th>Reference</th><th class="num">Amount</th></tr></thead>
-  <tbody>{''.join(rows)}</tbody>
-</table></div>"""
+<p class="title">INVOICE</p>
+<table class="two"><tr>
+  <td><p class="cap">Bill to</p><table class="kv">{bill}</table></td>
+  <td class="right"><table class="kv r">{meta}</table></td>
+</tr></table>
+{_items_table(doc)}
+<table class="after"><tr>
+  <td class="words"><p class="cap">Amount in words</p><p>{_esc(amount_in_words(doc.total_amount))}</p>{notes}</td>
+  <td class="tot">{_totals(doc)}</td>
+</tr></table>"""
+
+
+def _receipt_body(doc: InvoiceDoc) -> str:
+    pay = receipt_payment(doc)
+    if pay is None:
+        return '<p class="title">RECEIPT</p><p>No payment has been recorded against this invoice.</p>'
+    mode = METHOD_LABEL.get(str(pay.method), str(pay.method))
+    if pay.status and pay.status != "completed":
+        mode = f"{mode} ({pay.status})"
+    balance = max(Decimal("0"), _dec(doc.total_amount) - _dec(doc.paid_amount))
+    rows = _kv(
+        [
+            ("Receipt No.", f"<b>{_esc(document_number(doc))}</b>"),
+            ("Date", _esc(display_date(pay.paid_on))),
+            ("Received from", f"<b>{_esc(doc.patient_name)}</b>"),
+            ("Patient ID", _esc(doc.patient_id) if _filled(doc.patient_id) else ""),
+            ("Against invoice", _esc(doc.invoice_number)),
+            ("Amount received", f"<b>{money(pay.amount)}</b>"),
+            ("Amount in words", _esc(amount_in_words(pay.amount))),
+            ("Payment mode", _esc(mode)),
+            ("Transaction ref.", _esc(pay.reference) if _filled(pay.reference) else ""),
+            ("Invoice total", money(doc.total_amount)),
+            ("Balance due", f"<b>{money(balance)}</b>"),
+        ]
+    )
+    return f"""
+<p class="title">RECEIPT</p>
+<table class="kv receipt">{rows}</table>"""
+
+
+def _signatory(doc: InvoiceDoc) -> str:
+    """Round 4 (27 Nov 2026): a signature line with the clinic's authorised
+    person, text only (no signature image). The line stays even when no name
+    is set, so the paper can still be signed."""
+    name = _filled(doc.authorised_person)
+    who = f'<p class="sname">{_esc(name)}</p>' if name else ""
+    clinic = f'<p class="sfor">For {_esc(doc.clinic_name)}</p>' if _filled(doc.clinic_name) else ""
+    return f'<div class="sign">{clinic}<div class="sline"></div>{who}<p class="slabel">Authorised signatory</p></div>'
 
 
 def build_invoice_html(doc: InvoiceDoc) -> str:
-    title = "Payment Receipt" if doc.kind == "receipt" else "Invoice"
-    word = "receipt" if doc.kind == "receipt" else "invoice"
-    phone = f'<p class="p-line">{_esc(doc.patient_phone)}</p>' if _filled(doc.patient_phone) else ""
-    patient_id = (
-        f'<p class="p-line"><span class="muted">Patient ID</span> <span class="nowrap">{_esc(doc.patient_id)}</span></p>'
-        if _filled(doc.patient_id)
-        else ""
-    )
-    notes = (
-        f'<div class="block"><p class="tag">Notes</p><p>{_esc(doc.notes)}</p></div>'
-        if _filled(doc.notes)
-        else ""
-    )
-    authorised = (
-        f"<p>Authorised by {_esc(doc.authorised_person)}</p>" if _filled(doc.authorised_person) else ""
-    )
-    thanks = (
-        f"<p>Thank you for visiting {_esc(doc.clinic_name)}.</p>"
-        if _filled(doc.clinic_name)
-        else "<p>Thank you.</p>"
-    )
-    details = clinic_details(
-        address_line=doc.address_line,
-        city=doc.city,
-        state=doc.state,
-        pincode=doc.pincode,
-        phone=doc.phone,
-        email=doc.email,
-        website=doc.website,
-        registration_number=doc.registration_number,
-        gstin=doc.gstin,
-    )
-    page_top = letterhead_page_top_mm(details if _filled(doc.clinic_name) else [])
-    letterhead = letterhead_html(
-        _esc(LETTERHEAD_SUBTITLE[doc.kind]), _esc(doc.clinic_name), doc.clinic_logo_src, details
-    )
-
+    title = "Receipt" if doc.kind == "receipt" else "Invoice"
+    body = _receipt_body(doc) if doc.kind == "receipt" else _invoice_body(doc)
+    number = document_number(doc)
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8" />
-<title>{_esc(title)} {_esc(doc.invoice_number)}</title>
+<title>{_esc(title)} {_esc(number)}</title>
 <style>
 {font_faces()}
 @page {{
   size: A4;
-  margin: {page_top}mm 0 20mm 0;
+  margin: 16mm 16mm 18mm 16mm;
   background-color: #ffffff;
-  @top-center {{ content: element(letterhead); width: 100%; vertical-align: top; }}
-  @bottom-center {{ content: element(runningFooter); width: 100%; vertical-align: top; }}
+  @bottom-left {{ content: "{_esc(number)}"; font-family: 'Inter', sans-serif; font-size: 7pt; color: {GREY}; }}
+  @bottom-center {{ content: "Powered by Aarogya Virohan · AV Suite"; font-family: 'Inter', sans-serif;
+    font-size: 7pt; color: {GREY}; }}
+  @bottom-right {{ content: "Page " counter(page) " of " counter(pages);
+    font-family: 'Inter', sans-serif; font-size: 7pt; color: {GREY}; }}
 }}
-body {{ font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; color: {INK};
-  margin: 0; padding: 0 14mm; line-height: 1.45; font-size: 9pt; }}
+body {{ font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #000;
+  margin: 0; line-height: 1.45; font-size: 9.5pt; }}
 p {{ margin: 0; }}
-{letterhead_css()}
-{footer_css()}
-
-.head {{ width: 100%; border-collapse: collapse; margin-bottom: 5mm; }}
-.head td {{ vertical-align: top; padding: 0; }}
-.doc {{ text-align: right; width: 42%; }}
-.doc .t {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 15pt;
-  letter-spacing: 1.6px; text-transform: uppercase; color: {MIDNIGHT}; }}
-.meta-t {{ margin: 1.6mm 0 0 auto; border-collapse: collapse; }}
-.meta-t td {{ padding: 0.5mm 0; font-size: 8.6pt; }}
-.meta-t .k {{ color: {MUTED}; padding-right: 3mm; text-align: right; }}
-.meta-t .v {{ font-weight: 600; text-align: right; }}
-.status {{ text-transform: capitalize; }}
-.head td.bill {{ background: {PAPER}; border: 1px solid {RULE}; border-radius: 3mm; padding: 3mm 4mm; width: 50%; }}
-.head td.gap {{ width: 8%; }}
-.tag {{ font-size: 6.6pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
-  color: {MUTED}; margin-bottom: 1.2mm !important; }}
-.p-name {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 700; font-size: 10.5pt; }}
-.p-line {{ font-size: 8.6pt; color: {MUTED}; }}
-.p-line .nowrap {{ white-space: nowrap; color: {INK}; font-weight: 600; }}
+.clinic {{ border-collapse: collapse; width: 100%; padding-bottom: 4mm; border-bottom: 0.4mm solid #000; }}
+.clinic td {{ vertical-align: middle; padding: 0 0 4mm 0; font-size: 8.5pt; color: #222; }}
+.clinic td.logo {{ width: 1%; padding-right: 4mm; }}
+.clinic .cname {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 700; font-size: 13pt; color: #000;
+  margin-bottom: 0.8mm; }}
+.title {{ font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; font-weight: 800; font-size: 16pt;
+  letter-spacing: 2px; margin: 6mm 0 4mm 0; }}
+.cap {{ font-size: 7.5pt; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: {GREY};
+  margin-bottom: 1mm; }}
+.two {{ width: 100%; border-collapse: collapse; margin-bottom: 5mm; }}
+.two td {{ vertical-align: top; padding: 0; width: 50%; }}
+.two td.right {{ text-align: right; }}
+.kv {{ border-collapse: collapse; }}
+.kv.r {{ margin-left: auto; }}
+.kv td {{ padding: 0.6mm 0; vertical-align: top; }}
+.kv .k {{ color: {GREY}; padding-right: 5mm; white-space: nowrap; }}
+.kv.r .v {{ text-align: right; }}
+.kv.receipt {{ width: 100%; margin-top: 2mm; }}
+.kv.receipt td {{ padding: 2mm 0; border-bottom: 0.2mm solid {LINE}; }}
+.kv.receipt .k {{ width: 45mm; }}
 .items {{ width: 100%; border-collapse: collapse; }}
-.items th {{ text-align: left; font-size: 7pt; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
-  color: {MUTED}; border-bottom: 1.2px solid {MIDNIGHT}; padding: 1.6mm 2mm; }}
-.items td {{ padding: 2mm; border-bottom: 1px solid {RULE}; vertical-align: top; }}
+.items th {{ text-align: left; font-size: 8pt; font-weight: 700; border-top: 0.4mm solid #000;
+  border-bottom: 0.4mm solid #000; padding: 1.8mm 2mm; }}
+.items td {{ padding: 2mm; border-bottom: 0.2mm solid {LINE}; vertical-align: top; }}
 .items .num {{ text-align: right; white-space: nowrap; }}
-.items .empty {{ color: {MUTED}; text-align: center; }}
+.items .empty {{ color: {GREY}; text-align: center; }}
 .items tr {{ page-break-inside: avoid; }}
-.totals td {{ border-bottom: none; padding: 1.2mm 2mm; }}
-.totals .lbl {{ text-align: right; color: {MUTED}; }}
-.totals tr.grand td {{ border-top: 1.2px solid {MIDNIGHT}; font-weight: 700; color: {MIDNIGHT}; font-size: 10pt; padding-top: 2mm; }}
-.totals tr.grand .lbl {{ color: {MIDNIGHT}; }}
-.totals tr.due td {{ font-weight: 700; color: #b03a2e; }}
-.block {{ margin-top: 6mm; page-break-inside: avoid; }}
-.muted {{ color: {MUTED}; }}
-.closing {{ margin-top: 8mm; border-top: 1px solid {RULE}; padding-top: 3mm; font-size: 8pt; color: {MUTED};
-  page-break-inside: avoid; }}
-.closing .right {{ text-align: right; margin-top: 1.5mm; color: {INK}; }}
+.after {{ width: 100%; border-collapse: collapse; margin-top: 4mm; page-break-inside: avoid; }}
+.after td {{ vertical-align: top; padding: 0; }}
+.after td.words {{ width: 55%; padding-right: 8mm; }}
+.notes {{ margin-top: 4mm !important; font-size: 8.5pt; }}
+.totals {{ width: 100%; border-collapse: collapse; }}
+.totals td {{ padding: 1.2mm 2mm; }}
+.totals .k {{ color: #222; }}
+.totals .num {{ text-align: right; white-space: nowrap; }}
+.totals tr.grand td {{ border-top: 0.4mm solid #000; border-bottom: 0.4mm solid #000; font-weight: 700; font-size: 10.5pt; }}
+.totals tr.bal td {{ font-weight: 700; }}
+.sign {{ width: 62mm; margin: 16mm 0 0 auto; text-align: center; page-break-inside: avoid; font-size: 8.5pt; }}
+.sign .sfor {{ color: #222; margin-bottom: 12mm; }}
+.sign .sline {{ border-top: 0.3mm solid #000; }}
+.sign .sname {{ font-weight: 700; margin-top: 1.2mm; }}
+.sign .slabel {{ color: {GREY}; font-size: 7.5pt; margin-top: 0.6mm; }}
 </style></head>
 <body>
-{letterhead}
-{footer_html(('Receipt ' if doc.kind == 'receipt' else 'Invoice ') + doc.invoice_number)}
-
-<table class="head"><tr>
-  <td class="bill"><p class="tag">Billed to</p><p class="p-name">{_esc(doc.patient_name)}</p>{patient_id}{phone}</td>
-  <td class="gap"></td>
-  <td class="doc"><p class="t">{_esc(title)}</p><table class="meta-t">{_meta_rows(doc)}</table></td>
-</tr></table>
-
-{_items_table(doc)}
-{_payments_table(doc)}
-{notes}
-
-<div class="closing">
-  <p>This is a computer-generated {word} and does not need a signature.</p>
-  <div class="right">{authorised}{thanks}</div>
-</div>
+{_clinic_header(doc)}
+{body}
+{_signatory(doc)}
 </body></html>
 """
 
@@ -386,5 +488,7 @@ async def render_invoice_pdf(doc: InvoiceDoc) -> bytes:
     """Resolve the clinic logo, build the HTML and render it off the event loop."""
     from app.services.prescription_pdf import fetch_logo
 
-    doc.clinic_logo_src = await resolve_clinic_logo(doc.clinic_logo, fetch_logo)
+    # Invoices show the logo exactly as uploaded (BR-m), whatever the
+    # letterhead background mode.
+    doc.clinic_logo_src = await letterhead_logo(doc.clinic_logo, LOGO_BG_AS_IS, None, fetch_logo)
     return await asyncio.to_thread(_render, build_invoice_html(doc))

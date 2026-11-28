@@ -132,6 +132,8 @@ async def ctx(db_session: AsyncSession):
     headers = await make_user(db_session, role=UserRole.ADMIN)
     clinic = await _clinic_for(db_session, headers)
     clinic.name = "Spine Care Clinic"
+    # The Patient ID uses clinics.code (a fresh one per run: codes are unique).
+    clinic.code = f"S{uuid.uuid4().hex[:4].upper()}"
     await db_session.commit()
     patient = await _patient(db_session, clinic, number=7)
     return headers, clinic, patient
@@ -181,7 +183,7 @@ async def test_report_uses_crm_patient_and_is_saved(client: AsyncClient, db_sess
     assert report["patient"]["name"] == "Asha Rao"
     assert report["patient"]["age"] == 34
     assert report["patient"]["gender"] == "Female"
-    assert report["patient"]["caseRef"] == "SCC-000007"
+    assert report["patient"]["caseRef"] == f"{clinic.code}-000007"
     assert report["patient"]["patientId"] == str(patient.id)
     assert report["patient"]["heightCm"] == 172.0
     assert report["reportId"].startswith("PT-")
@@ -239,7 +241,10 @@ async def test_saved_report_can_be_listed_reopened_and_downloaded(client: AsyncC
     pdf = await client.get(f"{BASE}/reports/{rid}/pdf", headers=headers)
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages)
-    assert "Asha Rao" in text and "SCC-000007" in text and rid in text
+    # D-043: the printed number is the server-given POS number, not the PT id.
+    assert report["reportNumber"] == f"{clinic.code}-POS-000001"
+    assert listing[0]["reportNumber"] == report["reportNumber"]
+    assert "Asha Rao" in text and f"{clinic.code}-000007" in text and report["reportNumber"] in text
 
 
 async def test_saved_report_of_another_clinic_is_404(client: AsyncClient, db_session: AsyncSession, ctx):
@@ -272,15 +277,15 @@ async def test_picker_finds_by_name_and_crm_id_and_shows_no_phone(client: AsyncC
         return r.json()["patients"]
 
     assert [p["name"] for p in await find("asha")] == ["Asha Rao"]
-    assert [p["name"] for p in await find("SCC-000007")] == ["Asha Rao"]
+    assert [p["name"] for p in await find(f"{clinic.code}-000007")] == ["Asha Rao"]
     assert [p["name"] for p in await find("#21")] == ["Ravi Kumar"]
     assert {p["name"] for p in await find("")} >= {"Asha Rao", "Ravi Kumar"}
     assert "Foreign" not in json.dumps(await find(""))
     found = (await find("asha"))[0]
-    assert found["caseId"] == "SCC-000007" and found["age"] == 34 and found["gender"] == "Female"
+    assert found["caseId"] == f"{clinic.code}-000007" and found["age"] == 34 and found["gender"] == "Female"
     assert "phone" not in found and "9000000001" not in json.dumps(found)
     one = (await client.get(f"{BASE}/patients/{patient.id}", headers=headers)).json()
-    assert one["id"] == str(patient.id) and one["caseId"] == "SCC-000007"
+    assert one["id"] == str(patient.id) and one["caseId"] == f"{clinic.code}-000007"
 
 
 async def test_picker_needs_posture_access(client: AsyncClient, db_session: AsyncSession):
@@ -298,7 +303,7 @@ async def _events(db: AsyncSession, clinic: Clinic):
 async def test_usage_events_for_report_and_pdf_carry_no_patient_data(client: AsyncClient, db_session: AsyncSession, ctx):
     headers, clinic, patient = ctx
     report = (await _post_report(client, headers, patient.id)).json()
-    assert (await client.post(f"{BASE}/report/pdf", headers=headers, json=report)).status_code == 200
+    assert (await client.post(f"{BASE}/report/pdf", headers=headers, json={"reportId": report["reportId"]})).status_code == 200
     assert (await client.get(f"{BASE}/reports/{report['reportId']}/pdf", headers=headers)).status_code == 200
 
     events = await _events(db_session, clinic)
@@ -310,7 +315,7 @@ async def test_usage_events_for_report_and_pdf_carry_no_patient_data(client: Asy
     columns = {c.name for c in UsageEvent.__table__.columns}
     assert columns == {"id", "organization_id", "clinic_id", "user_id", "product_key", "event_type", "created_at"}
     blob = " ".join(str(getattr(e, c)) for e in events for c in columns)
-    for secret in ("Asha", "Rao", str(patient.id), "SCC-000007", report["reportId"]):
+    for secret in ("Asha", "Rao", str(patient.id), f"{clinic.code}-000007", report["reportId"]):
         assert secret not in blob
 
 
@@ -323,22 +328,67 @@ async def test_failed_requests_record_no_usage(client: AsyncClient, db_session: 
     assert await _events(db_session, clinic) == []
 
 
-# --- case ID format = the CRM's (frontend/crm/src/lib/patientNumber.ts) ---
+# --- Patient ID = the CRM's: clinics.code, then the number padded to 6 digits ---
 
 @pytest.mark.parametrize(
-    "name, number, expected",
+    "code, name, number, expected",
     [
-        ("Spine Care Clinic", 7, "SCC-000007"),
-        ("SpineAct", 123, "SPI-000123"),
-        ("Aarogya Virohan Physio Centre", 5, "AVP-000005"),
-        ("", 1, "PT-000001"),
-        ("123 456", 1, "PT-000001"),
-        ("Dr. Rao's Clinic", 42, "DRS-000042"),
+        ("ASC2", "AV Suite Clinic 1", 4, "ASC2-000004"),   # the stored code wins over the name rule
+        ("asc2", "AV Suite Clinic 1", 4, "ASC2-000004"),
+        (" SCC ", "Anything", 7, "SCC-000007"),
+        ("", "Spine Care Clinic", 7, "SCC-000007"),        # empty code: name rule
+        (None, "SpineAct", 123, "SPI-000123"),
+        ("", "Aarogya Virohan Physio Centre", 5, "AVP-000005"),
+        (None, "", 1, "PT-000001"),
+        ("", "123 456", 1, "PT-000001"),
+        ("", "Dr. Rao's Clinic", 42, "DRS-000042"),
     ],
 )
-async def test_case_id_matches_crm_format(name, number, expected):
-    assert store.format_case_id(number, name) == expected
+async def test_case_id_matches_crm_format(code, name, number, expected):
+    assert store.format_case_id(number, code, name) == expected
 
 
 async def test_case_id_empty_without_a_number():
-    assert store.format_case_id(None, "Spine Care") == ""
+    assert store.format_case_id(None, "SC", "Spine Care") == ""
+
+
+async def test_report_pdf_and_picker_use_the_clinic_code(client: AsyncClient, db_session: AsyncSession):
+    """Clinic code ASC2 on a clinic named "AV Suite Clinic 1": ASC2-000004 on the
+    picker, the saved report and the PDF (the WhatsApp text is built from the
+    report's caseRef, checked in the browser run)."""
+    headers = await make_user(db_session, role=UserRole.ADMIN)
+    clinic = await _clinic_for(db_session, headers)
+    clinic.name = "AV Suite Clinic 1"
+    clinic.code = f"A{uuid.uuid4().hex[:4].upper()}"  # unique per run; same shape as ASC2
+    await db_session.commit()
+    patient = await _patient(db_session, clinic, number=4)
+
+    picked = (await client.get(f"{BASE}/patients/{patient.id}", headers=headers)).json()
+    assert picked["caseId"] == f"{clinic.code}-000004"
+
+    report = (await _post_report(client, headers, patient.id)).json()
+    assert report["patient"]["caseRef"] == f"{clinic.code}-000004"
+    assert "AVS" not in report["patient"]["caseRef"]
+
+    pdf = await client.get(f"{BASE}/reports/{report['reportId']}/pdf", headers=headers)
+    text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages)
+    assert f"{clinic.code}-000004" in text
+
+
+async def test_clinic_with_code_asc2_gives_asc2_000004(client: AsyncClient, db_session: AsyncSession):
+    headers = await make_user(db_session, role=UserRole.ADMIN)
+    clinic = await _clinic_for(db_session, headers)
+    other = (await db_session.execute(select(Clinic).where(Clinic.code == "ASC2"))).scalars().first()
+    if other is not None:  # keep the literal code from the request when it is free
+        pytest.skip("ASC2 already taken in this database")
+    clinic.name = "AV Suite Clinic 1"
+    clinic.code = "ASC2"
+    await db_session.commit()
+    patient = await _patient(db_session, clinic, number=4)
+    report = (await _post_report(client, headers, patient.id)).json()
+    assert report["patient"]["caseRef"] == "ASC2-000004"
+    pdf = await client.get(f"{BASE}/reports/{report['reportId']}/pdf", headers=headers)
+    text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages)
+    assert "ASC2-000004" in text
+    clinic.code = f"Z{uuid.uuid4().hex[:4].upper()}"  # free the literal code for the next run
+    await db_session.commit()

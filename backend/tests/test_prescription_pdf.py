@@ -333,59 +333,59 @@ def _data_uri(fmt: str, mime: str, size=(300, 120)) -> str:
 
 
 async def test_letterhead_wording_and_no_signature() -> None:
-    out = build_prescription_html(_doc())
-    assert "Exercise Prescription Tool" in out
+    from app.services.prescription_pdf import clinic_brand
+    from app.services.report_letterhead import clinical_band_html
+
+    doc = _doc(document_number="GRP-RX-000014", display_doctor_name="Dr. Asha Rao")
+    out = build_prescription_html(doc)
     assert "Physical Therapy" not in out
     assert "Prescribed by" not in out
     assert "signature" not in out.lower()
-    assert '<div class="caption">Date</div>' not in out
     assert "Treating therapist" in out and "Asha Rao" in out
-    # D-036 (14 Nov): Aarogya Virohan mark on the far right of the header;
-    # "Powered by" only in the footer.
-    head = out[out.index('<div class="letterhead">') : out.index('<div class="running-footer">')]
-    assert "av-round" in head and "Powered by" not in head and "POWERED BY" not in head
-    foot = out[out.index('<div class="running-footer">') :]
-    assert "POWERED BY" in foot and "AAROGYA VIROHAN" in foot
-    assert "Grove &lt;Physio&gt;" in out
-    # No logo stored: clinic name only, no logo cell.
-    assert 'class="lh-logo"' not in out
-    # Date stays in the top box.
-    assert "Prescribed on" in out
+    # Round 4: AV round logo on the right of the band; "Powered by" only in
+    # the bottom band, with the document number above it.
+    band = clinical_band_html(clinic_brand(doc))
+    assert band in out
+    assert 'class="cl-av"' in band and "Powered by" not in band
+    foot = out[out.index('<div class="cl-footer">') :]
+    assert "Powered by" in foot and "Aarogya Virohan" in foot and "GRP-RX-000014" in foot
+    assert "Grove &lt;Physio&gt;" in foot
+    # No logo stored: no logo cell.
+    assert 'class="cl-logo"' not in out
 
 
-async def test_letterhead_av_only_without_clinic_and_no_empty_therapist() -> None:
+async def test_letterhead_without_clinic_keeps_av_and_a_fixed_patient_grid() -> None:
     out = build_prescription_html(_doc(clinic_name="", physio_name=""))
-    assert 'class="lh-clinic"' not in out and 'class="lh-logo"' not in out
+    assert 'class="cl-logo"' not in out
     assert ">Clinic<" not in out
-    # Aarogya Virohan only: round logo and name on the left, nothing on the right.
-    assert 'class="av-only"' in out and 'class="av-round"' in out
-    assert 'class="lh-contact' not in out
-    assert "Treating therapist" not in out
+    assert 'class="cl-av"' in out
+    # Same grid on every report (BR-l): an empty therapist shows a dash.
+    assert '<span class="k">Treating therapist</span><span class="v">&ndash;</span>' in out
 
 
 async def test_clinic_logo_is_used_when_valid() -> None:
-    from app.services.report_letterhead import resolve_clinic_logo
+    from app.services.report_letterhead import letterhead_logo
 
-    src = await resolve_clinic_logo(_data_uri("PNG", "png", (1600, 400)))
+    src = await letterhead_logo(_data_uri("PNG", "png", (1600, 400)), "as_is")
     assert src.startswith("data:image/png;base64,")
     import base64
 
     with Image.open(io.BytesIO(base64.b64decode(src.split(",", 1)[1]))) as img:
         assert max(img.size) <= 400  # shrunk
     out = build_prescription_html(_doc(clinic_logo_src=src))
-    assert '<td class="lh-logo"><div class="tile" style="width: ' in out
-    assert f'<img src="{src}"' in out[out.index('class="lh-logo"') :]
-    # Logo, then clinic name, then Aarogya Virohan on the right.
-    assert out.index('class="lh-logo"') < out.index('class="lh-clinic"')
+    assert '<td class="cl-logo"><div class="box">' in out
+    assert f'<img src="{src}"' in out[out.index('class="cl-logo"') :]
+    # Logo left, then doctor and contacts, then Aarogya Virohan on the right.
+    assert out.index('class="cl-logo"') < out.index('class="cl-who') < out.index('class="cl-av"')
 
 
 @pytest.mark.parametrize(
     ("fmt", "mime"), [("JPEG", "jpeg"), ("WEBP", "webp"), ("GIF", "gif"), ("PNG", "PNG")]
 )
 async def test_clinic_logo_raster_formats_become_png(fmt: str, mime: str) -> None:
-    from app.services.report_letterhead import resolve_clinic_logo
+    from app.services.report_letterhead import letterhead_logo
 
-    src = await resolve_clinic_logo(_data_uri(fmt, mime))
+    src = await letterhead_logo(_data_uri(fmt, mime), "as_is")
     assert src.startswith("data:image/png;base64,"), fmt
 
 
@@ -393,7 +393,7 @@ async def test_clinic_logo_bad_values_fall_back() -> None:
     import base64
 
     from app.services import report_letterhead
-    from app.services.report_letterhead import resolve_clinic_logo
+    from app.services.report_letterhead import letterhead_logo
 
     svg = "data:image/svg+xml;base64," + base64.b64encode(
         b'<svg xmlns="http://www.w3.org/2000/svg"><image href="http://169.254.169.254/"/></svg>'
@@ -410,11 +410,11 @@ async def test_clinic_logo_bad_values_fall_back() -> None:
         "data:image/png;base64," + "A" * (report_letterhead.LOGO_MAX_CHARS + 4),
     ]
     for value in bad:
-        assert await resolve_clinic_logo(value) == "", value
+        assert await letterhead_logo(value, "as_is") == "", value
 
 
 async def test_clinic_logo_remote_url_uses_fetcher() -> None:
-    from app.services.report_letterhead import resolve_clinic_logo
+    from app.services.report_letterhead import letterhead_logo
 
     seen: list[str] = []
 
@@ -431,13 +431,13 @@ async def test_clinic_logo_remote_url_uses_fetcher() -> None:
     async def junk(url: str) -> bytes:
         return b"<html>not a logo</html>"
 
-    assert (await resolve_clinic_logo("https://cdn.test/l.png", ok)).startswith("data:image/png")
+    assert (await letterhead_logo("https://cdn.test/l.png", "as_is", None, ok)).startswith("data:image/png")
     assert seen == ["https://cdn.test/l.png"]
-    assert await resolve_clinic_logo("https://cdn.test/l.png", none) == ""
-    assert await resolve_clinic_logo("https://cdn.test/l.png", boom) == ""
-    assert await resolve_clinic_logo("https://cdn.test/l.png", junk) == ""
+    assert await letterhead_logo("https://cdn.test/l.png", "as_is", None, none) == ""
+    assert await letterhead_logo("https://cdn.test/l.png", "as_is", None, boom) == ""
+    assert await letterhead_logo("https://cdn.test/l.png", "as_is", None, junk) == ""
     seen.clear()
-    assert await resolve_clinic_logo("http://cdn.test/l.png", ok) == ""
+    assert await letterhead_logo("http://cdn.test/l.png", "as_is", None, ok) == ""
     assert seen == []
 
 
@@ -480,24 +480,26 @@ async def test_generated_pdf_uses_clinic_logo_from_db(
     assert gen.status_code == 200, gen.text
     assert len(seen) == 1
     html_out = seen[0]
-    tile = html_out[html_out.index('<td class="lh-logo"><div class="tile" style="width: ') :]
-    assert tile.split("</td>")[0].count('<img src="data:image/png;base64,') == 1
+    box = html_out[html_out.index('<td class="cl-logo"><div class="box">') :]
+    assert box.split("</td>")[0].count('<img src="data:image/png;base64,') == 1
     assert clinic.name in html_out
+    # D-043: the number given on create is printed.
+    assert f"{clinic.code}-RX-000001" in html_out
     assert "Treating therapist" in html_out and "Asha Rao" in html_out
     assert storage.files[f"prescriptions/{clinic.id}/{rx_id}.pdf"][:5] == b"%PDF-"
 
 
-async def test_exercise_picture_is_large_and_above_the_dose() -> None:
-    """Founders, 27 Oct: pictures were too small for patients to follow.
-    The picture now spans the card above the dose, and is kept sharp."""
+async def test_exercise_picture_left_and_dose_right() -> None:
+    """BR-j (26 Nov): picture on the left half, description and dose on the
+    right, 3 exercises per page, the picture kept sharp."""
     from app.services import prescription_pdf as pdf
 
     item = RxItem("Clamshell", "Hip", "", 3, 10, 0, "Daily", "",
                   "https://example.com/a.png", image_src="data:image/jpeg;base64,AAAA")
     out = build_prescription_html(_doc(items=[item]))
-    card = out[out.index('<div class="ex-card">'):]
-    assert card.index('<div class="ex-img"><img') < card.index('<table class="dose">')
-    assert "max-height: 60mm" in out
+    card = out[out.index('<table class="ex-card">'):]
+    assert card.index('<td class="ex-img">') < card.index('<td class="ex-body">') < card.index('<table class="dose')
+    assert pdf.card_image_height_mm(3) >= 55
     assert pdf.IMAGE_MAX_PX >= 1200
 
 
@@ -529,27 +531,29 @@ def _png_uri(w: int, h: int) -> str:
 @pytest.mark.parametrize(
     ("w", "h", "expected"),
     [
-        (300, 300, (11.0, 11.0, 13.0)),  # square: same as before
-        (300, 100, (33.0, 11.0, 35.0)),  # wide wordmark grows sideways
-        (800, 100, (40.0, 5.0, 42.0)),  # very wide: capped at 40 mm
-        (150, 300, (5.5, 11.0, 13.0)),  # tall: fits the square
+        (300, 300, (15.0, 15.0)),  # square: full box height
+        (300, 100, (36.0, 12.0)),  # wide: full box width, ratio kept
+        (800, 100, (36.0, 4.5)),  # very wide: capped by the box width
+        (150, 300, (7.5, 15.0)),  # tall: capped by the box height
     ],
 )
 def test_logo_box_keeps_ratio(w, h, expected):
-    from app.services.report_letterhead import _logo_box_mm
+    """BR-f: any shape fits the fixed 36 x 15 mm box, never cropped or stretched."""
+    from app.services.report_letterhead import LOGO_BOX_H_MM, LOGO_BOX_W_MM, _fit_box
 
-    assert _logo_box_mm(_png_uri(w, h)) == expected
+    assert _fit_box(_png_uri(w, h), LOGO_BOX_W_MM, LOGO_BOX_H_MM) == expected
 
 
 def test_logo_box_unreadable_falls_back_to_square():
-    from app.services.report_letterhead import _logo_box_mm
+    from app.services.report_letterhead import LOGO_BOX_H_MM, LOGO_BOX_W_MM, _fit_box
 
-    assert _logo_box_mm("data:image/png;base64,AAAA") == (11.0, 11.0, 13.0)
-    assert _logo_box_mm("data:image/jpeg;base64,AAAA") == (11.0, 11.0, 13.0)
+    assert _fit_box("data:image/png;base64,AAAA", LOGO_BOX_W_MM, LOGO_BOX_H_MM) == (15.0, 15.0)
 
 
-def test_wide_logo_tile_in_letterhead():
+def test_wide_logo_in_the_band_keeps_its_ratio():
     src = _png_uri(300, 100)
     out = build_prescription_html(_doc(clinic_logo_src=src))
-    assert '<div class="tile" style="width: 35.0mm">' in out
-    assert 'style="width: 33.0mm; height: 11.0mm"' in out
+    assert 'style="width: 36.0mm; height: 12.0mm"' in out
+    white = build_prescription_html(_doc(clinic_logo_src=src, logo_bg_mode="white"))
+    # White tile: the padding comes off the box, the ratio stays 3:1.
+    assert '<span class="tile"><img src="' in white

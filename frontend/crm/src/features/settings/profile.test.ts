@@ -10,4 +10,9 @@ describe('clinic profile checks (D-026)', () => {
     expect(Object.keys(errors).sort()).toEqual(['email', 'gstin', 'pincode']);
     expect(clinicProfileErrors({ ...EMPTY_PROFILE, pincode: '201301', gstin: '09ABCDE1234F1Z5', email: 'c@x.com' })).toEqual({});
   });
+  it('checks the website like the API', () => {
+    expect(clinicProfileErrors({ ...EMPTY_PROFILE, website: 'not a site' }).website).toBeDefined();
+    expect(clinicProfileErrors({ ...EMPTY_PROFILE, website: 'www.clinic.in' })).toEqual({});
+    expect(clinicProfileErrors({ ...EMPTY_PROFILE, website: 'https://clinic.co.in/about' })).toEqual({});
+  });
 });
