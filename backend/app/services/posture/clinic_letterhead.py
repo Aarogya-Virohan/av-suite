@@ -19,9 +19,10 @@ from typing import Any
 
 from app.services.prescription_pdf import fetch_logo
 from app.services.report_letterhead import (
+    ClinicBrand,
     clinic_details,
     format_address,
-    resolve_clinic_logo,
+    letterhead_logo,
 )
 
 
@@ -29,15 +30,22 @@ def _text(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
-async def clinic_letterhead(clinic: Any) -> dict:
+async def clinic_letterhead(clinic: Any, doctor_name: str = "") -> dict:
     """
-    {"name", "logoSrc", "details"} for build_report_html, from a Clinic row.
-    An empty dict when there is no clinic; the letterhead then falls back to
-    Aarogya Virohan only.
+    {"name", "logoSrc", "details", "brand"} for build_report_html, from a
+    Clinic row. `brand` is the Round 4 letterhead (ClinicBrand); `doctor_name`
+    is the clinic's display doctor name with its fallback already applied
+    (app/services/clinic_brand.py). An empty dict when there is no clinic.
     """
     if clinic is None or not _text(getattr(clinic, "name", None)):
         return {}
-    logo = await resolve_clinic_logo(getattr(clinic, "branding_logo_url", None), fetch_logo)
+    mode = getattr(clinic, "logo_bg_mode", None) or "as_is"
+    logo = await letterhead_logo(
+        getattr(clinic, "branding_logo_url", None),
+        mode,
+        getattr(clinic, "branding_logo_render", None),
+        fetch_logo,
+    )
     details = clinic_details(
         address_line=getattr(clinic, "address_line", None),
         city=getattr(clinic, "city", None),
@@ -46,7 +54,22 @@ async def clinic_letterhead(clinic: Any) -> dict:
         phone=getattr(clinic, "phone", None),
         email=getattr(clinic, "email", None),
     )
-    return {"name": _text(clinic.name), "logoSrc": logo, "details": details}
+    brand = ClinicBrand(
+        name=_text(clinic.name),
+        logo_src=logo,
+        logo_bg_mode=mode,
+        doctor_name=_text(doctor_name) or _text(getattr(clinic, "display_doctor_name", None)),
+        phone=_text(getattr(clinic, "phone", None)),
+        email=_text(getattr(clinic, "email", None)),
+        address=format_address(
+            getattr(clinic, "address_line", None),
+            getattr(clinic, "city", None),
+            getattr(clinic, "state", None),
+            getattr(clinic, "pincode", None),
+        ),
+        website=_text(getattr(clinic, "website", None)),
+    )
+    return {"name": _text(clinic.name), "logoSrc": logo, "details": details, "brand": brand}
 
 
 def web_branding(clinic: Any, logo_src: str = "") -> dict:

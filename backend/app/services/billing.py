@@ -5,21 +5,22 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import text, func, select
+from sqlalchemy import func, select
 
 from app.services.invoice_pdf import (
     InvoiceDoc,
     InvoiceLine,
     ReceiptPayment,
+    document_number,
     pdf_filename,
     render_invoice_pdf,
 )
 from app.enums.billing import InvoiceStatus, PaymentStatus
 from app.enums.package import PackageStatus
-from app.models.billing import Invoice, Package, PatientPackage, Payment, InvoiceCounter
+from app.models.billing import Invoice, Package, PatientPackage, Payment
+from app.services.document_numbers import INV, RCP, next_financial_number
 from app.models.clinic import Clinic
 from app.services.usage_events import record_usage
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.repositories.appointment import AppointmentRepository
 from app.repositories.billing import (
     InvoiceItemRepository,
@@ -385,40 +386,18 @@ class BillingService:
             }
         )
 
-        # The invoice ID is server-generated and supplies a concurrency-safe
-        # number. The clinic-scoped unique constraint remains the final guard.
+        # D-043: INV-<FY>-<6 digits>, counted per clinic per Indian financial
+        # year of the issue date, from the shared server-side counter
+        # (services/document_numbers.py). Invoices issued before 27 Nov 2026
+        # keep their INV-0001 style number. The clinic-scoped unique
+        # constraint remains the final guard.
         for attempt in range(3):
-            counter_stmt = pg_insert(InvoiceCounter).values(
-                clinic_id=clinic_id,
-                last_number=text("""(
-                    SELECT COALESCE(MAX(
-                        substring(invoice_number from '^INV-([0-9]+)$')::integer
-                    ), 0) + 1
-                    FROM invoices
-                    WHERE clinic_id = :seed_clinic_id
-                      AND invoice_number ~ '^INV-[0-9]+$'
-                )""").bindparams(seed_clinic_id=clinic_id),
+            invoice_data["invoice_number"] = await next_financial_number(
+                self.invoice_repository.session,
+                clinic_id,
+                INV,
+                invoice_data.get("issue_date"),
             )
-            counter_stmt = counter_stmt.on_conflict_do_update(
-                index_elements=[InvoiceCounter.clinic_id],
-                set_={
-                    "last_number": func.greatest(
-                        InvoiceCounter.last_number + 1,
-                        text("""(
-                            SELECT COALESCE(MAX(
-                                substring(invoice_number from '^INV-([0-9]+)$')::integer
-                            ), 0) + 1
-                            FROM invoices
-                            WHERE clinic_id = EXCLUDED.clinic_id
-                              AND invoice_number ~ '^INV-[0-9]+$'
-                        )"""),
-                    )
-                },
-            ).returning(InvoiceCounter.last_number)
-            invoice_number = (
-                await self.invoice_repository.session.execute(counter_stmt)
-            ).scalar_one()
-            invoice_data["invoice_number"] = f"INV-{invoice_number:04d}"
             invoice_id = uuid4()
             invoice_data.update(
                 {
@@ -622,6 +601,13 @@ class BillingService:
 
         payment_data = payload.model_dump()
         payment_data["clinic_id"] = clinic_id
+        # D-043: one receipt per payment, RCP-<FY>-<6 digits> by payment date.
+        payment_data["receipt_number"] = await next_financial_number(
+            self.payment_repository.session,
+            clinic_id,
+            RCP,
+            payment_data.get("payment_date"),
+        )
         payment = await self.payment_repository.create(payment_data)
 
         new_paid_amount = invoice.paid_amount + payload.amount
@@ -756,7 +742,11 @@ class BillingService:
         return loaded_payment, updated_invoice, previous_paid, recalculated_paid
 
     async def build_invoice_document(
-        self, clinic_id: UUID, invoice_id: UUID, kind: str = "invoice"
+        self,
+        clinic_id: UUID,
+        invoice_id: UUID,
+        kind: str = "invoice",
+        payment_id: UUID | None = None,
     ) -> InvoiceDoc:
         """Collect everything the invoice or receipt PDF prints (L-41)."""
 
@@ -802,10 +792,22 @@ class BillingService:
                 p.transaction_reference,
                 p.amount,
                 getattr(p.status, "value", p.status),
+                p.receipt_number,
             )
             for p in receipt_rows
         ]
+        # D-043: one receipt per payment. Without payment_id the receipt is for
+        # the latest completed payment, as the old receipt button did.
+        selected = None
+        if kind == "receipt" and payment_id is not None:
+            match = [i for i, p in enumerate(receipt_rows) if p.id == payment_id]
+            if not match:
+                raise BillingNotFoundError(
+                    f"Payment '{payment_id}' not found on invoice '{invoice_id}'."
+                )
+            selected = payments[match[0]]
         return InvoiceDoc(
+            payment=selected,
             kind="receipt" if kind == "receipt" else "invoice",
             invoice_number=invoice.invoice_number,
             status=getattr(invoice.status, "value", invoice.status),
@@ -840,15 +842,19 @@ class BillingService:
         )
 
     async def generate_invoice_pdf(
-        self, clinic_id: UUID, invoice_id: UUID, kind: str = "invoice"
+        self,
+        clinic_id: UUID,
+        invoice_id: UUID,
+        kind: str = "invoice",
+        payment_id: UUID | None = None,
     ) -> tuple[bytes, str]:
         """Render the invoice (or payment receipt) PDF. Returns (bytes, file name).
 
         It was a fake five-line "%PDF" text until 31 Oct 2026 (L-41)."""
 
-        doc = await self.build_invoice_document(clinic_id, invoice_id, kind)
+        doc = await self.build_invoice_document(clinic_id, invoice_id, kind, payment_id)
         pdf = await render_invoice_pdf(doc)
-        return pdf, pdf_filename(doc.kind, doc.invoice_number)
+        return pdf, pdf_filename(doc.kind, document_number(doc))
 
     @staticmethod
     def _build_invoice_message(patient_name: str, pdf_url: str, patient_id: str = "") -> str:

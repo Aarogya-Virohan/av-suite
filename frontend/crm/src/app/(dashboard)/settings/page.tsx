@@ -15,6 +15,7 @@ import {
   CLIENT_TYPE_OPTIONS,
   CLINIC_PROFILE_KEYS,
   type ClientType,
+  type LogoBgMode,
   type ClinicProfile,
   useClinicSettings,
   useUpdateClinicSettings,
@@ -46,6 +47,7 @@ import {
 } from '../../../components/ui/brand';
 import { cn } from '../../../lib/cn';
 import { asset } from '../../../lib/hub';
+import { LogoLetterheadField } from '../../../features/settings/components/LogoLetterheadField';
 
 type TabKey = 'clinic' | 'fees' | 'users' | 'audit';
 
@@ -114,6 +116,7 @@ export default function SettingsPage() {
   const [brandColor, setBrandColor] = useState<string | null>(null);
   const [colorDirty, setColorDirty] = useState(false);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [logoMode, setLogoMode] = useState<LogoBgMode>('as_is');
   const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
   const [profileErrors, setProfileErrors] = useState<Partial<Record<keyof ClinicProfile, string>>>({});
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -138,6 +141,7 @@ export default function SettingsPage() {
       setBrandColor(clinicSettings.branding_color ?? null);
       setColorDirty(false);
       setLogoBase64(clinicSettings.branding_logo_url ?? null);
+      setLogoMode(clinicSettings.logo_bg_mode ?? 'as_is');
       const loaded = { ...EMPTY_PROFILE };
       for (const key of CLINIC_PROFILE_KEYS) loaded[key] = clinicSettings[key] ?? '';
       setProfile(loaded);
@@ -179,23 +183,6 @@ export default function SettingsPage() {
     return u ? `${u.first_name} ${u.last_name}` : `User #${id.slice(0, 8).toUpperCase()}`;
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 200 * 1024) {
-      toast.error('Logo file size must be under 200KB');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setLogoBase64(reader.result as string);
-      toast.success('Logo ready. Save to apply it.');
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleSaveClinic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canEditClinic) {
@@ -228,7 +215,9 @@ export default function SettingsPage() {
         // Only send the colour when it was changed, so saving the name never
         // writes a default colour over the theme (null resets to the theme).
         ...(colorDirty ? { branding_color: brandColor } : {}),
-        branding_logo_url: logoBase64,
+        // Unchanged logo is not sent again (it is checked and resized on upload).
+        ...(logoBase64 !== (clinicSettings?.branding_logo_url ?? null) ? { branding_logo_url: logoBase64 } : {}),
+        ...(logoMode !== (clinicSettings?.logo_bg_mode ?? 'as_is') ? { logo_bg_mode: logoMode } : {}),
       });
       toast.success('Clinic settings saved');
     } catch (err: any) {
@@ -532,41 +521,27 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <FieldLabel htmlFor="clinic-logo">Clinic Logo (max 200KB)</FieldLabel>
-                    {canEditClinic && (
-                      <input
-                        id="clinic-logo"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                        className="w-full cursor-pointer text-xs text-muted file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-grove-wash file:px-4 file:py-2 file:text-xs file:font-semibold file:text-grove hover:file:bg-[#d3eedc]"
-                      />
-                    )}
-                    {logoBase64 && (
-                      <div className="mt-3 flex items-center gap-3">
-                        <div className="w-fit rounded-xl border border-line bg-canvas p-2">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={logoBase64} alt="Clinic logo preview" className="h-12 rounded object-contain" />
-                        </div>
-                        {canEditClinic && (
-                          <button
-                            type="button"
-                            onClick={() => setLogoBase64(null)}
-                            className="cursor-pointer text-xs font-semibold text-danger hover:underline"
-                          >
-                            Remove logo
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <LogoLetterheadField
+                    logo={logoBase64}
+                    mode={logoMode}
+                    canEdit={canEditClinic}
+                    savedLowContrast={!!clinicSettings?.logo_low_contrast}
+                    isSaved={
+                      logoBase64 === (clinicSettings?.branding_logo_url ?? null) &&
+                      logoMode === (clinicSettings?.logo_bg_mode ?? 'as_is')
+                    }
+                    doctorName={profile.display_doctor_name}
+                    phone={profile.phone}
+                    email={profile.email}
+                    onLogoChange={setLogoBase64}
+                    onModeChange={setLogoMode}
+                  />
 
                   <div className="space-y-4 border-t border-line pt-5">
                     <div>
-                      <h3 className="font-display text-sm font-bold text-ink">Clinic details for invoices</h3>
+                      <h3 className="font-display text-sm font-bold text-ink">Clinic details for invoices and reports</h3>
                       <p className="mt-0.5 text-xs text-muted">
-                        Printed in the header of invoices and receipts. Leave a field empty to keep it off the invoice.
+                        Printed on invoices, receipts and clinical reports. Leave a field empty to keep it off.
                       </p>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">

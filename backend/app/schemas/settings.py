@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -9,6 +10,37 @@ from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
 
 from app.enums.clinic import ClinicPlanTier
 from app.services.clinic_code import normalize_clinic_code
+
+
+LogoBgMode = Literal["as_is", "white", "transparent"]
+_WEBSITE = re.compile(r"^(https?://)?([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(:[0-9]{1,5})?(/[^\s]*)?$", re.I)
+
+
+def clean_website(value: str | None) -> str | None:
+    """"www.clinic.in", "clinic.in/about" or a full http(s) link; blank = none."""
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    if not _WEBSITE.match(value):
+        raise ValueError("Enter a website like www.yourclinic.in")
+    return value
+
+
+class LogoPreviewRequest(BaseModel):
+    """A logo picked in Settings, before it is saved."""
+
+    logo: str = Field(..., description="The picked file as a data URI.")
+    logo_bg_mode: LogoBgMode = "as_is"
+
+
+class LogoPreviewResponse(BaseModel):
+    logo: str = Field(..., description="The copy that would be stored (resized, data URI).")
+    letterhead_logo: str = Field(..., description="The logo as the report band shows it in this mode.")
+    width: int
+    height: int
+    low_contrast: bool
 
 
 class ClinicSettingsResponse(BaseModel):
@@ -32,6 +64,14 @@ class ClinicSettingsResponse(BaseModel):
     registration_number: str | None = None
     gstin: str | None = None
     authorised_person: str | None = None
+    display_doctor_name: str | None = Field(
+        default=None, description="Doctor name in the clinical report header; empty = clinic owner admin's name."
+    )
+    website: str | None = Field(default=None, description="Shown in the clinic block above the report footer.")
+    logo_bg_mode: LogoBgMode = Field(default="as_is", description="How the logo background shows on the report band.")
+    logo_low_contrast: bool = Field(
+        default=False, description="The logo is hard to see on the report band in the chosen mode (Settings warning)."
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -62,6 +102,28 @@ class ClinicSettingsUpdate(BaseModel):
     registration_number: str | None = Field(default=None, max_length=120)
     gstin: str | None = None
     authorised_person: str | None = Field(default=None, max_length=255)
+    display_doctor_name: str | None = Field(default=None, max_length=255)
+    website: str | None = Field(default=None, max_length=255)
+    logo_bg_mode: LogoBgMode | None = None
+
+    @field_validator("display_doctor_name")
+    @classmethod
+    def clean_doctor(cls, value):
+        if value is None:
+            return None
+        return value.strip() or None
+
+    @field_validator("website")
+    @classmethod
+    def valid_website(cls, value):
+        return clean_website(value)
+
+    @field_validator("logo_bg_mode", mode="before")
+    @classmethod
+    def mode_not_null(cls, value):
+        if value is None:
+            raise ValueError("logo_bg_mode must be as_is, white or transparent")
+        return value
 
     @field_validator("code", mode="before")
     @classmethod

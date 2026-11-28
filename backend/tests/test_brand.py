@@ -76,12 +76,11 @@ def test_watermark_is_the_round_mark_faded(monkeypatch):
 
 
 def test_prescription_uses_the_watermark_switch(monkeypatch):
-    from app.services import prescription_pdf
     from app.services.prescription_pdf import RxDoc, build_prescription_html
 
     doc = RxDoc(rx_id="7b825459-0000-0000-0000-000000000000", clinic_name="", physio_name="",
                 patient_name="P", patient_phone=None, patient_dob=None, prescribed_on=None,
                 physio_notes=None)
     assert brand.watermark_data_uri() in build_prescription_html(doc)
-    monkeypatch.setattr(prescription_pdf, "watermark_data_uri", lambda: "")
+    monkeypatch.setattr(brand, "watermark_data_uri", lambda: "")
     assert "background-image" not in build_prescription_html(doc)

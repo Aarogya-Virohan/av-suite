@@ -4,6 +4,314 @@
  */
 
 export interface paths {
+    "/api/v1/platform/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Products */
+        get: operations["products_api_v1_platform_products_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Organizations */
+        get: operations["organizations_api_v1_platform_organizations_get"];
+        put?: never;
+        /** Create Organization */
+        post: operations["create_organization_api_v1_platform_organizations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{org_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Organization */
+        get: operations["get_organization_api_v1_platform_organizations__org_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Organization */
+        patch: operations["update_organization_api_v1_platform_organizations__org_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{org_id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suspend Org */
+        post: operations["suspend_org_api_v1_platform_organizations__org_id__suspend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{org_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Org */
+        post: operations["activate_org_api_v1_platform_organizations__org_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{org_id}/clinics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Clinic */
+        post: operations["create_clinic_api_v1_platform_organizations__org_id__clinics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/clinics/{clinic_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Clinic */
+        get: operations["get_clinic_api_v1_platform_clinics__clinic_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/clinics/{clinic_id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suspend Clinic */
+        post: operations["suspend_clinic_api_v1_platform_clinics__clinic_id__suspend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/clinics/{clinic_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Clinic */
+        post: operations["activate_clinic_api_v1_platform_clinics__clinic_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{org_id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge Organization */
+        post: operations["merge_organization_api_v1_platform_organizations__org_id__merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/clinics/{clinic_id}/products/{product_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Entitlement */
+        put: operations["set_entitlement_api_v1_platform_clinics__clinic_id__products__product_key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Usage */
+        get: operations["usage_api_v1_platform_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Audit Logs */
+        get: operations["audit_logs_api_v1_platform_audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/operators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Operators */
+        get: operations["list_operators_api_v1_platform_operators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Overview */
+        get: operations["overview_api_v1_platform_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_v1_platform_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/auth/mfa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Mfa */
+        post: operations["complete_mfa_api_v1_platform_auth_mfa_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/operators/{operator_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Operator */
+        patch: operations["update_operator_api_v1_platform_operators__operator_id__patch"];
+        trace?: never;
+    };
     "/api/v1/auth/me": {
         parameters: {
             query?: never;
@@ -19,78 +327,6 @@ export interface paths {
         get: operations["get_me_api_v1_auth_me_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/auth/register": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Register
-         * @description Endpoint ka purpose: New user aur clinic ko register karna signup flow mein
-         *     Yeh endpoint signup process handle karta hai jo:
-         *     1. New clinic create karta hai
-         *     2. Admin user create karta hai clinic owner ke taur par
-         *     3. JWT token generate karta hai authentication ke liye
-         *
-         *     HTTP Method: POST
-         *     URL: /api/v1/auth/register
-         *     Status Code: 201 CREATED (successful registration)
-         *
-         *     Request Body (RegisterRequest):
-         *     {
-         *         "email": "admin@clinic.com",           # Admin user ka email (unique)
-         *         "password": "SecurePassword123!",      # Strong password required
-         *         "clinic_name": "City Medical Clinic"   # New clinic ka name
-         *     }
-         *
-         *     Response (ResponseEnvelope[TokenResponse]):
-         *     {
-         *         "status": "success",
-         *         "data": {
-         *             "access_token": "eyJhbGc...",      # JWT bearer token
-         *             "token_type": "bearer"
-         *         }
-         *     }
-         *
-         *     Error Responses:
-         *     - 409 CONFLICT: Email already registered (duplicate email)
-         *     - 400 BAD REQUEST: Invalid input format or validation failure
-         *     - 500 INTERNAL_SERVER_ERROR: Database or server error
-         *
-         *     Security Considerations:
-         *     - Password hashing: Plain password kabhi stored nahi hota
-         *     - Clinic isolation: New clinic automatic create hota hai
-         *     - Admin role: First user always admin role se create hota hai
-         *     - HTTPS required: Production mein plain HTTP allow nahi
-         *
-         *     Usage Pattern:
-         *     1. Frontend signup form fill karta hai
-         *     2. POST request send karta hai email, password, clinic_name ke saath
-         *     3. Backend clinic create karta hai aur admin user add karta hai
-         *     4. JWT token return hota hai mobile/client ko
-         *     5. Token localStorage/sessionStorage mein save hota hai
-         *     6. Future requests ke headers mein token include hota hai
-         *
-         *     Example cURL:
-         *     curl -X POST http://localhost:8000/api/v1/auth/register \
-         *       -H "Content-Type: application/json" \
-         *       -d '{
-         *         "email": "admin@clinic.com",
-         *         "password": "SecurePassword123!",
-         *         "clinic_name": "City Medical Clinic"
-         *       }'
-         */
-        post: operations["register_api_v1_auth_register_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -838,12 +1074,115 @@ export interface paths {
         put?: never;
         /**
          * Export Posture Pdf
-         * @description Render an already-computed posture report to a clinical PDF.
+         * @description The clinical PDF of a saved report, by id.
          *
-         *     Takes the report payload the frontend already holds, so the MediaPipe
-         *     analysis is not re-run just to produce a document.
+         *     Since POS-10 (24 Nov 2026) the PDF is made only from the report saved in
+         *     the database for this clinic (#86 saves every report); nothing the client
+         *     sends is rendered. The body carries the report id and nothing else is
+         *     read from it, so an old client that still sends the whole report gets the
+         *     stored copy, not its own. Same result as GET /reports/{id}/pdf.
          */
         post: operations["export_posture_pdf_api_v1_posture_report_pdf_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/patients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pick Patients
+         * @description Patients of the signed-in clinic for the picker: name, age, sex and CRM ID only.
+         */
+        get: operations["pick_patients_api_v1_posture_patients_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/patients/{patient_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pick One Patient
+         * @description One patient of the clinic, for the screen opened from the CRM patient page (404 otherwise).
+         */
+        get: operations["pick_one_patient_api_v1_posture_patients__patient_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/patients/{patient_id}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Patient Reports
+         * @description Saved posture reports of one patient of the clinic, newest first.
+         */
+        get: operations["patient_reports_api_v1_posture_patients__patient_id__reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Saved Report
+         * @description A saved report to open again: as it was made, without photographs.
+         */
+        get: operations["open_saved_report_api_v1_posture_reports__report_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/reports/{report_id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Saved Report Pdf
+         * @description The PDF of a saved report, made again from the saved data.
+         */
+        get: operations["saved_report_pdf_api_v1_posture_reports__report_id__pdf_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1234,8 +1573,37 @@ export interface paths {
         /**
          * Create User
          * @description Create a new user in the clinic.
+         *
+         *     AUD-01: an email that already has an account (in any clinic) is a 409 with
+         *     no details about that account. Users are never attached across clinics
+         *     from here; multi-clinic staff are a platform action (console / script).
+         *     BE-1: optional `tools` switches on tool checkboxes (needs permissions.edit).
          */
         post: operations["create_user_api_v1_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{user_id}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User Tools
+         * @description BE-1: tool checkbox state for one user + which tools the clinic plan has.
+         */
+        get: operations["get_user_tools_api_v1_users__user_id__tools_get"];
+        /**
+         * Put User Tools
+         * @description BE-1: set a user's tool checkboxes. `tools` = the full list that should be on.
+         */
+        put: operations["put_user_tools_api_v1_users__user_id__tools_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1494,6 +1862,10 @@ export interface paths {
          * Download Invoice Pdf Endpoint
          * @description Download the invoice, or with `kind=receipt` the payment receipt, as a
          *     PDF (authenticated, clinic-scoped). Decisions.md L-41.
+         *
+         *     D-043: a receipt is per payment. `payment_id` picks the payment (404 when
+         *     it is not a payment of this invoice); without it the receipt is for the
+         *     latest completed payment, as before.
          */
         get: operations["download_invoice_pdf_endpoint_api_v1_invoices__id__pdf_download_get"];
         put?: never;
@@ -2008,6 +2380,27 @@ export interface paths {
         patch: operations["update_clinic_settings_api_v1_settings_clinic_patch"];
         trace?: never;
     };
+    "/api/v1/settings/clinic/logo-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Clinic Logo
+         * @description Check a picked logo and show it as the report band would, without
+         *     saving anything (live letterhead preview in Settings, BR-g).
+         */
+        post: operations["preview_clinic_logo_api_v1_settings_clinic_logo_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/overview": {
         parameters: {
             query?: never;
@@ -2169,6 +2562,750 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/psychosocial/instruments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screeners */
+        get: operations["list_screeners_api_v1_psychosocial_instruments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Patient Screeners */
+        get: operations["list_patient_screeners_api_v1_patients__patient_id__psychosocial_sessions_get"];
+        put?: never;
+        /** Assign Screeners */
+        post: operations["assign_screeners_api_v1_patients__patient_id__psychosocial_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/share-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Share Options
+         * @description Resources and advice chips for the Share form.
+         */
+        get: operations["share_options_api_v1_psychosocial_share_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/assignments/{assignment_id}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share With Patient
+         * @description Provider shares the result after the consultation. Never automatic.
+         */
+        post: operations["share_with_patient_api_v1_psychosocial_assignments__assignment_id__share_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Patient Shares */
+        get: operations["patient_shares_api_v1_patients__patient_id__psychosocial_shares_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/shares/{share_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Share */
+        post: operations["revoke_share_api_v1_psychosocial_shares__share_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Patient Consent
+         * @description Consent state and the latest re-consent link, for staff who send links.
+         */
+        get: operations["patient_consent_api_v1_patients__patient_id__psychosocial_consent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/consent-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Consent Again
+         * @description Consent-only link after a withdrawal (Q7 = 7B). The link is shown once.
+         */
+        post: operations["request_consent_again_api_v1_patients__patient_id__psychosocial_consent_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/assignments/{assignment_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Screener */
+        post: operations["cancel_screener_api_v1_psychosocial_assignments__assignment_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/assignments/{assignment_id}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reissue Link */
+        post: operations["reissue_link_api_v1_psychosocial_assignments__assignment_id__link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Patient Screening Summary */
+        get: operations["patient_screening_summary_api_v1_patients__patient_id__psychosocial_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Clinic Worklist */
+        get: operations["clinic_worklist_api_v1_psychosocial_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/priority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Priority Review
+         * @description Risk results nobody has opened yet. Leaves the list once a provider opens it.
+         */
+        get: operations["priority_review_api_v1_psychosocial_priority_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sent Links
+         * @description Links sent by the clinic with their status only. No clinical data.
+         */
+        get: operations["sent_links_api_v1_psychosocial_assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Session Detail */
+        get: operations["session_detail_api_v1_psychosocial_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/sessions/{session_id}/referral-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log Referral */
+        post: operations["log_referral_api_v1_psychosocial_sessions__session_id__referral_actions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/referral-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Patient Referral History */
+        get: operations["patient_referral_history_api_v1_patients__patient_id__psychosocial_referral_actions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Screening Data Overview */
+        get: operations["screening_data_overview_api_v1_patients__patient_id__psychosocial_data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/data/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Screening Data
+         * @description Erase a patient's screening data. Returns what was removed.
+         */
+        post: operations["delete_screening_data_api_v1_patients__patient_id__psychosocial_data_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Patient Trend */
+        get: operations["patient_trend_api_v1_patients__patient_id__psychosocial_trend_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/report.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Patient Report Pdf
+         * @description Screening summary PDF, rendered on request and never stored.
+         */
+        get: operations["patient_report_pdf_api_v1_patients__patient_id__psychosocial_report_pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/patients/{patient_id}/psychosocial/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Patient Schedules */
+        get: operations["patient_schedules_api_v1_patients__patient_id__psychosocial_schedules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/schedules/{schedule_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Schedule */
+        post: operations["stop_schedule_api_v1_psychosocial_schedules__schedule_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Due List
+         * @description Screeners due again across the clinic, most overdue first. No results.
+         */
+        get: operations["due_list_api_v1_psychosocial_due_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Clinic Settings
+         * @description Default repeat per screener and the referral rules in force. No patient data.
+         */
+        get: operations["get_clinic_settings_api_v1_psychosocial_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/settings/{instrument_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Instrument Setting
+         * @description Set the clinic default repeat for one screener. Existing schedules keep their interval.
+         */
+        put: operations["update_instrument_setting_api_v1_psychosocial_settings__instrument_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/aggregates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Clinic Statistics
+         * @description Completed sessions, band distribution and referral rate. Small cells hidden.
+         */
+        get: operations["clinic_statistics_api_v1_psychosocial_aggregates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/aggregates.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Clinic Statistics Csv
+         * @description The same figures as the screen, as CSV. Hidden cells stay hidden.
+         */
+        get: operations["clinic_statistics_csv_api_v1_psychosocial_aggregates_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/referral-contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Referral Contacts For Picker
+         * @description Active contacts, for the physio logging a referral action.
+         */
+        get: operations["referral_contacts_for_picker_api_v1_psychosocial_referral_contacts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/settings/referral-contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Referral Contacts For Admin
+         * @description Every contact, archived ones last.
+         */
+        get: operations["referral_contacts_for_admin_api_v1_psychosocial_settings_referral_contacts_get"];
+        put?: never;
+        /** Create Referral Contact */
+        post: operations["create_referral_contact_api_v1_psychosocial_settings_referral_contacts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/settings/referral-contacts/{contact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Referral Contact */
+        put: operations["update_referral_contact_api_v1_psychosocial_settings_referral_contacts__contact_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/psychosocial/settings/referral-contacts/{contact_id}/{change}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Referral Contact */
+        post: operations["archive_referral_contact_api_v1_psychosocial_settings_referral_contacts__contact_id___change__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/reconsent/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Reconsent */
+        get: operations["open_reconsent_api_v1_screener_reconsent__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/reconsent/{token}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer Reconsent */
+        post: operations["answer_reconsent_api_v1_screener_reconsent__token__answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/report/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report Gate */
+        get: operations["report_gate_api_v1_screener_report__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/report/{token}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report Open */
+        post: operations["report_open_api_v1_screener_report__token__open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Screener */
+        get: operations["open_screener_api_v1_screener__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/{token}/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Give Consent */
+        post: operations["give_consent_api_v1_screener__token__consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/{token}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw */
+        post: operations["withdraw_api_v1_screener__token__withdraw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/{token}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Answer */
+        post: operations["save_answer_api_v1_screener__token__answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/screener/{token}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit */
+        post: operations["submit_api_v1_screener__token__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -2207,6 +3344,23 @@ export interface components {
             valid_from: string | null;
             /** Valid Until */
             valid_until: string | null;
+        };
+        /** AggregatesOut */
+        AggregatesOut: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Min Cell */
+            min_cell: number;
+            /** Instruments */
+            instruments: components["schemas"]["InstrumentAggregateOut"][];
         };
         /**
          * AnalyticsOverviewEnvelope
@@ -2252,6 +3406,31 @@ export interface components {
              * Format: date-time
              */
             end: string;
+        };
+        /** AnswerOut */
+        AnswerOut: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Answered Count */
+            answered_count: number;
+            /** Total Items */
+            total_items: number;
+            /** Next Item Id */
+            next_item_id: string | null;
+            /** Ready To Submit */
+            ready_to_submit: boolean;
+        };
+        /** AnswerRequest */
+        AnswerRequest: {
+            /**
+             * Instrument Id
+             * @enum {string}
+             */
+            instrument_id: "phq9" | "gad7" | "dass21";
+            /** Item Id */
+            item_id: string;
+            /** Value */
+            value: number;
         };
         /**
          * AppointmentAnalytics
@@ -2556,6 +3735,23 @@ export interface components {
             status?: components["schemas"]["AppointmentStatus"] | null;
             source?: components["schemas"]["AppointmentSource"] | null;
         };
+        /** AssignRequest */
+        AssignRequest: {
+            /** Instruments */
+            instruments: ("phq9" | "gad7" | "dass21")[];
+            /**
+             * Expires In Days
+             * @default 7
+             */
+            expires_in_days: number;
+            /** Repeat Every Weeks */
+            repeat_every_weeks?: number | null;
+            /**
+             * Allow Recent
+             * @default false
+             */
+            allow_recent: boolean;
+        };
         /**
          * AssignableTherapist
          * @description A user an appointment can be booked with (Book Visit, D-029).
@@ -2570,6 +3766,43 @@ export interface components {
             name: string;
             role: components["schemas"]["UserRole"];
         };
+        /** AssignmentCreatedOut */
+        AssignmentCreatedOut: {
+            assignment: components["schemas"]["AssignmentOut"];
+            /** Screener Path */
+            screener_path: string;
+        };
+        /** AssignmentOut */
+        AssignmentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Status */
+            status: string;
+            /** Effective Status */
+            effective_status: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Assigned By Name */
+            assigned_by_name: string | null;
+            /** Sessions */
+            sessions: components["schemas"]["SessionSummaryOut"][];
+        };
         /**
          * AuditExportRequest
          * @description Minimal context recorded when a client-side export completes.
@@ -2579,6 +3812,45 @@ export interface components {
             entity_type: string;
             /** Row Count */
             row_count: number;
+        };
+        /** AuditLogOut */
+        AuditLogOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Operator Id */
+            operator_id: string | null;
+            /** Operator Name */
+            operator_name: string | null;
+            /** Action */
+            action: string;
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: string | null;
+            /** Target Name */
+            target_name: string | null;
+            /** Organization Id */
+            organization_id: string | null;
+            /** Clinic Id */
+            clinic_id: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Ip */
+            ip: string | null;
+            /** User Agent */
+            user_agent: string | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * AuditLogResponse
@@ -2613,6 +3885,38 @@ export interface components {
              */
             created_at: string;
         };
+        /** BandCountOut */
+        BandCountOut: {
+            /** Label */
+            label: string;
+            /** Count */
+            count: number | null;
+            /** Suppressed */
+            suppressed: boolean;
+        };
+        /** BandThresholdOut */
+        BandThresholdOut: {
+            /** Label */
+            label: string;
+            /** Min Score */
+            min_score: number;
+            /** Max Score */
+            max_score: number | null;
+            /** Refers */
+            refers: boolean;
+        };
+        /** BaselineOut */
+        BaselineOut: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Completed At */
+            completed_at: string | null;
+            /** Scales */
+            scales: components["schemas"]["ScaleOut"][];
+        };
         /** Body_detect_for_review_api_v1_posture_detect_post */
         Body_detect_for_review_api_v1_posture_detect_post: {
             /** Front Image */
@@ -2634,20 +3938,11 @@ export interface components {
             side_display: string;
             /** Back Display */
             back_display: string;
-            /** Patient Name */
-            patient_name: string;
-            /** Age */
-            age: number;
             /**
-             * Gender
-             * @default
+             * Patient Id
+             * Format: uuid
              */
-            gender: string;
-            /**
-             * Case Ref
-             * @default
-             */
-            case_ref: string;
+            patient_id: string;
             /** Patient Height Cm */
             patient_height_cm: number;
             /**
@@ -2736,6 +4031,66 @@ export interface components {
          * @enum {string}
          */
         CapabilityScope: "none" | "own" | "all";
+        /** ClinicCountsOut */
+        ClinicCountsOut: {
+            /** Total */
+            total: number;
+            /** Active */
+            active: number;
+            /** Suspended */
+            suspended: number;
+        };
+        /** ClinicCreateBody */
+        ClinicCreateBody: {
+            /** Reason */
+            reason?: string | null;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "clinic" | "solo" | "personal";
+        };
+        /** ClinicDetailOut */
+        ClinicDetailOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /** Staff Count */
+            staff_count: number;
+            /** Last Activity At */
+            last_activity_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Organization Name */
+            organization_name: string;
+            /** Organization Status */
+            organization_status: string;
+            /** Products */
+            products: components["schemas"]["EntitlementOut"][];
+            usage: components["schemas"]["ClinicUsageOut"];
+        };
         /** ClinicFeeItemCreate */
         ClinicFeeItemCreate: {
             /** Name */
@@ -2799,12 +4154,49 @@ export interface components {
             /** Sort Order */
             sort_order?: number | null;
         };
+        /** ClinicOut */
+        ClinicOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Organization Id
+             * Format: uuid
+             */
+            organization_id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /** Staff Count */
+            staff_count: number;
+            /** Last Activity At */
+            last_activity_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /**
          * ClinicPlanTier
          * @description Subscription tiers available to a clinic.
          * @enum {string}
          */
         ClinicPlanTier: "free" | "practice" | "clinical_pro";
+        /** ClinicSettingsOut */
+        ClinicSettingsOut: {
+            /** Thresholds Editable */
+            thresholds_editable: boolean;
+            /** Instruments */
+            instruments: components["schemas"]["InstrumentSettingOut"][];
+        };
         /**
          * ClinicSettingsResponse
          * @description Schema representing clinic branding and configuration settings.
@@ -2821,11 +4213,6 @@ export interface components {
              */
             name: string;
             /**
-             * Code
-             * @description Prefix of the Patient ID, e.g. ADP in ADP-000003.
-             */
-            code: string;
-            /**
              * Branding Logo Url
              * @description URL of clinic logo image asset.
              */
@@ -2836,6 +4223,11 @@ export interface components {
              * @enum {string}
              */
             client_type: "clinic" | "hospital" | "home_care";
+            /**
+             * Code
+             * @description Prefix of the Patient ID, e.g. ADP in ADP-000003.
+             */
+            code: string;
             /**
              * Branding Color
              * @description Primary branding color hex code (e.g. #008080).
@@ -2872,6 +4264,29 @@ export interface components {
             /** Authorised Person */
             authorised_person?: string | null;
             /**
+             * Display Doctor Name
+             * @description Doctor name in the clinical report header; empty = clinic owner admin's name.
+             */
+            display_doctor_name?: string | null;
+            /**
+             * Website
+             * @description Shown in the clinic block above the report footer.
+             */
+            website?: string | null;
+            /**
+             * Logo Bg Mode
+             * @description How the logo background shows on the report band.
+             * @default as_is
+             * @enum {string}
+             */
+            logo_bg_mode: "as_is" | "white" | "transparent";
+            /**
+             * Logo Low Contrast
+             * @description The logo is hard to see on the report band in the chosen mode (Settings warning).
+             * @default false
+             */
+            logo_low_contrast: boolean;
+            /**
              * Created At
              * Format: date-time
              */
@@ -2893,11 +4308,6 @@ export interface components {
              */
             name?: string | null;
             /**
-             * Code
-             * @description Prefix of the Patient ID: 1 to 6 capital letters or digits. Must be unused by other clinics.
-             */
-            code?: string | null;
-            /**
              * Branding Logo Url
              * @description Updated branding logo URL.
              */
@@ -2908,6 +4318,11 @@ export interface components {
              * @enum {string}
              */
             client_type: "clinic" | "hospital" | "home_care";
+            /**
+             * Code
+             * @description Prefix of the Patient ID: 1 to 6 capital letters or digits. Must be unused by other clinics.
+             */
+            code?: string | null;
             /**
              * Branding Color
              * @description Updated branding color hex string.
@@ -2936,6 +4351,12 @@ export interface components {
             gstin?: string | null;
             /** Authorised Person */
             authorised_person?: string | null;
+            /** Display Doctor Name */
+            display_doctor_name?: string | null;
+            /** Website */
+            website?: string | null;
+            /** Logo Bg Mode */
+            logo_bg_mode?: ("as_is" | "white" | "transparent") | null;
         };
         /**
          * ClinicType
@@ -2943,12 +4364,163 @@ export interface components {
          * @enum {string}
          */
         ClinicType: "clinic" | "solo" | "personal";
+        /** ClinicUsageOut */
+        ClinicUsageOut: {
+            /** Window Days */
+            window_days: number;
+            /** Total Events */
+            total_events: number;
+            /** By Product */
+            by_product: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** ConsentOut */
+        ConsentOut: {
+            /** Required */
+            required: boolean;
+            /** Text Version */
+            text_version: string;
+            /** Title */
+            title: string;
+            /** Paragraphs */
+            paragraphs: string[];
+        };
+        /** ConsentRequest */
+        ConsentRequest: {
+            /** Text Version */
+            text_version: string;
+        };
+        /** ConsentRequestCreate */
+        ConsentRequestCreate: {
+            /**
+             * Expires In Days
+             * @default 7
+             */
+            expires_in_days: number;
+        };
+        /** ConsentRequestCreatedOut */
+        ConsentRequestCreatedOut: {
+            request: components["schemas"]["ConsentRequestOut"];
+            /** Consent Path */
+            consent_path: string;
+        };
+        /** ConsentRequestOut */
+        ConsentRequestOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "granted" | "declined" | "cancelled" | "expired";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Answered At */
+            answered_at: string | null;
+            /** Requested By Name */
+            requested_by_name: string | null;
+        };
+        /** CustomLinkIn */
+        CustomLinkIn: {
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
+        /** DeleteScreeningDataRequest */
+        DeleteScreeningDataRequest: {
+            /**
+             * Confirm
+             * @constant
+             */
+            confirm: "DELETE";
+        };
         /**
          * DocumentCategory
          * @description Categories for patient documents and medical attachments.
          * @enum {string}
          */
         DocumentCategory: "medical_report" | "prescription" | "lab_result" | "consent_form" | "x_ray_scan" | "id_proof" | "other";
+        /** DueItemOut */
+        DueItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Instrument Id */
+            instrument_id: string;
+            /** Short Name */
+            short_name: string;
+            /** Interval Days */
+            interval_days: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "consent_withdrawn" | "retired" | "waiting" | "due" | "upcoming";
+            /** Next Due At */
+            next_due_at: string | null;
+            /** Last Completed At */
+            last_completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By Name */
+            created_by_name: string | null;
+            /** Patient Name */
+            patient_name: string;
+        };
+        /** EntitlementBody */
+        EntitlementBody: {
+            /** Reason */
+            reason?: string | null;
+            /** Status */
+            status: string;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid Until */
+            valid_until: string | null;
+        };
+        /** EntitlementOut */
+        EntitlementOut: {
+            /** Product Key */
+            product_key: string;
+            /** Status */
+            status: string;
+            /** Source */
+            source: string;
+            /** Valid From */
+            valid_from: string | null;
+            /** Valid Until */
+            valid_until: string | null;
+            /** Is Effective */
+            is_effective: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /**
          * EntitlementSource
          * @enum {string}
@@ -3053,6 +4625,16 @@ export interface components {
              * @default []
              */
             categories: components["schemas"]["ExerciseCategoryRef"][];
+            /**
+             * Rx Mode
+             * @default PATIENT
+             */
+            rx_mode: string;
+            /**
+             * Requires Side
+             * @default false
+             */
+            requires_side: boolean;
             /** Image Url */
             readonly image_url: string | null;
             /** Demo Video Url */
@@ -3095,6 +4677,84 @@ export interface components {
             valid_from: string | null;
             /** Valid Until */
             valid_until: string | null;
+            /**
+             * Is Effective
+             * @default false
+             */
+            is_effective: boolean;
+        };
+        /** InstrumentAggregateOut */
+        InstrumentAggregateOut: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Short Name */
+            short_name: string;
+            /** Completed */
+            completed: number;
+            /** Too Few */
+            too_few: boolean;
+            referral: components["schemas"]["ReferralFigureOut"];
+            /** Scales */
+            scales: components["schemas"]["ScaleDistributionOut"][];
+        };
+        /** InstrumentOut */
+        InstrumentOut: {
+            /** Id */
+            id: string;
+            /** Version */
+            version: string;
+            /** Short Name */
+            short_name: string;
+            /** Name */
+            name: string;
+            /** Instructions */
+            instructions: string;
+            /** Options */
+            options: components["schemas"]["OptionOut"][];
+            /** Items */
+            items: components["schemas"]["ItemOut"][];
+            /** Licence Note */
+            licence_note: string;
+        };
+        /** InstrumentSettingOut */
+        InstrumentSettingOut: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Instrument Version */
+            instrument_version: string;
+            /** Short Name */
+            short_name: string;
+            /** Name */
+            name: string;
+            /** Default Repeat Weeks */
+            default_repeat_weeks: number | null;
+            /** Updated At */
+            updated_at: string | null;
+            /** Updated By Name */
+            updated_by_name: string | null;
+            /** Source */
+            source: string;
+            /** Scales */
+            scales: components["schemas"]["ScaleThresholdOut"][];
+            /** Risk Rules */
+            risk_rules: components["schemas"]["RiskRuleOut"][];
+        };
+        /** InstrumentSummaryOut */
+        InstrumentSummaryOut: {
+            /** Id */
+            id: string;
+            /** Version */
+            version: string;
+            /** Short Name */
+            short_name: string;
+            /** Name */
+            name: string;
+            /** Item Count */
+            item_count: number;
+            /** Citation */
+            citation: string;
+            /** Default Repeat Weeks */
+            default_repeat_weeks?: number | null;
         };
         /**
          * InvoiceCreate
@@ -3321,6 +4981,19 @@ export interface components {
             /** Discount Reason */
             discount_reason?: string | null;
         };
+        /** ItemOut */
+        ItemOut: {
+            /** Id */
+            id: string;
+            /** Number */
+            number: number;
+            /** Text */
+            text: string;
+            /** Scored */
+            scored: boolean;
+            /** Options */
+            options?: components["schemas"]["OptionOut"][] | null;
+        };
         /**
          * LeadAnalytics
          * @description Analytics metrics for clinic prospective leads.
@@ -3500,17 +5173,48 @@ export interface components {
             /** Lost Remark */
             lost_remark?: string | null;
         };
-        /** LoginRequest */
-        LoginRequest: {
+        /**
+         * LogoPreviewRequest
+         * @description A logo picked in Settings, before it is saved.
+         */
+        LogoPreviewRequest: {
             /**
-             * Email
-             * Format: email
+             * Logo
+             * @description The picked file as a data URI.
              */
-            email: string;
-            /** Password */
-            password: string;
-            /** Clinic Id */
-            clinic_id?: string | null;
+            logo: string;
+            /**
+             * Logo Bg Mode
+             * @default as_is
+             * @enum {string}
+             */
+            logo_bg_mode: "as_is" | "white" | "transparent";
+        };
+        /** LogoPreviewResponse */
+        LogoPreviewResponse: {
+            /**
+             * Logo
+             * @description The copy that would be stored (resized, data URI).
+             */
+            logo: string;
+            /**
+             * Letterhead Logo
+             * @description The logo as the report band shows it in this mode.
+             */
+            letterhead_logo: string;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Low Contrast */
+            low_contrast: boolean;
+        };
+        /** MFARequest */
+        MFARequest: {
+            /** Challenge Token */
+            challenge_token: string;
+            /** Code */
+            code: string;
         };
         /** MarketplaceEntitlementResponse */
         MarketplaceEntitlementResponse: {
@@ -3522,6 +5226,16 @@ export interface components {
             valid_from: string | null;
             /** Valid Until */
             valid_until: string | null;
+        };
+        /** MergeBody */
+        MergeBody: {
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Source Organization Id
+             * Format: uuid
+             */
+            source_organization_id: string;
         };
         /** MetaError */
         MetaError: {
@@ -3544,6 +5258,203 @@ export interface components {
             page: number;
             /** Page Size */
             page_size: number;
+        };
+        /** OperatorOut */
+        OperatorOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Mfa Enabled */
+            mfa_enabled: boolean;
+            /** Last Login At */
+            last_login_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** OperatorPatch */
+        OperatorPatch: {
+            /** Role */
+            role?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** OptionOut */
+        OptionOut: {
+            /** Value */
+            value: number;
+            /** Label */
+            label: string;
+        };
+        /** OrganizationCountsOut */
+        OrganizationCountsOut: {
+            /** Total */
+            total: number;
+            /** Active */
+            active: number;
+            /** Suspended */
+            suspended: number;
+            /** By Type */
+            by_type: {
+                [key: string]: number;
+            };
+        };
+        /** OrganizationCreateBody */
+        OrganizationCreateBody: {
+            /** Reason */
+            reason?: string | null;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "individual" | "clinic" | "chain" | "franchise" | "hospital" | "government" | "partner_platform";
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Contact Phone */
+            contact_phone?: string | null;
+        };
+        /** OrganizationDetailOut */
+        OrganizationDetailOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /** Contact Email */
+            contact_email: string | null;
+            /** Contact Phone */
+            contact_phone: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Clinics */
+            clinics: components["schemas"]["ClinicOut"][];
+        };
+        /** OrganizationListOut */
+        OrganizationListOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /** Contact Email */
+            contact_email: string | null;
+            /** Contact Phone */
+            contact_phone: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Clinic Count */
+            clinic_count: number;
+            /** Active Clinic Count */
+            active_clinic_count: number;
+        };
+        /** OrganizationOut */
+        OrganizationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /** Contact Email */
+            contact_email: string | null;
+            /** Contact Phone */
+            contact_phone: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** OrganizationUpdateBody */
+        OrganizationUpdateBody: {
+            /** Reason */
+            reason?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Type */
+            type?: ("individual" | "clinic" | "chain" | "franchise" | "hospital" | "government" | "partner_platform") | null;
+            /** Contact Email */
+            contact_email?: string | null;
+            /** Contact Phone */
+            contact_phone?: string | null;
+        };
+        /** OverviewOut */
+        OverviewOut: {
+            organizations: components["schemas"]["OrganizationCountsOut"];
+            clinics: components["schemas"]["ClinicCountsOut"];
+            /** Products */
+            products: components["schemas"]["ProductCountOut"][];
+            /** Usage Last 30 Days */
+            usage_last_30_days: number;
+            /** Recent Audit */
+            recent_audit: components["schemas"]["AuditLogOut"][];
         };
         /**
          * PackageCreate
@@ -3642,6 +5553,22 @@ export interface components {
             new_patients_this_month: number;
             /** New Patients In Period */
             new_patients_in_period: number;
+        };
+        /**
+         * PatientConsentOut
+         * @description Consent state for staff who send links. No clinical data.
+         */
+        PatientConsentOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "none" | "granted" | "withdrawn";
+            /** Recorded At */
+            recorded_at: string | null;
+            /** Outdated */
+            outdated: boolean;
+            request: components["schemas"]["ConsentRequestOut"] | null;
         };
         /** PatientCreate */
         PatientCreate: {
@@ -3985,6 +5912,33 @@ export interface components {
          * @enum {string}
          */
         PatientStatus: "active" | "inactive" | "discharged";
+        /**
+         * PatientSummaryOut
+         * @description CDSS read contract v1 (SRS 5.1). Supporting input only.
+         */
+        PatientSummaryOut: {
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Referral Flag */
+            referral_flag: boolean;
+            /** Risk Item Flag */
+            risk_item_flag: boolean;
+            /** Latest */
+            latest: components["schemas"]["SessionSummaryOut"][];
+        };
+        /** PatientTrendOut */
+        PatientTrendOut: {
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Series */
+            series: components["schemas"]["TrendSeriesOut"][];
+        };
         /** PatientUpdate */
         PatientUpdate: {
             /** First Name */
@@ -4109,6 +6063,8 @@ export interface components {
             void_reason?: string | null;
             /** Voided By */
             voided_by?: string | null;
+            /** Receipt Number */
+            receipt_number?: string | null;
         };
         /**
          * PaymentStatus
@@ -4196,6 +6152,8 @@ export interface components {
             hold_angle?: number | null;
             /** Note */
             note?: string | null;
+            /** Side */
+            side?: ("left" | "right") | null;
         };
         /** PrescriptionItemRead */
         PrescriptionItemRead: {
@@ -4226,6 +6184,8 @@ export interface components {
             hold_angle: number | null;
             /** Note */
             note: string | null;
+            /** Side */
+            side?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -4275,6 +6235,8 @@ export interface components {
             status: string;
             /** Pdf Key */
             pdf_key: string | null;
+            /** Number */
+            number?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -4287,6 +6249,33 @@ export interface components {
             updated_at: string;
             /** Items */
             items: components["schemas"]["PrescriptionItemRead"][];
+        };
+        /**
+         * PriorityItemOut
+         * @description A risk result no provider has opened yet (F4 = 4A). Providers only.
+         */
+        PriorityItemOut: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Patient Name */
+            patient_name: string;
+            /** Short Name */
+            short_name: string;
+            /** Status */
+            status: string;
+            /**
+             * Activity At
+             * Format: date-time
+             */
+            activity_at: string;
         };
         /** ProductCatalogItem */
         ProductCatalogItem: {
@@ -4304,6 +6293,24 @@ export interface components {
             installed: boolean;
             /** Enabled */
             enabled: boolean;
+        };
+        /** ProductCatalogOut */
+        ProductCatalogOut: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Category */
+            category: string;
+        };
+        /** ProductCountOut */
+        ProductCountOut: {
+            /** Product Key */
+            product_key: string;
+            /** Effective Clinics */
+            effective_clinics: number;
         };
         /**
          * PublicClinicBrandingResponse
@@ -4323,6 +6330,37 @@ export interface components {
             logo_url?: string | null;
             /** Brand Color */
             brand_color?: string | null;
+        };
+        /** ReasonBody */
+        ReasonBody: {
+            /** Reason */
+            reason?: string | null;
+        };
+        /** ReconsentAnswer */
+        ReconsentAnswer: {
+            /** Accept */
+            accept: boolean;
+            /** Text Version */
+            text_version?: string | null;
+        };
+        /**
+         * ReconsentOut
+         * @description What the patient sees on the consent-only link. No identity, no scores.
+         */
+        ReconsentOut: {
+            /** Clinic Name */
+            clinic_name: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "granted" | "declined" | "cancelled" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            consent: components["schemas"]["ConsentOut"];
         };
         /**
          * RecycleBinItemResponse
@@ -4384,25 +6422,217 @@ export interface components {
             /** Restored */
             restored: boolean;
         };
-        /** RegisterRequest */
-        RegisterRequest: {
+        /** ReferralActionOut */
+        ReferralActionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Action */
+            action: string;
+            /** Note */
+            note: string | null;
+            /** Recorded By Name */
+            recorded_by_name: string | null;
+            /**
+             * Recorded At
+             * Format: date-time
+             */
+            recorded_at: string;
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Contact Role */
+            contact_role?: string | null;
+        };
+        /** ReferralActionRequest */
+        ReferralActionRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "referred_gp" | "referred_psychologist" | "referred_psychiatrist" | "already_under_care" | "patient_declined" | "monitor_and_rescreen" | "other";
+            /** Note */
+            note?: string | null;
+            /** Contact Id */
+            contact_id?: string | null;
+        };
+        /** ReferralContactIn */
+        ReferralContactIn: {
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Phone */
+            phone?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** ReferralContactOut */
+        ReferralContactOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string;
+            /** Phone */
+            phone: string | null;
+            /** Email */
+            email: string | null;
+            /** Note */
+            note: string | null;
+            /** Archived */
+            archived: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By Name */
+            updated_by_name: string | null;
+        };
+        /** ReferralFigureOut */
+        ReferralFigureOut: {
+            /** Count */
+            count: number | null;
+            /** Rate Percent */
+            rate_percent: number | null;
+            /** Suppressed */
+            suppressed: boolean;
+        };
+        /** ReissueLinkRequest */
+        ReissueLinkRequest: {
+            /**
+             * Expires In Days
+             * @default 7
+             */
+            expires_in_days: number;
+        };
+        /**
+         * ReportGateOut
+         * @description Before the patient unlocks the page: nothing clinical.
+         */
+        ReportGateOut: {
             /** Clinic Name */
             clinic_name: string;
+            /** Needs Birth Year */
+            needs_birth_year: boolean;
+        };
+        /** ReportLineOut */
+        ReportLineOut: {
+            /** Short Name */
+            short_name: string;
+            /** Score */
+            score: number;
+            /** Max Score */
+            max_score: number;
+            /** Phrase */
+            phrase: string;
+        };
+        /** ReportLinkOut */
+        ReportLinkOut: {
+            /** Title */
+            title: string;
+            /** Description */
+            description: string | null;
+            /** Url */
+            url: string | null;
+            /** Domain */
+            domain: string | null;
+            /** Phones */
+            phones: {
+                [key: string]: string;
+            }[];
+        };
+        /** ReportOpen */
+        ReportOpen: {
+            /** Birth Year */
+            birth_year?: number | null;
+        };
+        /**
+         * ReportOut
+         * @description What the patient sees. Never band names, flags or answers.
+         */
+        ReportOut: {
+            /** Clinic Name */
+            clinic_name: string;
+            /** Provider Name */
+            provider_name: string | null;
             /**
-             * Email
-             * Format: email
+             * Shared On
+             * Format: date-time
              */
-            email: string;
-            /** Password */
-            password: string;
-            /** First Name */
-            first_name: string;
-            /** Last Name */
-            last_name: string;
+            shared_on: string;
+            /** Advice */
+            advice: string | null;
+            /** Summary */
+            summary: components["schemas"]["ReportLineOut"][];
+            /** Resources */
+            resources: components["schemas"]["ReportLinkOut"][];
+        };
+        /** ResourceOut */
+        ResourceOut: {
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Url */
+            url: string | null;
+            /** Source */
+            source: string | null;
+            /** Phones */
+            phones: {
+                [key: string]: string;
+            }[];
+        };
+        /** ResponseEnvelope[AggregatesOut] */
+        ResponseEnvelope_AggregatesOut_: {
+            data?: components["schemas"]["AggregatesOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[AnswerOut] */
+        ResponseEnvelope_AnswerOut_: {
+            data?: components["schemas"]["AnswerOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
         };
         /** ResponseEnvelope[AppointmentRequestResponse] */
         ResponseEnvelope_AppointmentRequestResponse_: {
             data?: components["schemas"]["AppointmentRequestResponse"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[AssignmentCreatedOut] */
+        ResponseEnvelope_AssignmentCreatedOut_: {
+            data?: components["schemas"]["AssignmentCreatedOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[AssignmentOut] */
+        ResponseEnvelope_AssignmentOut_: {
+            data?: components["schemas"]["AssignmentOut"] | null;
             /** Meta */
             meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
                 [key: string]: unknown;
@@ -4419,6 +6649,46 @@ export interface components {
         /** ResponseEnvelope[BundleInstallResponse] */
         ResponseEnvelope_BundleInstallResponse_: {
             data?: components["schemas"]["BundleInstallResponse"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ClinicDetailOut] */
+        ResponseEnvelope_ClinicDetailOut_: {
+            data?: components["schemas"]["ClinicDetailOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ClinicOut] */
+        ResponseEnvelope_ClinicOut_: {
+            data?: components["schemas"]["ClinicOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ClinicSettingsOut] */
+        ResponseEnvelope_ClinicSettingsOut_: {
+            data?: components["schemas"]["ClinicSettingsOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ConsentRequestCreatedOut] */
+        ResponseEnvelope_ConsentRequestCreatedOut_: {
+            data?: components["schemas"]["ConsentRequestCreatedOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[EntitlementOut] */
+        ResponseEnvelope_EntitlementOut_: {
+            data?: components["schemas"]["EntitlementOut"] | null;
             /** Meta */
             meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
                 [key: string]: unknown;
@@ -4511,9 +6781,57 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ResponseEnvelope[OrganizationDetailOut] */
+        ResponseEnvelope_OrganizationDetailOut_: {
+            data?: components["schemas"]["OrganizationDetailOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[OrganizationOut] */
+        ResponseEnvelope_OrganizationOut_: {
+            data?: components["schemas"]["OrganizationOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[OverviewOut] */
+        ResponseEnvelope_OverviewOut_: {
+            data?: components["schemas"]["OverviewOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[PatientConsentOut] */
+        ResponseEnvelope_PatientConsentOut_: {
+            data?: components["schemas"]["PatientConsentOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ResponseEnvelope[PatientRead] */
         ResponseEnvelope_PatientRead_: {
             data?: components["schemas"]["PatientRead"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[PatientSummaryOut] */
+        ResponseEnvelope_PatientSummaryOut_: {
+            data?: components["schemas"]["PatientSummaryOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[PatientTrendOut] */
+        ResponseEnvelope_PatientTrendOut_: {
+            data?: components["schemas"]["PatientTrendOut"] | null;
             /** Meta */
             meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
                 [key: string]: unknown;
@@ -4543,6 +6861,102 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ResponseEnvelope[ReconsentOut] */
+        ResponseEnvelope_ReconsentOut_: {
+            data?: components["schemas"]["ReconsentOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ReferralActionOut] */
+        ResponseEnvelope_ReferralActionOut_: {
+            data?: components["schemas"]["ReferralActionOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ReferralContactOut] */
+        ResponseEnvelope_ReferralContactOut_: {
+            data?: components["schemas"]["ReferralContactOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ReportGateOut] */
+        ResponseEnvelope_ReportGateOut_: {
+            data?: components["schemas"]["ReportGateOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ReportOut] */
+        ResponseEnvelope_ReportOut_: {
+            data?: components["schemas"]["ReportOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ScreenerOut] */
+        ResponseEnvelope_ScreenerOut_: {
+            data?: components["schemas"]["ScreenerOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ScreeningDataOut] */
+        ResponseEnvelope_ScreeningDataOut_: {
+            data?: components["schemas"]["ScreeningDataOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[SessionDetailOut] */
+        ResponseEnvelope_SessionDetailOut_: {
+            data?: components["schemas"]["SessionDetailOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ShareCreatedOut] */
+        ResponseEnvelope_ShareCreatedOut_: {
+            data?: components["schemas"]["ShareCreatedOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ShareOptionsOut] */
+        ResponseEnvelope_ShareOptionsOut_: {
+            data?: components["schemas"]["ShareOptionsOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[ShareOut] */
+        ResponseEnvelope_ShareOut_: {
+            data?: components["schemas"]["ShareOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[SubmitOut] */
+        ResponseEnvelope_SubmitOut_: {
+            data?: components["schemas"]["SubmitOut"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ResponseEnvelope[TemplateRead] */
         ResponseEnvelope_TemplateRead_: {
             data?: components["schemas"]["TemplateRead"] | null;
@@ -4562,6 +6976,14 @@ export interface components {
         /** ResponseEnvelope[UserRead] */
         ResponseEnvelope_UserRead_: {
             data?: components["schemas"]["UserRead"] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[UserToolsRead] */
+        ResponseEnvelope_UserToolsRead_: {
+            data?: components["schemas"]["UserToolsRead"] | null;
             /** Meta */
             meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
                 [key: string]: unknown;
@@ -4620,10 +7042,37 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ResponseEnvelope[list[AssignmentOut]] */
+        ResponseEnvelope_list_AssignmentOut__: {
+            /** Data */
+            data?: components["schemas"]["AssignmentOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[AuditLogOut]] */
+        ResponseEnvelope_list_AuditLogOut__: {
+            /** Data */
+            data?: components["schemas"]["AuditLogOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ResponseEnvelope[list[AuditLogResponse]] */
         ResponseEnvelope_list_AuditLogResponse__: {
             /** Data */
             data?: components["schemas"]["AuditLogResponse"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[DueItemOut]] */
+        ResponseEnvelope_list_DueItemOut__: {
+            /** Data */
+            data?: components["schemas"]["DueItemOut"][] | null;
             /** Meta */
             meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
                 [key: string]: unknown;
@@ -4638,6 +7087,42 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ResponseEnvelope[list[InstrumentSummaryOut]] */
+        ResponseEnvelope_list_InstrumentSummaryOut__: {
+            /** Data */
+            data?: components["schemas"]["InstrumentSummaryOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[OperatorOut]] */
+        ResponseEnvelope_list_OperatorOut__: {
+            /** Data */
+            data?: components["schemas"]["OperatorOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[OrganizationListOut]] */
+        ResponseEnvelope_list_OrganizationListOut__: {
+            /** Data */
+            data?: components["schemas"]["OrganizationListOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[PriorityItemOut]] */
+        ResponseEnvelope_list_PriorityItemOut__: {
+            /** Data */
+            data?: components["schemas"]["PriorityItemOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
         /** ResponseEnvelope[list[ProductCatalogItem]] */
         ResponseEnvelope_list_ProductCatalogItem__: {
             /** Data */
@@ -4646,6 +7131,93 @@ export interface components {
             meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
                 [key: string]: unknown;
             } | null;
+        };
+        /** ResponseEnvelope[list[ProductCatalogOut]] */
+        ResponseEnvelope_list_ProductCatalogOut__: {
+            /** Data */
+            data?: components["schemas"]["ProductCatalogOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[ReferralActionOut]] */
+        ResponseEnvelope_list_ReferralActionOut__: {
+            /** Data */
+            data?: components["schemas"]["ReferralActionOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[ReferralContactOut]] */
+        ResponseEnvelope_list_ReferralContactOut__: {
+            /** Data */
+            data?: components["schemas"]["ReferralContactOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[ScheduleOut]] */
+        ResponseEnvelope_list_ScheduleOut__: {
+            /** Data */
+            data?: components["schemas"]["ScheduleOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[SentLinkOut]] */
+        ResponseEnvelope_list_SentLinkOut__: {
+            /** Data */
+            data?: components["schemas"]["SentLinkOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[ShareOut]] */
+        ResponseEnvelope_list_ShareOut__: {
+            /** Data */
+            data?: components["schemas"]["ShareOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[UsageRowOut]] */
+        ResponseEnvelope_list_UsageRowOut__: {
+            /** Data */
+            data?: components["schemas"]["UsageRowOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseEnvelope[list[WorklistRowOut]] */
+        ResponseEnvelope_list_WorklistRowOut__: {
+            /** Data */
+            data?: components["schemas"]["WorklistRowOut"][] | null;
+            /** Meta */
+            meta?: components["schemas"]["MetaPagination"] | components["schemas"]["MetaError"] | {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ResponseOut */
+        ResponseOut: {
+            /** Item Id */
+            item_id: string;
+            /** Number */
+            number: number;
+            /** Text */
+            text: string;
+            /** Scored */
+            scored: boolean;
+            /** Value */
+            value: number | null;
+            /** Answer Label */
+            answer_label: string | null;
         };
         /**
          * RevenueAnalytics
@@ -4693,6 +7265,321 @@ export interface components {
              * @description Legacy alias for outstanding_amount; retains the all-time status-based invoice balance calculation.
              */
             total_outstanding_amount: string;
+        };
+        /** RiskRuleOut */
+        RiskRuleOut: {
+            /** Item Number */
+            item_number: number;
+            /** Min Value */
+            min_value: number;
+            /** Min Label */
+            min_label: string;
+            /** Description */
+            description: string;
+        };
+        /** ScaleDistributionOut */
+        ScaleDistributionOut: {
+            /** Scale Id */
+            scale_id: string;
+            /** Label */
+            label: string;
+            /** Bands */
+            bands: components["schemas"]["BandCountOut"][];
+        };
+        /** ScaleOut */
+        ScaleOut: {
+            /** Scale Id */
+            scale_id: string;
+            /** Label */
+            label: string;
+            /** Score */
+            score: number;
+            /** Max Score */
+            max_score: number;
+            /** Band Label */
+            band_label: string;
+            /** Band Level */
+            band_level: number;
+            /** Referral */
+            referral: boolean;
+        };
+        /** ScaleThresholdOut */
+        ScaleThresholdOut: {
+            /** Scale Id */
+            scale_id: string;
+            /** Label */
+            label: string;
+            /** Max Score */
+            max_score: number;
+            /** Referral Band */
+            referral_band: string;
+            /** Referral Min Score */
+            referral_min_score: number;
+            /** Bands */
+            bands: components["schemas"]["BandThresholdOut"][];
+        };
+        /** ScheduleOut */
+        ScheduleOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Instrument Id */
+            instrument_id: string;
+            /** Short Name */
+            short_name: string;
+            /** Interval Days */
+            interval_days: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "consent_withdrawn" | "retired" | "waiting" | "due" | "upcoming";
+            /** Next Due At */
+            next_due_at: string | null;
+            /** Last Completed At */
+            last_completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By Name */
+            created_by_name: string | null;
+        };
+        /** ScreenerInstrumentOut */
+        ScreenerInstrumentOut: {
+            instrument: components["schemas"]["InstrumentOut"];
+            /** Status */
+            status: string;
+            /** Answers */
+            answers: {
+                [key: string]: number;
+            };
+        };
+        /** ScreenerOut */
+        ScreenerOut: {
+            /** Clinic Name */
+            clinic_name: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            consent: components["schemas"]["ConsentOut"];
+            /** Questionnaires */
+            questionnaires: components["schemas"]["ScreenerInstrumentOut"][];
+            /** Current Instrument Id */
+            current_instrument_id: string | null;
+        };
+        /**
+         * ScreeningDataOut
+         * @description Counts only. Never scores, bands or flags: admins use this (SRS 3.2).
+         */
+        ScreeningDataOut: {
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Links */
+            links: number;
+            /** Screeners */
+            screeners: number;
+            /** Referral Actions */
+            referral_actions: number;
+            /** Schedules */
+            schedules: number;
+            /** Consent Records */
+            consent_records: number;
+            /** Withdrawal On File */
+            withdrawal_on_file: boolean;
+        };
+        /**
+         * SentLinkOut
+         * @description Operational view of one link (F3 = enhanced 3A).
+         *
+         *     Deliberately has no scores, answers or flags: admins see this list.
+         */
+        SentLinkOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Patient Name */
+            patient_name: string;
+            /** Screeners */
+            screeners: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "expired" | "completed" | "cancelled";
+            /**
+             * Sent At
+             * Format: date-time
+             */
+            sent_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Sent By Name */
+            sent_by_name: string | null;
+            /** Can Cancel */
+            can_cancel: boolean;
+        };
+        /** SessionDetailOut */
+        SessionDetailOut: {
+            session: components["schemas"]["SessionSummaryOut"];
+            /** Patient Name */
+            patient_name: string;
+            /** Instrument Name */
+            instrument_name: string;
+            /** Citation */
+            citation: string;
+            /** Reasons */
+            reasons: string[];
+            /** Responses */
+            responses: components["schemas"]["ResponseOut"][];
+            baseline: components["schemas"]["BaselineOut"] | null;
+            /** Is Baseline */
+            is_baseline: boolean;
+            /** Referral Actions */
+            referral_actions: components["schemas"]["ReferralActionOut"][];
+        };
+        /** SessionSummaryOut */
+        SessionSummaryOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /**
+             * Patient Id
+             * Format: uuid
+             */
+            patient_id: string;
+            /** Instrument Id */
+            instrument_id: string;
+            /** Instrument Version */
+            instrument_version: string;
+            /** Short Name */
+            short_name: string;
+            /** Position */
+            position: number;
+            /** Status */
+            status: string;
+            /** Answered Count */
+            answered_count: number;
+            /** Total Items */
+            total_items: number;
+            /** Started At */
+            started_at: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Referral Flag */
+            referral_flag: boolean;
+            /** Risk Item Flag */
+            risk_item_flag: boolean;
+            /** Partial Risk */
+            partial_risk: boolean;
+            /** Scales */
+            scales: components["schemas"]["ScaleOut"][];
+        };
+        /** ShareCreate */
+        ShareCreate: {
+            /** Advice */
+            advice?: string | null;
+            /** Resources */
+            resources?: string[];
+            /** Custom Links */
+            custom_links?: components["schemas"]["CustomLinkIn"][];
+            /**
+             * Expires In Days
+             * @default 30
+             */
+            expires_in_days: number;
+        };
+        /** ShareCreatedOut */
+        ShareCreatedOut: {
+            share: components["schemas"]["ShareOut"];
+            /** Report Path */
+            report_path: string;
+        };
+        /** ShareOptionsOut */
+        ShareOptionsOut: {
+            /** Resources */
+            resources: components["schemas"]["ResourceOut"][];
+            /** Advice Chips */
+            advice_chips: string[];
+            /** Advice Max */
+            advice_max: number;
+            /** Custom Links Max */
+            custom_links_max: number;
+        };
+        /** ShareOut */
+        ShareOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Assignment Id
+             * Format: uuid
+             */
+            assignment_id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "active" | "expired" | "revoked" | "locked";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Shared By Name */
+            shared_by_name: string | null;
+            /** Birth Year Check */
+            birth_year_check: boolean;
+            /** First Opened At */
+            first_opened_at: string | null;
+            /** Open Count */
+            open_count: number;
+            /** Advice */
+            advice: string | null;
+            /** Resource Titles */
+            resource_titles: string[];
         };
         /**
          * SoapAssessmentCreate
@@ -4818,6 +7705,27 @@ export interface components {
          * @enum {string}
          */
         Specialty: "physiotherapy" | "chiropractic" | "osteopathy" | "massage" | "acupuncture" | "ortho" | "neuro" | "cardiopulm" | "sports" | "paeds" | "general" | "other";
+        /** SubmitOut */
+        SubmitOut: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Assignment Complete */
+            assignment_complete: boolean;
+            /** Next Instrument Id */
+            next_instrument_id: string | null;
+            /** Show Referral Message */
+            show_referral_message: boolean;
+            /** Show Support Contacts */
+            show_support_contacts: boolean;
+        };
+        /** SubmitRequest */
+        SubmitRequest: {
+            /**
+             * Instrument Id
+             * @enum {string}
+             */
+            instrument_id: "phq9" | "gad7" | "dass21";
+        };
         /** TemplateIn */
         TemplateIn: {
             /** Name */
@@ -5094,6 +8002,81 @@ export interface components {
             /** Finalized */
             finalized?: boolean | null;
         };
+        /** TrendBandOut */
+        TrendBandOut: {
+            /** Min Score */
+            min_score: number;
+            /** Max Score */
+            max_score: number;
+            /** Label */
+            label: string;
+            /** Level */
+            level: number;
+        };
+        /** TrendPointOut */
+        TrendPointOut: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            /** Score */
+            score: number;
+            /** Band Label */
+            band_label: string;
+            /** Band Level */
+            band_level: number;
+            /** Referral */
+            referral: boolean;
+        };
+        /** TrendSeriesOut */
+        TrendSeriesOut: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Short Name */
+            short_name: string;
+            /** Scale Id */
+            scale_id: string;
+            /** Label */
+            label: string;
+            /** Max Score */
+            max_score: number;
+            /** Referral From */
+            referral_from: number | null;
+            /** Bands */
+            bands: components["schemas"]["TrendBandOut"][];
+            /** Points */
+            points: components["schemas"]["TrendPointOut"][];
+        };
+        /** UpdateInstrumentSettingRequest */
+        UpdateInstrumentSettingRequest: {
+            /** Default Repeat Weeks */
+            default_repeat_weeks: number | null;
+        };
+        /** UsageRowOut */
+        UsageRowOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Clinic Id
+             * Format: uuid
+             */
+            clinic_id: string;
+            /** Product Key */
+            product_key: string;
+            /** Event Type */
+            event_type: string;
+            /** Count */
+            count: number;
+        };
         /**
          * UserCreate
          * @description User creation payload with AV Suite first/last name compatibility.
@@ -5123,6 +8106,8 @@ export interface components {
             first_name?: string | null;
             /** Last Name */
             last_name?: string | null;
+            /** Tools */
+            tools?: string[] | null;
         };
         /**
          * UserPermissionCreate
@@ -5203,6 +8188,10 @@ export interface components {
             first_name?: string | null;
             /** Last Name */
             last_name?: string | null;
+            /** Tools */
+            tools?: {
+                [key: string]: boolean;
+            } | null;
             /**
              * Created At
              * Format: date-time
@@ -5220,6 +8209,38 @@ export interface components {
          * @enum {string}
          */
         UserRole: "admin" | "therapist" | "front_desk" | "patient";
+        /**
+         * UserToolsRead
+         * @description BE-1: checkbox state for one user plus what the clinic plan allows.
+         */
+        UserToolsRead: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            role: components["schemas"]["UserRole"];
+            /** Tools */
+            tools: {
+                [key: string]: boolean;
+            };
+            /** Available */
+            available: {
+                [key: string]: boolean;
+            };
+            /** Labels */
+            labels: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * UserToolsUpdate
+         * @description BE-1: PUT /users/{id}/tools. Exactly these tools end up on; others off.
+         */
+        UserToolsUpdate: {
+            /** Tools */
+            tools: string[];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -5232,6 +8253,14 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorklistRowOut */
+        WorklistRowOut: {
+            session: components["schemas"]["SessionSummaryOut"];
+            /** Patient Name */
+            patient_name: string;
+            /** Assignment Effective Status */
+            assignment_effective_status: string;
         };
         /** WorkspaceContext */
         WorkspaceContext: {
@@ -5253,6 +8282,16 @@ export interface components {
              */
             clinic_id: string;
         };
+        /** LoginRequest */
+        app__api__v1__platform_auth__LoginRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Password */
+            password: string;
+        };
         /**
          * AppointmentRequestStatus
          * @description Approval states for public booking requests.
@@ -5265,6 +8304,18 @@ export interface components {
          * @enum {string}
          */
         app__enums__booking__AppointmentRequestStatus: "pending" | "approved" | "rejected";
+        /** LoginRequest */
+        app__schemas__auth__LoginRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Password */
+            password: string;
+            /** Clinic Id */
+            clinic_id?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -5274,6 +8325,652 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    products_api_v1_platform_products_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_ProductCatalogOut__"];
+                };
+            };
+        };
+    };
+    organizations_api_v1_platform_organizations_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                type?: string | null;
+                status?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_OrganizationListOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_organization_api_v1_platform_organizations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationCreateBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_OrganizationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_organization_api_v1_platform_organizations__org_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_OrganizationDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_organization_api_v1_platform_organizations__org_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrganizationUpdateBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_OrganizationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suspend_org_api_v1_platform_organizations__org_id__suspend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_OrganizationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_org_api_v1_platform_organizations__org_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_OrganizationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_clinic_api_v1_platform_organizations__org_id__clinics_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClinicCreateBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ClinicOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_clinic_api_v1_platform_clinics__clinic_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clinic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ClinicDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suspend_clinic_api_v1_platform_clinics__clinic_id__suspend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clinic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ClinicOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_clinic_api_v1_platform_clinics__clinic_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clinic_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ClinicOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    merge_organization_api_v1_platform_organizations__org_id__merge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_OrganizationDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_entitlement_api_v1_platform_clinics__clinic_id__products__product_key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clinic_id: string;
+                product_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntitlementBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_EntitlementOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    usage_api_v1_platform_usage_get: {
+        parameters: {
+            query?: {
+                clinic_id?: string | null;
+                product_key?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_UsageRowOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_logs_api_v1_platform_audit_logs_get: {
+        parameters: {
+            query?: {
+                operator_id?: string | null;
+                organization_id?: string | null;
+                clinic_id?: string | null;
+                action?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_AuditLogOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_operators_api_v1_platform_operators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    overview_api_v1_platform_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_OverviewOut_"];
+                };
+            };
+        };
+    };
+    login_api_v1_platform_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__v1__platform_auth__LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_mfa_api_v1_platform_auth_mfa_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MFARequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_operator_api_v1_platform_operators__operator_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operator_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_me_api_v1_auth_me_get: {
         parameters: {
             query?: never;
@@ -5294,39 +8991,6 @@ export interface operations {
             };
         };
     };
-    register_api_v1_auth_register_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RegisterRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ResponseEnvelope_TokenResponse_"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
@@ -5336,7 +9000,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["LoginRequest"];
+                "application/json": components["schemas"]["app__schemas__auth__LoginRequest"];
             };
         };
         responses: {
@@ -6133,6 +9797,161 @@ export interface operations {
                 };
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pick_patients_api_v1_posture_patients_get: {
+        parameters: {
+            query?: {
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pick_one_patient_api_v1_posture_patients__patient_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_reports_api_v1_posture_patients__patient_id__reports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_saved_report_api_v1_posture_reports__report_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saved_report_pdf_api_v1_posture_reports__report_id__pdf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -7142,6 +10961,72 @@ export interface operations {
             };
         };
     };
+    get_user_tools_api_v1_users__user_id__tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_UserToolsRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_user_tools_api_v1_users__user_id__tools_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserToolsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_UserToolsRead_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_user_permissions_api_v1_users__user_id__permissions_get: {
         parameters: {
             query?: never;
@@ -7800,6 +11685,7 @@ export interface operations {
         parameters: {
             query?: {
                 kind?: "invoice" | "receipt";
+                payment_id?: string | null;
             };
             header?: never;
             path: {
@@ -8902,6 +12788,39 @@ export interface operations {
             };
         };
     };
+    preview_clinic_logo_api_v1_settings_clinic_logo_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogoPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_analytics_overview_api_v1_analytics_overview_get: {
         parameters: {
             query?: {
@@ -9154,6 +13073,1326 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResponseEnvelope_PlatformContextResponse_"];
+                };
+            };
+        };
+    };
+    list_screeners_api_v1_psychosocial_instruments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_InstrumentSummaryOut__"];
+                };
+            };
+        };
+    };
+    list_patient_screeners_api_v1_patients__patient_id__psychosocial_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_AssignmentOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_screeners_api_v1_patients__patient_id__psychosocial_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssignRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_AssignmentCreatedOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_options_api_v1_psychosocial_share_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ShareOptionsOut_"];
+                };
+            };
+        };
+    };
+    share_with_patient_api_v1_psychosocial_assignments__assignment_id__share_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShareCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ShareCreatedOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_shares_api_v1_patients__patient_id__psychosocial_shares_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_ShareOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_share_api_v1_psychosocial_shares__share_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ShareOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_consent_api_v1_patients__patient_id__psychosocial_consent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_PatientConsentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_consent_again_api_v1_patients__patient_id__psychosocial_consent_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentRequestCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ConsentRequestCreatedOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_screener_api_v1_psychosocial_assignments__assignment_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_AssignmentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reissue_link_api_v1_psychosocial_assignments__assignment_id__link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                assignment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReissueLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_AssignmentCreatedOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_screening_summary_api_v1_patients__patient_id__psychosocial_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_PatientSummaryOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clinic_worklist_api_v1_psychosocial_sessions_get: {
+        parameters: {
+            query?: {
+                status?: ("pending" | "in_progress" | "completed" | "cancelled") | null;
+                flagged?: boolean;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_WorklistRowOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    priority_review_api_v1_psychosocial_priority_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_PriorityItemOut__"];
+                };
+            };
+        };
+    };
+    sent_links_api_v1_psychosocial_assignments_get: {
+        parameters: {
+            query?: {
+                status?: ("pending" | "expired" | "completed" | "cancelled") | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_SentLinkOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    session_detail_api_v1_psychosocial_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_SessionDetailOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_referral_api_v1_psychosocial_sessions__session_id__referral_actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferralActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ReferralActionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_referral_history_api_v1_patients__patient_id__psychosocial_referral_actions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_ReferralActionOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screening_data_overview_api_v1_patients__patient_id__psychosocial_data_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ScreeningDataOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_screening_data_api_v1_patients__patient_id__psychosocial_data_delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteScreeningDataRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ScreeningDataOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_trend_api_v1_patients__patient_id__psychosocial_trend_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_PatientTrendOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_report_pdf_api_v1_patients__patient_id__psychosocial_report_pdf_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patient_schedules_api_v1_patients__patient_id__psychosocial_schedules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                patient_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_ScheduleOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_schedule_api_v1_psychosocial_schedules__schedule_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    due_list_api_v1_psychosocial_due_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_DueItemOut__"];
+                };
+            };
+        };
+    };
+    get_clinic_settings_api_v1_psychosocial_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ClinicSettingsOut_"];
+                };
+            };
+        };
+    };
+    update_instrument_setting_api_v1_psychosocial_settings__instrument_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instrument_id: "phq9" | "gad7" | "dass21";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateInstrumentSettingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ClinicSettingsOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clinic_statistics_api_v1_psychosocial_aggregates_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                instrument?: ("phq9" | "gad7" | "dass21") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_AggregatesOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clinic_statistics_csv_api_v1_psychosocial_aggregates_csv_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                instrument?: ("phq9" | "gad7" | "dass21") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    referral_contacts_for_picker_api_v1_psychosocial_referral_contacts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_ReferralContactOut__"];
+                };
+            };
+        };
+    };
+    referral_contacts_for_admin_api_v1_psychosocial_settings_referral_contacts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_list_ReferralContactOut__"];
+                };
+            };
+        };
+    };
+    create_referral_contact_api_v1_psychosocial_settings_referral_contacts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferralContactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ReferralContactOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_referral_contact_api_v1_psychosocial_settings_referral_contacts__contact_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferralContactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ReferralContactOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_referral_contact_api_v1_psychosocial_settings_referral_contacts__contact_id___change__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+                change: "archive" | "restore";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ReferralContactOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_reconsent_api_v1_screener_reconsent__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ReconsentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_reconsent_api_v1_screener_reconsent__token__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconsentAnswer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ReconsentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_gate_api_v1_screener_report__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ReportGateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_open_api_v1_screener_report__token__open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportOpen"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ReportOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_screener_api_v1_screener__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_ScreenerOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    give_consent_api_v1_screener__token__consent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_api_v1_screener__token__withdraw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_dict_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_answer_api_v1_screener__token__answers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_AnswerOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_api_v1_screener__token__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubmitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResponseEnvelope_SubmitOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

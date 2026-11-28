@@ -17,6 +17,7 @@ from app.core.security import create_access_token, get_password_hash
 from app.enums.shared import Specialty
 from app.enums.user import UserRole
 from app.models.billing import Invoice, InvoiceCounter
+from app.services.document_numbers import financial_year
 from app.models.clinic import Clinic
 from app.models.membership import Membership
 from app.models.patient import Patient
@@ -235,11 +236,14 @@ async def test_invoice_numbers_are_per_clinic_sequential_seeded_and_unique(db_se
     first_a = await (await _billing_service(db_session)).create_invoice(clinic_a.id, _invoice_payload(patient_a.id))
     second_a = await (await _billing_service(db_session)).create_invoice(clinic_a.id, _invoice_payload(patient_a.id))
     first_b = await (await _billing_service(db_session)).create_invoice(clinic_b.id, _invoice_payload(patient_b.id))
+    fy = financial_year()
+    # D-043 (27 Nov 2026): INV-<FY>-<6 digits>, per clinic per financial year.
     assert (first_a.invoice_number, second_a.invoice_number, first_b.invoice_number) == (
-        "INV-0001", "INV-0002", "INV-0001"
+        f"INV-{fy}-000001", f"INV-{fy}-000002", f"INV-{fy}-000001"
     )
 
-    # Existing formatted invoice and its migration-seeded counter are retained.
+    # Invoices issued before D-043 keep their numbers; new ones use the new
+    # format and do not collide with them.
     clinic_existing = Clinic(name=f"Existing invoice clinic {uuid.uuid4()}")
     db_session.add(clinic_existing)
     await db_session.flush()
@@ -260,7 +264,7 @@ async def test_invoice_numbers_are_per_clinic_sequential_seeded_and_unique(db_se
         next_existing = await (await _billing_service(session)).create_invoice(
             clinic_existing.id, _invoice_payload(patient_existing.id)
         )
-    assert next_existing.invoice_number == "INV-0008"
+    assert next_existing.invoice_number == f"INV-{fy}-000001"
     assert {invoice.invoice_number for invoice in legacy_invoices} == {
         "INV-0001", "INV-0002", "INV-0007"
     }
@@ -291,7 +295,8 @@ async def test_twenty_concurrent_invoice_number_creations_are_unique_and_ordered
             return invoice.invoice_number
 
     numbers = await asyncio.gather(*(create_one() for _ in range(20)))
-    assert sorted(numbers) == [f"INV-{n:04d}" for n in range(1, 21)]
+    fy = financial_year()
+    assert sorted(numbers) == [f"INV-{fy}-{n:06d}" for n in range(1, 21)]
 
 
 async def test_invoice_number_retry_advances_past_number_created_after_allocation(
@@ -331,8 +336,9 @@ async def test_invoice_number_retry_advances_past_number_created_after_allocatio
         service.invoice_repository.create = collide_once
         created = await service.create_invoice(clinic.id, _invoice_payload(patient.id))
 
-    assert failed_numbers == ["INV-0002"]
-    assert created.invoice_number == "INV-0003"
+    fy = financial_year()
+    assert failed_numbers == [f"INV-{fy}-000001"]
+    assert created.invoice_number == f"INV-{fy}-000002"
 
 
 async def test_auth_me_includes_clinic_slug(client, db_session):

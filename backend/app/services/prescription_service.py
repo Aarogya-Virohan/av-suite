@@ -12,6 +12,8 @@ from app.repositories.prescription import PrescriptionRepository
 from app.services.patient_number import format_patient_id
 from app.utils.whatsapp import build_whatsapp_link
 from app.services import exercise_media, exercise_photos
+from app.services.clinic_brand import display_doctor_name
+from app.services.document_numbers import RX, next_clinical_number
 from app.services.prescription_pdf import (
     RxDoc,
     RxItem,
@@ -45,6 +47,9 @@ async def create_prescription(
         await db.flush()
         clinic = await db.get(Clinic, clinic_id)
         if clinic is not None:
+            # D-043: <clinic code>-RX-<6 digits>, server side only.
+            db_prescription.number = await next_clinical_number(db, clinic_id, clinic.code, RX)
+            await db.flush()
             await record_usage(db, clinic, physio_id, "exercise-prescription", "prescription_created")
 
         # Return prescription with relationships loaded
@@ -171,6 +176,11 @@ def _storage_client():
         return None
 
 
+def _sex_label(patient) -> str | None:
+    value = getattr(patient.gender, "value", patient.gender)
+    return str(value).capitalize() if value else None
+
+
 def _rx_doc(rx: Prescription) -> RxDoc:
     patient = rx.patient
     physio = rx.physio
@@ -210,6 +220,11 @@ def _rx_doc(rx: Prescription) -> RxDoc:
         pincode=(rx.clinic.pincode if rx.clinic else None),
         phone=(rx.clinic.phone if rx.clinic else None),
         email=(rx.clinic.email if rx.clinic else None),
+        website=(rx.clinic.website if rx.clinic else None),
+        logo_bg_mode=((rx.clinic.logo_bg_mode if rx.clinic else None) or "as_is"),
+        document_number=rx.number,
+        patient_age=(patient.age if patient else None),
+        patient_sex=(_sex_label(patient) if patient else None),
         physio_name=physio_name,
         patient_name=(
             f"{patient.first_name} {patient.last_name}".strip() if patient else "Patient"
@@ -275,7 +290,13 @@ async def generate_prescription_pdf(
     if not rx:
         raise ValueError("Prescription not found")
 
+    if not rx.number and rx.clinic is not None:
+        # A row made outside create_prescription (an older build, a script)
+        # gets its number the first time it is printed.
+        rx.number = await next_clinical_number(db, rx.clinic_id, rx.clinic.code, RX)
+        await db.flush()
     doc = _rx_doc(rx)
+    doc.display_doctor_name = await display_doctor_name(db, rx.clinic)
     await _attach_clinic_photos(db, rx.clinic_id, doc)
     pdf_bytes = await render_prescription_pdf(doc)
     pdf_key = await _store_pdf(rx, pdf_bytes)

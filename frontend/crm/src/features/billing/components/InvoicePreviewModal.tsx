@@ -84,6 +84,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
   );
 
   const [downloading, setDownloading] = React.useState(false);
+  const [receiptBusy, setReceiptBusy] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -117,6 +118,19 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
 
   const balance = Number(invoice.total_amount || 0) - Number(invoice.paid_amount || 0);
   const docTitle = isReceipt ? 'Payment Receipt' : 'Invoice';
+
+  // D-043: one receipt per payment, with its own RCP number. Payments made
+  // before 27 Nov 2026 have none; their receipt keeps the invoice number.
+  const downloadReceipt = async (paymentId: string, receiptNumber: string | null | undefined) => {
+    setReceiptBusy(paymentId);
+    try {
+      await downloadInvoicePdf(invoice.id, receiptNumber || invoice.invoice_number, 'receipt', paymentId);
+    } catch {
+      toast.error('Could not download the receipt PDF. Please try again.');
+    } finally {
+      setReceiptBusy(null);
+    }
+  };
 
   // The server renders the real PDF with the same content (D-027, L-41).
   const downloadPdf = async (): Promise<boolean> => {
@@ -371,6 +385,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
               ) : invoicePayments.length === 0 ? (
                 <p className="italic text-[#767b93]">No payments recorded against this invoice.</p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="border-b border-[#ebe5d8]">
@@ -378,6 +393,7 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
                       <th className="p-2 text-[10px] font-bold uppercase text-[#5d6380]">Mode</th>
                       <th className="p-2 text-[10px] font-bold uppercase text-[#5d6380]">Reference</th>
                       <th className="p-2 text-right text-[10px] font-bold uppercase text-[#5d6380]">Amount</th>
+                      <th className="p-2 text-right text-[10px] font-bold uppercase text-[#5d6380] print:hidden">Receipt</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#f1ece2]">
@@ -389,10 +405,23 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
                           <td className="p-2">{METHOD_LABEL[p.payment_method] ?? p.payment_method}</td>
                           <td className="p-2 font-mono text-[11px]">{p.transaction_reference || '-'}</td>
                           <td className="p-2 text-right tabular-nums">{money(p.amount)}</td>
+                          <td className="p-2 text-right print:hidden">
+                            <button
+                              type="button"
+                              onClick={() => downloadReceipt(p.id, p.receipt_number)}
+                              disabled={receiptBusy !== null}
+                              aria-label={`Download receipt ${p.receipt_number || invoice.invoice_number}`}
+                              className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-md border border-[#ebe5d8] px-2 py-1 font-mono text-[11px] text-[#1b4a54] hover:bg-[#f6f3ec] disabled:cursor-wait disabled:opacity-60"
+                            >
+                              {receiptBusy === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                              {p.receipt_number || invoice.invoice_number}
+                            </button>
+                          </td>
                         </tr>
                       ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           )}
@@ -404,12 +433,14 @@ export function InvoicePreviewModal({ isOpen, onClose, invoice, mode = 'invoice'
             </p>
           )}
 
+          {/* Round 4 (27 Nov 2026): same signatory line as the PDF, text only. */}
           <div className="flex items-end justify-between border-t border-[#ebe5d8] pt-8 text-[11px] text-[#767b93]">
-            {/* Clinics have no digital signature, so no signature line (C-19). */}
-            <p>This is a computer-generated {isReceipt ? 'receipt' : 'invoice'} and does not need a signature.</p>
-            <div className="text-right">
-              {clinic?.authorised_person && <p>Authorised by {clinic.authorised_person}</p>}
-              <p>Thank you for visiting {clinicName}.</p>
+            <p>Thank you for visiting {clinicName}.</p>
+            <div className="w-48 text-center">
+              <p className="mb-8 text-[#454b66]">For {clinicName}</p>
+              <div className="border-t border-black" />
+              {clinic?.authorised_person && <p className="mt-1 font-bold text-black">{clinic.authorised_person}</p>}
+              <p>Authorised signatory</p>
             </div>
           </div>
         </div>

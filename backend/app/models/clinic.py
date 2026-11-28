@@ -14,6 +14,9 @@ class Clinic(Base, TimestampMixin):
         CheckConstraint("client_type IN ('clinic', 'hospital', 'home_care')", name="ck_clinics_client_type"),
         CheckConstraint("status IN ('active', 'suspended')", name="ck_clinics_status"),
         CheckConstraint("length(code) BETWEEN 1 AND 6", name="ck_clinics_code_length"),
+        CheckConstraint(
+            "logo_bg_mode IN ('as_is', 'white', 'transparent')", name="ck_clinics_logo_bg_mode"
+        ),
         UniqueConstraint("code", name="uq_clinics_code"),
         Index("ix_clinics_organization_id", "organization_id"),
     )
@@ -54,6 +57,14 @@ class Clinic(Base, TimestampMixin):
     registration_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
     gstin: Mapped[str | None] = mapped_column(String(15), nullable=True)
     authorised_person: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Round 4 branding (26 Nov 2026). Doctor name in the clinical report header
+    # (empty = clinic owner admin's name), website in the clinic block above the
+    # footer, and how the logo background is shown on the band (BR-b).
+    display_doctor_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    website: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    logo_bg_mode: Mapped[str] = mapped_column(
+        String(12), nullable=False, default="as_is", server_default="as_is"
+    )
     plan_tier: Mapped[ClinicPlanTier] = mapped_column(
         Enum(
             ClinicPlanTier,
